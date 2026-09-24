@@ -12,11 +12,10 @@
 |---|---|---|---|
 | 1 | [01-claude-price.png](01-claude-price.png) | “先看价格”Opus 5.5 段 | 输入、输出单价各降 20%，缓存读取降 60%。 |
 | 2 | [02-openai-price.png](02-openai-price.png) | Sol / Luna 价格段 | 标准处理、短上下文价格，美元／百万 Token。 |
-| 3 | [04-aa.png](04-aa.png) | “AA 综合智能指数” | 看 Opus 5.5 与 Astra 两行；注意 max / fallback 标签。 |
-| 5 | [06-anthropic-benchmark-table.png](06-anthropic-benchmark-table.png) | “Anthropic 发布页的表格里” | 看 Terminal-Bench 4.0 一行：66.4% 对 57.9%。 |
-| 6 | [10-aa-terminal-bench.png](10-aa-terminal-bench.png) | “AA 自己测” | 同一个 Terminal-Bench 4.0，AA 测出 59.6% 打平。 |
-| 7 | [30-arena-webdev.png](30-arena-webdev.png) | “Arena 真人盲评网页开发榜” | Opus 5.5 与 Astra 排名区间都是 1–2，分不出高下。 |
-| 8 | [32-frontiermath.png](32-frontiermath.png) | “数学反过来” | FrontierMath 最难档：Astra 领先，Claude 最高为 Fable 5。已裁掉 Cookie 弹窗与浏览器插件图标，原图在 `../sources/usage/32-frontiermath-original.png`。 |
+| 3 | [04-aa.png](04-aa.png) | “AA综合指数确实是它领先” | 看 Opus 5.5 与 Astra 两行；注意 max / fallback 标签。 |
+| 5 | [06-anthropic-benchmark-table.png](06-anthropic-benchmark-table.png) | “但Terminal-Bench 4.0一个榜两种结果” | 看 Terminal-Bench 4.0 一行：66.4% 对 57.9%。 |
+| 6 | [10-aa-terminal-bench.png](10-aa-terminal-bench.png) | 同上段，紧接图 5 | 同一个 Terminal-Bench 4.0，AA 测出 59.6% 打平。 |
+| 7 | [32-frontiermath.png](32-frontiermath.png) | “数学反过来” | FrontierMath 最难档：Astra 领先，Claude 最高为 Fable 5。已裁掉 Cookie 弹窗与浏览器插件图标，原图在 `../sources/usage/32-frontiermath-original.png`。 |
 
 图 5、图 6 必须相邻，读者才能直接对比同一个榜的两种结果。LiveBench 段已从正文删除，原图 4 移入备用。平台限制图数时，优先删图 3。
 
@@ -29,6 +28,7 @@
 | [06-anthropic-benchmark.png](06-anthropic-benchmark.png) | 图 5 的完整脚注版，含测试配置与回退说明。 |
 | [05-livebench.png](05-livebench.png) | LiveBench 前三名（正文已删该段）。 |
 | [30-arena-text.png](30-arena-text.png) | Arena Text 榜（页面 9 月 13 日，早于新模型发布，勿用）。 |
+| [30-arena-webdev.png](30-arena-webdev.png) | Arena WebDev：Opus 5.5 与 Astra 排名区间均 1–2（1000 字版正文已删该句）。 |
 | [31-openrouter.png](31-openrouter.png) | OpenRouter 使用量（窗口口径，非自发布累计）。 |
 | [11-opus-security-test-setup.png](11-opus-security-test-setup.png) | 系统卡 §6.4.9 测试设定（p.119）。本期未用，留作候选选题。 |
 | [12-opus-security-test-results.png](12-opus-security-test-results.png) | 系统卡 §6.4.9 结果与 Anthropic 解释（p.120）。同上。 |

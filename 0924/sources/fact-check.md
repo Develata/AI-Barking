@@ -102,3 +102,7 @@ X 抽样附带观察（未写入正文）：GPT-6 Sol 情感 88 条中负面 54 
 ## 存档清理（2026-09-24，经 Develata 授权）
 
 删除 138 个中间文件（约 23MB）：系统卡 PDF（原文见 [官方 PDF](https://www-cdn.anthropic.com/fc1b44717c85dc068bc6ba5024219938094694bd/Claude%20Opus%205.5%20System%20Card.pdf)，可检索文本 `opus-5-5-system-card.txt` 与截图 11、12 保留）；调试元数据；`usage/` 下逐次 X 检索原始返回（已合并入 `x_raw.jsonl`）、编码草稿 `x_review.txt`、浏览器与网络调试记录、与本期无关的 Epoch 评测 CSV（仅保留 FrontierMath Tier 4 v2、Tiers 1–3 v2、Erdős）。`evidence.md`、`usage/new-files.txt` 中对这些文件的引用以此为准。
+
+## 1000 字版（2026-09-24，平台上限）
+
+压缩到标题+正文共 987 字（含空格换行）。只删减、不新增事实：删去额度重置细节行、Arena 一句、“Anthropic 正文另一口径”一句、X 抽样“其余各有取舍”分句；“标准短上下文价”简为“标准价”；FLT 句改为“其内部模型”（仍非 Opus 5.5）；“部分题目它独占访问”改为“部分题只有它能看”（指 OpenAI 对部分题目的独占访问）。以上各项依据见前文各表。未再跑 codex-reviewer（无新增事实）。
