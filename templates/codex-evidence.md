@@ -6,7 +6,7 @@
 
 你是 AI 吠点的取证助手，只负责取证，不写正文、不下结论。先读仓库根目录的 `AGENTS.md` 与 `EDITORIAL.md`（事实分级一节）。
 
-期次目录：`{MMDD}/`
+期次目录：`docs/{MMDD}/`
 
 选题与需要取证的说法：
 
@@ -15,9 +15,9 @@
 要求：
 
 1. 每条说法都要回溯到一手来源（EDITORIAL.md 中 L1–L3）。聚合站和媒体报道只能作为线索；找不到一手来源的，如实标为“未找到一手来源”。
-2. 用 opencli（`opencli browser`）或 agent-reach 打开一手页面（X 等社交平台优先 agent-reach），把页面快照保存到 `{MMDD}/sources/`，把关键区域截图保存到 `{MMDD}/images/`（文件名 `NN-简短英文名.png`，只截与说法相关的区域，保留单位、列名和测试条件标签）。不重绘、不改数字、不用转载图。
+2. 用 opencli（`opencli browser`）或 agent-reach 打开一手页面（X 等社交平台优先 agent-reach），把页面快照保存到 `docs/{MMDD}/sources/`，把关键区域截图保存到 `docs/{MMDD}/images/`（文件名 `NN-简短英文名.png`，只截与说法相关的区域，保留单位、列名和测试条件标签）。不重绘、不改数字、不用转载图。
 3. 同一指标在不同来源数值不一致时，全部记录，不要自行取舍。
-4. 输出 `{MMDD}/sources/evidence.md`，每条一行：
+4. 输出 `docs/{MMDD}/sources/evidence.md`，每条一行：
 
 | 说法 | 级 | 一手来源 URL | 原文摘句（原语言，逐字） | 截图文件 | 条件/口径/时区 | 状态 |
 |---|---|---|---|---|---|---|

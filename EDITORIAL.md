@@ -71,10 +71,10 @@
 分工：Develata 只与 Claude 交流。Claude 起草；取证、存档与截图由 Claude 直接派给代理自动完成，不经 Develata 搬运；反向核验走 `codex-reviewer`（只读）；Develata 终审并手动发布。
 
 1. 选题：Develata 把根目录 `daily-scan.md` 整个拖给 ChatGPT（聊天模式，联网）运行并回贴；Claude 据此列候选及各自吠点，Develata 拍板。ChatGPT 产出只算线索，不替代第 3 步抽查。每期定稿后，Claude 在 `daily-scan.md` 末尾“已发过”追加一行。
-2. 取证：少量条目 Claude 直接查；大批量取证、页面存档与截图，Claude 按 `templates/codex-evidence.md` 派给 Sonnet 子代理，或 Codex（Luna，effort max），用 opencli / agent-reach 直接完成。产出：`sources/` 存档、`images/` 截图、事实清单。
+2. 取证：少量条目 Claude 直接查；大批量取证、页面存档与截图，Claude 按 `templates/codex-evidence.md` 默认派给 Sonnet 子代理；需要跨模型取证或批量较大时，派给 Windows 主机的 Codex CLI（`gpt-6-luna`，effort max，见 codex-orchestration）。执行方用 opencli / agent-reach 直接完成。产出：`sources/` 存档、`images/` 截图、事实清单。
 3. 抽查：Claude 对照代理产出的存档检查工作区改动，并对高风险条目（价格、跑分、对比结论、标题所涉说法）逐字核对一手页面。自述回报不算验收。
 4. 起草：Claude 按本规范写 `_publish.txt` 与 `images/README.md`。
-5. 反向核验：`codex-reviewer` 只读检查正文中每个数字与判断是否都能在事实清单中找到、有无夸大。Claude 逐条判断采纳与否，记入 `fact-check.md`。
+5. 反向核验：`codex-reviewer` 只读检查正文中每个数字与判断是否都能在事实清单中找到、有无夸大。取证由 Claude 系代理（Sonnet 或 Claude 本身）完成时，同时让它逐行核对事实清单与 `sources/` 存档是否相符，补上取证环节的跨模型核对。Claude 逐条判断采纳与否，记入 `fact-check.md`。
 6. 修订后运行 `cargo run --release --manifest-path tools/barking/Cargo.toml -- lint <期次目录>`，0 个错误才交付 Develata。它机械检查本规范与 `AGENTS.md` 中可精确判定的条目（字数上限、固定开场/Slogan/来源顺序、禁用套话、中英文空格、Markdown 残留、配图文件与两张封面是否齐全）；这些规则改动时同步改 `tools/barking/src/lint.rs` 顶部常量。warn 需人工确认，不阻塞。
 
 每期 `sources/fact-check.md` 格式：

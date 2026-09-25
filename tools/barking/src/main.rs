@@ -8,7 +8,7 @@ use lint::Level;
 
 const USAGE: &str = "\
 用法：
-  barking lint [期次目录...]   定稿前机械检查；不给目录则检查仓库内全部期次（如 0924、0925）
+  barking lint [期次目录...]   定稿前机械检查；不给目录则检查 docs/ 下全部期次（如 docs/0925）
 
 退出码：0 无错误；1 有错误；2 用法错误";
 
@@ -61,31 +61,26 @@ fn run_lint(args: &[String]) -> ExitCode {
     }
 }
 
-/// Issue directories are the four-digit `MMDD` folders under the repo root or
-/// its `docs/`; the root is found by walking up from the current directory to
-/// `EDITORIAL.md`.
+/// Issue directories are the four-digit `MMDD` folders under `docs/` (see
+/// AGENTS.md); the repo root is found by walking up to `EDITORIAL.md`.
 fn all_issues() -> io::Result<Vec<PathBuf>> {
     let cwd = std::env::current_dir()?;
     let root = cwd
         .ancestors()
         .find(|p| p.join("EDITORIAL.md").is_file())
         .ok_or_else(|| io::Error::other("当前目录不在 AI-Barking 仓库内"))?;
-    let mut dirs = Vec::new();
-    for parent in [root.to_path_buf(), root.join("docs")] {
-        let Ok(rd) = std::fs::read_dir(&parent) else {
-            continue;
-        };
-        dirs.extend(rd.filter_map(Result::ok).map(|e| e.path()).filter(|p| {
+    let mut dirs: Vec<PathBuf> = std::fs::read_dir(root.join("docs"))?
+        .filter_map(Result::ok)
+        .map(|e| e.path())
+        .filter(|p| {
             p.is_dir()
                 && p.file_name()
                     .and_then(|n| n.to_str())
                     .is_some_and(|n| n.len() == 4 && n.bytes().all(|b| b.is_ascii_digit()))
-        }));
-    }
+        })
+        .collect();
     if dirs.is_empty() {
-        return Err(io::Error::other(
-            "仓库根目录和 docs/ 下都没有 MMDD 期次目录",
-        ));
+        return Err(io::Error::other("docs/ 下没有 MMDD 期次目录"));
     }
     dirs.sort();
     Ok(dirs)
