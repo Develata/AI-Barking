@@ -1,6 +1,6 @@
 # 0924 配图说明
 
-正文：`../doc_0924_publish.txt`（2026-09-23 按 `EDITORIAL.md` 重写）。原稿 `../doc_0924.md` 保留不动。事实核验见 `../sources/fact-check.md`，取证明细见 `../sources/evidence.md`。
+正文：`../doc_0924_publish.txt`（2026-09-23 按 `EDITORIAL.md` 重写）。来源与核验限制见[来源入口](../sources/README.md)。原稿 `../doc_0924.md` 保留不动。事实核验见 `../sources/fact-check.md`，取证明细见 `../sources/evidence.md`。
 
 全部图片为原站或官方 PDF 的实时截图，未重绘、未改数字。截图日期 2026-09-23。
 
@@ -42,6 +42,8 @@
 ## 封面
 
 已生成：[00-cover.webp](00-cover.webp)（3:4，2026-09-24）。已逐字核对：记分牌“官方表 66.4 : 57.9”“AA 实测 59.6 : 59.6”、标题、副标题、“汪！？”均无误；两位 CEO 无台词。上传顺序排在所有配图之前。公众号横版（2.35:1）：本期由 Develata 从 3:4 封面手动裁剪，保存为 `00-cover-wide.*`。
+
+历史备份另保留 `00-cover.png`：它与 `00-cover.webp` 的 SHA-256 相同，实际编码也是 WebP，并非另一张 PNG 图片。正式上传使用 `00-cover.webp`，不重复上传这份同内容文件。
 
 ### 生成记录
 

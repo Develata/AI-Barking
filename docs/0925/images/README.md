@@ -1,6 +1,6 @@
 # 0925 配图说明
 
-正文：`../doc_0925_publish.txt`。事实核验见 `../sources/fact-check.md`，一手存档在 `../sources/`。
+正文：`../doc_0925_publish.txt`。来源与核验限制见[来源入口](../sources/README.md)。事实核验见 `../sources/fact-check.md`，一手存档在 `../sources/`。
 
 状态：截图于 2026-09-26 凌晨（北京时间）由 Codex 从原站截取，日志见 `../sources/capture-log.md`。图 4、6 由 Claude 用 ffmpeg 无损裁剪/竖向拼接（灰色细线为拼接处），未缩放、改字；裁前原图在 `../sources/screenshots-full/`。图 5 从图 4 的同一张原图裁出。
 
