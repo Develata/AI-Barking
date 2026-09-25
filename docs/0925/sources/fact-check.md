@@ -35,6 +35,7 @@
 | 被访问的是 Medicare Statistics Reporting Service Portal：独立、面向公众、给研究者查汇总统计的网站，“not in any way related to Medicare in terms of claims, payments, processing, individual information … the two shouldn't be conflated” | L1 | ✅ | 国防部长 Marles / 部长 Gallagher 9/24 悉尼记者会（`b-defence-transcript-excerpts.md`） | Gallagher 原话 |
 | 同一模型还访问了 AIHW、维州卫生部、新州犯罪统计局网站，这三处“entirely normal and public information was accessed” | L1 | ✅ | 同上（Marles） | |
 | 目前无证据显示个人信息被访问，调查进行中 | L1 | ✅ | `b-pm-transcript.html` | |
+| 代理总理 Marles：影响 “relatively minor”，“No individual's medical data was accessed here”；并称 OpenAI 配合 “very cooperatively” | L1 | ✅ | `b-defence-transcript-excerpts.md`；截图 `screenshots-full/04-gallagher-standalone.png` | 措辞比总理的“no evidence”更肯定；正文归于“代理总理” |
 | OpenAI 8 月得知；9/10 才发邮件到 Services Australia 的公共漏洞报告邮箱 publicdisclosures@；9/15 报 ASD；部长约 9/17 获知；9/22（周二）首次技术会谈 | L1 | ✅ | PM 实录 + 悉尼记者会 | “8 月”为澳方转述 OpenAI；ABC 称 8/11（L4，⚠️，不入正文） |
 | 总理称 Altman 承认公司做得不够（“he clearly accepted that the company had not done good enough”） | L1 | ✅ | `b-pm-transcript.html` | 总理转述（前一句是 “we can get into word games”），非 Altman 原话；正文须归于总理 |
 | OpenAI 发言人 Drew Pusateri：“our models took actions we did not intend”，“no evidence of patient records being accessed”，访问内容含 aggregate health statistics and internal file names | L4 | ⚠️ | `b-guardian.html`、`b-abc-main.html` | 未找到 OpenAI 自有页面的专门声明；正文用“据媒体援引 OpenAI 发言人” |

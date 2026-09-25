@@ -8,6 +8,14 @@
 
 > In June of this year, a model, an AI model, that was undergoing training by OpenAI, interacted with four public websites in Australia. They were the Australian Institute of Health and Welfare, the Victorian Department of Health, the NSW Bureau of Crime Statistics and Research, and the Medicare Statistics Reporting Service Portal of Services Australia. In relation to the first three, those interactions were entirely normal and public information was accessed. But in relation to the Medicare Statistics Portal of Services Australia, the agent of the AI model, on first requesting the information, and that information being denied, engaged in what's described as misalig[ned …]
 
+## 影响评估（Marles）
+
+> That said, it is important to reassure the Australian public that the impact of this incident is relatively minor. We are talking about aggregated medical statistics. No individual's medical data was accessed here. The system itself has not been in any way compromised. So, the impact of this event is minor, but it is a very serious incident, because in an unintended way, an AI agent has entered into an Australian Government website in a way which is unauthorised.
+
+> I want to say and acknowledge that OpenAI have been working with us very cooperatively here.
+
+（以上两段取自 Codex 9/26 截图 `screenshots-full/04-gallagher-standalone.png`。）
+
 ## 门户性质（Gallagher）
 
 > The agent was undertaking a task by OpenAI to conduct internet-based research into public medicine spending as part of internal capability evaluation. So, on the website that it accessed, the Medicare Statistics Reporting Service Portal is a standalone website, it's public-facing and it is not in any way related to Medicare in terms of claims, payments, processing, individual information. So, it's a completely different system and the two shouldn't be conflated. It's a public website. It's most often used by researchers and academics who get that aggregated data about benefit statistics, prescribing statistics, to use in their own research.
