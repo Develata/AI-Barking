@@ -15,9 +15,6 @@ const OPENING: &str = "AI 沸点，今日谁吠？";
 const SLOGAN: &str = "AI 吠点：聊 AI 沸点，轻松识破吠点。";
 const TLDR_PREFIX: &str = "省流：";
 const SOURCES_PREFIX: &str = "来源：";
-/// Fixed lines and brand strings that keep their CJK–ASCII spaces
-/// (the slogan itself has 「聊 AI」). Longer entries first.
-const SPACING_EXEMPT: [&str; 4] = [SLOGAN, OPENING, "AI 沸点", "AI 吠点"];
 const BANNED: [&str; 5] = [
     "值得注意的是",
     "需要指出的是",
@@ -27,6 +24,10 @@ const BANNED: [&str; 5] = [
 ];
 const PLACEHOLDERS: [&str; 6] = ["TODO", "TBD", "待补", "待核", "【图", "[图"];
 const IMAGE_EXTS: [&str; 5] = ["png", "jpg", "jpeg", "webp", "gif"];
+/// Characters that mark a number as a quantity or date rather than a version.
+const UNITS: [char; 14] = [
+    '月', '日', '年', '美', '元', '倍', '万', '亿', '个', '条', '次', '天', '分', '秒',
+];
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Level {
@@ -180,8 +181,13 @@ fn lint_publish(sink: &mut Sink, raw: &str, fact_check: Option<&str>) {
         for p in PLACEHOLDERS.iter().filter(|p| line.contains(*p)) {
             sink.error(n, format!("编辑占位符「{p}」"));
         }
-        for gap in cjk_ascii_gaps(line) {
-            sink.error(n, format!("中文与数字/英文之间有空格：「{gap}」"));
+        if i > 0 {
+            for issue in spacing_issues(line) {
+                sink.error(n, issue);
+            }
+        }
+        for name in spaced_model_names(line) {
+            sink.warn(n, format!("疑似型号名用空格分隔：「{name}」，应改用连字符"));
         }
         if let Some(fc) = &fc_compact {
             for num in key_numbers(line) {
@@ -270,26 +276,89 @@ fn is_han(c: char) -> bool {
     matches!(c, '\u{3400}'..='\u{4DBF}' | '\u{4E00}'..='\u{9FFF}' | '\u{F900}'..='\u{FAFF}')
 }
 
-fn is_ascii_word(c: char) -> bool {
-    c.is_ascii_alphanumeric() || c == '%'
+/// A maximal run of non-space ASCII graphic characters (`Opus-5.5`, `99.7%`,
+/// `2/10`), as a half-open char-index span `[start, end)` into the line.
+struct Run {
+    start: usize,
+    end: usize,
+    has_letter: bool,
+    has_digit: bool,
 }
 
-/// Returns each `X Y` triple where one side is a Han character and the other
-/// an ASCII letter/digit. Spaces inside model names (`Opus 5.5`) are ASCII–ASCII
-/// and are not reported; strings in `SPACING_EXEMPT` are masked out first.
-pub fn cjk_ascii_gaps(line: &str) -> Vec<String> {
-    let mut s = line.to_string();
-    for b in SPACING_EXEMPT {
-        // U+FFFC is neither Han nor ASCII, so masking cannot create a new gap.
-        s = s.replace(b, "\u{FFFC}");
+fn ascii_runs(cs: &[char]) -> Vec<Run> {
+    let mut runs = Vec::new();
+    let mut i = 0;
+    while i < cs.len() {
+        if !cs[i].is_ascii_graphic() {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        while i < cs.len() && cs[i].is_ascii_graphic() {
+            i += 1;
+        }
+        let run = &cs[start..i];
+        runs.push(Run {
+            start,
+            end: i,
+            has_letter: run.iter().any(char::is_ascii_alphabetic),
+            has_digit: run.iter().any(char::is_ascii_digit),
+        });
     }
-    let cs: Vec<char> = s.chars().collect();
-    cs.windows(3)
+    runs
+}
+
+/// Body spacing rule: an ASCII run containing a letter (English word, model
+/// name) must be separated from adjacent Han by one space; a purely numeric run
+/// (`99.7%`, `4/20`) must touch adjacent Han directly. Titles are exempt.
+pub fn spacing_issues(line: &str) -> Vec<String> {
+    let cs: Vec<char> = line.chars().collect();
+    let han_at = |k: Option<usize>| k.and_then(|k| cs.get(k)).is_some_and(|&c| is_han(c));
+    let ctx = |a: usize, b: usize| -> String {
+        cs[a.saturating_sub(1)..(b + 1).min(cs.len())]
+            .iter()
+            .collect()
+    };
+    let mut out = Vec::new();
+    for r in ascii_runs(&cs) {
+        let before = r.start.checked_sub(1);
+        if r.has_letter {
+            if han_at(before) || han_at(Some(r.end)) {
+                out.push(format!(
+                    "英文与中文之间应留空格：「{}」",
+                    ctx(r.start, r.end)
+                ));
+            }
+        } else if r.has_digit {
+            let gap_before = before.is_some_and(|b| cs[b] == ' ') && han_at(r.start.checked_sub(2));
+            let gap_after = cs.get(r.end) == Some(&' ') && han_at(Some(r.end + 1));
+            if gap_before || gap_after {
+                let (a, b) = (r.start.saturating_sub(1), (r.end + 1).min(cs.len()));
+                out.push(format!("数字与中文之间不留空格：「{}」", ctx(a, b)));
+            }
+        }
+    }
+    out
+}
+
+/// Model names joined by a space instead of a hyphen: a letter run followed by
+/// a run starting with a digit (`Opus 5.5`), or a letter+digit run followed by
+/// a capitalized word (`GPT-6 Sol`). Heuristic, so reported as a warning.
+pub fn spaced_model_names(line: &str) -> Vec<String> {
+    let cs: Vec<char> = line.chars().collect();
+    let runs = ascii_runs(&cs);
+    runs.windows(2)
+        .filter(|w| w[1].start == w[0].end + 1 && cs[w[0].end] == ' ')
         .filter(|w| {
-            w[1] == ' '
-                && ((is_han(w[0]) && is_ascii_word(w[2])) || (is_ascii_word(w[0]) && is_han(w[2])))
+            let next = cs[w[1].start];
+            // `Opus 66.4%`, `Astra 10/50美元`, `OpenAI 8月` are figures, not versions.
+            let figure =
+                cs[w[1].end - 1] == '%' || cs.get(w[1].end).is_some_and(|c| UNITS.contains(c));
+            w[0].has_letter
+                && ((next.is_ascii_digit() && !figure)
+                    || (w[0].has_digit && next.is_ascii_uppercase()))
         })
-        .map(|w| w.iter().collect())
+        .map(|w| cs[w[0].start..w[1].end].iter().collect())
         .collect()
 }
 
@@ -415,12 +484,28 @@ mod tests {
     }
 
     #[test]
-    fn spacing_flags_cjk_ascii_but_not_brand_or_model_names() {
-        assert_eq!(cjk_ascii_gaps("Opus 5.5 完爆 Astra？"), ["5 完", "爆 A"]);
-        assert!(cjk_ascii_gaps(SLOGAN).is_empty());
-        assert!(cjk_ascii_gaps(OPENING).is_empty());
-        assert!(cjk_ascii_gaps("GPT-6 Sol：2/10美元").is_empty());
-        assert_eq!(cjk_ascii_gaps("降 20% 的"), ["降 2", "% 的"]);
+    fn spacing_wants_space_around_english_but_not_numbers() {
+        assert!(spacing_issues(SLOGAN).is_empty());
+        assert!(spacing_issues(OPENING).is_empty());
+        assert!(spacing_issues("Anthropic 恢复收费，Opus-5.5 更便宜").is_empty());
+        assert!(spacing_issues("测试中99.7%的账户，2/10美元").is_empty());
+        assert!(spacing_issues("“Medicare 被黑”").is_empty());
+        assert_eq!(spacing_issues("Anthropic恢复").len(), 1);
+        assert_eq!(spacing_issues("由Guardian 报道").len(), 1);
+        assert_eq!(spacing_issues("降 20% 的").len(), 1);
+    }
+
+    #[test]
+    fn model_names_with_spaces_are_flagged() {
+        assert_eq!(
+            spaced_model_names("Opus 5.5 完爆 GPT-6 Astra？"),
+            ["Opus 5.5", "GPT-6 Astra"]
+        );
+        assert!(spaced_model_names("Opus-5.5 完爆 GPT-6-Astra").is_empty());
+        assert!(spaced_model_names(SLOGAN).is_empty());
+        assert!(spaced_model_names("Claude Code 和 Hacker News").is_empty());
+        assert!(spaced_model_names("Opus 66.4%对Astra 10/50美元，OpenAI 8月").is_empty());
+        assert_eq!(spaced_model_names("Opus 5.5完爆Astra？"), ["Opus 5.5"]);
     }
 
     #[test]

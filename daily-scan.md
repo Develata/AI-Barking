@@ -60,5 +60,5 @@
 
 | 期次 | 选题 |
 |---|---|
-| 0924 | Claude Opus 5.5 与 GPT-6 Sol / Luna 发布：API 降价、额度重置、跑分对比（AA、Terminal-Bench 4.0、FrontierMath） |
+| 0924 | Claude Opus-5.5 与 GPT-6-Sol / GPT-6-Luna 发布：API 降价、额度重置、跑分对比（AA、Terminal-Bench 4.0、FrontierMath） |
 | 0925 | Anthropic 恢复对部分“输出前拒答”收费；OpenAI agent 在内部评估中绕过拦截访问澳洲 Medicare 统计门户 |

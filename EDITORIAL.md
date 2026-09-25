@@ -35,7 +35,7 @@
 - 吠点：哪些说法被夸大、哪些条件没讲、哪些仍未确认。这是本账号与搬运号的区别，不能省略。
 - 结论：一句话。
 
-长度：平台上限 1000 字。按最保守口径计——标题加正文、含来源与 Slogan、空格和换行都算——硬上限 1000，目标 800–950。中文与数字、英文之间不加空格（型号名内部的空格保留）。超出时先砍意义与分析，不砍事实与吠点。定稿前做一次省流检查：逐句问“删掉会损失信息吗”，不会就删。
+长度：平台上限 1000 字。按最保守口径计——标题加正文、含来源与 Slogan、空格和换行都算——硬上限 1000，目标 800–950。空格：正文中英文单词（含型号名、公司名）与中文之间留一个空格，数字与中文之间不留；标题为省字数，中英文之间不必留空格。型号名用连字符代替空格，如 Opus-5.5、GPT-6-Astra、Fable-5.1。超出时先砍意义与分析，不砍事实与吠点。定稿前做一次省流检查：逐句问“删掉会损失信息吗”，不会就删。
 
 禁用无信息套话：值得注意的是、需要指出的是、随着人工智能不断发展、从某种意义上来说、当然我们也不能忽视……除非后面紧跟新信息。
 
@@ -71,7 +71,7 @@
 分工：Develata 只与 Claude 交流。Claude 起草；取证、存档与截图由 Claude 直接派给代理自动完成，不经 Develata 搬运；反向核验走 `codex-reviewer`（只读）；Develata 终审并手动发布。
 
 1. 选题：Develata 把根目录 `daily-scan.md` 整个拖给 ChatGPT（聊天模式，联网）运行并回贴；Claude 据此列候选及各自吠点，Develata 拍板。ChatGPT 产出只算线索，不替代第 3 步抽查。每期定稿后，Claude 在 `daily-scan.md` 末尾“已发过”追加一行。
-2. 取证：少量条目 Claude 直接查；大批量取证、页面存档与截图，Claude 按 `templates/codex-evidence.md` 默认派给 Sonnet 子代理；需要跨模型取证或批量较大时，派给 Windows 主机的 Codex CLI（`gpt-6-luna`，effort max，见 codex-orchestration）。执行方用 opencli / agent-reach 直接完成。产出：`sources/` 存档、`images/` 截图、事实清单。
+2. 取证：少量条目 Claude 直接查；大批量取证、页面存档与截图，Claude 按 `templates/codex-evidence.md` 机械采集（截图、页面存档）派给 Sonnet 子代理或 Codex `gpt-6-luna`（max）；需要判断的取证（回溯一手来源、定级、找吠点）若交给 Codex，用 `gpt-6-astra`（medium 或 max）。Windows 主机 Codex 一律 full-access，见 codex-orchestration。执行方用 opencli / agent-reach 直接完成。产出：`sources/` 存档、`images/` 截图、事实清单。
 3. 抽查：Claude 对照代理产出的存档检查工作区改动，并对高风险条目（价格、跑分、对比结论、标题所涉说法）逐字核对一手页面。自述回报不算验收。
 4. 起草：Claude 按本规范写 `_publish.txt` 与 `images/README.md`。
 5. 反向核验：`codex-reviewer` 只读检查正文中每个数字与判断是否都能在事实清单中找到、有无夸大。取证由 Claude 系代理（Sonnet 或 Claude 本身）完成时，同时让它逐行核对事实清单与 `sources/` 存档是否相符，补上取证环节的跨模型核对。Claude 逐条判断采纳与否，记入 `fact-check.md`。
