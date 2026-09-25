@@ -42,6 +42,21 @@
 | 工作组调查是否违法，考虑执法与立法回应，并提交议会 AI 特别委员会 | L1 | ✅ | PM 实录；悉尼记者会 “whether laws have been broken” | 尚无违法认定 |
 | 议员 David Pocock 质问为何不追究 AI 公司责任 | L2 | ✅ | `b-pocock.html` | 议员立场 |
 | 具体绕过手法 | — | 未公开 | 悉尼记者会只说有防护、“this agent got around that” | Transluce 日志不涉及 Medicare，不得挪用 |
-| 媒体标题：Guardian “…OpenAI agent hacked Medicare…”；ABC “OpenAI hacked Medicare portal…” | L4 | ✅ | `b-guardian.html`、`b-abc-main.html` | 与政府“不要混为一谈”形成对照。注意：ChatGPT 给的 Guardian 链接是 sslip.io 镜像域名，已改用 theguardian.com 原站 |
+| 媒体标题：Guardian 标题 “Australia launches investigation after OpenAI agent hacked healthcare database” | L4 | ✅ | `b-guardian.html`（title / og:title / h1，9/25 抓取） | “hacked Medicare” 只在网址与导语（前有 “Anthony Albanese says”），不是标题；网址措辞暗示初版标题可能不同，但无存档，不作断言。ABC og:title 为 “OpenAI agent hacked Medicare portal, PM says”（带 portal 与归因），正文不点名。ChatGPT 给的 Guardian 链接是 sslip.io 镜像，已改用原站 |
 
 未存档/未能抓取：AIHW 声明、OpenAI misalignment framework 页面（反爬，只抓到壳）；两者均未进入正文事实。
+
+## 反向核验（codex-reviewer，gpt-6-astra，effort high，2026-09-25）
+
+| # | 审阅意见 | 级别 | 处理 |
+|---|---|---|---|
+| 1 | 把 Guardian 导语/网址措辞 “hacked Medicare” 当成标题 | BLOCKER | 采纳。已核存档 title/og:title/h1 为 “…hacked healthcare database”；正文改为引用实际标题，配图说明与截图交接同步 |
+| 2 | “API用户不在统计里”超出原帖 | should-fix | 采纳。改为“只覆盖……没给API数据” |
+| 3 | “只给了反馈入口，没提退款”遗漏回退等处理，退款范围不明 | should-fix | 采纳。改为“误拦可以反馈，但官方没说误拦的费用怎么处理”；回退机制因字数未写入 |
+| 4 | “8月得知”与结尾“不接受拒绝是真的”缺归因 | should-fix | 采纳。加“据澳方说法”；结尾改为“绕过拦截是澳方明说的” |
+| 5 | 结尾“AI安全的账正在摊给用户和第三方”写成定论；应补“内部评估” | should-fix | 采纳。删去该句，改为问句；事实段补“在内部评估中” |
+| 6 | “没有公开测试集”“双方都没公开”缺检索范围 | needs-verification | 采纳。改为“官方没交代……”“已公开说明里没有”；结论“缺口径”改“缺测试细节” |
+| 7 | 缺“意义”段，顺序应为事实→意义→吠点 | should-fix | 采纳。两题各加一句意义，置于吠点前 |
+| 8 | 图2图注应限定为 bio 与 frontier_llm 两类 | nit | 采纳 |
+
+其余检查（标题 18 字、总长、日期、模型/平台范围、Altman 归因、空格规则）审阅者判定通过。改后全文 981 字（LF 口径）。
