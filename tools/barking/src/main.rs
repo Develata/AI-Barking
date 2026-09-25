@@ -63,23 +63,38 @@ fn run_lint(args: &[String]) -> ExitCode {
 
 /// Issue directories are the four-digit `MMDD` folders under `docs/` (see
 /// AGENTS.md); the repo root is found by walking up to `EDITORIAL.md`.
+/// Issues named in `docs/.lint-ignore` (one `MMDD` per line, `#` starts a
+/// comment) are skipped here; naming one explicitly on the command line still
+/// lints it.
 fn all_issues() -> io::Result<Vec<PathBuf>> {
     let cwd = std::env::current_dir()?;
     let root = cwd
         .ancestors()
         .find(|p| p.join("EDITORIAL.md").is_file())
         .ok_or_else(|| io::Error::other("当前目录不在 AI-Barking 仓库内"))?;
-    let mut dirs: Vec<PathBuf> = std::fs::read_dir(root.join("docs"))?
-        .filter_map(Result::ok)
-        .map(|e| e.path())
-        .filter(|p| {
-            p.is_dir()
-                && p.file_name()
-                    .and_then(|n| n.to_str())
-                    .is_some_and(|n| n.len() == 4 && n.bytes().all(|b| b.is_ascii_digit()))
-        })
+    let docs = root.join("docs");
+    let ignored: Vec<String> = std::fs::read_to_string(docs.join(".lint-ignore"))
+        .unwrap_or_default()
+        .lines()
+        .map(|l| l.split('#').next().unwrap_or("").trim().to_string())
+        .filter(|l| !l.is_empty())
         .collect();
-    if dirs.is_empty() {
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    for entry in std::fs::read_dir(&docs)?.filter_map(Result::ok) {
+        let path = entry.path();
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if !(path.is_dir() && name.len() == 4 && name.bytes().all(|b| b.is_ascii_digit())) {
+            continue;
+        }
+        if ignored.iter().any(|i| i == name) {
+            println!("skip: {}（列于 docs/.lint-ignore）", path.display());
+        } else {
+            dirs.push(path);
+        }
+    }
+    if dirs.is_empty() && ignored.is_empty() {
         return Err(io::Error::other("docs/ 下没有 MMDD 期次目录"));
     }
     dirs.sort();
