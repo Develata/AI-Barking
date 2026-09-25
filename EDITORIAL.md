@@ -70,7 +70,7 @@
 
 分工：Develata 只与 Claude 交流。Claude 起草；大批量取证由 Claude 写交接 prompt、Develata 在 Codex 应用中运行；反向核验走 `codex-reviewer`（只读）；Develata 终审并手动发布。
 
-1. 选题：Claude 读两个线索源，列候选及各自吠点，Develata 拍板。
+1. 选题：默认由 Claude 按 `templates/gpt-daily-scan.md` 填好 prompt，Develata 在 ChatGPT 聊天模式中跑扫描、取证与反方复查并回贴；Claude 据此列候选及各自吠点，Develata 拍板。ChatGPT 产出只算线索与取证草稿，不替代第 3 步抽查。
 2. 取证：少量条目 Claude 直接查；大批量时 Claude 按 `templates/codex-evidence.md` 写交接 prompt 到 `.handoff/`，Develata 在 Codex 应用中运行并把回报贴回。产出：`sources/` 存档、`images/` 截图、事实清单。
 3. 抽查：Claude 对照 Codex 产出的存档检查工作区改动，并对高风险条目（价格、跑分、对比结论、标题所涉说法）逐字核对一手页面。自述回报不算验收。
 4. 起草：Claude 按本规范写 `_publish.txt` 与 `images/README.md`。
