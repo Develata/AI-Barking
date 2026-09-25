@@ -75,7 +75,7 @@
 3. 抽查：Claude 对照 Codex 产出的存档检查工作区改动，并对高风险条目（价格、跑分、对比结论、标题所涉说法）逐字核对一手页面。自述回报不算验收。
 4. 起草：Claude 按本规范写 `_publish.txt` 与 `images/README.md`。
 5. 反向核验：`codex-reviewer` 只读检查正文中每个数字与判断是否都能在事实清单中找到、有无夸大。Claude 逐条判断采纳与否，记入 `fact-check.md`。
-6. 修订后交付 Develata。
+6. 修订后运行 `cargo run --release --manifest-path tools/barking/Cargo.toml -- lint <期次目录>`，0 个错误才交付 Develata。它机械检查本规范与 `AGENTS.md` 中可精确判定的条目（字数上限、固定开场/Slogan/来源顺序、禁用套话、中英文空格、Markdown 残留、配图文件与两张封面是否齐全）；这些规则改动时同步改 `tools/barking/src/lint.rs` 顶部常量。warn 需人工确认，不阻塞。
 
 每期 `sources/fact-check.md` 格式：
 
