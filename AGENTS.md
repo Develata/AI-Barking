@@ -2,7 +2,7 @@
 
 选题、正文结构、事实分级、核验流程与纠错见 `EDITORIAL.md`；本文件只管交付格式。
 
-- 仓库结构：每期一个目录 `docs/<MMDD>/`（正文、`images/`、`sources/`）；根目录只放规范、`daily-scan.md`、`brand/`、`templates/`、`tools/`，保持整洁。
+- 仓库结构：每期一个目录 `docs/<MMDD>/`（正文、`images/`、`sources/`）；根目录只放规范、`daily-scan.md`、`brand/`、`common_images/`（跨期通用图片，如头像 PNG 原图）、`templates/`、`tools/`，保持整洁。
 - 内容面向小红书、抖音、微博、微信公众号，默认维护一份统一正文。
 - 正文与图片分开交付：发布正文应能直接复制，图片作为独立素材保存在对应期次的 images/ 中。
 - 可复制正文默认保存为 `<稿件名>_publish.txt`，不包含 Markdown 标题、加粗、链接语法等排版标记；标题与正文用纯文本表达。不要再生成 `with_images` 插图副本作为发布稿。
