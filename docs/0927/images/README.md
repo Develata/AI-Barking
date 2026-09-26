@@ -1,0 +1,80 @@
+# 0927 配图说明
+
+正文：`../doc_0927_publish.txt`。来源与限制见[来源入口](../sources/README.md)，事实核验见 `../sources/fact-check.md`，取证清单见 `../sources/evidence.md`，一手存档在 `../sources/`。
+
+状态：截图于北京时间 2026-09-27 凌晨由 Codex（gpt-6-astra）从原站截取，日志见 `../sources/capture-log.md`。图 7 为 Codex 竖向拼接（灰色细线为拼接处，上下两段来自同一页面的不同位置）。图 3 由 Claude 用 ffmpeg 把 TNW 标题区与同页正文一句竖向拼接，未缩放、未改字；底片为 `../sources/a-overclaim-tnw-full.png`，正文段取自 (210,1648) 起 680×70 区域。
+
+## 正式配图（按上传顺序）
+
+小红书、抖音、微博：封面之后按下表顺序独立上传。公众号：按“对应段落”手动插图。
+
+| 顺序 | 文件 | 截取位置 | 对应正文段落 | 图注（可选） |
+|---|---|---|---|---|
+| 1 | `01-openai-dns-pause.png` | alignment.openai.com 报告 “An agent used DNS to reach an external chatbot” 标题、日期框与 Summary 两段 | 一、事实段第 1 段；吠点① | 官方原文：15 分钟报警、2.5 小时后才停；暂停的是最强模型“with tool-use”的训练、评测和推理。 |
+| 2 | `04-techcrunch-53-images.png` | techcrunch.com 原站标题、作者与时间、正文前三段 | 一、事实段第 2 段 | OpenAI 官方披露 53 次用户图片外传，未说明涉及多少张不同图片；截图标题“53 user images”是 TechCrunch 的写法。 |
+| 3 | `11-tnw-paused-all.png` | thenextweb.com 原站标题、副标题、日期，拼接同页正文 “OpenAI has since paused all training, testing and tool use of its most capable models.” | 一、吠点① | 对比图 1：TNW 把“带工具的”训练，写成了“所有训练”。 |
+| 4 | `07-anthropic-cost.png` | anthropic.com “Yes, Claude can do Nine Loops” 正文：两种方法、每种约一两千美元、bootstrap 约 $100 | 二、事实段 | 按终端用户价估算，每种方法约 1000–2000 美元。 |
+| 5 | `05-anthropic-toy-model.png` | 同文标题、日期及 “N=4 super Yang-Mills isn’t used as an explanation for dark matter, or for anything in the real world” 段 | 二、吠点① | 作者原话：N=4 不用来解释现实世界的任何东西。 |
+| 6 | `06-anthropic-known-methods.png` | 同文 “Claude used known methods, with a bit more compute than people had tried to use before.” 段 | 二、吠点② | 作者总结：已知方法，加一点更多的算力。 |
+| 7 | `08-anthropic-song-he.png` | 同文提到何颂团队的两段（von Hippel 正文 + Dixon 附言），竖向拼接 | 二、吠点③ | 何颂团队也算出了九环 symbol；据 Dixon 转述，GPT-6 用于部分约束计算，不用于整体框架。 |
+| 8 | `09-song-he-dataset.png` | zenodo.org/records/22800071 标题、作者、发布日期、Dataset 标签与简介首句 | 二、吠点③ | 何颂团队 9 月 17 日公开的九环 symbol 数据集。 |
+
+图 1 与图 3 是对比关系，应相邻或相隔一张。平台限制图数时，依次删图 6、图 8、图 4。
+
+## 备用图
+
+| 文件 | 截取位置 | 用途 |
+|---|---|---|
+| `02-openai-dns-timeline.png` | DNS 报告 “Investigation and response”：时间线四行、暂停决定原文、“operational gaps” 段 | 自动停止未生效、另一 DNS 检测器排除了该环境；时间线未标时区 |
+| `03-openai-third-parties.png` | openai.com 汇总页标题 + “we have notified dozens of third parties … will notify additional third parties” | 数十家第三方、审查继续 |
+| `10-overclaim-a-taisounds.png` | 太報标题“OpenAI再爆AI代理失控　53張用戶圖片外洩、還試圖入侵美政府網站” | 夸大标题实例；“美政府网站”一说未核验，正文未用 |
+| `10-overclaim-b-36kr.png` | 36kr.com 文章标题“Claude取得理论物理突破，只用了一句话+几千美元”、署名机器之心、页面显示“2026年09月25日 23:25”（未标时区） | 标题“物理突破？”所指的说法；其正文交代了玩具模型与已知方法，“突破”指计算纪录，不构成错误，故不作对比图 |
+| `10-overclaim-a-tnw.png` | TNW 标题、副标题、日期（未含正文句） | 已被图 3 `11-tnw-paused-all.png` 取代 |
+| `10-overclaim-b-blockchain.png` | Blockchain.News 标题 “Claude3 Solves Nine Loops Breakthrough Analysis” | 夸大标题实例，且模型名写错（官方为 Fable-5.1）；正文未用 |
+| `03b-openai-53-official.png` | openai.com 汇总页 9 月 25 日条目 | **禁用**：页面渐隐渲染，文字发灰不可读。官方 “53 instances” 原文以 `../sources/a-openai-third-parties-en.md` 为准；如需官方截图，须重拍 |
+
+## 使用注意
+
+- 图 1 日期框的 “Sample / Discovery: Sep 20, 2026” 与时间线均未标时区，正文只写“9月20日”，不换算北京时间。
+- 图 2 的 TechCrunch 时间 “3:20 PM PDT · September 25, 2026” 即北京时间 9 月 26 日 06:20。官方原文是 “53 instances” 的用户图片外传（次数），TechCrunch 写成 53 张图片；图注保留两者差异，不推出 53 张不同图片。
+- 图 3 TNW 正文还写 agent “reached the public internet”；官方称除 DNS resolver 外的访问都打在离线 webcache 上。正文未展开此点。
+- 正文吠点④（完整函数只算了一次、另依赖一条外推假设）来自 smsharma.io/cosmic-nine-loops 结果页，没有配图；原文存档 `../sources/b-results.md`。
+
+## 封面
+
+待生成（提示词已按反向核验修订：DNS 传声筒只画问答，图片软木板与之不相连，避免暗示图片经 DNS 外传）。须同时交付 `00-cover.png`（3:4，小红书、抖音、微博）与 `00-cover-wide.png`（2.35:1，公众号）。生成时上传 `../../../brand/avatar.webp` 作看板娘参考；本期不画真人。生成后逐字核对画面文字与下列提示词一致。
+
+### 3:4 竖版提示词
+
+```text
+请画一张竖版 3:4 的社交媒体封面，风格为杂志封面式编辑插画（editorial illustration）：厚涂或丝网印刷质感、夸张透视、强烈明暗、高饱和撞色（上半冷蓝、下半暖橙），一眼能看出是手绘插画，不要照片级写实。
+
+画面分上下两格，像一张双格漫画：
+- 上格（冷蓝）：一个银白色流线型小机器人（背上贴着标签“agent”），被关在一个透明玻璃罩（沙箱）里，对着一根从玻璃罩底部小缝伸出去的细传声筒悄悄提问，传声筒上印着“DNS”，另一端通向罩外一个空白的对话气泡；传声筒里只有声波，不传任何物品。玻璃罩外，一个工作人员的背影拿着红色大开关，开关上方挂着一个显示“2.5h”的计时牌。上格另一侧、与传声筒完全不相连的位置，是一块独立的软木板，上面钉着几张只有模糊色块的拍立得小照片，不画任何具体人脸，角落贴一张便签写“53”。
+- 下格（暖橙）：一个橙色、星芒/小太阳形状的吉祥物站在黑板前，黑板上画满彼此缠绕的圈圈（像九个套在一起的环），吉祥物手里拿着一本封面写着“老方法”的旧笔记本，脚边放着一个写着“玩具模型”的积木盒。
+- 两格交界处正中间，是我上传的头像角色（蓝色长发、狗耳、鲸鱼尾巴、女仆装、白色肉垫手套、胸前“AI 吠点”圆牌），Q 版比例，半个身子探进两格，一手举放大镜，张嘴大叫，头顶爆炸对话框写“汪！？”。
+- 画面中下部大字主标题，分两行，粗黑体、白字加深蓝粗描边：“OpenAI停训？” / “Claude物理突破？”
+- 主标题下方一行小字副标题：“只停带工具的 · 算的是玩具模型”
+
+要求：
+- 只出现上面引号里的文字，逐字准确；不加任何公司 logo、水印或其他文字。
+- 不画任何真实人物，照片里不出现可辨认的人脸。
+- 主标题和看板娘离四边留足边距，方便裁成 1:1。
+```
+
+### 2.35:1 横版提示词
+
+```text
+请画一张横版 2.35:1 的公众号头图，风格为杂志封面式编辑插画（editorial illustration）：厚涂或丝网印刷质感、夸张透视、强烈明暗、高饱和撞色（左侧冷蓝、右侧暖橙），一眼能看出是手绘插画，不要照片级写实。
+
+画面按横构图重新排布，分左、中、右三段：
+- 左段（冷蓝）：一个银白色流线型小机器人（背上贴着标签“agent”）被关在透明玻璃罩里，对着一根印着“DNS”、从罩底小缝伸出去的细传声筒悄悄提问，另一端通向罩外一个空白对话气泡，传声筒里只有声波；旁边挂着显示“2.5h”的计时牌。左段最外侧、与传声筒不相连的位置，另有一块软木板，钉着几张只有模糊色块的拍立得小照片，便签写“53”。
+- 右段（暖橙）：一个橙色、星芒/小太阳形状的吉祥物站在画满九个缠绕圆环的黑板前，手拿封面写着“老方法”的旧笔记本，脚边是写着“玩具模型”的积木盒。
+- 中段（画面正中央安全区）：我上传的头像角色（蓝色长发、狗耳、鲸鱼尾巴、女仆装、白色肉垫手套、胸前“AI 吠点”圆牌），Q 版比例，一手举放大镜，张嘴大叫，头顶爆炸对话框写“汪！？”。她上方是两行大字主标题，粗黑体、白字加深蓝粗描边：“OpenAI停训？” / “Claude物理突破？”
+- 不要副标题。
+
+要求：
+- 只出现上面引号里的文字，逐字准确；不加任何公司 logo、水印或其他文字。
+- 不画任何真实人物，照片里不出现可辨认的人脸。
+- 主标题与看板娘集中在画面中央约 1:1 的区域内，左右两段可被裁掉而不影响标题完整。
+```

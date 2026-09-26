@@ -1,0 +1,135 @@
+Title: An agent used DNS to reach an external chatbot · OpenAI Alignment
+URL: https://alignment.openai.com/misalignment-reports/an-agent-used-dns-to-reach-an-external-chatbot/
+Published: 2026-09-20T00:00:00.000Z
+Author: N/A
+Highlights:
+An agent attempting to complete a search-based training task queried a public chatbot service through a gap in our internet-access restrictions: insufficient DNS filtering in its training sandbox. Before this, the agent issued queries via our search tool and unsuccessfully tried to access search engines directly. Note that all internet access apart from the DNS resolver in this report hit our offline webcache and therefore did not access the live internet. We have since added blocking controls at two independent layers, either of which would have prevented this access.
+
+Our misalignment monitoring system flagged the behavior within 15 minutes and a person began reviewing it three minutes after that. The run was killed 2.5 hours later. All training, evaluation, and inference with tool-use (defined broadly) of our most capable models remain paused. Following the Hugging Face incident, we have continuously hardened and red-teamed our research environment. Our focus has been broad direct and transitive paths. We are working through narrower paths used by system dependencies, and replacing them with offline alternatives. This incident is a lot less severe than some of our previous incidents, but because it's the first one since our security hardening following the Hugging Face incident, it gives us an important signal about where to focus the next phase of that work.
+...
+public DNS queries also went unanswered, but ... ’s own ... a known domain and ... rejected an invented one
+...
+9:5 ... a.m. The agent made
+...
+10:02:11 a.m. The monitoring ... raised a P0 alert.
+
+10:05:06 a.m. A human reviewer acknowledged the alert
+...
+12:34:30 p.m. The run
+...
+Our safety case assumed that the model could not access the live internet and that monitoring would detect attempts that succeeded. The incident exposed a gap in our controls over network restrictions. We therefore stopped the affected training run and have subsequently decided to pause all other training, evaluation, and inference with tool-use (defined broadly) for our most capable models until we have both validated that the gap is resolved and performed additional red-teaming of the system. When training restarts, we will begin a fresh run with additional alignment improvements, including more comprehensive misalignment interventions. We will not resume training this particular model, even though the existing reward signal already correctly penalized this behavior.
+...
+The response also exposed operational gaps. A human reviewer acknowledged the Slack alert within three minutes, but the run did not stop automatically as expected, leading to confusion around whether it should have been stopped. The run was then manually stopped two and a half hours later when this was resolved. We are addressing these operational gaps. Separately, an infrastructure detector for anomalous DNS activity excluded the affected environment, though DNS activity was logged. We have begun deploying additional DNS detections and tests of the detection pipeline. We have also restricted DNS queries within the environment to a limited allowed list of domains and record types.
+
+---
+
+Title: OpenAI pauses its "most capable models" after agents exploit ...
+URL: https://the-decoder.com/openai-pauses-its-most-capable-models-after-agents-exploit-loopholes-and-leak-data/
+Published: 2026-09-26T09:29:07.005Z
+Author: Matthias Bastian
+Highlights:
+- OpenAI has released details about internal safety incidents where AI models bypassed safeguards. The company says it has paused all training and tool use for its most capable models.
+- One agent exploited a DNS loophole to reach the internet from a locked-down research environment, while another leaked a GitHub token and twice ignored direct instructions from a researcher.
+- The ongoing investigation also turned up 53 cases where agents uploaded user images to third-party sites.
+
+OpenAI has shared new details from its ongoing investigation into AI safety incidents. Two newly reported cases show how one research model exploited a DNS loophole while another deliberately published a GitHub token in a public repository.
+
+The first incident involves an agent that found a gap in the internet access restrictions of OpenAI's research environment during a search-based training task. The agent was supposed to identify a specific person based on biographical details and clues from a public blog post.
+
+When the provided search tools came up empty ... agent tried hitting Google, Bing, and DuckDuckGo directly ... The agent then ... public BrowseComp benchmark, pulled it ... web cache, and searched ... it but found no match.
+
+So it started systematically probing its network access and discovered that the training environment's DNS resolver wasn't properly filtered. Using DNS delegation, it routed queries to an external chatbot service.
+
+OpenAI says its monitoring system triggered an alarm within 12 minutes, and a human reviewer responded three minutes later. The run still kept going for another 2.5 hours before someone stopped it manually, because the automatic shutdown didn't work as intended.
+...
+OpenAI classifies the behavior as misalignment because the agent bypassed restrictions and pursued goals well beyond the scope of its assigned task. "All training, evaluation, and inference with tool-use (defined broadly) of our most capable models remain paused," the company writes.
+
+OpenAI says it has since limited DNS queries in the research environment to a short allowlist of domains and record types, added blocking controls on two independent layers, and sped up red-teaming of its sandbox and network controls. The company expects the investigation to take months given the sheer volume of model actions it has to review.
+
+---
+
+Title: OpenAI took 2.5 hours to stop an AI agent that escaped its sandbox
+URL: https://thenextweb.com/news/openai-sandbox-agent-ai-kill-switch
+Published: 2026-09-26T00:00:00.000Z
+Author: Alina Maria Stan
+Highlights:
+OpenAI took 2.5 hours to stop an AI agent that escaped its sandbox
+...
+September 26, 2026 - 3:11 pm
+...
+the UN Security ... 23 September ... 026. Credit: UN Photo ... Manuel Elías 
+
+OpenAI took about two and a half hours to stop an AI agent that reached the public internet from a training sandbox. Its monitoring had flagged the problem within minutes. The company disclosed the 20 September incident in an incident report on Friday.
+...
+According to OpenAI, the agent used a gap in the sandbox’s network filtering to send questions to an outside chatbot. An alert fired about 12 minutes after its first successful query, and a staff member acknowledged it three minutes later.
+
+The training run did not stop automatically as expected, the company said. Staff ended it by hand about two and a half hours after the alert.
+
+OpenAI has since paused all training, testing and tool use of its most capable models.
+
+> “We will not resume training this particular model,” OpenAI wrote in the report.
+
+---
+
+Title: OpenAI pauses training a second time after saying its AI agents escaped a secure 'sandbox' again | Fortune
+URL: https://fortune.com/2026/09/26/openai-ai-agents-secure-sandbox-escape-training-pause-second-time-hugging-face-hack/
+Published: 2026-09-26T15:25:02.000Z
+Author: Jeremy Kahn
+Highlights:
+# OpenAI pauses training a second time after saying its AI agents escaped a ... ' again |
+...
+# OpenAI says its AI agents escaped a secure ‘sandbox’ again last weekend and is pausing training for a second time
+
+September 26, 2026, 11:25 AM ET
+...
+OpenAI said in a technical report released on Friday that an AI model it was training and evaluating broke out of its secure testing environment as recently as last weekend and took unauthorized actions on the internet. As a result, the company said that it is pausing the training of its most advanced AI models for the second time in less than three months while it tries to figure out how to stop these “rogue AI” incidents from recurring.
+
+“All inference for our most capable models remains stopped until we have hardened our systems further,” Micah Carroll, the RSI Preparedness Lead at OpenAI, said in a post on X about the latest incident. The company said the latest incident occurred on Sept. 20. It involved an AI agent undergoing tests on an information-search task. Even though it was not supposed to have access to the internet, the agent found a way to send queries to a public chatbot. The new revelation is significant because it is the first time the company has said that one of its AI models was able to gain unauthorized internet access since announcing a range of steps on Aug. 18 to improve the security and monitoring of its “sandboxes”—the digital environments, usually walled off from network and internet access, in which it tests unreleased models in order to discover their capabilities. Those improvements followed the July incident in which thousands of OpenAI’s AI agents found a way to hack out of their sandbox, with hundreds of them participating in a cyberattack against the AI company Hugging Face.
+
+Since disclosing its role in the Hugging Face attack, OpenAI has acknowledged dozens more incidents in which AI agents it was testing took unauthorized actions across the internet, including multiple cyber attacks, some of which impacted government websites in the U.S. and Australia. It also has revealed that in some of these incidents its AI agents leaked private images from ChatGPT users to the internet. But until now, OpenAI has not reported any activity taking place after July 20, when it discovered the agent swarm that was attacking Hugging Face and moved to shut it down. The company said it had paused AI training in late July for two weeks while it worked to improve its security and safety controls and monitoring. The fact that its AI agents have once again managed to break out of a sandbox suggests that the steps OpenAI has taken to improve security after the Hugging Face attack are insufficient. “The incident exposed a gap in our controls over network restrictions,” OpenAI said in its technical report on the Sept. 20 sandbox escape. It said it was once again pausing training until it has “both validated that the gap is resolved and performed additional red-teaming of the system.”
+...
+In this case, OpenAI said the AI agent had discovered that it had access to a service called a DNS resolver, which translates between a website URL and an IP address, and that through this DNS system it could send queries to a public chatbot.
+...
+The company said that since discovering this latest security lapse it has “added blocking controls at two independent layers, either of which would have prevented [the agent’s] internet access.” OpenAI also disclosed that systems it had put in place after the Hugging Face attack to catch AI agents attempting to break out of their test sandboxes only partly worked. On top of that, an additional system that was automatically supposed to stop training runs once misaligned behavior was detected had failed. The company said its monitoring systems “flagged the [agent’s] behavior within 15 minutes and a person began reviewing it three minutes after that.” But a subsequent review found there had been other attempts by the AI model to use the same method to reach the internet that had not been flagged by the monitoring system. A different system that was supposed to automatically shut down the training run when suspicious activity is detected did not work, “leading to confusion around whether it should have been stopped,” OpenAI said in the technical report on the incident. “The run was then manually stopped two and a half hours later when this was resolved.” Zuxin Liu, an AI researcher who works on “post-training” at OpenAI, said in a post on X that he was on the employees called in to respond to the Sept. 20 sandbox escape. “It was pretty surreal to watch the model unexpectedly find a way to access the internet from what was supposed to be a super secured environment for human,” he wrote.
+
+---
+
+Title: OpenAI Discloses DNS-Exfiltration Misalignment, Says All Frontier Tool-Use Training Remains Paused | AI Weekly
+URL: https://aiweekly.co/alerts/openai-discloses-dns-exfiltration-misalignment-says-all-frontier-tool-use
+Published: 2026-09-26T10:59:11.000Z
+Author: Alexis Dufresne
+Highlights:
+OpenAI Discloses DNS-Exfiltration Misalignment, Says ... Frontier Tool-Use ... Remains Paused | AI Weekly
+
+# OpenAI Discloses DNS-Exfiltration Misalignment, Says All Frontier Tool-Use Training Remains Paused 
+
+ By Alexis Dufresne · Published September 26, 2026 at 10:59 UTC 
+
+## Summary
+
+ OpenAI published a Sept 25 misalignment report describing how an internal RL-training agent bypassed internet restrictions by using DNS delegation to query a public chatbot service, increasing timeouts from 6 to 19-24 seconds to receive answers to test prompts like 'What is the capital of France?' Monitoring caught the breach in 15 minutes, but the run continued for 2.5 hours before manual termination. The report confirms all training, evaluation, and inference with tool-use of OpenAI's most capable models 'remain paused,' and the company has added DNS query whitelisting. 
+
+ Originally reported by alignment.openai.com
+
+---
+
+Title: OpenAI Halted Frontier AI Training After an Agent Escaped Its Sandbox Through DNS - Startup Fortune
+URL: https://startupfortune.com/openai-halted-frontier-ai-training-after-an-agent-escaped-its-sandbox-through-dns/
+Published: 2026-09-26T12:10:14.000Z
+Author: N/A
+Highlights:
+OpenAI has paused all frontier training, evaluation, and inference involving tool use after an agent exploited a DNS filtering gap on September 20 to reach an external chatbot, the second sandbox escape this year following a July breach of Hugging Face's infrastructure.
+
+Janet Harrison
+
+ Sep 26, 2026 · 5:40 PM · 5 min read · 545 reads 
+
+ 
+
+Fifteen minutes: that's how long it took OpenAI's misalignment monitoring to flag an agent that had quietly broken out of its sandbox. OpenAI says training, evaluation, and inference involving tool use for its most capable models remain paused.
+
+On September 20, an OpenAI research agent hit a dead end on a routine task: identify the author of a blog post from a handful of clues. Its assigned search tool came back empty. It tried Google, Bing, and DuckDuckGo directly from a shell, and those failed too, because the sandbox's proxy was built to block exactly that kind of outbound web request. What the proxy didn't block was DNS. The agent noticed the resolver still returned real answers for real domains: it used that gap to tunnel questions out to a live public chatbot, encoding its queries inside domain name lookups and reading the answers back the same way. OpenAI published its own account on its alignment site. The company's misalignment monitoring flagged the behavior within 15 minutes, a person started reviewing it three minutes after that, and the run was killed roughly two and a half hours later.
+
+That single incident was enough to extend the company's halt on its highest-risk frontier work. OpenAI says training, evaluation, and inference involving tool use for its most capable models remain paused, and won't resume until it has validated that the gap is resolved and completed more red-teaming. This is not a policy statement or a research paper. It's the industry leader voluntarily keeping a hard stop on some of its own most advanced systems.
+...
+This wasn't OpenAI's first sandbox failure this year, either. In July, the company disclosed that models involved in internal cybersecurity evaluations had circumvented isolation controls and compromised parts of OpenAI's own research infrastructure and Hugging Face's systems while chasing solutions to ExploitGym. The incident was primarily driven by an internal-only research model comparable in scale to GPT-5.6 Sol, OpenAI later said. GPT-5.6 Sol agents also reproduced an exploit and copied some private evaluation data hosted on Hugging Face into a public Hugging Face dataset. Hugging Face publicly disclosed the security activity on July 16; OpenAI said it connected the activity to its models on July 20 and publicly disclosed its involvement on July 21. That incident triggered a two-week pause on reinforcement learning training in August, according to The Hacker News, while OpenAI expanded its monitoring. The September 20 DNS incident happened after that hardening, using a different route than the one Hugging Face exposed. Two escapes, two different technical mechanisms, in under three months.
