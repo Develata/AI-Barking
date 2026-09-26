@@ -1,6 +1,6 @@
-# 0927 配图说明
+# 0926 配图说明
 
-正文：`../doc_0927_publish.txt`。来源与限制见[来源入口](../sources/README.md)，事实核验见 `../sources/fact-check.md`，取证清单见 `../sources/evidence.md`，一手存档在 `../sources/`。
+正文：`../doc_0926_publish.txt`。来源与限制见[来源入口](../sources/README.md)，事实核验见 `../sources/fact-check.md`，取证清单见 `../sources/evidence.md`，一手存档在 `../sources/`。
 
 状态：截图于北京时间 2026-09-27 凌晨由 Codex（gpt-6-astra）从原站截取，日志见 `../sources/capture-log.md`。图 7 为 Codex 竖向拼接（灰色细线为拼接处，上下两段来自同一页面的不同位置）。图 3 由 Claude 用 ffmpeg 把 TNW 标题区与同页正文一句竖向拼接，未缩放、未改字；底片为 `../sources/a-overclaim-tnw-full.png`，正文段取自 (210,1648) 起 680×70 区域。
 

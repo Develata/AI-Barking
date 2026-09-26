@@ -1,4 +1,4 @@
-# 0927 事实清单
+# 0926 事实清单
 
 线索：ChatGPT 选题扫描（北京时间 2026-09-27 01:07，聊天记录未存档，仅作线索）。取证：Codex（gpt-6-astra，medium，联网）按 `.handoff/2026-09-27-0927-evidence.md` 执行，产出 `evidence.md`、`capture-log.md` 与本目录存档。下表每行由 Claude 对照本目录存档逐字核对（不是只读 `evidence.md` 的转述）。时间：OpenAI DNS 报告（Sep 20 / Sep 25）、OpenAI 汇总页（September 25）、Anthropic 文章（Sep 25）、Zenodo（September 17）均只给日期、未标时区，正文照录为“官方标注日期”，**未换算北京时间，北京日期未核实**（可能晚一天）。TechCrunch 3:20 PM PDT 9/25 = 北京 9/26 06:20；TNW 9/26 15:11 UTC = 北京 9/26 23:11。
 
