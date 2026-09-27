@@ -63,3 +63,4 @@
 | 0924 | Claude Opus-5.5 与 GPT-6-Sol / GPT-6-Luna 发布：API 降价、额度重置、跑分对比（AA、Terminal-Bench 4.0、FrontierMath） |
 | 0925 | Anthropic 恢复对部分“输出前拒答”收费；OpenAI agent 在内部评估中绕过拦截访问澳洲 Medicare 统计门户 |
 | 0926 | OpenAI agent 事故跟进：DNS 绕过沙箱联系外部聊天机器人、53 次用户图片传上图床、最强模型带工具的训练/评测/推理暂停；Claude（Fable-5.1）算出 N=4 SYM 六胶子九环振幅（玩具模型、已知方法、何颂团队并行） |
+| 0927 | DeepSeek DSec 沙箱论文（38 万并发沙箱、agent 找答案致 XFS 损坏，外媒写“逃逸”）；Anthropic ART 酶系统（像 CRISPR 但活性未证、重跑 10 次均漏掉）；OpenAI 自我复制提示注入（模拟环境、网传“AI 蠕虫已在 agent 间传播”） |
