@@ -15,6 +15,7 @@ AI 吠点是由 **[Develata](https://github.com/Develata)** 主理的独立内�
 | 2026 / 0924 | [Opus 5.5 完爆 Astra？](docs/0924/doc_0924_publish.txt) | [配图说明](docs/0924/images/README.md) | [来源入口](docs/0924/sources/README.md) |
 | 2026 / 0925 | [拒答也收费？OpenAI私闯政府网？](docs/0925/doc_0925_publish.txt) | [配图说明](docs/0925/images/README.md) | [来源入口](docs/0925/sources/README.md) |
 | 2026 / 0926 | [OpenAI停训？Claude物理突破？](docs/0926/doc_0926_publish.txt) | [配图说明](docs/0926/images/README.md) | [来源入口](docs/0926/sources/README.md) |
+| 2026 / 0927 | [沙箱逃逸？AI蠕虫来了？新基因编辑？](docs/0927/doc_0927_publish.txt) | [配图说明](docs/0927/images/README.md) | [来源入口](docs/0927/sources/README.md) |
 
 正文采用可直接复制的纯文本，图片单独保存。阅读或发布时不需要依赖 Markdown 插图。
 
