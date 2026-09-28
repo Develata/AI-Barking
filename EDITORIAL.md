@@ -50,7 +50,7 @@
 - 文字：主标题取正文标题的钩子（冲突 + 问号），另加至多一行关键数字或副标题；手机缩略图下能看清。
 - 事实：图中每个字都受事实分级约束。不编造公司 slogan、人物台词或未核实的能力宣传；数字与正文一致。
 - 立场：不做应援式宣传（“yyds”“更美好的未来”），保留“吠”的质疑感。
-- 尺寸：每期必须同时交付两张封面，各配一段完整、可单独使用的生成提示词——`00-cover.*`（3:4，小红书、抖音、微博）与 `00-cover-wide.*`（2.35:1，公众号）。横版按横构图重新排版，不靠裁切竖版；主标题放在中央安全区，以便公众号再裁出 1:1 缩略图。
+- 尺寸：每期必须同时交付两张封面，各配一段完整、可单独使用的生成提示词——`00-cover.*`（3:4，小红书、抖音）与 `00-cover-wide.*`（2.35:1，公众号）。横版按横构图重新排版，不靠裁切竖版；主标题放在中央安全区，以便公众号再裁出 1:1 缩略图。
 - 发布时按平台要求声明 AI 生成。文件名 `images/00-cover.*`，生成提示词记在 `images/README.md`。
 - 生成：Claude 用 Codex CLI 的图像生成直接出图，附 `common_images/profile_picture.png` 作看板娘参考，命令与派工模板见 `templates/codex-cover.md`。每种尺寸先出 2 张候选，Claude 逐字核对画面文字后挑一张；都不合适就改提示词再生成，每种尺寸最多 5 张。挑选结果与落选原因记在 `images/README.md`，候选图不入库。
 
@@ -73,7 +73,7 @@
 
 ## 核验流程
 
-分工：Develata 只与 Claude 交流。Claude 起草；取证、存档与截图由 Claude 直接派给代理自动完成，不经 Develata 搬运；反向核验走 `codex-reviewer`（只读）；Develata 终审。微博由 Claude 用 `barking publish weibo <期次目录>`（经官方 weibo-cli）发出：先预演给 Develata 看，Develata 在聊天中明确说“发”后才加 `--confirm`；公众号（个人主体未认证，无发布接口）、抖音、小红书由 Develata 手动发布。
+分工：Develata 只与 Claude 交流。Claude 起草；取证、存档与截图由 Claude 直接派给代理自动完成，不经 Develata 搬运；反向核验走 `codex-reviewer`（只读）；Develata 终审并在小红书、抖音、公众号手动发布（公众号为个人主体未认证，无发布接口）。
 
 1. 选题：Develata 把根目录 `daily-scan.md` 整个拖给 ChatGPT（聊天模式，联网）运行并回贴；Claude 据此列候选及各自吠点，Develata 拍板。ChatGPT 产出只算线索，不替代第 3 步抽查。每期定稿后，Claude 在 `daily-scan.md` 末尾“已发过”追加一行。
 2. 取证：少量条目 Claude 直接查；大批量取证、页面存档与截图，Claude 按 `templates/codex-evidence.md` 机械采集（截图、页面存档）派给 Sonnet 子代理或 Codex `gpt-6-luna`（max）；需要判断的取证（回溯一手来源、定级、找吠点）若交给 Codex，用 `gpt-6-astra`（medium 或 max）。Windows 主机 Codex 一律 full-access，见 codex-orchestration。执行方用 opencli / agent-reach 直接完成。产出：`sources/` 存档、`images/` 截图、事实清单。

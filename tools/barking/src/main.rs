@@ -1,5 +1,4 @@
 mod lint;
-mod publish;
 
 use std::io;
 use std::path::PathBuf;
@@ -10,9 +9,6 @@ use lint::Level;
 const USAGE: &str = "\
 用法：
   barking lint [期次目录...]   定稿前机械检查；不给目录则检查 docs/ 下全部期次（如 docs/0925）
-  barking publish weibo <期次目录> [--private] [--confirm]
-                              经官方 weibo-cli 发微博（封面 + 正式配图 + 正文）；默认只预演，
-                              --confirm 才上传发布，--private 仅自己可见（测试用）
 
 退出码：0 无错误；1 有错误；2 用法错误";
 
@@ -20,7 +16,6 @@ fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.split_first() {
         Some((cmd, rest)) if cmd == "lint" => run_lint(rest),
-        Some((cmd, rest)) if cmd == "publish" => run_publish(rest),
         _ => {
             eprintln!("{USAGE}");
             ExitCode::from(2)
@@ -104,40 +99,4 @@ fn all_issues() -> io::Result<Vec<PathBuf>> {
     }
     dirs.sort();
     Ok(dirs)
-}
-
-fn run_publish(args: &[String]) -> ExitCode {
-    let Some((platform, rest)) = args.split_first() else {
-        eprintln!("{USAGE}");
-        return ExitCode::from(2);
-    };
-    if platform != "weibo" {
-        eprintln!("error: 暂只支持 weibo（公众号、抖音、小红书手动发布）");
-        return ExitCode::from(2);
-    }
-    let (flags, dirs): (Vec<&String>, Vec<&String>) =
-        rest.iter().partition(|a| a.starts_with("--"));
-    let [dir] = dirs.as_slice() else {
-        eprintln!("{USAGE}");
-        return ExitCode::from(2);
-    };
-    if let Some(bad) = flags
-        .iter()
-        .find(|f| !matches!(f.as_str(), "--confirm" | "--private"))
-    {
-        eprintln!("error: 未知参数 {bad}");
-        return ExitCode::from(2);
-    }
-    let opts = publish::Options {
-        dir: PathBuf::from(dir),
-        confirm: flags.iter().any(|f| *f == "--confirm"),
-        private: flags.iter().any(|f| *f == "--private"),
-    };
-    match publish::run(&opts) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(e) => {
-            eprintln!("error: {e}");
-            ExitCode::FAILURE
-        }
-    }
 }
