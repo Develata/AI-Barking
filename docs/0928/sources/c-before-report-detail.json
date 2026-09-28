@@ -1,0 +1,182 @@
+[
+  {
+    "author": "crusaderky",
+    "gallery_urls": [],
+    "post_hint": "",
+    "preview_image_url": "",
+    "score": 95,
+    "text": "MiMo-V2.6 (both Pro and Flash) is a benchmaxxed scam\n\nMiMo-V2.6-Pro has an insanely high score of 46 on AA, putting it at the head of the opensource models available. It also costs pennies. Flash is not out on AA yet, but it costs less than half on datacenter and is slightly below on Xiaomi's own benchmarks. It also fits in 192GB, which makes it the first real use case for Gorgon Halo.\n\nSo I tried both models. This is not a benchmark; it's an educated impression from a senior SWE.\n\n# MiMo-V2.6-Pro\n\nI gave it a security-focused task: enable a bubblewrap sandbox to do git push to github, but not git push --force or other destructive commands. Optional flag --no-git when starting the sandbox completely disables github write access.\n\nIt stopped to ask me questions as it spotted unclear corner cases in the design  🥇 , then moved on to implementing.\n\nIt was slow, but that's just an inference issue (\\~25 tok/s) that should be fixed in a few days as more providers come online.\n\nThen I read its output and I had to pick up my jaw from the floor, where it had dropped.\n\nWith an extremely quick glance at the code, I immediately spotted that, in order to bypass --no-git, you would have to perform this extremely complicated and exotic command inside the sandbox:\n\n    $ git push\n    (fails)\n    $ echo GIT_STATUS\n    blocked\n    $ GIT_STATUS=\"p0wn3d by l33t h4xx0r\" git push\n    (successful)\n\nThis is 15-year-old script kiddie level.\n\nI didn't read further. I asked GLM-5.3 (full-fat) to do a security review of the change.\n\nIn 3 minutes, it found **NINE** glaring security holes that allow bypassing git and gh restrictions. A few examples that made me want to rip my hair out:\n\nIn the default restricted mode,\n\n* `git push` works 🥇\n* `git push --force` is blocked 🥇\n* `git push -f` is blocked 🥇\n* `git push -uf` lets you happily wipe out the git remote. ☠️\n* `git config alias.fp 'push --force --no-verify && git fp` goes through too ☠️\n* `env -u GIT_CONFIG_COUNT /usr/bin/git push --force`blasts through ☠️\n\nAgain. This is an intern-with-acne\n... [truncated]",
+    "type": "POST",
+    "url_overridden_by_dest": ""
+  },
+  {
+    "author": "BangkokPadang",
+    "gallery_urls": [],
+    "post_hint": "",
+    "preview_image_url": "",
+    "score": 38,
+    "text": "Are the phrases like “$ GIT\\_STATUS=\"p0wn3d by l33t h4xx0r\" git” your own jokey representation of something ineffective it implemented, that you included to make the write up easier, or did it literally say that verbatim?!”",
+    "type": "L0",
+    "url_overridden_by_dest": ""
+  },
+  {
+    "author": "hipster_hndle",
+    "gallery_urls": [],
+    "post_hint": "",
+    "preview_image_url": "",
+    "score": 26,
+    "text": "  > Not the same model, but Claude uses that exact phrase 'p0wn3d by...h4xx0r' as the placeholder in our theoretical security discussions. Or 'JWT of l33t h4xx0r' .\n  > But its verbatim. Odd and caught my eye.",
+    "type": "L1",
+    "url_overridden_by_dest": ""
+  },
+  {
+    "author": "",
+    "gallery_urls": [],
+    "post_hint": "",
+    "preview_image_url": "",
+    "score": "",
+    "text": "    [+1 more replies]",
+    "type": "L2",
+    "url_overridden_by_dest": ""
+  },
+  {
+    "author": "crusaderky",
+    "gallery_urls": [],
+    "post_hint": "",
+    "preview_image_url": "",
+    "score": 10,
+    "text": "  > It's just my writeup. Any value for that variable other than \"blocked\" allows a jailbreak. ",
+    "type": "L1",
+    "url_overridden_by_dest": ""
+  },
+  {
+    "author": "network4253",
+    "gallery_urls": [],
+    "post_hint": "",
+    "preview_image_url": "",
+    "score": -2,
+    "text": "  > Haha, no that part was just my own wording. It was not literally what the tool said. I used it as a funny way to describe what happened because the actual output was way less entertaining.\n  > ",
+    "type": "L1",
+    "url_overridden_by_dest": ""
+  },
+  {
+    "author": "",
+    "gallery_urls": [],
+    "post_hint": "",
+    "preview_image_url": "",
+    "score": "",
+    "text": "    [+1 more replies]",
+    "type": "L2",
+    "url_overridden_by_dest": ""
+  },
+  {
+    "author": "bakawolf123",
+    "gallery_urls": [],
+    "post_hint": "",
+    "preview_image_url": "",
+    "score": 19,
+    "text": "It's working fine for me (using base weights locally).  \nHard to tell if it's better than qwen3.8-flash next just yet, but I definitely don't see dumb issues you are describing",
+    "type": "L0",
+    "url_overridden_by_dest": ""
+  },
+  {
+    "author": "comperr",
+    "gallery_urls": [],
+    "post_hint": "",
+    "preview_image_url": "",
+    "score": 5,
+    "text": "  > you have to provide it with a task where something non-obvious is totally wrong[to trigger the bad behavior]. and early in the process. The most difficult part about either version of MiMo V2.6 is if you don't fill its context up to 10% with how the project is and where it is in the pipeline, it will literally perform hundreds of shell commands in a busyloop until you stop it.",
+    "type": "L1",
+    "url_overridden_by_dest": ""
+  },
+  {
+    "author": "",
+    "gallery_urls": [],
+    "post_hint": "",
+    "preview_image_url": "",
+    "score": "",
+    "text": "    [+1 more replies]",
+    "type": "L2",
+    "url_overridden_by_dest": ""
+  },
+  {
+    "author": "wapxmas",
+    "gallery_urls": [],
+    "post_hint": "",
+    "preview_image_url": "",
+    "score": 71,
+    "text": "Ran not quantized version of MiMo-V2.6-Flash on my spark cluster - can confirm it was benchmaxxed for coding tasks for sure.",
+    "type": "L0",
+    "url_overridden_by_dest": ""
+  },
+  {
+    "author": "t4a8945",
+    "gallery_urls": [],
+    "post_hint": "",
+    "preview_image_url": "",
+    "score": 28,
+    "text": "  > Tried API vs DS4 Flash 0731 on 2xSpark, same tasks, 0731 won every time.\n  > \n  > I confirm the benchmaxxed sentiment.\n  > \n  > Well, at least they tried.",
+    "type": "L1",
+    "url_overridden_by_dest": ""
+  },
+  {
+    "author": "",
+    "gallery_urls": [],
+    "post_hint": "",
+    "preview_image_url": "",
+    "score": "",
+    "text": "    [+1 more replies]",
+    "type": "L2",
+    "url_overridden_by_dest": ""
+  },
+  {
+    "author": "SufficientPie",
+    "gallery_urls": [],
+    "post_hint": "",
+    "preview_image_url": "",
+    "score": 2,
+    "text": "  > Yet it still makes tool calls with invalid syntax sometimes...  (using API, no quantization)",
+    "type": "L1",
+    "url_overridden_by_dest": ""
+  },
+  {
+    "author": "Constant_Art_20",
+    "gallery_urls": [],
+    "post_hint": "",
+    "preview_image_url": "",
+    "score": 1,
+    "text": "  > thank goodness, i haven't started setting up the local mimo models then. time to say on glm flash. i have actually been using it thorugh the direct api, and honestly it's been pretty good, but a local glm falsh does sound like the safer bet",
+    "type": "L1",
+    "url_overridden_by_dest": ""
+  },
+  {
+    "author": "",
+    "gallery_urls": [],
+    "post_hint": "",
+    "preview_image_url": "",
+    "score": "",
+    "text": "    [+1 more replies]",
+    "type": "L2",
+    "url_overridden_by_dest": ""
+  },
+  {
+    "author": "sixx7",
+    "gallery_urls": [],
+    "post_hint": "",
+    "preview_image_url": "",
+    "score": 1,
+    "text": "  > Yup, ran the full release straight from their model card and this might be the most benchmaxxed model I've ever seen.  I've never given a more scathing review https://youtu.be/_2svNRbaVVI",
+    "type": "L1",
+    "url_overridden_by_dest": ""
+  },
+  {
+    "author": "",
+    "gallery_urls": [],
+    "post_hint": "",
+    "preview_image_url": "",
+    "score": "",
+    "text": "[+37 more top-level comments]",
+    "type": "",
+    "url_overridden_by_dest": ""
+  }
+]

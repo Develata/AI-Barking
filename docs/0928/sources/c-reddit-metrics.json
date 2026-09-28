@@ -1,0 +1,47 @@
+[
+  {
+    "id": "1wrq71o",
+    "title": "Mimo v2.6 flash MOPD",
+    "subreddit": "r/LocalLLaMA",
+    "author": "Automatic-Arm8153",
+    "score": 128,
+    "comments": 12,
+    "url": "https://www.reddit.com/r/LocalLLaMA/comments/1wrq71o/mimo_v26_flash_mopd/",
+    "created_utc": 1790530295,
+    "selftext": "",
+    "post_hint": "link",
+    "url_overridden_by_dest": "https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Flash-MOPD",
+    "preview_image_url": "https://external-preview.redd.it/tVd7TT_w7M0h3Q0YuZad5cGhIMKwARCL0r2fXVdr2lM.png?auto=webp&s=be84f6eb853c7f01b4c5649df7a116d597adf000",
+    "gallery_urls": []
+  },
+  {
+    "id": "1woa5d3",
+    "title": "MiMo-V2.6 (both Pro and Flash) is a benchmaxxed scam",
+    "subreddit": "r/LocalLLaMA",
+    "author": "crusaderky",
+    "score": 96,
+    "comments": 85,
+    "url": "https://www.reddit.com/r/LocalLLaMA/comments/1woa5d3/mimov26_both_pro_and_flash_is_a_benchmaxxed_scam/",
+    "created_utc": 1790179514,
+    "selftext": "MiMo-V2.6-Pro has an insanely high score of 46 on AA, putting it at the head of the opensource models available. It also costs pennies. Flash is not out on AA yet, but it costs less than half on datacenter and is slightly below on Xiaomi's own benchmarks. It also fits in 192GB, which makes it the first real use case for Gorgon Halo.\n\nSo I tried both models. This is not a benchmark; it's an educated impression from a senior SWE.\n\n# MiMo-V2.6-Pro\n\nI gave it a security-focused task: enable a bubblewrap sandbox to do git push to github, but not git push --force or other destructive commands. Optional flag --no-git when starting the sandbox completely disables github write access.\n\nIt stopped to ask me questions as it spotted unclear corner cases in the design  🥇 , then moved on to implementing.\n\nIt was slow, but that's just an inference issue (\\~25 tok/s) that should be fixed in a few days as more providers come online.\n\nThen I read its output and I had to pick up my jaw from the floor, where it had dropped.\n\nWith an extremely quick glance at the code, I immediately spotted that, in order to bypass --no-git, you would have to perform this extremely complicated and exotic command inside the sandbox:\n\n    $ git push\n    (fails)\n    $ echo GIT_STATUS\n    blocked\n    $ GIT_STATUS=\"p0wn3d by l33t h4xx0r\" git push\n    (successful)\n\nThis is 15-year-old script kiddie level.\n\nI didn't read further. I asked GLM-5.3 (full-fat) to do a security review of the change.\n\nIn 3 minutes, it found **NINE** glaring security holes that allow bypassing git and gh restrictions. A few examples that made me want to rip my hair out:\n\nIn the default restricted mode,\n\n* `git push` works 🥇\n* `git push --force` is blocked 🥇\n* `git push -f` is blocked 🥇\n* `git push -uf` lets you happily wipe out the git remote. ☠️\n* `git config alias.fp 'push --force --no-verify && git fp` goes through too ☠️\n* `env -u GIT_CONFIG_COUNT /usr/bin/git push --force`blasts through ☠️\n\nAgain. This is an intern-with-acne level kind of incompetence.\n\nTo seal the lid on the coffin, MiMo's prose in the chat is infuriating. Not quite Opus-level infuriating, but it gets close. It hurts the eyes and it frequently takes 2 reads to understand what the hell it's saying. GLM, DeepSeek, and Qwen are much more pleasant to work with.\n\n# MiMo-V2.6-Flash\n\nI asked MiMo-V2.6-Flash to do a very simple git surgery: create a new branch off master and cherry-pick a single commit from another branch.\n\nHowever, I didn't realise that the git worktree I pointed it to was corrupted (the branch on the main git repo was fine).\n\n* A **dumb** model would have just returned \"there's no git here, I have no idea what you're talking about\"\n* A **smarter** model would have noticed that there was a /worktrees/ in the path, come up with an educated guess about what happened, and gave me a hint on how to fix it\n* A **very smart** model would have noticed that the only other directory existing in the sandbox was the main git repo, which had a branch with the same name as the broken worktree directory, and recovered it from there.\n\nMiMo-V2.6-Flash went on 80k tokens worth of acid trip. It first attempted to find the main git repo, failed, and then panicked and went down a rabbit hole which involved tampering with /tmp, `mount --bind`, and  other insanity. I noticed after a while as I was wondering what the heck was wrong. I suspect that given enough time it may have nuked my main git repo and I tremble at the idea of what it could have done if not sandboxed.\n\nIf you scale down Pro's intelligence on AA by comparing the available self-published benchmarks against those of Pro (which is a very crude method but gives a ballpark idea), MiMo-V2.6-Flash comes out on par with GLM-5.3-Flash (high) and Qwen3.8-Flash.\n\nWhich is absolutely, categorically, not.\n\nDO NOT shell out the money for a Gorgon Halo for MiMo-V2.6-Flash. Qwen3.8-Flash on a Strix Halo is vastly better.\n\nI'm going to stick with my previous models:\n\n* DSv4.1 Flash as the default\n* GLM-5.3-Flash (high) as the dirt cheap option\n* GLM-5.3 when the big guns are needed\n* Qwen3.8-Flash and Qwen3.8-27B to run locally (I have a 3080 so Flash is very slow).",
+    "post_hint": "",
+    "url_overridden_by_dest": "",
+    "preview_image_url": "",
+    "gallery_urls": []
+  },
+  {
+    "id": "1wmp5h2",
+    "title": "Mimo v2.6-Flash-RL vs open-weight models",
+    "subreddit": "r/LocalLLaMA",
+    "author": "ababaka",
+    "score": 141,
+    "comments": 44,
+    "url": "https://www.reddit.com/r/LocalLLaMA/comments/1wmp5h2/mimo_v26flashrl_vs_openweight_models/",
+    "created_utc": 1790024092,
+    "selftext": "Since there’s no comparison chart on the model page, I asked Perplexity to compare it against some relatively small open-weight models in a similar size range. Here are the results.\n\nUpd. Terminal-Bench 4.0 results:\nMiMo‑V2.6‑Flash‑RL — 28.8%\nDeepSeek‑V4‑Flash‑0731 — 12.0%\nQwen3.8‑Flash‑Next — 25.3%\nGLM‑5.3‑Flash — 32.8%",
+    "post_hint": "image",
+    "url_overridden_by_dest": "https://i.redd.it/gxwz3rdnsxqh1.jpeg",
+    "preview_image_url": "https://preview.redd.it/gxwz3rdnsxqh1.jpeg?auto=webp&s=17404c1d880970e8fa2a8b05c05f203c7315e482",
+    "gallery_urls": []
+  }
+]

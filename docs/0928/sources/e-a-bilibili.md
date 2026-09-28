@@ -1,0 +1,662 @@
+![](//i0.hdslb.com/bfs/archive/1b92a4010171e29a8d3dc6d6782553e108790d46.jpg@.avif)
+
+[
+
+首页](//www.bilibili.com)
+
+[番剧](//www.bilibili.com/anime/)
+
+[直播](//live.bilibili.com)
+
+[游戏中心](//game.bilibili.com/platform)
+
+[会员购](//show.bilibili.com/platform/home.html?msource=pc_web)
+
+[漫画](//manga.bilibili.com?from=bill_top_mnav)
+
+[赛事](//www.bilibili.com/match/home/)
+
+[
+
+VCT
+
+![图片](//i0.hdslb.com/bfs/banner/774834df7f4721810da3e37a64b7284e2b4f643e.png)
+
+VCT
+
+
+](https://www.bilibili.com/blackboard/era/X1Wcn7ARKZFdpnoV.html)
+
+[下载客户端](//app.bilibili.com/)
+
+[![](//i0.hdslb.com/bfs/face/93911930401a6508ecee0b7470b217baec0508ae.jpg@120w_120h_1c)](//space.bilibili.com/397166483)[
+
+](//space.bilibili.com/397166483)
+
+[
+
+大会员](//account.bilibili.com/big)
+
+[
+
+14
+
+消息](//message.bilibili.com)
+
+[回复我的 1](//message.bilibili.com/#/reply)[@我的](//message.bilibili.com/#/at) [收到的赞 5](//message.bilibili.com/#/love)[系统消息](//message.bilibili.com/#/system) [我的消息 8](//message.bilibili.com/#/whisper)
+
+[
+
+动态](//t.bilibili.com/)
+
+[
+
+收藏](//space.bilibili.com/397166483/favlist)
+
+[历史](//www.bilibili.com/history)
+
+[创作中心](//member.bilibili.com/platform/home)
+
+[
+
+投稿
+
+](//member.bilibili.com/platform/upload/video/frame)
+
+# 已吓哭！Claude Sonnet 5.5 灰测默秒全，3D 建模已有 Fable 5.1 水平??
+
+3.7万
+
+16
+
+2026-09-24 01:34:47
+
+个人观点，仅供参考
+
+我第一眼以为是我的世界
+
+瘫坐
+
+已吓哭！Claude Sonnet 5.5 灰测默秒全，3D 建模已有 Fable 5.1 水平??
+
+![](//i1.hdslb.com/bfs/face/1af0e4327c38279db689f22a43bae1dcc8dbaaa9.jpg@96w.webp)关注
+
+正在缓冲...
+
+为TA充电后即可观看
+
+00:06 / 01:12
+
+1080P 高清
+
+自动
+
+-   4K 超高清大会员
+-   1080P 60帧大会员
+-   1080P 高清
+-   720P 准高清
+-   480P 标清
+-   360P 流畅
+-   自动(1080P 高清)
+
+选集
+
+-   DeepSeek V4 Pro 灰测：与 Opus 5 Max 对比造 波音 737max-8
+-   震惊瘫坐！Claude Opus 5.2 灰测+提示词工程，一轮制作超精细山水+体素中式建筑！
+-   再次震惊瘫坐！Fable 5.2 灰测水平，一轮出绝美山水，疑似暴打 Astra ？
+-   已吓哭！Claude Sonnet 5.5 灰测默秒全，3D 建模已有 Fable 5.1 水平??
+
+倍速
+
+-   2.0x
+-   1.5x
+-   1.25x
+-   1.0x
+-   0.75x
+-   0.5x
+
+倍速
+
+登录可享
+
+100
+
+镜像画面
+
+单集循环
+
+自动开播
+
+更多播放设置
+
+播放方式
+
+自动切集 播完暂停
+
+视频比例
+
+自动 4:3 16:9
+
+播放策略
+
+默认 AV1 HEVC AVC
+
+音量均衡
+
+标准 高动态 关闭
+
+右键长按倍速
+
+智能 1.5X 2X 3X
+
+其他设置
+
+隐藏黑边
+
+关灯模式
+
+原生画中画
+
+网络状况异常，请刷新后重试
+
+您的浏览器还未开启本地网络访问权限，可能会影响视频内容的正常播放。
+
+1\. 您可在浏览器通知中允许 bilibili.com 查找并连接本设备的请求；
+
+2\. 您可进入浏览器在"设置">"隐私和安全">"网站设置">"查看各网站的权限及存储数据"找到 www.bilibili.com，在"权限"中开启"本地网络访问权限"，开启后刷新页面即可正常播放视频。
+
+![本地网络权限开启示意图](https://i0.hdslb.com/bfs/activity-plat/static/20251218/38aa8c2cd2ba5ac4bb1c348540c179e9/69SYFkklcz.png)
+
+6人正在看
+
+按类型过滤
+
+滚动
+
+固定
+
+彩色
+
+高级
+
+弹幕随屏幕缩放
+
+防挡字幕
+
+智能防挡弹幕
+
+弹幕观看屏蔽词
+
+同步屏蔽列表
+
+显示区域
+
+100%
+
+弹幕密度
+
+正常 较多 重叠
+
+不透明度
+
+80%
+
+弹幕字号
+
+100%
+
+弹幕速度
+
+适中
+
+高级设置全新【硬核会员弹幕模式】
+
+更多弹幕设置
+
+弹幕速度同步播放倍数
+
+弹幕字体
+
+黑体
+
+-   黑体
+-   宋体
+-   新宋体
+-   仿宋
+-   微软雅黑
+-   微软雅黑 Light
+-   Noto Sans DemiLight
+-   Noto Sans Regular
+
+粗体
+
+描边类型
+
+重墨 描边 45°投影
+
+恢复默认设置
+
+发个友善的弹幕见证当下
+
+[弹幕礼仪](//www.bilibili.com/blackboard/help.html#/?qid=359&pid=357)
+
+发送
+
+优先使用播放器内置策略播放
+
+优先使用 AV1 编码视频播放
+
+优先使用 HEVC/H.265 编码视频播放
+
+优先使用 AVC/H.264 编码视频播放
+
+智能倍速会根据视频语速自动调节倍速
+
+自动平衡不同视频间的音量大小
+
+平衡音量同时保留更多声音细节
+
+关闭音量均衡
+
+开启画中画
+
+宽屏模式
+
+网页全屏
+
+进入全屏 (f)
+
+关闭弹幕 (d)
+
+视频底部15%部分为空白保留区
+
+特殊颜色、运动形式的弹幕
+
+反馈
+
+上一个 (\[)
+
+510
+
+17
+
+189
+
+242
+
+稿件举报
+
+记笔记
+
+笔记
+
+记笔记
+
+还没有人发布笔记哦，快去发布一篇吧～
+
+公开发布笔记
+
+感谢[@内向小学生的影子](//space.bilibili.com/387269454) 提供的素材 Claude Sonnet 5.5 ( 5 肯定是做不出来这个的 ) Max 思考强度 约花费 90% 的 5h 额度 Pro 套餐 Sonnet 可能把 Sol 按在地上锤有没有懂的
+
+展开更多
+
+[B站AI无限竞技场](https://m.bilibili.com/topic-detail?topic_id=1346854&topic_name=B%E7%AB%99AI%E6%97%A0%E9%99%90%E7%AB%9E%E6%8A%80%E5%9C%BA&spm_id_from=333.788.top.function_card.click "B站AI无限竞技场")
+
+[克劳德](//search.bilibili.com/all?keyword=%E5%85%8B%E5%8A%B3%E5%BE%B7&from_source=video_tag)
+
+[A\\](//search.bilibili.com/all?keyword=A%5C&from_source=video_tag)
+
+[Anthropic](//search.bilibili.com/all?keyword=Anthropic&from_source=video_tag)
+
+[Fable](//search.bilibili.com/all?keyword=Fable&from_source=video_tag)
+
+[灰测](//search.bilibili.com/all?keyword=%E7%81%B0%E6%B5%8B&from_source=video_tag)
+
+[Claude Sonnet 5.5](//search.bilibili.com/all?keyword=Claude%20Sonnet%205.5&from_source=video_tag)
+
+**汇集全球AI模型真实测评！**
+
+![汇集全球AI模型真实测评！](//i0.hdslb.com/bfs/activity-plat/static/11412/12105/d41d8cd98f00b204e9800998ecf8427e/QrtNk8xftb.png@640w_200h_!web-video-activity-cover.avif)
+
+[
+
+![](//i0.hdslb.com/bfs/sycp_brand/creative_img/202609/db11aaedcbd992fae8c036263e694bb0.png@100q.avif)
+
+![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEwAAAAsCAMAAAD4va5DAAAA/1BMVEX///8AAAADAwMDAwMBAQEBAQEXFxcUFBQBAQECAgLu7u4BAQHz8/MCAgL29vbj4+NpaWkAAAADAwOcnJwBAQEHBwexsbG2trYBAQHc3NwHBwf6+vro6OjGxsbLy8t3d3eAgIBJSUkCAgKsrKxtbW0+Pj4BAQEDAwPS0tJjY2NcXFwEBAQEBASoqKjh4eGqqqqfn59AQEBCQkJXV1cDAwMCAgLl5eW5ubk4ODgAAAADAwMDAwMQEBDAwMCgoKCbm5u6urpMTEwiIiIjIyNBQUHq6urT09Ph4eGOjo6Dg4PPz89+fn6NjY1lZWWOjo5ycnJ5eXkqKio0NDQzMzMAAACMgo+YAAAAVXRSTlOZABgJLzAIBTw5kEKNJ5WBXEUsXj8PbmxJhhSTf3t5U01CIXFZUE82dWQ2FhB4d2VcTks4NByLd1pXNTMQgHpuaWFLSkmSgHh4cWphV0lGQT08NjIijBlD5gAAAkhJREFUSMfll2lzojAYgLNcCSAICAgKbsGKt9b7arfn3vfx/3/LJh7r1s1OU+FLp89ogjjzzJvkDbwBLzJkI4NQ4o9HkiDcyySnU2pzx1NyeLiTSefcL80SRFHcfgVh9xExmwthc2d9i/zYN4KlxZwjERlxTUaBDtLQa00cuJY5XKsMUlJucTzEMtiJ34LUBPE5kUklDaSnrJUkIuMskAFWm8cynhOykAncs5KJgI4yu7yXy/oUNxdd5SiZfqu64C/CpAmA4fmAhvjfYV5UXdctXn2uR1dFt1rtvgKEgV0B4ETOPzIyQ0XIRnJ9KSNbNb1kATAuqkfR6Kf1IxrW5vN37DL0qVh0iwR3F9lUlcfjlaBp1hipXvKeeTVPUQMc4N+gfg7zTeuRTtGZZQaenQNCtQAIX7Tg0XP2j8zv5wnBV+tDgHvf93XG1TTM8DDnEhXJmJUgiEvZts1kodAjY5C9bhovMSdr8MVps6mzzpn5JrvtVDMpaV4tFM7OChjS9dl3wK05BZTkk0kOqzbpa8xPjbJp6oCSfIVGpRKGlUqjLw+Yh+mrN4Aiq//J5Pz4jnmYl+bHB2SrO+bIrr0ZVfY9Gg5qtcEwipZD1jlTFolCkRk2QqrneaZq4wVgHmb3GlBoejO8wTG5XOjNmWV0dEXfB688ubdTO5vygJM2hYsO0rMpXKATB+ldvbgDsQxP2iizYg+HNhn10qkCXIZK2wLZ4WLNEgjitt0j7jrx8J91oXxQIGMgn6p0b5c6PLx3qEhzqtgfKjLkN54+ORjAm+g5AAAAAElFTkSuQmCC)](//cm.bilibili.com/cm/api/fees/pc/sync/v2?msg=a%7C2629%2Cb%7Cbilibili%2Cc%7C1%2Cd%7C1%2Ce%7CCAAQABiAwJa36OPD3RAgACgAMP8fOMUUQh8xNzkwNjIyMTIxNzE1cTEwYTg1YTY4YTEzM3E1NDQ1SPP9lMuONFIG5ZCI6IKlWgblronlvr1iBuS4reWbvWgBcAB4gICAgLANgAEAiAHsvAWSAQ0yMTAuNDUuMTE4LjEzmgEAoAEAsgEgNwjEdOm5h7jL85ZoiHF0hdTzl1XvtqBj2nlHokozw9S6AVlodHRwczovL3d3dy5iaWxpYmlsaS5jb20vYmxhY2tib2FyZC9lcmEvclpQS1NEcXJKRU9ydGtWaS5odG1sP25hdmhpZGU9MSZtc291cmNlPXBjdG9uZ2xhbsIBANIBANgBa%2BABAOgBAPAB0aKEwMrWGoACAogCALgCAMACANACANgCAOoCAPAC55ot%2BALOAogDAZIDAKgDALADALgDAMIDDEJWMWJaYWM2TkVkZMgDGNIDtgF7IjEiOiIxMjA1NTczOTQ5MDM4MzcwODE2IiwiMiI6IjQwOTUiLCIzIjoiNDA5NSIsIjYiOiI0MDk1XzMzNCIsIjEyIjoiMjYyOSIsIjEzIjoiMzYxNyIsIjE0IjoiMCIsIjE1IjoiMCIsIjE2IjoiMzYxN18zMzQiLCIxNyI6IjI2MjUiLCIxOSI6Ijg5NzA4IiwiMjUiOiIxMjkwIiwiMjYiOiIxMjkxIiwiMjciOiIzMzQifeADAOgDAPADAPoDA3VnY4IEQGF2X2lkOjExNzMyNDE0NTI5OTc5MyxjX2lkOjAsdXBfbWlkOjUyMTE4NjQ4OCxidl9pZDpCVjFiWmFjNk5FZGSYBACgBACqBAQIABAEsAQA4gSkAjU2LnsicHNJZCI6MTU0NTk3LCJ2MiI6IkdlTjBfcHRObFlrS195RGZ2ckVaUFcyb05PZy05LWI1c2RVRHR2LWl1Zk10Zm1iTWJKYlhtYm85ZDl6WXIzUGNiNWR5em9NcjFUaUw2ckpvR0hlQlRycDVQNUJPS05wb2I1WlZBU1dUQnZWYmVNbkxzYUlnRTNkWkZZZjFCblRDbDRkZTlnaU1GTkh1NUNQVzFnakNzYlhIOFJERWgtWGtIUC12WlhSQ3J1TnZRUE9RT2tHU2ZLUVVsUUszZ2NudzRwMllmTEU3NERSMTBBIn07NjMueyJwc0lkIjoxNTQ0MDMsInYyIjoiQVhBdiJ9OzcwLnsicHNJZCI6MTE0NzgwLCJ2MiI6IkFBIn36BAJ7fZAFgAaQBYEGkAWBCJAFggaQBQuQBY0DkAWPBpAFkweQBZQDkAWYA5AFmBGQBZkDkAWaApAFmgOQBZsDkAUlkAWmBpAFpwOQBawDkAWwA5AFM5AFswGQBbQBkAW0BJAFNpAFtwiQBTuQBcADkAXBA5AFxAOQBcYFkAVIkAXICJAFyxCQBc0DkAXOApAF0AGQBdMCkAXWApAF1wKQBdgBkAXYApAF2gKQBd8CkAXgA5AF7gGQBe8FkAXwApAF8wOQBfUDkAX4A5AF%2BwKQBf8CkAX%2FA6AFAMgFA9IFAOAFA8AGAA%3D%3D%2Cf%7Cclick_sync_3%2Cg%7C1%2Ch%7C1%2Ci%7C397166483%2Cj%7C%2Ck%7C1790622122688%2Cl%7C2625%2Cm%7C1790622120845%2Cn%7C1%2Co%7C0%2Cp%7Cad_card&ts=1790622122689&spm_id_from=333.788.right_bottom.adfloor-2625.click)
+
+[
+
+![](//i0.hdslb.com/bfs/face/1af0e4327c38279db689f22a43bae1dcc8dbaaa9.jpg@96w_96h_1c_1s_!web-avatar.avif)
+
+](//space.bilibili.com/521186488/?spm_id_from=333.788.upinfo.head.click)
+
+[无机酸-\_-](//space.bilibili.com/521186488/?spm_id_from=333.788.upinfo.detail.click) [发消息](//message.bilibili.com/?spm_id_from=333.788.upinfo.detail.click#whisper/mid521186488)
+
+这个人很神秘，什么都懒得写（
+
+![](https://i0.hdslb.com/bfs/garb/item/33e2e72d9a0c855f036b4cb55448f44af67a0635.png@.webp)
+
+充电
+
+关注 7886
+
+弹幕列表
+
+弹幕列表
+
+屏蔽设定
+
+高级弹幕
+
+弹幕列表填充中...
+
+查看历史弹幕
+
+[
+
+![](//i0.hdslb.com/bfs/sycp/sanlian/image/506a0fd52ca24971b1a6871f39d294a4.jpeg@336w_190h_100q_!web-video-ad-cover.avif)
+
+广告
+
+万小智AI建站限时福利，首月15元送域名送2000灵感值
+
+新客送2000灵感
+
+5万人感兴趣
+
+
+](//cm.bilibili.com/cm/api/fees/pc/sync/v2?msg=a%7C4331%2Cb%7Cbilibili%2Cc%7C1%2Cd%7C1%2Ce%7CCJf1qBkQ98DH0QIYnvuGsg0gTygBMNKY5gE46yFCHzE3OTA2MjIxMjE3MTVxMTBhODVhNjhhMTMzcTU0NDVI8%2F2Uy440UgblkIjogqVaBuWuieW%2BvWIG5Lit5Zu9aAFwAHiAgICAoDmAAQGIAQCSAQ0yMTAuNDUuMTE4LjEzoAHoAagBA7IBICZPDYdicXa3QQe5snYX0SqkQZ%2F19JtrzFLJTRty9epZugG%2BA2h0dHBzOi8vY2xpY2suYWxpeXVuLmNvbS9tLzIwMDAwMDAwNDY4Lz90cmFja19pZD1wYmFlcy4tdE9oMGZhNTkxMXVrcnVMbUlMd2Z0ZWdCcEFsdDl1akFFRllfN18waTRPZ1hJM0Q4U2hscGowcG9BeUxSRzFUSnVKWHpSUVQ4bVZoVGJQVTJ0TnFoWWNvWjBSMm1COEpleng1a0VhODh3a292S0lfOG1xcmVsV2RwVXRSdGN3eVo4T2lKMGc2OERUcmNIdmNqYjNFbUFFakFfT3pjUmQ1a3hDaEw3NWZNcE96czZ4c1FTaDlOdGpvaW53Q1lTTDRWTHktWDM3Mk9Ed0RrU3QyQXV3OWNBJmNhaWQ9X19DQUlEX18mcmVzb3VyY2VfaWQ9X19SRVNPVVJDRUlEX18mc291cmNlX2lkPTQzMzEmZnJvbV9zcG1pZD1fX0ZST01TUE1JRF9fJnJlcXVlc3RfaWQ9MTc5MDYyMjEyMTcxNXExMGE4NWE2OGExMzNxNTQ0NSZjcmVhdGl2ZV9pZD0zNTY5MzA1MTI4JmxpbmtlZF9jcmVhdGl2ZV9pZD0zNTk0NjMyNjA2wgEBMdIBANgBygPgAcCaDOgB8IoM8AHRooTAytYa%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%2FwKQBYwDkAWNA5AFkwOQBZQDkAWYA5AFmQOQBZoDkAWbA5AFpQOQBacDkAW2A5AFtwOQBcADkAXBA5AFxAOQBc0DkAXgA5AF4QOQBeQDkAX1A5AF%2BAOQBf8DkAWHBJAFiQSQBckEkAXLBJAFzQSQBYMFkAWgBZAFqgWQBa8FkAWxBZAFtQWQBcYFkAXOBZAF0gWQBdMFkAXvBZAFowaQBaYGkAXaBpAF8AaQBfkGkAX%2FBpAFuweQBcIHkAXUB5AF9QeQBYEIkAW9CJAFlRGQBaERkAWsEZAF%2BxGQBc0SoAUAuAUFwAXY83PIBQPgBQToBQDyBYQBQ0F3UUFUQUZWY1hnODBKZFRMY3F3bVhwVUpWQmJRQkFIRVoxQUFDQVA1VUI2VkNWUWFBQmdaclR6Z0tvQWFpTS9hVU5zQUVCd0FIT3B4VElBUVh0QVFBQWdELzFBUUFBZ0QrZEFnQUFnRCtsQXNQMWlEK3RBZ0FBZ0QrMUFzUDFpRDg9%2BAWBmtPOAoAG%2F5Pr3AOIBqiM%2FaUNkAYEmAYGqAaBmtPOAg%3D%3D%2Cf%7Cclick_sync_3%2Cg%7C1%2Ch%7C1%2Ci%7C397166483%2Cj%7C%2Ck%7C1790622122694%2Cl%7C4330%2Cm%7C1790622120845%2Cn%7C1%2Co%7C0%2Cp%7Cad_card&ts=1790622122694&spm_id_from=333.788.right_bottom.adfloor-4330.click)
+
+[世界是一个巨大的灰测](//space.bilibili.com/521186488/channel/collectiondetail?sid=9141602&spm_id_from=333.788.0.0 "世界是一个巨大的灰测")
+
+（4/4）
+
+12.5万播放
+
+简介
+
+订阅合集
+
+DeepSeek V4 Pro 灰测：与 Opus 5 Max 对比造 波音 737max-8
+
+02:35
+
+震惊瘫坐！Claude Opus 5.2 灰测+提示词工程，一轮制作超精细山水+体素中式建筑！
+
+01:41
+
+再次震惊瘫坐！Fable 5.2 灰测水平，一轮出绝美山水，疑似暴打 Astra ？
+
+01:30
+
+已吓哭！Claude Sonnet 5.5 灰测默秒全，3D 建模已有 Fable 5.1 水平??
+
+01:13
+
+[
+
+![Claude用代码搓了13015帧4K视频然后吃了你13亿Token](//i0.hdslb.com/bfs/archive/0a2b3e321c1f6535f7898b70c169203843ef6c9b.jpg@336w_190h_1c_!web-video-rcmd-cover.avif)
+
+](/video/BV1SgaY64EG5/?spm_id_from=333.788.recommend_more_video.0&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+03:37
+
+[
+
+Claude用代码搓了13015帧4K视频然后吃了你13亿Token
+
+](/video/BV1SgaY64EG5/?spm_id_from=333.788.recommend_more_video.0&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+[穆阿蒂布](//space.bilibili.com/272722241/)
+
+6.3万 274
+
+[
+
+![已吓哭 opus5.5真神降临 群论之美宣传片](//i0.hdslb.com/bfs/archive/1e4e35b414c39e461e9043f2a520ec01501a4450.jpg@336w_190h_1c_!web-video-rcmd-cover.avif)
+
+](/video/BV12Zhm6oE6m/?spm_id_from=333.788.recommend_more_video.1&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+04:23
+
+[
+
+已吓哭 opus5.5真神降临 群论之美宣传片
+
+](/video/BV12Zhm6oE6m/?spm_id_from=333.788.recommend_more_video.1&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+[sadssxa](//space.bilibili.com/1244283786/)
+
+17.5万 198
+
+[
+
+![Opus 5.5、GPT-6 Sol首发实测，Claude再次统治世界？！](//i0.hdslb.com/bfs/archive/d194551382067e86bfbc482c18fb7363193ab634.jpg@336w_190h_1c_!web-video-rcmd-cover.avif)
+
+](/video/BV1fVhx67EgU/?spm_id_from=333.788.recommend_more_video.2&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+13:38
+
+[
+
+Opus 5.5、GPT-6 Sol首发实测，Claude再次统治世界？！
+
+](/video/BV1fVhx67EgU/?spm_id_from=333.788.recommend_more_video.2&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+[GenJi是真想教会你](//space.bilibili.com/49746395/)
+
+26.6万 515
+
+[
+
+![吓哭了Opus5.5 AGI概念MV](//i0.hdslb.com/bfs/archive/72c50cc1b7f0c8208207ad8e73504e6135434196.jpg@336w_190h_1c_!web-video-rcmd-cover.avif)
+
+](/video/BV18ta86EEHb/?spm_id_from=333.788.recommend_more_video.3&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+02:37
+
+[
+
+吓哭了Opus5.5 AGI概念MV
+
+](/video/BV18ta86EEHb/?spm_id_from=333.788.recommend_more_video.3&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+[白雪仅当雪白](//space.bilibili.com/593044297/)
+
+5.9万 85
+
+[
+
+![Opus 5.5 生成的最好的短片，没有之一](//i0.hdslb.com/bfs/archive/936bd68f2041ae8b45f3e2d553a801b5cb41c962.jpg@336w_190h_1c_!web-video-rcmd-cover.avif)
+
+](/video/BV1TBaa6JEFS/?spm_id_from=333.788.recommend_more_video.4&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+04:36
+
+[
+
+Opus 5.5 生成的最好的短片，没有之一
+
+](/video/BV1TBaa6JEFS/?spm_id_from=333.788.recommend_more_video.4&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+[一起Vibe](//space.bilibili.com/11770390/)
+
+3.3万 28
+
+[
+
+![在 Opus 5.5 之后，看 GPT 6 Astra 设计的任何东西都真的辣眼睛。](//i0.hdslb.com/bfs/archive/807aff5d77fcecdd33b825389cb0dbafd7f09083.jpg@336w_190h_1c_!web-video-rcmd-cover.avif)
+
+](/video/BV1YMhQ6mEjc/?spm_id_from=333.788.recommend_more_video.5&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+00:34
+
+[
+
+在 Opus 5.5 之后，看 GPT 6 Astra 设计的任何东西都真的辣眼睛。
+
+](/video/BV1YMhQ6mEjc/?spm_id_from=333.788.recommend_more_video.5&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+[一摩尔炸鸡翅](//space.bilibili.com/34842921/)
+
+3.4万 3
+
+[
+
+![吓哭了！Opus 5.5一轮生成绝美动漫樱花小镇！](//i0.hdslb.com/bfs/archive/c98d510f63363af874dae8ebf115072f5f5afda6.jpg@336w_190h_1c_!web-video-rcmd-cover.avif)
+
+](/video/BV1Ziac6JEUc/?spm_id_from=333.788.recommend_more_video.6&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+02:34
+
+[
+
+吓哭了！Opus 5.5一轮生成绝美动漫樱花小镇！
+
+](/video/BV1Ziac6JEUc/?spm_id_from=333.788.recommend_more_video.6&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+[水母菌Jellyfish](//space.bilibili.com/48143121/)
+
+4.8万 48
+
+[
+
+![Claude Opus 5.5 用代码亲手画出了这段动画](//i0.hdslb.com/bfs/archive/d3c9acf0c5736f1118309452867f2e8b198e37cc.jpg@336w_190h_1c_!web-video-rcmd-cover.avif)
+
+](/video/BV1K6ht6BEuk/?spm_id_from=333.788.recommend_more_video.7&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+00:32
+
+[
+
+Claude Opus 5.5 用代码亲手画出了这段动画
+
+](/video/BV1K6ht6BEuk/?spm_id_from=333.788.recommend_more_video.7&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+[平常心ljk](//space.bilibili.com/3546385934715647/)
+
+2.7万 1
+
+[
+
+![opus 5.5一句话生成的游戏，这是什么怪物模型啊](//i0.hdslb.com/bfs/archive/8cf914868d938adf28c961beb5a22c38455396d7.jpg@336w_190h_1c_!web-video-rcmd-cover.avif)
+
+](/video/BV1ddhx6UEd1/?spm_id_from=333.788.recommend_more_video.8&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+02:05
+
+[
+
+opus 5.5一句话生成的游戏，这是什么怪物模型啊
+
+](/video/BV1ddhx6UEd1/?spm_id_from=333.788.recommend_more_video.8&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+[星际100](//space.bilibili.com/14816104/)
+
+9.3万 25
+
+[
+
+![Opus 5.5 把 “瘫坐长椅，看到原子弹爆炸”做成了动画！](//i0.hdslb.com/bfs/archive/339e1e148297d4cd2f60a9aece24b63825f077c1.jpg@336w_190h_1c_!web-video-rcmd-cover.avif)
+
+](/video/BV1jyaA6QEoH/?spm_id_from=333.788.recommend_more_video.9&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+00:42
+
+[
+
+Opus 5.5 把 “瘫坐长椅，看到原子弹爆炸”做成了动画！
+
+](/video/BV1jyaA6QEoH/?spm_id_from=333.788.recommend_more_video.9&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+[一起Vibe](//space.bilibili.com/11770390/)
+
+9万 51
+
+[
+
+![震惊瘫坐！！Claude Opus 5.5 一句话生成的MV](//i0.hdslb.com/bfs/archive/62c4167f6087beda6e83cce2e26b8588ff59b6c3.jpg@336w_190h_1c_!web-video-rcmd-cover.avif)
+
+](/video/BV1EDhW6LEYU/?spm_id_from=333.788.recommend_more_video.10&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+02:37
+
+[
+
+震惊瘫坐！！Claude Opus 5.5 一句话生成的MV
+
+](/video/BV1EDhW6LEYU/?spm_id_from=333.788.recommend_more_video.10&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+[pixel像素直播间](//space.bilibili.com/161721776/)
+
+11.9万 374
+
+[
+
+![Claude Opus 5.5：前端之王重回它的宝座，如同核弹爆炸。AI 前端能力全面测试](//i0.hdslb.com/bfs/archive/7522bc8b166a5d48832ca5e1b60ff730d7a3b01f.jpg@336w_190h_1c_!web-video-rcmd-cover.avif)
+
+](/video/BV1NRhp6XEiq/?spm_id_from=333.788.recommend_more_video.11&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+02:51
+
+[
+
+Claude Opus 5.5：前端之王重回它的宝座，如同核弹爆炸。AI 前端能力全面测试
+
+](/video/BV1NRhp6XEiq/?spm_id_from=333.788.recommend_more_video.11&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+[无机酸-\_-](//space.bilibili.com/521186488/)
+
+7.2万 99
+
+[
+
+![吓哭了！前端真神Opus5.5制作的AI动画短片Claude Dreaming，一定要看完！](//i0.hdslb.com/bfs/archive/9c07701e4d47056d28f16c128f30a8e56df5d5b7.jpg@336w_190h_1c_!web-video-rcmd-cover.avif)
+
+](/video/BV1KChX6kEmE/?spm_id_from=333.788.recommend_more_video.12&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+04:15
+
+[
+
+吓哭了！前端真神Opus5.5制作的AI动画短片Claude Dreaming，一定要看完！
+
+](/video/BV1KChX6kEmE/?spm_id_from=333.788.recommend_more_video.12&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+[我永遠愛初音未來](//space.bilibili.com/3546686519511324/)
+
+2.2万 67
+
+[
+
+![吓哭了！Claude Sonnet 5.5一轮直出盗版《喷射战士》](//i0.hdslb.com/bfs/archive/cbd5795ed9504a5b27044f6558025cb85037e597.jpg@336w_190h_1c_!web-video-rcmd-cover.avif)
+
+](/video/BV1ftho6uEAv/?spm_id_from=333.788.recommend_more_video.13&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+04:18
+
+[
+
+吓哭了！Claude Sonnet 5.5一轮直出盗版《喷射战士》
+
+](/video/BV1ftho6uEAv/?spm_id_from=333.788.recommend_more_video.13&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+[同喜同喜](//space.bilibili.com/12597025/)
+
+2.9万 22
+
+[
+
+![Opus5.5+GPT还原鸣潮穗波市！](//i0.hdslb.com/bfs/archive/146898660ec700692f7ba8cbdf0d39ade0dd195a.jpg@336w_190h_1c_!web-video-rcmd-cover.avif)
+
+](/video/BV16xhm6UEg4/?spm_id_from=333.788.recommend_more_video.14&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+02:03
+
+[
+
+Opus5.5+GPT还原鸣潮穗波市！
+
+](/video/BV16xhm6UEg4/?spm_id_from=333.788.recommend_more_video.14&trackid=web_related_0.router-related-2589621-qhxck.1790622121732.259)
+
+
