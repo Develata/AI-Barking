@@ -14,7 +14,7 @@
 | Muse 权限选项 | [Meta 帮助中心：Muse 权限](https://www.meta.com/help/artificial-intelligence/1385290430137537/) |
 | “发给5个人”等采访内容 | [Guardian](https://www.theguardian.com/technology/2026/sep/28/metas-ai-agent-muse-home-address) |
 | GPT-6-Astra 模拟越权测试 | [UK AISI 博客](https://www.aisi.gov.uk/blog/gpt-6-astra-performs-unsanctioned-supply-chain-attacks-in-simulations)、[技术报告 PDF](https://cdn.prod.website-files.com/663bd486c5e4c81588db7a1d/6aba83e3772048bdd24df3d8_AISI_GPT-6_Astra_Technical_Report.pdf) |
-| GPT-6.1-Astra 不发布 | [WSJ](https://www.wsj.com/tech/ai/openai-chatgpt-model-release-cancel-safety-5a2f9f42)、[CBS](https://www.cbsnews.com/news/openai-halts-gpt-astra-safety-concerns/)、[CNBC](https://www.cnbc.com/2026/09/28/openai-abandons-plan-to-release-upcoming-model-as-safety-concerns-escalate.html) |
+| GPT-6.1-Astra 不按计划发布 | [CNBC DevDay 直播（Altman 采访）](https://www.cnbc.com/2026/09/29/openai-devday-2026-live-updates.html)、[WSJ](https://www.wsj.com/tech/ai/openai-chatgpt-model-release-cancel-safety-5a2f9f42)、[CBS](https://www.cbsnews.com/news/openai-halts-gpt-astra-safety-concerns/)、[CNBC](https://www.cnbc.com/2026/09/28/openai-abandons-plan-to-release-upcoming-model-as-safety-concerns-escalate.html) |
 
 ## 阅读限制
 
@@ -23,7 +23,7 @@
 - Robb 的帖子与附图是当事人自述，Muse 的聊天截图是模型对自己行为的复述，都不是 Meta 后台日志；Singleton 的回复是员工个人发言。
 - Robb 更新帖称 $600 报价、$700 底价，原帖附图却显示商品标价 CA$15、成交 $10，两者对不上，正文不写价格。
 - AISI 的 29.2% 为 100 个场景、每场景 5 次运行下的比例，全程模拟且关闭了 Astra 的网安分类器；44% 与 4/49 来自 10 个高越权场景子集，不能与 29.2% 按同一分母比较。
-- GPT-6.1-Astra 不发布只见媒体报道与媒体所获声明；截至北京时间 9/30 01:00，未找到 OpenAI 官方原文。
+- GPT-6.1-Astra 不按计划发布：OpenAI 安全系统负责人向媒体发声明，Altman 在 DevDay 当天接受 CNBC 采访称属“normal course”、常是改完再发（`e-cnbc-devday-live.html`）；官网与官方 X 账号未见公告。
 - 取证清单（[evidence.md](evidence.md)）、抓取日志（[capture-log.md](capture-log.md)）与[事实核验](fact-check.md)均保留为工作档案；配图说明见[这里](../images/README.md)。`*.py`、`capture.ps1` 为取证时使用的抓取脚本。
 
 发现影响正文的错误时，在本期增加 `CORRECTION.md`，保留更正原因与来源。

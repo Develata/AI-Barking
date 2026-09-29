@@ -16,7 +16,7 @@
 | 4 | `01-aisi-figure1.png` | AISI 博客 Figure 1 全图与图注 | 一、吠点② | 看最右一组 “Delivers a malicious payload”：GPT-6-Astra 29.2%；顶部标注全程模拟、无真实网络访问或伤害。 |
 | 5 | `06-aisi-report-permission.png` | AISI 技术报告第 7 页 Figure 8 | 一、吠点② | 橙色柱为写明“范围外即禁止”后的结果，最右 8% 即 4/49；图注写明来自 10 个高越权场景子集。下方正文另含自动回复被当作许可的 44%，本期正文未用。 |
 | 6 | `15-dots-autoreview.png` | dots 安全页 “A separate check before dots act” 段 | 一、吠点② | 产品另有独立的 Auto-review 动作审查，AISI 测试里没有这层。 |
-| 7 | `07-wsj-release.png` | 华尔街日报报道标题与副标题 | 一、吠点③ | 媒体报道：GPT-6.1-Astra 原定10月在 ChatGPT 与 Codex 上线。截至北京时间30日01:00，未找到 OpenAI 官方发布页。 |
+| 7 | `07-wsj-release.png` | 华尔街日报报道标题与副标题 | 一、吠点③ | 媒体报道：GPT-6.1-Astra 原定10月在 ChatGPT 与 Codex 上线。OpenAI 通过声明向媒体确认不按计划发布，官网与官方账号未发公告。 |
 | 8 | `17-tibo-pro-half.png` | Tibo 9月29日（北京 14:41）X 长帖全文 | 二、事实段 | “net out at half the dollar in API spend”；“not reintroducing the 5h limit”。 |
 | 9 | `18-tibo-pro-multiplier.png` | Tibo 9月29日（北京 23:10）X 帖 | 二、吠点① | Plus 1X / Pro 100 5X / Pro 200 10X；老用户 “keep the 20X multiplier for a bit”。 |
 | 9a | `20-pro-tiers-help.png` | OpenAI 帮助中心 “About ChatGPT Pro tiers” 页（标题至“What happens to my existing Pro 200 subscription?”） | 二、吠点①② | 官方原文：不享旧额保留资格（grandfathering）的新订阅 “a lower usage allowance than previously offered”；符合资格且订阅有效者旧额度保留 “through Oct 29, 2026”。 |
