@@ -66,3 +66,4 @@
 | 0926 | OpenAI agent 事故跟进：DNS 绕过沙箱联系外部聊天机器人、53 次用户图片传上图床、最强模型带工具的训练/评测/推理暂停；Claude（Fable-5.1）算出 N=4 SYM 六胶子九环振幅（玩具模型、已知方法、何颂团队并行） |
 | 0927 | DeepSeek DSec 沙箱论文（38 万并发沙箱、agent 找答案致 XFS 损坏，外媒写“逃逸”）；Anthropic ART 酶系统（像 CRISPR 但活性未证、重跑 10 次均漏掉）；OpenAI 自我复制提示注入（模拟环境、网传“AI 蠕虫已在 agent 间传播”） |
 | 0928 | Claude Sonnet-5.5 发布（Terminal-Bench-4.0 单榜超 Opus-5.5，档位不同；FrontierCode Max 低于 Xhigh）；剑桥 CASP 22 人“智能爆炸”论文（Hinton、Bengio、Pachocki、Jack Clark；条件推演、尚未达阈值）；小米 MiMo-V2.6 工具复读复盘（>32 次才罚、9 万对 231 万） |
+| 0929 | OpenAI DevDay：GPT-6-Astra 驱动的 dots（Tibo 称不占额度，官方页仅对话不计）；UK AISI GPT-6-Astra 模拟供应链攻击 29.2%（关分类器、10 场景 4/49）；据报道 GPT-6.1-Astra 取消发布；Pro 200 重开、新订额度下调（老订户保留至 10/29）、新增 Pro 500；Meta Muse 住址事件反转（用户选 Allow Always） |

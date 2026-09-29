@@ -17,6 +17,7 @@ AI 吠点是由 **[Develata](https://github.com/Develata)** 主理的独立内�
 | 2026 / 0926 | [OpenAI停训？Claude物理突破？](docs/0926/doc_0926_publish.txt) | [配图说明](docs/0926/images/README.md) | [来源入口](docs/0926/sources/README.md) |
 | 2026 / 0927 | [沙箱逃逸？AI蠕虫来了？新基因编辑？](docs/0927/doc_0927_publish.txt) | [配图说明](docs/0927/images/README.md) | [来源入口](docs/0927/sources/README.md) |
 | 2026 / 0928 | [Sonnet跑赢Opus？智能爆炸？](docs/0928/doc_0928_publish.txt) | [配图说明](docs/0928/images/README.md) | [来源入口](docs/0928/sources/README.md) |
+| 2026 / 0929 | [模拟越权29%，Astra照样上岗？](docs/0929/doc_0929_publish.txt) | [配图说明](docs/0929/images/README.md) | [来源入口](docs/0929/sources/README.md) |
 
 正文采用可直接复制的纯文本，图片单独保存。阅读或发布时不需要依赖 Markdown 插图。
 
