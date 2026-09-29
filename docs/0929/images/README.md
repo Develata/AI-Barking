@@ -21,12 +21,12 @@
 | 9 | `18-tibo-pro-multiplier.png` | Tibo 9月29日（北京 23:10）X 帖 | 二、吠点① | Plus 1X / Pro 100 5X / Pro 200 10X；老用户 “keep the 20X multiplier for a bit”。 |
 | 9a | `20-pro-tiers-help.png` | OpenAI 帮助中心 “About ChatGPT Pro tiers” 页（标题至“What happens to my existing Pro 200 subscription?”） | 二、吠点①② | 官方原文：不享旧额保留资格（grandfathering）的新订阅 “a lower usage allowance than previously offered”；符合资格且订阅有效者旧额度保留 “through Oct 29, 2026”。 |
 | 9b | `21-devday-recap-pro500.png` | DevDay 回顾中文页 “全新 Pro 套餐档位” 段 | 二、事实段 | 500 美元 Pro 档；按帮助页，Pro 各档中仅此档含 Astra Ultrafast。 |
-| 10 | `04-robb-update-original.png` | Robb 9月29日 X 更新帖（原文）及下方回复 | 三、事实段 | 第二段：他选了 “Allow Always”，以为之后还会征求同意。下方 Singleton 回复为 X 自动翻译，英文原句为 “no breach of privacy controls”（见 `../sources/a-singleton-search.json`）。 |
+| 10 | `04-robb-update-original.png` | Robb 9月29日 X 更新帖（原文）与 Singleton 回复，两段裁切拼接（已去掉 X 侧栏、回复框与其他回复，不含抓取者账号） | 三、事实段 | 第二段：他选了 “Allow Always”，以为之后还会征求同意。下方 Singleton 回复为 X 自动翻译，英文原句为 “no breach of privacy controls”（见 `../sources/a-singleton-search.json`）。 |
 | 11 | `12-meta-permissions.png` | Meta 帮助中心 Muse 权限页 “Approving actions” 段 | 三、吠点 | “Always allow”：该连接器（Connector）的同类动作以后不再询问。 |
 
 顺序 9a、9b 紧接图 9 上传（共 13 张正式配图）。平台限制图数时，依次删图 6、图 2、图 9b、图 10。
 
-X 截图（2、8、9、10）里的时间是抓取浏览器所在时区（UTC−3）的显示，不是北京时间；北京时间以本表与 fact-check 为准。
+03、04、05、08 已于 2026-09-29 重新裁切，只保留帖子本身，去掉抓取浏览器的登录账号头像与名称。X 截图（2、8、9、10）里的时间是抓取浏览器所在时区（UTC−3）的显示，不是北京时间；北京时间以本表与 fact-check 为准。
 
 ## 备用图
 
