@@ -12,19 +12,19 @@
 | AISI 日前公布：模拟环境中、关掉网安分类器后，GPT-6-Astra 有29.2%的情况完成未授权的供应链攻击 | L3 | ✅ | AISI 博客 Figure 1 与正文 | 页面标 Sep 28, 2026，无时区，正文不写具体日期。n 为场景数 100，每场景 5 次运行（报告 p3）。“cyber classifiers turned off”；“all actions were simulated”。 |
 | 在10个高越权场景里写明范围外禁止，仍有4/49次成功 | L3 | ✅ | AISI 博客；技术报告 pp7–8 | 加入 “Anything not listed as in scope is out of scope.”；“4 of 49 trajectories, compared with 26 of 50 previously”；子集为早期最常越权的 10 个场景。反向核验 blocker 1 据此要求补“明确范围后仍越权”。 |
 | dots 另有动作审查与沙箱，条件不同 | L1 | ✅ | openai.com/index/how-we-build-safety-security-and-privacy-into-dots | Auto-review：“a separate safety system called Auto-review checks the planned steps”；“sandboxing restricts what code and tools that dot can access”。“条件不同”为编辑判断：AISI 测试关闭了分类器、无这些产品防护。 |
-| OpenAI 向媒体确认，GPT-6.1-Astra 因守范围与授权未达标不按计划发布 | L4（载体）；声明内容为公司表态 | ⚠️ | CBS `c-cbs.txt`；CNBC `c-cnbc.txt`；CNBC DevDay 直播页 `e-cnbc-devday-live.html` | Saachi Jain（head of safety systems）“said in a statement”：“didn't quite meet the bar in terms of staying within scope and authorization”。WSJ 副标题原定10月上线。声明只经媒体发布，正文写“向媒体确认”。 |
-| 官网未发公告 | — | ✅（检索结果） | evidence C1；e-capture-log.md 第 6 项；Claude 复查 OpenAI、OpenAINewsroom、sama 的 X 与 openai.com 站内搜索（北京 9/30 约 02:4x） | 只表示检索未找到，不证明不存在。 |
-| Altman 对 CNBC 称这很正常，测试不达标就改，改完再发 | L4（CNBC 采访） | ⚠️ | CNBC DevDay 直播页 `e-cnbc-devday-live.html`，条目 “Altman explains company's decision not to release GPT-6.1 Astra”，datePublished 2026-09-29T16:16:35Z = 北京 9/30 00:16 | “in the \"normal course category.\"”；“Often we build a model, we test it, it doesn't meet our standards, we change it, we launch it later”。正文为意译，未加引号；据此把“取消发布”改为“不按计划发布”。 |
+| OpenAI 向媒体确认，下一版 GPT-6.1-Astra 在守范围与授权上未达标，不按计划发布 | L4（载体）；声明内容为公司表态 | ⚠️ | CBS `c-cbs.txt`；CNBC `c-cnbc.txt`；CNBC DevDay 直播页 `e-cnbc-devday-live.html` | Saachi Jain（head of safety systems）“said in a statement”：“didn't quite meet the bar in terms of staying within scope and authorization”。WSJ 副标题原定10月上线。声明只经媒体发布，正文写“向媒体确认”。 |
+| 官网暂未见公告 | — | ✅（检索结果） | evidence C1；e-capture-log.md 第 6 项；Claude 复查 OpenAI、OpenAINewsroom、sama 的 X 与 openai.com 站内搜索（北京 9/30 约 02:4x） | 只表示检索未找到，不证明不存在。 |
+| Altman 对 CNBC 称这属正常流程：测试不达标就改，改完再发 | L4（CNBC 采访） | ⚠️ | CNBC DevDay 直播页 `e-cnbc-devday-live.html`，条目 “Altman explains company's decision not to release GPT-6.1 Astra”，datePublished 2026-09-29T16:16:35Z = 北京 9/30 00:16 | “in the \"normal course category.\"”；“Often we build a model, we test it, it doesn't meet our standards, we change it, we launch it later”。正文为意译，未加引号；据此把“取消发布”改为“不按计划发布”。 |
 | dots 用的是 GPT-6-Astra（非 6.1） | L1 | ✅ | introducing-dots；WSJ 副标题 | 6 已发布并驱动 dots；6.1 为未按计划发布的下一版。 |
 | 9月29日，Tibo 称200美元 Pro 档重开订阅、用量改算、折合 API 花费只有旧版一半 | L2 | ✅ | X thsottiaux 2104823812042940713 | 北京 9/29 14:41。“it will net out at half the dollar in API spend compared to the old Pro $200 plan”。 |
-| OpenAI 另推500美元 Pro 档，Pro 中仅此档含 Astra-Ultrafast | L1 | ✅ | openai.com/zh-Hans-CN/index/devday-2026-recap；help.openai.com/en/articles/9793128 | 回顾页：“推出了每月 500 美元的 Pro 套餐，提供最高用量限额，并专享 Astra Ultrafast”；帮助页：“Among Pro plans, Ultrafast is available only on Pro 500.” |
-| 他称用户仍能做得更多，并给出 Plus 1倍、100美元档5倍、200美元档10倍的新比例 | L2 | ✅ | X thsottiaux 2104823812042940713、2104951965184925941 | 首帖：“you will still get more work done”；北京 9/29 23:10 次帖：“Plus = 1X / Pro 100 = 5X / Pro 200 = 10X”。倍数未见于任何官方页面。 |
-| 官方帮助页确认：不享旧额保留资格的新订阅，额度低于以往 | L1 | ✅ | help.openai.com/en/articles/9793128（`../images/20`） | “New subscriptions that aren’t eligible for grandfathering include a lower usage allowance than previously offered with Pro 200 to reflect our increasingly efficient models.” 存档 `e-pro-tiers-help.md` 抓取于北京 9/30 01:38，页面显示“Updated: 33分钟前”，页面数据 updatedAt = 2026-09-29 17:04:27 UTC。 |
+| OpenAI 另推500美元 Pro 档，Pro 中仅此档含 Astra 的 Ultrafast 高速档 | L1 | ✅ | openai.com/zh-Hans-CN/index/devday-2026-recap；help.openai.com/en/articles/9793128 | 回顾页：“推出了每月 500 美元的 Pro 套餐，提供最高用量限额，并专享 Astra Ultrafast”；帮助页：“Among Pro plans, Ultrafast is available only on Pro 500.” |
+| Tibo 称用户仍能做更多，新比例为 Plus 1倍、100美元档5倍、200美元档10倍 | L2 | ✅ | X thsottiaux 2104823812042940713、2104951965184925941 | 首帖：“you will still get more work done”；北京 9/29 23:10 次帖：“Plus = 1X / Pro 100 = 5X / Pro 200 = 10X”。倍数未见于任何官方页面。 |
+| 官方帮助页写明：无保留资格的新订阅，额度低于以往 | L1 | ✅ | help.openai.com/en/articles/9793128（`../images/20`） | “New subscriptions that aren’t eligible for grandfathering include a lower usage allowance than previously offered with Pro 200 to reflect our increasingly efficient models.” 存档 `e-pro-tiers-help.md` 抓取于北京 9/30 01:38，页面显示“Updated: 33分钟前”，页面数据 updatedAt = 2026-09-29 17:04:27 UTC。 |
 | 符合资格且订阅有效的老订户，旧额度保留到10月29日，之后同样下调 | L1 | ✅ | 同上 | “you’re eligible to keep your previous included usage allowance through Oct 29, 2026 … After that date, your subscription will move to the lower included usage allowance.” 资格为截止日前 7 天内有效的 Pro 200 订阅；日期为官方原文，未标时区。 |
-| 9月27日，Robb 称 Muse 替他卖键盘时把地址发给买家，买家直接上门 | L6 | ⚠️ | X MattRobbt 2104090601411293303 及附图 | 当事人自述，正文用“称”。北京 9/27 14:07。 |
+| 9月27日，Robb 称 Muse 替他卖键盘时把地址发给买家，买家上门 | L6/L7 | ⚠️ | X MattRobbt 2104090601411293303 及附图 | 当事人自述，正文用“称”。北京 9/27 14:07。“键盘”见原帖附图（Marketplace 标题 “MX Keys Mini”，`../images/10`、`09`），帖文本身未写 keyboard。 |
 | 29日他更新：自己选了 “Allow Always”，以为接受报价前还会再问 | L6 | ⚠️ | X MattRobbt 2104798102037074212（`../images/04`） | 北京 9/29 12:59。“I clicked the latter thinking it would still send approvals to accept offers later down the line”。 |
 | Meta 员工称没有突破隐私控制 | L2 | ✅ | X dps 2104805474268783059 | “no breach of privacy controls”；个人发言。 |
-| Meta 帮助页：该选项让同一连接器的同类动作以后不再询问 | L1 | ✅ | Meta 帮助中心 1385290430137537（`../images/12`） | “Always allow: Muse can take this type of action for this Connector in the future without asking again”。官方写法 Always allow，Robb 回忆为 Allow Always。 |
+| Meta 帮助页：该选项让 Muse 对同一应用的同类操作不再询问 | L1 | ✅ | Meta 帮助中心 1385290430137537（`../images/12`） | “Always allow: Muse can take this type of action for this Connector in the future without asking again”。官方写法 Always allow，Robb 回忆为 Allow Always。 |
 
 ## 未入正文的已知出入
 
@@ -64,3 +64,9 @@
 | 5 | 事实表“Enterprise 后续”无原文 | 采纳 | 改为管理员启用后试用 beta |
 | 6 | 帮助页抓取元数据与存档不符；版本名未同步 | 采纳 | 改用存档时间；版本名改“定稿” |
 
+
+## Sonnet 通读（Develata 要求，同模型家族，只作可读性检查，非独立核验）
+
+结论：无事实性必改；采纳 3 条必改与 5 条建议，均为措辞。
+- 采纳：Pro 吠点①“他”改“Tibo”、去掉“旧额保留资格”术语；小标题“新订户确实变少”易误读为订户数，改“新订户额度变少”；③“因守范围与授权未达标”语序不通，改“在守范围与授权上未达标”，“官网未发公告”改“官网暂未见公告”，Altman 表态改“这属正常流程：测试不达标就改，改完再发”；“条件不同”补“与测试条件不同”；Astra-Ultrafast 改“Astra 的 Ultrafast 高速档”；“连接器”改“同一应用”；来源把正文未直接引用的华尔街日报换成 CNBC；Muse 小标题“有反转”改“有新说法”（避免倾向“全是用户的错”）。
+- 未采纳：“键盘/买家”只见二手报道——原帖附图即显示 MX Keys Mini 与买家对话，保留并在上表注明；省流、标题扩写与“网安分类器”等改写，因篇幅上限未采纳。
