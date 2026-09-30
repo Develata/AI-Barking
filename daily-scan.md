@@ -67,3 +67,4 @@
 | 0927 | DeepSeek DSec 沙箱论文（38 万并发沙箱、agent 找答案致 XFS 损坏，外媒写“逃逸”）；Anthropic ART 酶系统（像 CRISPR 但活性未证、重跑 10 次均漏掉）；OpenAI 自我复制提示注入（模拟环境、网传“AI 蠕虫已在 agent 间传播”） |
 | 0928 | Claude Sonnet-5.5 发布（Terminal-Bench-4.0 单榜超 Opus-5.5，档位不同；FrontierCode Max 低于 Xhigh）；剑桥 CASP 22 人“智能爆炸”论文（Hinton、Bengio、Pachocki、Jack Clark；条件推演、尚未达阈值）；小米 MiMo-V2.6 工具复读复盘（>32 次才罚、9 万对 231 万） |
 | 0929 | OpenAI DevDay：GPT-6-Astra 驱动的 dots（Tibo 称不占额度，官方页仅对话不计）；UK AISI GPT-6-Astra 模拟供应链攻击 29.2%（关分类器、10 场景 4/49）；据报道 GPT-6.1-Astra 取消发布；Pro 200 重开、新订额度下调（老订户保留至 10/29）、新增 Pro 500；Meta Muse 住址事件反转（用户选 Allow Always） |
+| 0930 | GPT-6.1-Sol（“五分之一价”为相对 Astra 的 token 单价，6-Sol 已同价，仅缓存降价；AA 52 对 53、每题 0.72 对 3.26 美元、xhigh 编码反超 max 3 分）；Anthropic 评估 GLM-5.3 网络能力（64%–100% 为模拟中尝试连接比例、50/410 对 56/410、Flash 版 20.4 美元打已知漏洞）；白宫行政令把 AI 改称 SI（定义沿用法定 AI、ai.gov 未改名） |
