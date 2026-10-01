@@ -29,9 +29,9 @@ Develata 在对话中说“已发布”，即授权 Claude 对当期完成下面
 | GitHub（本仓库） | 发布正文、配图说明、正式配图（无损压缩后）、`sources/` 中的文本（md、txt、json、jsonl、py、ps1 等）、`images/.gitignore`、`sources/offsite.tsv` |
 | OpenList（`openlist.develata.me`） | 封面 `images/00-cover*`、备用图，`sources/` 中的 PDF、HTML、图片与音视频原件 |
 
-- 分界写在根目录 `.gitignore`（封面与 `sources/` 原件）和各期 `images/.gitignore`（备用图，由 `barking offsite` 生成：`images/README.md` 中“## 正式配图”一节引用的是正式配图，其余图片除封面外都算备用图）。忽略规则只对未跟踪文件生效：2609/0928 及更早期次的原件、1001 及更早期次的备用图已在 Git 历史中，不搬也不改写。
+- 分界写在根目录 `.gitignore`（封面与 `sources/` 原件）和各期 `images/.gitignore`（备用图，由 `barking offsite` 生成：`images/README.md` 中“## 正式配图”一节引用的是正式配图，其余图片除封面外都算备用图）。忽略规则只对未跟踪文件生效：2609/0928 及更早期次的原件、1001 及更早期次的备用图已在 Git 中，不移出也不改写历史，但同样上传 OpenList 并记入 `offsite.tsv`。
 - OpenList 目标路径：`<OPENLIST_ROOT>/<YYMM>/<MMDD>/<相对期次目录的路径>`，与仓库目录一一对应。
-- `sources/offsite.tsv` 每行一个不入库文件：相对期次目录的路径、字节数、SHA-256。它入库，用来证明网盘上的原件就是当时取证的那一份。
+- `sources/offsite.tsv` 每行一个存于 OpenList 的文件：相对期次目录的路径、字节数、SHA-256。它入库，用来证明网盘上的原件就是当时取证的那一份。
 - 单文件 1 MB 为提交上限。超过的文本文件（如大 JSON 采样）先问是否必须入库；入库的历史无法靠 `.gitignore` 撤回。
 
 ## 凭据
