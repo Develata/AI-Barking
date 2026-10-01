@@ -68,3 +68,4 @@
 | 0928 | Claude Sonnet-5.5 发布（Terminal-Bench-4.0 单榜超 Opus-5.5，档位不同；FrontierCode Max 低于 Xhigh）；剑桥 CASP 22 人“智能爆炸”论文（Hinton、Bengio、Pachocki、Jack Clark；条件推演、尚未达阈值）；小米 MiMo-V2.6 工具复读复盘（>32 次才罚、9 万对 231 万） |
 | 0929 | OpenAI DevDay：GPT-6-Astra 驱动的 dots（Tibo 称不占额度，官方页仅对话不计）；UK AISI GPT-6-Astra 模拟供应链攻击 29.2%（关分类器、10 场景 4/49）；据报道 GPT-6.1-Astra 取消发布；Pro 200 重开、新订额度下调（老订户保留至 10/29）、新增 Pro 500；Meta Muse 住址事件反转（用户选 Allow Always） |
 | 0930 | GPT-6.1-Sol（“五分之一价”为相对 Astra 的 token 单价，6-Sol 已同价，仅缓存降价；AA 52 对 53、每题 0.72 对 3.26 美元、xhigh 编码反超 max 3 分）；Anthropic 的 GLM-5.3 网络能力报告（写攻击程序 50/410 逼近 5 个月前的 Mythos-Preview 56/410；64%–100% 绕过率为模拟中尝试连接比例；Flash 版 20.4 美元打已知漏洞）；白宫行政令把 AI 改称 SI（定义沿用法定 AI、ai.gov 未改名） |
+| 1001 | Gemini-4-Argon（先向受信任者推出、大众开放未给日期；AA-Omniscience 没答对的题里错答15%、答对率50%对 Astra 63%；限时首发价 $2/$10、期满 $4/$20；谷歌自家对比表19项 Argon 最高13、并列1、落后5）；OpenAI 蒸馏行动（1.6万次请求为尝试、核心集群归因月之暗面相关人员、页面未给归因依据、月之暗面未立即回应）；Anthropic 机器人研究（74% 体力任务约占34% 工时，成本低于人工仅占全部工时0.3%，成本降约70% 才到10%、按年降3% 约40年） |
