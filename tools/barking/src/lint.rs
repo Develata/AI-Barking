@@ -23,7 +23,7 @@ const BANNED: [&str; 5] = [
     "当然我们也不能忽视",
 ];
 const PLACEHOLDERS: [&str; 6] = ["TODO", "TBD", "待补", "待核", "【图", "[图"];
-const IMAGE_EXTS: [&str; 5] = ["png", "jpg", "jpeg", "webp", "gif"];
+pub const IMAGE_EXTS: [&str; 5] = ["png", "jpg", "jpeg", "webp", "gif"];
 /// Characters that mark a number as a quantity or date rather than a version.
 const UNITS: [char; 14] = [
     '月', '日', '年', '美', '元', '倍', '万', '亿', '个', '条', '次', '天', '分', '秒',
