@@ -44,7 +44,7 @@
 
 ## 封面
 
-已生成（2026-09-29，Codex CLI 内置图像生成，gpt-6-astra，参考图 `../../../common_images/profile_picture.png`）：[00-cover.png](00-cover.png)（1086×1448，3:4，小红书、抖音）、[00-cover-wide.png](00-cover-wide.png)（1921×819，约 2.35:1，公众号）。上传顺序排在所有配图之前。
+已生成（2026-09-29，Codex CLI 内置图像生成，gpt-6-astra，参考图 `../../../../common_images/profile_picture.png`）：[00-cover.png](00-cover.png)（1086×1448，3:4，小红书、抖音）、[00-cover-wide.png](00-cover-wide.png)（1921×819，约 2.35:1，公众号）。上传顺序排在所有配图之前。
 
 候选与挑选：竖版、横版各 2 张候选，竖版选第 1 张，横版选第 2 张。
 - 竖版：第 2 张主标题更大，但安检门、会员卡与看板娘挤满下半幅；第 1 张主体间留白多，保留说明书式 ①②③ 编号，更贴本期画风，主标题仍占画宽约 80%，缩略图可读。
