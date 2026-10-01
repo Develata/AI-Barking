@@ -14,7 +14,7 @@ Develata 在对话中说“已发布”，即授权 Claude 对当期完成下面
 2. **检查**（任一不过就停下报告）：
    - `cargo run --release --manifest-path tools/barking/Cargo.toml -- lint <期次目录>`，0 个错误；
    - 配图无损压缩：`oxipng -o 4 --strip safe <期次目录>/images/*.png`，像素不变；
-   - 大文件：`cargo run --release --manifest-path tools/barking/Cargo.toml -- offsite <期次目录>` 生成 `sources/offsite.tsv`；待提交文件中没有单个超过 1 MB 的，有就先问；
+   - 大文件：`cargo run --release --manifest-path tools/barking/Cargo.toml -- offsite <期次目录>` 按 `images/README.md` 的“正式配图”一节生成 `images/.gitignore`（备用图清单）和 `sources/offsite.tsv`；待提交文件中没有单个超过 1 MB 的，有就先问；
    - 身份：按 `templates/codex-evidence.md` 第 7 条，grep 抓取者的头像链接、显示名与 handle，确认未入库；
    - 凭据与会话状态（`.env`、cookies、storage-state）未入库。
 3. **提交**：按 `AGENTS.md` 的提交约定分三批、依序提交。
@@ -26,10 +26,10 @@ Develata 在对话中说“已发布”，即授权 Claude 对当期完成下面
 
 | 存放处 | 内容 |
 |---|---|
-| GitHub（本仓库） | 发布正文、配图说明、`images/` 中封面以外的 PNG（无损压缩后）、`sources/` 中的文本（md、txt、json、jsonl、py、ps1 等）、`sources/offsite.tsv` |
-| OpenList（`openlist.develata.me`） | 封面 `images/00-cover*`，`sources/` 中的 PDF、HTML、图片与音视频原件 |
+| GitHub（本仓库） | 发布正文、配图说明、正式配图（无损压缩后）、`sources/` 中的文本（md、txt、json、jsonl、py、ps1 等）、`images/.gitignore`、`sources/offsite.tsv` |
+| OpenList（`openlist.develata.me`） | 封面 `images/00-cover*`、备用图，`sources/` 中的 PDF、HTML、图片与音视频原件 |
 
-- 分界写在根目录 `.gitignore`，只对未跟踪文件生效。2609/0928 及更早期次的原件已在 Git 历史中，不搬也不改写。
+- 分界写在根目录 `.gitignore`（封面与 `sources/` 原件）和各期 `images/.gitignore`（备用图，由 `barking offsite` 生成：`images/README.md` 中“## 正式配图”一节引用的是正式配图，其余图片除封面外都算备用图）。忽略规则只对未跟踪文件生效：2609/0928 及更早期次的原件、1001 及更早期次的备用图已在 Git 历史中，不搬也不改写。
 - OpenList 目标路径：`<OPENLIST_ROOT>/<YYMM>/<MMDD>/<相对期次目录的路径>`，与仓库目录一一对应。
 - `sources/offsite.tsv` 每行一个不入库文件：相对期次目录的路径、字节数、SHA-256。它入库，用来证明网盘上的原件就是当时取证的那一份。
 - 单文件 1 MB 为提交上限。超过的文本文件（如大 JSON 采样）先问是否必须入库；入库的历史无法靠 `.gitignore` 撤回。
@@ -43,6 +43,6 @@ Develata 在对话中说“已发布”，即授权 Claude 对当期完成下面
 | `OPENLIST_URL` | 站点地址，如 `https://openlist.develata.me` |
 | `OPENLIST_USERNAME` | 上传专用用户名 |
 | `OPENLIST_PASSWORD` | 该用户的密码 |
-| `OPENLIST_ROOT` | 该用户可见路径下的归档根目录，如 `/AI-Barking` |
+| `OPENLIST_ROOT` | 归档根目录，相对该用户的基本路径。WebDAV 地址 `https://openlist.develata.me/dav/AI-Barking` 对应的 OpenList 路径是 `/AI-Barking`：用户基本路径为 `/` 时填 `/AI-Barking`；基本路径已限定为 `/AI-Barking` 时填 `/` |
 
 建议在 OpenList 后台为上传单独建一个用户：基本路径限定到归档所在的网盘目录；权限只勾“创建目录或上传”（源码 `internal/model/user.go` 权限位 3，覆盖同名文件也只需这一项），不勾删除、重命名、移动、WebDAV 等；不开二步验证（脚本无法输入验证码）。凭据由 Develata 直接写进 `.env`，不在对话中发送。
