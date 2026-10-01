@@ -2,7 +2,7 @@
 
 选题、正文结构、事实分级、核验流程与纠错见 `EDITORIAL.md`；本文件只管交付格式。
 
-- 仓库结构：每期一个目录 `docs/<MMDD>/`（正文、`images/`、`sources/`）；根目录只放 `README.md`、规范、`daily-scan.md`、`brand/`、`common_images/`（跨期通用图片，如头像 PNG 原图）、`templates/`、`tools/` 与 `.handoff/`（历史派工及交接），保持整洁。
+- 仓库结构：每期一个目录 `docs/<YYMM>/<MMDD>/`（正文、`images/`、`sources/`），按月份归档，如 `docs/2609/0928/`；流程文档放 `docs/workflow/`。根目录只放 `README.md`、规范、`daily-scan.md`、`.env.example`、`brand/`、`common_images/`（跨期通用图片，如头像 PNG 原图）、`templates/`、`tools/` 与 `.handoff/`（历史派工及交接），保持整洁。`daily-scan.md` 是定时检索任务读取的 prompt，不要移动或改名。
 - 内容面向小红书、抖音、微信公众号（2026-09-28 起不再运营微博），默认维护一份统一正文。
 - 正文与图片分开交付：发布正文应能直接复制，图片作为独立素材保存在对应期次的 images/ 中。
 - 可复制正文默认保存为 `<稿件名>_publish.txt`，不包含 Markdown 标题、加粗、链接语法等排版标记；标题与正文用纯文本表达。不要再生成 `with_images` 插图副本作为发布稿。
@@ -14,5 +14,5 @@
 - 不生成 ZIP 等打包副本，除非用户明确要求。
 - 默认交付正文文件、图片目录和配图说明的本地链接；不为方便下载另做压缩包或重复目录。
 - 保留用户原稿；内部稿和核验记录可以使用 Markdown。调整交付格式不等于授权重写正文事实或结论。
-- 公开归档范围见 `README.md`。本仓库同时保存完整工作材料与 Git 历史；草稿、核验笔记、派工、原始采集与完整网页存档可以公开，但须与发布正文及已核验事实区分。凭据、浏览器会话状态、缓存和构建产物不上传；`.gitignore` 不能排除已有提交中的文件。
-- 提交约定：每期新增内容按三批、依序提交，提交信息以期次 `<MMDD>：` 开头。①仓库层：根目录 `README.md` 期次索引、`daily-scan.md` 的“已发过”、`.handoff/` 派工单；②取证存档：`docs/<MMDD>/sources/` 下除下面第③批所列之外的全部文件（页面存档、PDF、社交与媒体采样、抓取脚本、失败截图、辅助记录）；③本期成品：`doc_<MMDD>_publish.txt`、`images/`（含 `images/README.md`）以及 `sources/` 下的 `README.md`、`fact-check.md`、`evidence.md`、`capture-log.md`。取证存档先于成品提交，因为成品引用它。体量最大的是第②批，提交前先看有无单个超过 5 MB 的文件，有就先问是否必须入库；入库的历史无法靠 `.gitignore` 撤回。当期没有新增取证存档时，第②批省略。发布后的标题、文字或配图修订，各自单独小提交。推送、打标签、改写已推送的历史需要当次明确授权；尚未推送的提交可经同意后重新拆分。
+- 公开归档范围见 `README.md`。本仓库同时保存完整工作材料与 Git 历史；草稿、核验笔记、派工与原始采集可以公开，但须与发布正文及已核验事实区分。封面与 `sources/` 中的 PDF、HTML、图片和音视频原件不入库，存 OpenList，`sources/offsite.tsv` 记其大小与 SHA-256，分工见 `docs/workflow/publish.md`。凭据、浏览器会话状态、缓存和构建产物不上传；`.gitignore` 不能排除已有提交中的文件。
+- 提交约定：Develata 说“已发布”后，按 `docs/workflow/publish.md` 检查、提交、推送并上传原件。每期新增内容按三批、依序提交，提交信息以期次 `<MMDD>：` 开头。①仓库层：根目录 `README.md` 期次索引、`daily-scan.md` 的“已发过”、`.handoff/` 派工单；②取证存档：`sources/` 下除下面第③批所列之外的全部入库文件（文本存档、社交采样、抓取脚本、辅助记录、`offsite.tsv`）；③本期成品：`doc_<MMDD>_publish.txt`、`images/`（含 `images/README.md`）以及 `sources/` 下的 `README.md`、`fact-check.md`、`evidence.md`、`capture-log.md`。取证存档先于成品提交，因为成品引用它。提交前先看有无单个超过 1 MB 的文件，有就先问是否必须入库；入库的历史无法靠 `.gitignore` 撤回。当期没有新增取证存档时，第②批省略。发布后的标题、文字或配图修订，各自单独小提交。推送、打标签、改写已推送的历史需要当次明确授权（“已发布”即当期三批的推送授权）；尚未推送的提交可经同意后重新拆分。

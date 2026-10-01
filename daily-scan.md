@@ -1,6 +1,6 @@
 # AI 吠点 · 每日选题扫描
 
-> 维护说明（ChatGPT 可忽略本段）：Develata 把本文件整个拖进 ChatGPT（聊天模式，开联网），无需修改，直接发送；结果整段回贴给 Claude。每期定稿后，Claude 在文末“已发过”追加一行。
+> 维护说明（ChatGPT 可忽略本段）：本文件是 ChatGPT 定时任务的 prompt，每天 0、6、12、18 点读取 GitHub `main` 分支上的版本；结果由 Develata 汇总回贴给 Claude。每期发布后，Claude 在文末“已发过”追加一行并推送（见 `docs/workflow/publish.md`），不要移动或改名本文件。
 
 ---
 

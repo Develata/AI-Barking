@@ -75,7 +75,7 @@
 
 分工：Develata 只与 Claude 交流。Claude 起草；取证、存档与截图由 Claude 直接派给代理自动完成，不经 Develata 搬运；反向核验走 `codex-reviewer`（只读）；Develata 终审并在小红书、抖音、公众号手动发布（公众号为个人主体未认证，无发布接口）。
 
-1. 选题：Develata 把根目录 `daily-scan.md` 整个拖给 ChatGPT（聊天模式，联网）运行并回贴；Claude 据此列候选及各自吠点，Develata 拍板。ChatGPT 产出只算线索，不替代第 3 步抽查。每期定稿后，Claude 在 `daily-scan.md` 末尾“已发过”追加一行。
+1. 选题：ChatGPT 定时任务每天 4 次读取 GitHub 上的根目录 `daily-scan.md` 联网检索，Develata 把结果汇总回贴；Claude 据此列候选及各自吠点（以本地“已发过”去重），Develata 拍板。ChatGPT 产出只算线索，不替代第 3 步抽查。每期发布后，Claude 在 `daily-scan.md` 末尾“已发过”追加一行并推送，见 `docs/workflow/publish.md`。
 2. 取证：少量条目 Claude 直接查；大批量取证、页面存档与截图，Claude 按 `templates/codex-evidence.md` 机械采集（截图、页面存档）派给 Sonnet 子代理或 Codex `gpt-6-luna`（max）；需要判断的取证（回溯一手来源、定级、找吠点）若交给 Codex，用 `gpt-6-astra`（medium 或 max）。Windows 主机 Codex 一律 full-access，见 codex-orchestration。执行方用 opencli / agent-reach 直接完成。产出：`sources/` 存档、`images/` 截图、事实清单。
 3. 抽查：Claude 对照代理产出的存档检查工作区改动，并对高风险条目（价格、跑分、对比结论、标题所涉说法）逐字核对一手页面。自述回报不算验收。
 4. 起草：Claude 按本规范写 `_publish.txt` 与 `images/README.md`。
