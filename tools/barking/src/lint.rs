@@ -483,6 +483,22 @@ fn offsite_paths(dir: &Path) -> BTreeSet<String> {
     parse_offsite(&text)
 }
 
+/// `tok` as written in a file under `dir` (e.g. `../sources/a.png` in
+/// `images/README.md`), folded into an issue-relative `/` path like `offsite.tsv` uses.
+fn issue_rel(dir: &str, tok: &str) -> String {
+    let mut parts: Vec<&str> = vec![dir];
+    for seg in tok.split('/') {
+        match seg {
+            "" | "." => {}
+            ".." => {
+                parts.pop();
+            }
+            _ => parts.push(seg),
+        }
+    }
+    parts.join("/")
+}
+
 fn parse_offsite(text: &str) -> BTreeSet<String> {
     text.lines()
         .filter(|l| !l.starts_with('#'))
@@ -511,7 +527,7 @@ fn lint_images(
             if let Some(name) = Path::new(tok).file_name().and_then(|n| n.to_str()) {
                 referenced.insert(name.to_string());
             }
-            if !images.join(tok).is_file() && !offsite.contains(&format!("images/{tok}")) {
+            if !images.join(tok).is_file() && !offsite.contains(&issue_rel("images", tok)) {
                 sink.error(Some(i + 1), format!("配图说明列出的 {tok} 不存在"));
             }
         }
@@ -542,7 +558,7 @@ fn lint_images(
         ("00-cover-wide.", "2.35:1 横版封面", true),
         ("00-tldr.", "省流卡", new_format),
     ] {
-        let remote = format!("images/{stem}");
+        let remote = issue_rel("images", stem);
         if required
             && !files.iter().any(|f| f.starts_with(stem))
             && !offsite.iter().any(|p| p.starts_with(&remote))
@@ -595,7 +611,7 @@ fn lint_cards(
     if let Some(spec_time) = mtime(&path) {
         for o in spec.outputs() {
             match mtime(&images.join(o)) {
-                None if offsite.contains(&format!("images/{o}")) => {}
+                None if offsite.contains(&issue_rel("images", o)) => {}
                 None => sink.error(None, format!("images/{o} 尚未渲染（barking card）")),
                 Some(t) if t < spec_time => sink.warn(
                     None,
@@ -632,6 +648,16 @@ fn card_text_errors(texts: &[&str], body_lines: &[String]) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn issue_rel_folds_parent_segments() {
+        assert_eq!(issue_rel("images", "00-tldr.png"), "images/00-tldr.png");
+        assert_eq!(
+            issue_rel("images", "../sources/usage/a.png"),
+            "sources/usage/a.png"
+        );
+        assert_eq!(issue_rel("images", "./a.png"), "images/a.png");
+    }
 
     #[test]
     fn offsite_manifest_lists_paths_and_skips_comments() {

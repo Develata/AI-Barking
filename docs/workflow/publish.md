@@ -14,7 +14,7 @@ Develata 在对话中说“已发布”，即授权 Claude 对当期完成下面
 2. **检查**（任一不过就停下报告）：
    - `cargo run --release --manifest-path tools/barking/Cargo.toml -- lint <期次目录>`，0 个错误；
    - 配图无损压缩（可选，减小上传体积）：`oxipng -o 4 --strip safe <期次目录>/images/*.png`，像素不变；
-   - 大文件：`cargo run --release --manifest-path tools/barking/Cargo.toml -- offsite <期次目录>` 生成 `sources/offsite.tsv`（1002 期起全部图片与原件都在清单里；1001 及更早期次另会按 `images/README.md` 的“正式配图”一节写 `images/.gitignore`）；待提交文件中没有单个超过 1 MB 的，有就先问；
+   - 大文件：`cargo run --release --manifest-path tools/barking/Cargo.toml -- offsite <期次目录>` 生成 `sources/offsite.tsv`（全部图片与原件都在清单里）；待提交文件中没有单个超过 1 MB 的，有就先问；
    - 身份：按 `templates/codex-evidence.md` 第 7 条，grep 抓取者的头像链接、显示名与 handle，确认未入库；
    - 凭据与会话状态（`.env`、cookies、storage-state）未入库。
 3. **提交**：按 `AGENTS.md` 的提交约定分三批、依序提交。
@@ -26,10 +26,10 @@ Develata 在对话中说“已发布”，即授权 Claude 对当期完成下面
 
 | 存放处 | 内容 |
 |---|---|
-| GitHub（本仓库） | 只入库文字：发布正文、配图说明 `images/README.md`、`images/cards.toml`、`sources/` 中的文本（md、txt、json、jsonl、py、ps1 等）、`sources/offsite.tsv`（1001 及更早期次另有 `images/.gitignore`） |
-| OpenList（`openlist.develata.me`） | 1002 期起 `images/` 下的全部图片（封面、省流卡、批注截图、备用图），以及 `sources/` 中的 PDF、HTML、图片与音视频原件 |
+| GitHub（本仓库） | 只入库文字：发布正文、配图说明 `images/README.md`、`images/cards.toml`、`sources/` 中的文本（md、txt、json、jsonl、py、ps1 等）、`sources/offsite.tsv` |
+| OpenList（`openlist.develata.me`） | `images/` 下的全部图片（封面、省流卡、批注截图、备用图），以及 `sources/` 中的 PDF、HTML、图片与音视频原件；逐个文件直传，不打压缩包 |
 
-- 分界写在根目录 `.gitignore`：`images/` 下所有 png、jpg、jpeg、webp、gif，和 `sources/` 下的 PDF、HTML、图片与音视频。忽略规则只对未跟踪文件生效：2609/0928 及更早期次的原件、1001 及更早期次的正式配图与备用图已在 Git 中，不移出也不改写历史；这些期次的备用图仍由各期 `images/.gitignore`（`barking offsite` 按 `images/README.md` 的“## 正式配图”一节生成）保持不入库。已入库的文件同样会上传 OpenList 并记入 `offsite.tsv`。
+- 分界写在根目录 `.gitignore`：`images/` 下所有 png、jpg、jpeg、webp、gif，和 `sources/` 下的 PDF、HTML、图片与音视频。0924–1001 期原先已入库的图片与原件，已于 2026-10-02 全部补传 OpenList（417 个文件逐个核对远端大小一致）、记入各期 `offsite.tsv`，并用 `git filter-repo` 从 Git 历史中移出。
 - 没有图片的克隆里，`barking lint` 把 `offsite.tsv` 列出的图片视为存在；重渲卡片前，先从 OpenList 的同一路径取回 `-raw` 底图。
 - OpenList 目标路径：`<OPENLIST_ROOT>/<YYMM>/<MMDD>/<相对期次目录的路径>`，与仓库目录一一对应。
 - `sources/offsite.tsv` 每行一个存于 OpenList 的文件：相对期次目录的路径、字节数、SHA-256。它入库，用来证明网盘上的原件就是当时取证的那一份。
