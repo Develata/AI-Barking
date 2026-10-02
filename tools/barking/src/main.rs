@@ -1,3 +1,4 @@
+mod card;
 mod lint;
 mod offsite;
 
@@ -11,6 +12,7 @@ const USAGE: &str = "\
 用法：
   barking lint [期次目录...]                定稿前机械检查；不给目录则检查 docs/<YYMM>/<MMDD> 下全部期次（如 docs/2609/0925）
   barking offsite <期次目录>... [--upload]  把不入库的原件记入 sources/offsite.tsv；--upload 同时上传 OpenList
+  barking card <期次目录> [文件名...]       按 images/cards.toml 渲染省流卡与批注截图（见 templates/cards/）
 
 退出码：0 无错误；1 有错误；2 用法错误";
 
@@ -19,6 +21,7 @@ fn main() -> ExitCode {
     match args.split_first() {
         Some((cmd, rest)) if cmd == "lint" => run_lint(rest),
         Some((cmd, rest)) if cmd == "offsite" => offsite::run(rest),
+        Some((cmd, rest)) if cmd == "card" => card::run(rest),
         _ => {
             eprintln!("{USAGE}");
             ExitCode::from(2)

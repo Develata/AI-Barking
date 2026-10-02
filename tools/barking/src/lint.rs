@@ -9,6 +9,8 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::card;
+
 const TITLE_MAX: usize = 20;
 const TOTAL_MAX: usize = 1000;
 const OPENING: &str = "AI 沸点，今日谁吠？";
@@ -125,6 +127,8 @@ pub fn lint_issue(dir: &Path) -> Vec<Finding> {
         })
         .unwrap_or_default();
     publish.sort();
+    // All publish texts with whitespace removed, for verbatim card checks.
+    let mut bodies = String::new();
     if publish.is_empty() {
         Sink {
             path: dir,
@@ -138,12 +142,16 @@ pub fn lint_issue(dir: &Path) -> Vec<Finding> {
             out: &mut out,
         };
         match fs::read_to_string(p) {
-            Ok(raw) => lint_publish(&mut sink, &raw, fact_check.as_deref(), new_format),
+            Ok(raw) => {
+                bodies.extend(raw.chars().filter(|c| !c.is_whitespace()));
+                lint_publish(&mut sink, &raw, fact_check.as_deref(), new_format);
+            }
             Err(e) => sink.error(None, format!("读取失败：{e}")),
         }
     }
 
     lint_images(&dir.join("images"), new_format, &mut out);
+    lint_cards(&dir.join("images"), &bodies, new_format, &mut out);
     out
 }
 
@@ -482,6 +490,39 @@ fn lint_images(images: &Path, new_format: bool, out: &mut Vec<Finding>) {
     unlisted.sort();
     for f in unlisted {
         sink.warn(None, format!("images/{f} 未在配图说明中出现"));
+    }
+}
+
+/// Card texts must be verbatim (ignoring whitespace) excerpts of the
+/// verified publish text; EDITORIAL.md 省流卡与批注截图.
+fn lint_cards(images: &Path, bodies: &str, new_format: bool, out: &mut Vec<Finding>) {
+    let path = images.join(card::SPEC_FILE);
+    let mut sink = Sink { path: &path, out };
+    let spec = match card::load_spec(images) {
+        Ok(Some(spec)) => spec,
+        Ok(None) if new_format => {
+            return sink.warn(None, "缺少 images/cards.toml：省流卡文字无法与正文自动比对");
+        }
+        Ok(None) => return,
+        Err(e) => return sink.error(None, e),
+    };
+    // A card line may join several body excerpts with “；” and end with its
+    // own full stop; each excerpt must appear verbatim.
+    for t in spec.quoted_texts() {
+        for seg in t.split('；') {
+            let compact: String = seg
+                .trim_end_matches(['。', '，', '！', '？'])
+                .chars()
+                .filter(|c| !c.is_whitespace())
+                .collect();
+            if !compact.is_empty() && !bodies.contains(&compact) {
+                sink.error(None, format!("卡片文字未在正文中逐字出现：「{seg}」（出自「{t}」）"));
+            }
+        }
+    }
+    let n = spec.tldr_bark_count();
+    if !spec.tldr.is_empty() && !(2..=3).contains(&n) {
+        sink.warn(None, format!("省流卡吠点共 {n} 条，规范为 2–3 条"));
     }
 }
 

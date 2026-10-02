@@ -1,30 +1,33 @@
-# 省流卡与批注截图模板
+# 省流卡与批注截图
 
-规则见 `EDITORIAL.md`“省流卡与批注截图”，命名见 `AGENTS.md`。两张模板都以 0926 期为样例，版式已获 Develata 认可（2026-10-02）。
+规则见 `EDITORIAL.md`“省流卡与批注截图”，命名见 `AGENTS.md`。版式 2026-10-02 经 Develata 认可。
 
-| 文件 | 产出 |
+| 文件 | 作用 |
 |---|---|
-| `tldr.html` | `images/00-tldr.png`，省流卡 |
-| `annot.html` | `images/NN-name.png`，批注截图（底图 `NN-name-raw.png`） |
+| `tldr.html`、`annot.html` | 版式模板，`barking card` 填充；改版式只改这里 |
+| `example.toml` | `images/cards.toml` 样例（0926 期），字段说明在注释里 |
+| `visual-review.md` | 视觉复核提示词 |
 
-工具：Chrome 无头模式渲染（荧光笔依赖 CSS 正片叠底 `mix-blend-mode: multiply`；Typst 0.15 尚无混合模式，见 typst/typst#8815），Tesseract 取词框（`scoop install tesseract tesseract-languages`），ffmpeg 放大与裁切检查。字体用系统已装的 Noto Sans SC。
+工具：Chrome 无头模式渲染（荧光笔依赖 CSS 正片叠底；Typst 0.15 尚无混合模式，见 typst/typst#8815），Tesseract 定位关键句，ffmpeg 放大底图。安装：`scoop install tesseract tesseract-languages`（ffmpeg、Chrome 已有）。找不到 Chrome 时用环境变量 `BARKING_CHROME` 指定。Scoop 安装语言包时设置了用户环境变量 `TESSDATA_PREFIX`，安装前已打开的终端要重开才生效。
 
 ## 步骤
 
-1. 把模板复制到 Claude 的 scratchpad，按模板顶部注释改内容。中间 HTML 不入库。
-2. 批注截图先取关键句的词框。放大 3 倍识别更稳，坐标再除以 3：
+1. 每张要批注的截图另存一份底图 `images/NN-name-raw.png`（原始裁切，像素不改）。底图只截标题与关键段落，宽度尽量窄（页面 CSS 宽约 700 px 以内），否则缩进 1080 宽的卡片后英文太小；取证按 2 倍像素比截图，读者放大后仍清晰。
+2. 复制 `example.toml` 为 `images/cards.toml`，填写省流卡与各批注图。省流卡的 `fact`、`barks` 和批注图的 `bark` 都从正文逐字摘取（可加句末标点；不相邻的几段用“；”拼接，每段各自核对；不要断章丢掉同句里改变含义的限定）；`quote` 写英文原句，`gloss` 照 `fact-check.md` 的译法。
+3. 渲染：
 
    ```bash
-   ffmpeg -v error -y -i images/NN-name-raw.png -vf scale=iw*3:ih*3:flags=lanczos /tmp/ocr3.png
-   tesseract /tmp/ocr3.png stdout --psm 6 -l eng -c tessedit_create_tsv=1 | awk -F'\t' 'NR>1 && $12!="" {printf "%s\t%d\t%d\t%d\t%d\t%s\n", $12, $7/3, $8/3, ($7+$9)/3, ($8+$10)/3, $11}'
+   cargo run --release --manifest-path tools/barking/Cargo.toml -- card docs/<YYMM>/<MMDD>
    ```
 
-   输出列：词、left、top、right、bottom、置信度。中文媒体截图改用 `-l chi_sim+eng`。一句跨几行，就按行各取首词 left、末词 right，各放一个 `.hl`；高度取该行词框上下缘，上下各留约 1 px。置信度低于 80 或找不到原句的词时，不要猜坐标：放大看图手量，或换更清晰的底图。0926 图 1 的实测：OCR 词框与手量坐标相差不超过 2 px。
-3. 渲染（1080×1440，`file:///` 用绝对路径）：
+   只重渲某几张：在期次目录后跟文件名，如 `00-tldr.png`。工具用 OCR 找到每条 `quote` 并逐行加高亮：找不到、出现不止一次、或识别置信度低于 60 时直接报错，不会猜位置。OCR 认不准的图（拼接图、低清图）在该 note 里改写 `rects`（底图像素 `[x, y, w, h]`，每行一个）。中间 HTML 在系统临时目录 `barking-card/`，报错信息里会给出路径。
+4. 自查：逐张打开成图；高亮处再裁出来放大看（例：`ffmpeg -i out.png -vf "crop=1080:420:0:600" zoom.png`）。确认高亮没有扫进邻句、下划线落在目标限定词下方、引号与换行正常、页脚不压内容。
+5. 视觉复核（必做，跨模型）：按 `visual-review.md` 填好提示词，附上全部卡片与对应的 `-raw` 底图，交给 WSL 中的 Codex（`gpt-6-astra`，effort `medium`，只读）：
 
    ```bash
-   "/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=1 --allow-file-access-from-files --window-size=1080,1440 --screenshot=E:/.../images/00-tldr.png file:///C:/.../tldr.html
+   MSYS_NO_PATHCONV=1 wsl -d Debian -e bash -lc 'cd "$1" && exec timeout 1200 "$0" exec -m gpt-6-astra -c "model_reasoning_effort=\"medium\"" -s read-only --skip-git-repo-check --ephemeral -C "$1" -o "$2" --image=images/00-tldr.png --image=images/01-x.png --image=images/01-x-raw.png - < "$3"' /home/deve/.bun/bin/codex "<期次目录的 WSL 路径>" "<报告的 WSL 路径>" "<提示词的 WSL 路径>"
    ```
 
-4. 核对：打开成图逐处检查；高亮区域再用 ffmpeg 裁出来放大看（例：`ffmpeg -i out.png -vf "crop=1080:420:0:600" zoom.png`）。确认高亮没有扫进邻句、下划线落在目标限定词上、引号与换行正常、页脚不压内容。
-5. 在 `images/README.md` 正式配图中，省流卡列第 1 行，批注图替代原截图；`-raw` 底图列入备用图（用途“批注底图”）。
+   每张图写成一个 `--image=` 参数；路径用 `wsl -d Debian -e wslpath -a` 转换。后台运行，等完成通知后读报告。Codex 不可用或超时时，改派 Sonnet 子代理按同一提示词看图复核，并在记录中注明复核方。Claude 逐条核实意见再改，结论记入 `sources/fact-check.md`。
+6. `barking lint`：cards.toml 中的卡片文字须在正文中逐字出现，省流卡吠点须为 2–3 条。
+7. `images/README.md` 的正式配图里，省流卡列第 1 行，批注图替代原截图；`-raw` 底图列入备用图（用途写“批注底图”）。

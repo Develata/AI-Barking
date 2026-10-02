@@ -1,75 +1,62 @@
 <!doctype html>
 <!--
-  批注截图模板（images/NN-name.png，1080×1440）。样例为 0926 期图 1，已获 Develata 认可（2026-10-02）。
-  底图是原始裁切图 NN-name-raw.png，像素不改；高亮、下划线、编号都按底图原始像素坐标叠加。
-  每期改：
-    1. .head 标题；img src 用 file:/// 绝对路径指向底图。
-    2. .shot 的 width/height = 底图像素尺寸；scale = 940 / 底图宽（2 倍图约 0.7）；底图过高时减小 scale，保证 .panel 不压图。
-    3. 每个关键句按行各放一个 .hl（一句跨行就放多个，不用一个大框扫进邻句）；坐标用 tesseract 取词框，见 README.md。
-       .hl.a / .hl.b 分别对应编号 1 / 2；.ul 是对关键限定词的下划线；.mk 是页边编号。
-    4. 译注是关键句直译，措辞照 fact-check.md；吠点取正文原句。二者分栏，不混写。
-    5. 页脚：来源域名与存档日期。
-  渲染后必须打开 PNG 逐处核对高亮位置，见 README.md。
+  批注截图模板（images/NN-name.png，1080×1440），由 `barking card` 填充；内容写在期次的 images/cards.toml。
+  版式 2026-10-02 经 Develata 认可。底图 NN-name-raw.png 像素不改；高亮、下划线与编号都按底图原始像素坐标叠加，
+  整体随底图一起缩放。下方说明区贴底排布，脚本按它的高度算出底图能用的缩放比。
+  占位符：{{TITLE}} {{IMG}} {{W}} {{H}} {{OVERLAYS}} {{NOTES}} {{BARK}} {{SOURCE}}。
 -->
 <html lang="zh-CN"><head><meta charset="utf-8">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { width: 1080px; height: 1440px; background: #f6f4ef; font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif; color: #1b1b1b; position: relative; overflow: hidden; }
   .head { position: absolute; left: 60px; top: 44px; right: 60px; display: flex; align-items: center; gap: 16px; }
-  .tag { background: #1b1b1b; color: #fff; font-size: 26px; font-weight: 700; padding: 6px 16px; border-radius: 6px; }
+  .tag { background: #1b1b1b; color: #fff; font-size: 26px; font-weight: 700; padding: 6px 16px; border-radius: 6px; flex: none; }
   .head .t { font-size: 30px; font-weight: 700; }
-  /* Screenshot: original pixels, scaled as a whole; overlays use original coordinates. */
-  .shot { position: absolute; left: 70px; top: 116px; width: 660px; height: 525px; transform: scale(1.40); transform-origin: 0 0; background: #fff; box-shadow: 0 0 0 1px #d9d5cc; }
+  /* --s is the screenshot scale; markers and underlines divide by it to keep a fixed on-card size. */
+  .shot { --s: 1; position: absolute; left: 70px; top: 116px; transform-origin: 0 0; background: #fff; box-shadow: 0 0 0 1px #d9d5cc; }
   .shot img { display: block; width: 100%; height: 100%; }
   .hl { position: absolute; mix-blend-mode: multiply; border-radius: 2px; }
-  .a { background: rgba(255, 210, 0, .55); }
-  .b { background: rgba(255, 140, 90, .45); }
-  .ul { position: absolute; height: 2px; background: #d6336c; }
-  .mk { position: absolute; width: 26px; height: 26px; border-radius: 50%; color: #fff; font: 700 17px/26px "Noto Sans SC", sans-serif; text-align: center; transform: translateX(-100%); }
-  .mk.a1 { background: #c99a00; } .mk.b1 { background: #e8590c; }
-  .panel { position: absolute; left: 60px; right: 60px; top: 878px; }
+  .hl.c1 { background: rgba(255, 210, 0, .55); }
+  .hl.c2 { background: rgba(255, 140, 90, .45); }
+  .hl.c3 { background: rgba(110, 210, 120, .45); }
+  .hl.c4 { background: rgba(190, 140, 255, .45); }
+  .ul { position: absolute; height: calc(3px / var(--s)); background: #d6336c; }
+  .mk { position: absolute; width: calc(38px / var(--s)); height: calc(38px / var(--s)); border-radius: 50%; color: #fff; font: 700 calc(24px / var(--s)) / calc(38px / var(--s)) "Noto Sans SC", sans-serif; text-align: center; transform: translate(-100%, -50%); }
+  .mk.c1, .n.c1 { background: #c99a00; }
+  .mk.c2, .n.c2 { background: #e8590c; }
+  .mk.c3, .n.c3 { background: #2f9e44; }
+  .mk.c4, .n.c4 { background: #7048e8; }
+  .panel { position: absolute; left: 60px; right: 60px; bottom: 90px; }
   .row { display: flex; gap: 18px; margin-bottom: 18px; }
   .n { flex: none; width: 46px; height: 46px; border-radius: 50%; color: #fff; font-size: 26px; font-weight: 700; line-height: 46px; text-align: center; margin-top: 2px; }
-  .n.a1 { background: #c99a00; } .n.b1 { background: #e8590c; }
   .lab { font-size: 22px; font-weight: 700; color: #6b665c; letter-spacing: 1px; }
   .tx { font-size: 32px; line-height: 1.42; font-weight: 500; }
   .tx em { font-style: normal; background: linear-gradient(transparent 62%, rgba(214, 51, 108, .28) 0); }
   .q { text-indent: -.45em; }
   .bark { margin-top: 6px; border-left: 8px solid #1f4fd1; background: #e8edfb; padding: 18px 24px; border-radius: 0 10px 10px 0; }
   .bark .lab { color: #1f4fd1; }
-  .foot { position: absolute; left: 60px; right: 60px; bottom: 34px; font-size: 21px; color: #7a756b; display: flex; justify-content: space-between; }
+  .foot { position: absolute; left: 60px; right: 60px; bottom: 34px; font-size: 21px; color: #7a756b; display: flex; justify-content: space-between; gap: 24px; }
 </style></head>
 <body>
-  <div class="head"><span class="tag">原文截图</span><span class="t">OpenAI 事故报告 · DNS 越界</span></div>
-
-  <div class="shot">
-    <img src="file:///E:/gitclone/AI-Barking/docs/2609/0926/images/01-openai-dns-pause.png" alt="">
-    <!-- 1：15 分钟报警 … 2.5 小时后停 -->
-    <div class="hl a" style="left:18px; top:366px; width:583px; height:15px"></div>
-    <div class="hl a" style="left:18px; top:382px; width:503px; height:15px"></div>
-    <!-- 2：暂停范围 -->
-    <div class="hl b" style="left:522px; top:382px; width:75px; height:15px"></div>
-    <div class="hl b" style="left:18px; top:398px; width:600px; height:15px"></div>
-    <div class="hl b" style="left:18px; top:414px; width:52px; height:15px"></div>
-    <div class="ul" style="left:186px; top:413px; width:198px"></div>
-    <div class="mk a1" style="left:16px; top:360px;">1</div>
-    <div class="mk b1" style="left:16px; top:395px;">2</div>
+  <div class="head"><span class="tag">原文截图</span><span class="t">{{TITLE}}</span></div>
+  <div class="shot" style="width:{{W}}px; height:{{H}}px">
+    <img src="{{IMG}}" alt="">
+{{OVERLAYS}}
   </div>
-
   <div class="panel">
-    <div class="row"><div class="n a1">1</div><div>
-      <div class="lab">译注</div>
-      <div class="tx">监控系统 15 分钟内报警，3 分钟后有人开始查看；这次运行 2.5 小时后才被停掉。</div>
-    </div></div>
-    <div class="row"><div class="n b1">2</div><div>
-      <div class="lab">译注</div>
-      <div class="tx">最强模型所有<em>涉及工具调用（广义）</em>的训练、评测和推理，仍在暂停。</div>
-    </div></div>
-    <div class="bark">
-      <div class="lab">吠点</div>
-      <div class="tx q">“停训”有范围：新暂停只限最强模型带工具的训练、评测、推理。</div>
-    </div>
+{{NOTES}}
+{{BARK}}
   </div>
-
-  <div class="foot"><span>来源：alignment.openai.com 原文截图（2026-09-27 存档），未改动原文</span><span>AI 吠点</span></div>
+  <div class="foot"><span>来源：{{SOURCE}}</span><span>AI 吠点</span></div>
+  <script>
+    // Fit the screenshot into the space between the header and the panel:
+    // at most 940 px wide, never upscaled past 2x, centred horizontally.
+    const shot = document.querySelector('.shot');
+    const W = {{W}}, H = {{H}}, TOP = 116, GAP = 28;
+    const avail = document.querySelector('.panel').getBoundingClientRect().top - TOP - GAP;
+    const s = Math.min(940 / W, avail / H, 2);
+    shot.style.setProperty('--s', s);
+    shot.style.transform = `scale(${s})`;
+    shot.style.left = `${Math.round((1080 - W * s) / 2)}px`;
+  </script>
 </body></html>
