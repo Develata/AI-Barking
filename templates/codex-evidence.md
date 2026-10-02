@@ -15,7 +15,7 @@
 要求：
 
 1. 每条说法都要回溯到一手来源（EDITORIAL.md 中 L1–L3）。聚合站和媒体报道只能作为线索；找不到一手来源的，如实标为“未找到一手来源”。
-2. 用 opencli（`opencli browser`）或 agent-reach 打开一手页面（X 等社交平台优先 agent-reach），把页面快照保存到 `docs/{YYMM}/{MMDD}/sources/`，把关键区域截图保存到 `docs/{YYMM}/{MMDD}/images/`（文件名 `NN-简短英文名.png`，只截与说法相关的区域，保留单位、列名和测试条件标签）。不重绘、不改数字、不用转载图。
+2. 用 opencli（`opencli browser`）或 agent-reach 打开一手页面（X 等社交平台优先 agent-reach），把页面快照保存到 `docs/{YYMM}/{MMDD}/sources/`，把关键区域截图保存到 `docs/{YYMM}/{MMDD}/images/`（文件名 `NN-简短英文名.png`，只截与说法相关的区域，保留单位、列名和测试条件标签）。不重绘、不改数字、不用转载图。截图用 2 倍设备像素比（device scale factor 2），以便批注截图放大到 1080 宽时不发虚；下面的宽度上限按页面 CSS 像素计。
    - 官方 benchmark 表格与评测图例外：截全，不只截说法涉及的那一两行。整张表的标题、全部行与列、列头（模型名、effort/档位）以及表下脚注都要进图，读者能自己看到对比全貌和测试条件。表太长时竖向拼接成一张，不删行；宽度仍不超过 1400 px，字太小就分成上下两张完整截图，而不是裁掉行列。
 3. 同一指标在不同来源数值不一致时，全部记录，不要自行取舍。
 4. 输出 `docs/{YYMM}/{MMDD}/sources/evidence.md`，每条一行：

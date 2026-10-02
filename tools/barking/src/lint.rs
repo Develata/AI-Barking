@@ -22,6 +22,10 @@ const BANNED: [&str; 5] = [
     "从某种意义上来说",
     "当然我们也不能忽视",
 ];
+/// Issues dated on or after this `YYMM_MMDD` follow the 2026-10-02 format:
+/// no trailing 来源 line, and a 省流卡 `images/00-tldr.*`. Older, published
+/// issues keep their original format (EDITORIAL.md 纠错: no rewrites).
+const NEW_FORMAT_FROM: u32 = 2610_1002;
 const PLACEHOLDERS: [&str; 6] = ["TODO", "TBD", "待补", "待核", "【图", "[图"];
 pub const IMAGE_EXTS: [&str; 5] = ["png", "jpg", "jpeg", "webp", "gif"];
 /// Characters that mark a number as a quantity or date rather than a version.
@@ -81,8 +85,22 @@ impl Sink<'_> {
     }
 }
 
+/// `docs/<YYMM>/<MMDD>` → `YYMMMMDD` as a number; `None` if the path is not
+/// shaped like an issue directory.
+fn issue_key(dir: &Path) -> Option<u32> {
+    let four = |p: Option<&Path>| {
+        p.and_then(Path::file_name)
+            .and_then(|n| n.to_str())
+            .filter(|n| n.len() == 4 && n.bytes().all(|b| b.is_ascii_digit()))
+            .and_then(|n| n.parse::<u32>().ok())
+    };
+    Some(four(dir.parent())? * 10_000 + four(Some(dir))?)
+}
+
 pub fn lint_issue(dir: &Path) -> Vec<Finding> {
     let mut out = Vec::new();
+    // Unrecognised paths get the current rules.
+    let new_format = issue_key(dir).is_none_or(|k| k >= NEW_FORMAT_FROM);
 
     let fc_path = dir.join("sources").join("fact-check.md");
     let fact_check = fs::read_to_string(&fc_path).ok();
@@ -120,12 +138,12 @@ pub fn lint_issue(dir: &Path) -> Vec<Finding> {
             out: &mut out,
         };
         match fs::read_to_string(p) {
-            Ok(raw) => lint_publish(&mut sink, &raw, fact_check.as_deref()),
+            Ok(raw) => lint_publish(&mut sink, &raw, fact_check.as_deref(), new_format),
             Err(e) => sink.error(None, format!("读取失败：{e}")),
         }
     }
 
-    lint_images(&dir.join("images"), &mut out);
+    lint_images(&dir.join("images"), new_format, &mut out);
     out
 }
 
@@ -143,7 +161,7 @@ pub fn char_count(s: &str) -> usize {
     s.chars().count()
 }
 
-fn lint_publish(sink: &mut Sink, raw: &str, fact_check: Option<&str>) {
+fn lint_publish(sink: &mut Sink, raw: &str, fact_check: Option<&str>, new_format: bool) {
     let text = normalize(raw);
     let lines: Vec<&str> = text.lines().collect();
     let title = lines.first().map_or("", |l| l.trim());
@@ -166,7 +184,7 @@ fn lint_publish(sink: &mut Sink, raw: &str, fact_check: Option<&str>) {
         sink.error(None, format!("全文 {total} 字，超过上限 {TOTAL_MAX}"));
     }
 
-    lint_structure(sink, &lines);
+    lint_structure(sink, &lines, new_format);
 
     let fc_compact: Option<String> =
         fact_check.map(|fc| fc.chars().filter(|c| !c.is_whitespace()).collect());
@@ -203,7 +221,8 @@ fn lint_publish(sink: &mut Sink, raw: &str, fact_check: Option<&str>) {
 }
 
 /// Required order: 标题 → 固定开场 → 省流 → … → Slogan（最后一行）.
-fn lint_structure(sink: &mut Sink, lines: &[&str]) {
+/// Old-format issues may end with one extra 来源 line after the Slogan.
+fn lint_structure(sink: &mut Sink, lines: &[&str], new_format: bool) {
     let nonempty: Vec<(usize, &str)> = lines
         .iter()
         .enumerate()
@@ -235,12 +254,11 @@ fn lint_structure(sink: &mut Sink, lines: &[&str]) {
             }
             match &nonempty[k + 1..] {
                 [] => {}
-                // Issues published before 2026-10-02 end with one 来源 line.
-                [(i, l)] if l.starts_with(SOURCES_PREFIX) => sink.warn(
+                [(_, l)] if !new_format && l.starts_with(SOURCES_PREFIX) => {}
+                [(i, _), ..] => sink.error(
                     at(*i),
-                    "2026-10-02 起正文不写文末来源行（来源见 sources/README.md）；已发布的旧期次可忽略",
+                    "Slogan 应为最后一行（正文不写来源行，来源见 sources/README.md）",
                 ),
-                [(i, _), ..] => sink.error(at(*i), "Slogan 应为最后一行"),
             }
         }
     }
@@ -417,7 +435,7 @@ pub fn image_refs_in_line(line: &str) -> Vec<&str> {
     out
 }
 
-fn lint_images(images: &Path, out: &mut Vec<Finding>) {
+fn lint_images(images: &Path, new_format: bool, out: &mut Vec<Finding>) {
     let readme = images.join("README.md");
     let mut sink = Sink { path: &readme, out };
     let md = match fs::read_to_string(&readme) {
@@ -444,11 +462,12 @@ fn lint_images(images: &Path, out: &mut Vec<Finding>) {
                 .collect()
         })
         .unwrap_or_default();
-    for (stem, what) in [
-        ("00-cover.", "3:4 封面"),
-        ("00-cover-wide.", "2.35:1 横版封面"),
+    for (stem, what, required) in [
+        ("00-cover.", "3:4 封面", true),
+        ("00-cover-wide.", "2.35:1 横版封面", true),
+        ("00-tldr.", "省流卡", new_format),
     ] {
-        if !files.iter().any(|f| f.starts_with(stem)) {
+        if required && !files.iter().any(|f| f.starts_with(stem)) {
             sink.error(None, format!("缺少{what} images/{stem}*"));
         }
     }
@@ -478,7 +497,8 @@ mod tests {
         assert_eq!(char_count(&normalize(crlf)), 9);
     }
 
-    fn structure(text: &str) -> Vec<(bool, String)> {
+    /// Whether `lint_structure` reports any error.
+    fn structure_errs(text: &str, new_format: bool) -> bool {
         let mut out = Vec::new();
         let lines: Vec<&str> = text.lines().collect();
         lint_structure(
@@ -487,26 +507,32 @@ mod tests {
                 out: &mut out,
             },
             &lines,
+            new_format,
         );
-        out.into_iter()
-            .map(|f| (f.level == Level::Error, f.msg))
-            .collect()
+        out.iter().any(|f| f.level == Level::Error)
     }
 
     #[test]
-    fn slogan_ends_the_text_and_legacy_sources_line_only_warns() {
+    fn slogan_ends_the_text_and_sources_line_is_old_format_only() {
         let ok = format!("标题\n\n{OPENING}\n\n省流：x\n\n{SLOGAN}\n");
-        assert!(structure(&ok).is_empty());
-
         let legacy = format!("{ok}\n来源：OpenAI\n");
-        let f = structure(&legacy);
-        assert_eq!(f.len(), 1);
-        assert!(!f[0].0, "legacy 来源 line should be a warning");
-
         let extra = format!("{ok}\n多一行\n");
-        assert!(structure(&extra).iter().any(|(err, _)| *err));
         let two = format!("{legacy}\n多一行\n");
-        assert!(structure(&two).iter().any(|(err, _)| *err));
+        for new_format in [true, false] {
+            assert!(!structure_errs(&ok, new_format));
+            assert!(structure_errs(&extra, new_format));
+            assert!(structure_errs(&two, new_format));
+        }
+        assert!(!structure_errs(&legacy, false));
+        assert!(structure_errs(&legacy, true));
+    }
+
+    #[test]
+    fn issue_key_reads_yymm_mmdd() {
+        assert_eq!(issue_key(Path::new("docs/2610/1002")), Some(2610_1002));
+        assert_eq!(issue_key(Path::new("E:/x/docs/2609/0926")), Some(2609_0926));
+        assert_eq!(issue_key(Path::new("docs/0926")), None);
+        assert!(issue_key(Path::new("docs/2609/0930")).unwrap() < NEW_FORMAT_FROM);
     }
 
     #[test]

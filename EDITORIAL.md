@@ -54,6 +54,15 @@
 - 发布时按平台要求声明 AI 生成。文件名 `images/00-cover.*`，生成提示词记在 `images/README.md`。
 - 生成：Claude 用 Codex CLI 的图像生成直接出图，附 `common_images/profile_picture.png` 作看板娘参考，命令与派工模板见 `templates/codex-cover.md`。每种尺寸先出 2 张候选，Claude 逐字核对画面文字后挑一张；都不合适就改提示词再生成，每种尺寸最多 5 张。挑选结果与落选原因记在 `images/README.md`，候选图不入库。
 
+## 省流卡与批注截图（2026-10-02 起）
+
+抖音、小红书以图为主，正文默认折叠，读者常常只翻图。所以图本身要能独立传达省流和吠点，同时保留英文原文作为严格依据。
+
+- 省流卡 `images/00-tldr.png`（3:4，1080×1440），每期必做，上传时紧跟封面、排第 2 张。内容按条目列：每条一句事实，加 2–3 条吠点，挑最能纠正标题或流行说法的那几条；每个字都取自已核验的正文，不新增说法，不新增数字。页脚写“本号整理，非原文截图”。平台限制图数时，先删截图，不删省流卡。公众号正文开头就是省流，默认不插省流卡。
+- 批注截图：英文原文截图照常作为依据，但正式配图用批注版。原截图像素不改、不缩裁关键内容；关键句用半透明荧光笔叠加（正片叠底，不遮字形），编号放在页边。下方“译注”是关键句的直译，措辞以 `fact-check.md` 为准（限定词、单位、口径照搬）；“吠点”另用颜色和标签与译注分开，不混写。每张底部注明“来源：域名 + 原文截图（存档日期）”。原始裁切图作为备用图保留，命名见 `AGENTS.md`。
+- 渲染后必须打开成图逐处核对：高亮是否正好落在目标词句上、有没有扫进相邻句子、译注与原句是否对应。证据图上的高亮放错位置，等于替原文说了它没说的话。
+- 模板与渲染命令见 `templates/cards/`。
+
 ## 事实分级
 
 | 级 | 来源 | 正文措辞 | 可否标 ✅ |
@@ -79,8 +88,8 @@
 2. 取证：少量条目 Claude 直接查；大批量取证、页面存档与截图，Claude 按 `templates/codex-evidence.md` 机械采集（截图、页面存档）派给 Sonnet 子代理或 Codex `gpt-6-luna`（max）；需要判断的取证（回溯一手来源、定级、找吠点）若交给 Codex，用 `gpt-6-astra`（medium 或 max）。Windows 主机 Codex 一律 full-access，见 codex-orchestration。执行方用 opencli / agent-reach 直接完成。产出：`sources/` 存档、`images/` 截图、事实清单。
 3. 抽查：Claude 对照代理产出的存档检查工作区改动，并对高风险条目（价格、跑分、对比结论、标题所涉说法）逐字核对一手页面。自述回报不算验收。
 4. 起草：Claude 按本规范写 `_publish.txt` 与 `images/README.md`。
-5. 反向核验：`codex-reviewer` 只读检查正文中每个数字与判断是否都能在事实清单中找到、有无夸大。取证由 Claude 系代理（Sonnet 或 Claude 本身）完成时，同时让它逐行核对事实清单与 `sources/` 存档是否相符，补上取证环节的跨模型核对。Claude 逐条判断采纳与否，记入 `fact-check.md`。
-6. 修订后运行 `cargo run --release --manifest-path tools/barking/Cargo.toml -- lint <期次目录>`，0 个错误才交付 Develata。它机械检查本规范与 `AGENTS.md` 中可精确判定的条目（字数上限、固定开场/省流/Slogan 顺序、禁用套话、中英文空格、Markdown 残留、配图文件与两张封面是否齐全）；这些规则改动时同步改 `tools/barking/src/lint.rs` 顶部常量。warn 需人工确认，不阻塞。
+5. 反向核验：`codex-reviewer` 只读检查正文、省流卡与每条译注中的每个数字与判断是否都能在事实清单中找到、有无夸大（省流卡与译注是公开说法，风险与封面文字同级）。取证由 Claude 系代理（Sonnet 或 Claude 本身）完成时，同时让它逐行核对事实清单与 `sources/` 存档是否相符，补上取证环节的跨模型核对。Claude 逐条判断采纳与否，记入 `fact-check.md`。
+6. 修订后运行 `cargo run --release --manifest-path tools/barking/Cargo.toml -- lint <期次目录>`，0 个错误才交付 Develata。它机械检查本规范与 `AGENTS.md` 中可精确判定的条目（字数上限、固定开场/省流/Slogan 顺序、禁用套话、中英文空格、Markdown 残留、配图文件、两张封面与省流卡是否齐全）；这些规则改动时同步改 `tools/barking/src/lint.rs` 顶部常量。warn 需人工确认，不阻塞。
 
 每期 `sources/fact-check.md` 格式：
 
