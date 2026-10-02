@@ -3,8 +3,10 @@
 //! screenshotting them with headless Chrome.
 //!
 //! Highlights come from Tesseract word boxes found by matching the quoted
-//! sentence. A missing, ambiguous or low-confidence match is an error, never a
-//! guess: a misplaced highlight on evidence puts words in the source's mouth.
+//! sentence. A missing, ambiguous, partial-word or low-confidence match is an
+//! error, never a guess: a misplaced highlight on evidence puts words in the
+//! source's mouth. Layout overflow (text cut off, screenshot squeezed) is
+//! detected in the page and is an error too.
 
 use std::fmt::Write as _;
 use std::fs;
@@ -18,7 +20,7 @@ use serde::Deserialize;
 const TLDR_TEMPLATE: &str = include_str!("../../../templates/cards/tldr.html");
 const ANNOT_TEMPLATE: &str = include_str!("../../../templates/cards/annot.html");
 pub const SPEC_FILE: &str = "cards.toml";
-const TLDR_OUT: &str = "00-tldr.png";
+pub const TLDR_OUT: &str = "00-tldr.png";
 /// Highlight colours defined in annot.html (`.c1` … `.c4`).
 const MAX_NOTES: usize = 4;
 /// Below this Tesseract confidence a matched word is not trusted.
@@ -85,6 +87,14 @@ impl Spec {
     pub fn tldr_bark_count(&self) -> usize {
         self.tldr.iter().map(|t| t.barks.len()).sum()
     }
+
+    /// Image file names this spec renders.
+    pub fn outputs(&self) -> Vec<&str> {
+        let tldr = (!self.tldr.is_empty()).then_some(TLDR_OUT);
+        tldr.into_iter()
+            .chain(self.annot.iter().map(|a| a.out.as_str()))
+            .collect()
+    }
 }
 
 /// `Ok(None)` when the issue has no `images/cards.toml`.
@@ -125,8 +135,26 @@ fn render_issue(dir: &Path, only: &[String]) -> Result<usize, String> {
             images.join(SPEC_FILE).display()
         )
     })?;
+    let outputs = spec.outputs();
+    for out in &outputs {
+        if out.contains(['/', '\\']) || !out.ends_with(".png") {
+            return Err(format!(
+                "输出名「{out}」须为 images/ 下的 .png 文件名，不含路径"
+            ));
+        }
+    }
+    let unknown: Vec<&String> = only
+        .iter()
+        .filter(|o| !outputs.contains(&o.as_str()))
+        .collect();
+    if !unknown.is_empty() {
+        return Err(format!("cards.toml 中没有这些输出：{unknown:?}"));
+    }
     let chrome = find_chrome()?;
-    let work = std::env::temp_dir().join("barking-card");
+    // Per-process scratch, so concurrent runs don't overwrite each other.
+    let work = std::env::temp_dir()
+        .join("barking-card")
+        .join(std::process::id().to_string());
     fs::create_dir_all(&work).map_err(|e| format!("{}: {e}", work.display()))?;
     let wanted = |name: &str| only.is_empty() || only.iter().any(|o| o == name);
 
@@ -141,7 +169,7 @@ fn render_issue(dir: &Path, only: &[String]) -> Result<usize, String> {
         n += 1;
     }
     if n == 0 {
-        return Err("没有要渲染的卡片（检查 cards.toml 或文件名参数）".into());
+        return Err("cards.toml 里没有要渲染的卡片".into());
     }
     Ok(n)
 }
@@ -190,13 +218,28 @@ fn annot_html(a: &Annot, images: &Path, work: &Path) -> Result<String, String> {
     let mut uls: Vec<(Rect, u32)> = Vec::new();
     for (i, note) in a.note.iter().enumerate() {
         let c = i + 1;
-        let rects: Vec<Rect> = match (&note.rects, &note.quote) {
-            (Some(r), _) => r.iter().map(|&[x, y, w, h]| Rect { x, y, w, h }).collect(),
-            (None, Some(q)) => locate(ocr_words(&raw, w, &a.lang, work, &mut ocr)?, q)
-                .map_err(|e| format!("第 {c} 条 quote：{e}"))?
-                .into_iter()
-                .map(|(r, _)| r)
-                .collect(),
+        let (rects, quote_words) = match (&note.rects, &note.quote) {
+            (Some(_), Some(_)) => {
+                return Err(format!("第 {c} 条 note 的 quote 与 rects 只能二选一"));
+            }
+            (Some(r), None) => {
+                let rects: Vec<Rect> = r.iter().map(|&[x, y, w, h]| Rect { x, y, w, h }).collect();
+                if let Some(r) = rects
+                    .iter()
+                    .find(|r| r.w == 0 || r.h == 0 || r.x + r.w > w || r.y + r.h > h)
+                {
+                    return Err(format!("第 {c} 条 rects {r:?} 为空或超出底图 {w}×{h}"));
+                }
+                (rects, None)
+            }
+            (None, Some(q)) => {
+                let found = locate(ocr_words(&raw, w, &a.lang, work, &mut ocr)?, q)
+                    .map_err(|e| format!("第 {c} 条 quote：{e}"))?;
+                (
+                    found.lines.into_iter().map(|(r, _)| r).collect(),
+                    Some(found.words),
+                )
+            }
             (None, None) => return Err(format!("第 {c} 条 note 需要 quote 或 rects")),
         };
         if rects.is_empty() {
@@ -204,21 +247,24 @@ fn annot_html(a: &Annot, images: &Path, work: &Path) -> Result<String, String> {
         }
         hls.push(rects);
         if let Some(u) = &note.underline {
-            uls.extend(
-                locate(ocr_words(&raw, w, &a.lang, work, &mut ocr)?, u)
-                    .map_err(|e| format!("第 {c} 条 underline：{e}"))?,
-            );
+            let Some(quote_words) = quote_words else {
+                return Err(format!(
+                    "第 {c} 条用了 rects，underline 无法核对位置；改用 quote"
+                ));
+            };
+            let found = locate(ocr_words(&raw, w, &a.lang, work, &mut ocr)?, u)
+                .map_err(|e| format!("第 {c} 条 underline：{e}"))?;
+            if !found.words.iter().all(|i| quote_words.contains(i)) {
+                return Err(format!("第 {c} 条 underline「{u}」不在本条 quote 范围内"));
+            }
+            uls.extend(found.lines);
         }
     }
     split_overlaps(&mut hls);
 
-    // Pass 2: markers sit in the left margin, beside each note's first line,
-    // pushed down so they never stack. The on-card scale is only known in the
-    // page script, so spacing uses the same fit-to-width estimate.
-    let margin = hls.iter().flatten().map(|r| r.x).min().unwrap_or(0).saturating_sub(3);
-    let min_gap = (44.0 / (940.0 / w as f64).min(2.0)).ceil() as u32;
+    // Pass 2: emit. Markers go outside the screenshot's left edge, at each
+    // note's first line; the page script spaces them once the scale is known.
     let mut overlays = String::new();
-    let mut last_mark: Option<u32> = None;
     for (i, rects) in hls.iter().enumerate() {
         let c = i + 1;
         for r in rects {
@@ -228,14 +274,10 @@ fn annot_html(a: &Annot, images: &Path, work: &Path) -> Result<String, String> {
                 r.x, r.y, r.w, r.h
             );
         }
-        let mut y = rects[0].y + rects[0].h / 2;
-        if let Some(prev) = last_mark {
-            y = y.max(prev + min_gap);
-        }
-        last_mark = Some(y);
+        let y = rects[0].y + rects[0].h / 2;
         let _ = writeln!(
             overlays,
-            r#"    <div class="mk c{c}" style="left:{margin}px; top:{y}px">{c}</div>"#
+            r#"    <div class="mk c{c}" data-y="{y}" style="top:{y}px">{c}</div>"#
         );
     }
     // Drawn just under the baseline, not under descenders, so it stays clear
@@ -273,6 +315,8 @@ fn annot_html(a: &Annot, images: &Path, work: &Path) -> Result<String, String> {
             esc(b)
         )
     });
+    // Every inserted value is escaped (braces included), so no value can
+    // smuggle in a later placeholder.
     Ok(ANNOT_TEMPLATE
         .replace("{{TITLE}}", &esc(&a.title))
         .replace("{{IMG}}", &file_url(&raw)?)
@@ -301,6 +345,8 @@ fn esc(s: &str) -> String {
             '<' => out.push_str("&lt;"),
             '>' => out.push_str("&gt;"),
             '"' => out.push_str("&quot;"),
+            '{' => out.push_str("&#123;"),
+            '}' => out.push_str("&#125;"),
             _ => out.push(c),
         }
     }
@@ -348,25 +394,63 @@ fn find_chrome() -> Result<PathBuf, String> {
     .ok_or_else(|| "找不到 Chrome / Edge；用环境变量 BARKING_CHROME 指定可执行文件".into())
 }
 
+fn chrome_cmd(chrome: &Path, work: &Path) -> Command {
+    let mut cmd = Command::new(chrome);
+    cmd.args([
+        "--headless=new",
+        "--disable-gpu",
+        "--hide-scrollbars",
+        "--force-device-scale-factor=1",
+        "--allow-file-access-from-files",
+        "--window-size=1080,1440",
+    ])
+    // Own profile: never hand the job to a running Chrome.
+    .arg(format!(
+        "--user-data-dir={}",
+        work.join("profile").display()
+    ))
+    .stderr(Stdio::null());
+    cmd
+}
+
 fn render(chrome: &Path, work: &Path, html: &str, out: &Path) -> Result<(), String> {
     let name = out.file_stem().and_then(|n| n.to_str()).unwrap_or("card");
     let page = work.join(format!("{name}.html"));
     fs::write(&page, html).map_err(|e| format!("{}: {e}", page.display()))?;
+    let url = file_url(&page)?;
+
+    // The page script records `data-layout` on <body>: "ok" or "overflow:…".
+    let dom = chrome_cmd(chrome, work)
+        .arg("--dump-dom")
+        .arg(&url)
+        .output()
+        .map_err(|e| format!("无法运行 {}: {e}", chrome.display()))?;
+    let dom = String::from_utf8_lossy(&dom.stdout);
+    match layout_state(&dom) {
+        Some("ok") => {}
+        Some(bad) => {
+            return Err(format!(
+                "{}：版面溢出（{}）。HTML 留在 {}",
+                out.display(),
+                bad.trim_start_matches("overflow:"),
+                page.display()
+            ));
+        }
+        None => {
+            return Err(format!(
+                "{}：读不到版面检查结果（HTML 留在 {}）",
+                out.display(),
+                page.display()
+            ));
+        }
+    }
+
     let out_abs = std::path::absolute(out).map_err(|e| format!("{}: {e}", out.display()))?;
     let started = SystemTime::now();
-    let status = Command::new(chrome)
-        .args([
-            "--headless=new",
-            "--disable-gpu",
-            "--hide-scrollbars",
-            "--force-device-scale-factor=1",
-            "--allow-file-access-from-files",
-            "--window-size=1080,1440",
-        ])
+    let status = chrome_cmd(chrome, work)
         .arg(format!("--screenshot={}", out_abs.display()))
-        .arg(file_url(&page)?)
+        .arg(&url)
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
         .status()
         .map_err(|e| format!("无法运行 {}: {e}", chrome.display()))?;
     // Chrome may exit 0 without writing; require a file newer than the launch.
@@ -382,6 +466,13 @@ fn render(chrome: &Path, work: &Path, html: &str, out: &Path) -> Result<(), Stri
     }
     println!("{}  （HTML：{}）", out.display(), page.display());
     Ok(())
+}
+
+/// The `data-layout` value on the dumped <body>, if present.
+fn layout_state(dom: &str) -> Option<&str> {
+    let start = dom.find("data-layout=\"")? + "data-layout=\"".len();
+    let len = dom[start..].find('"')?;
+    Some(&dom[start..start + len])
 }
 
 /// A Tesseract word with its box in raw-image pixels.
@@ -544,13 +635,21 @@ fn tokens(s: &str) -> Vec<String> {
     out
 }
 
-/// One padded rectangle per text line covered by the unique occurrence of
-/// `quote` in `words`, with that line's approximate baseline (the highest word
-/// bottom, i.e. a word without descenders).
+/// Where a quote sits on the image.
+struct Located {
+    /// One padded rectangle per text line, with that line's approximate
+    /// baseline (the highest word bottom, i.e. a word without descenders).
+    lines: Vec<(Rect, u32)>,
+    /// Indices into the OCR words, in order.
+    words: Vec<usize>,
+}
+
+/// The unique occurrence of `quote` in `words`.
 ///
-/// Pre: `words` are in Tesseract reading order. Post: rectangles follow the
-/// quote's line order; every matched word has confidence ≥ `MIN_CONF`.
-fn locate(words: &[Word], quote: &str) -> Result<Vec<(Rect, u32)>, String> {
+/// Pre: `words` are in Tesseract reading order. Post: the match covers whole
+/// OCR words only (a box is never wider than the quote); lines follow the
+/// quote's order; every matched word has confidence ≥ `MIN_CONF`.
+fn locate(words: &[Word], quote: &str) -> Result<Located, String> {
     let flat: Vec<(String, usize)> = words
         .iter()
         .enumerate()
@@ -589,8 +688,23 @@ fn locate(words: &[Word], quote: &str) -> Result<Vec<(Rect, u32)>, String> {
             ));
         }
     };
+    let e = s + q.len() - 1;
+    // A word box is all-or-nothing, so the quote must start and end on word
+    // boundaries (e.g. not inside "state-of-the-art").
+    let (first, last) = (flat[s].1, flat[e].1);
+    if (s > 0 && flat[s - 1].1 == first) || flat.get(e + 1).is_some_and(|(_, i)| *i == last) {
+        let partial = if s > 0 && flat[s - 1].1 == first {
+            first
+        } else {
+            last
+        };
+        return Err(format!(
+            "原句的起止落在 OCR 词「{}」中间，高亮会多盖字；把 quote 写到整词，或改用 rects",
+            words[partial].text
+        ));
+    }
 
-    let mut idx: Vec<usize> = flat[s..s + q.len()].iter().map(|(_, i)| *i).collect();
+    let mut idx: Vec<usize> = flat[s..=e].iter().map(|(_, i)| *i).collect();
     idx.dedup();
     if let Some(w) = idx.iter().map(|&i| &words[i]).find(|w| w.conf < MIN_CONF) {
         return Err(format!(
@@ -614,7 +728,7 @@ fn locate(words: &[Word], quote: &str) -> Result<Vec<(Rect, u32)>, String> {
             None => lines.push((w.line, [w.left, w.top, w.right, w.bottom, w.bottom])),
         }
     }
-    Ok(lines
+    let lines = lines
         .into_iter()
         .map(|(_, [l, t, r, b, base])| {
             let pad = ((b - t) / 8).max(1);
@@ -626,16 +740,26 @@ fn locate(words: &[Word], quote: &str) -> Result<Vec<(Rect, u32)>, String> {
             };
             (rect, base)
         })
-        .collect())
+        .collect();
+    Ok(Located { lines, words: idx })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn word(text: &str, left: u32, top: u32, line: u32) -> String {
+    fn row(text: &str, left: u32, top: u32, line: u32, conf: u32) -> String {
         // level page block par line word left top width height conf text
-        format!("5\t1\t1\t1\t{line}\t1\t{left}\t{top}\t30\t12\t95\t{text}")
+        format!("5\t1\t1\t1\t{line}\t1\t{left}\t{top}\t30\t12\t{conf}\t{text}")
+    }
+
+    fn words(rows: &[(&str, u32, u32, u32)]) -> Vec<Word> {
+        let mut tsv = vec!["header".to_string()];
+        tsv.extend(
+            rows.iter()
+                .map(|&(t, l, top, line)| row(t, l, top, line, 95)),
+        );
+        parse_tsv(&tsv.join("\n"), 1)
     }
 
     #[test]
@@ -645,6 +769,7 @@ mod tests {
         assert_eq!(spec.tldr.len(), 2);
         assert_eq!(spec.tldr_bark_count(), 3);
         assert_eq!(spec.quoted_texts().len(), 2 + 3 + 1);
+        assert_eq!(spec.outputs(), [TLDR_OUT, "01-openai-dns-pause.png"]);
     }
 
     #[test]
@@ -655,30 +780,114 @@ mod tests {
 
     #[test]
     fn locate_gives_one_rect_per_line_and_rejects_ambiguity() {
-        let tsv = [
-            "header".to_string(),
-            word("The", 10, 10, 1),
-            word("run", 50, 10, 1),
-            word("was", 90, 10, 1),
-            word("killed.", 10, 30, 2),
-            word("The", 60, 30, 2),
-        ]
-        .join("\n");
-        let words = parse_tsv(&tsv, 1);
-        let rects = locate(&words, "run was killed").unwrap();
-        assert_eq!(rects.len(), 2);
-        let r0 = Rect { x: 49, y: 9, w: 72, h: 14 };
-        assert_eq!(rects[0], (r0, 22));
-        assert!(locate(&words, "The").unwrap_err().contains("2 次"));
-        assert!(locate(&words, "run was not").unwrap_err().contains("2/3"));
+        let w = words(&[
+            ("The", 10, 10, 1),
+            ("run", 50, 10, 1),
+            ("was", 90, 10, 1),
+            ("killed.", 10, 30, 2),
+            ("The", 60, 30, 2),
+        ]);
+        let found = locate(&w, "run was killed").unwrap();
+        assert_eq!(found.words, [1, 2, 3]);
+        assert_eq!(found.lines.len(), 2);
+        let r0 = Rect {
+            x: 49,
+            y: 9,
+            w: 72,
+            h: 14,
+        };
+        assert_eq!(found.lines[0], (r0, 22));
+        assert!(locate(&w, "The").err().unwrap().contains("2 次"));
+        assert!(locate(&w, "run was not").err().unwrap().contains("2/3"));
+    }
+
+    #[test]
+    fn locate_rejects_partial_words_and_low_confidence() {
+        let w = words(&[
+            ("a", 0, 0, 1),
+            ("state-of-the-art", 10, 0, 1),
+            ("model", 60, 0, 1),
+        ]);
+        assert!(locate(&w, "a state of the").err().unwrap().contains("中间"));
+        assert!(
+            locate(&w, "of the art model")
+                .err()
+                .unwrap()
+                .contains("中间")
+        );
+        assert!(locate(&w, "state of the art").is_ok());
+
+        let tsv = format!(
+            "h\n{}\n{}",
+            row("blurry", 0, 0, 1, 95),
+            row("w0rd", 40, 0, 1, 41)
+        );
+        assert!(
+            locate(&parse_tsv(&tsv, 1), "blurry w0rd")
+                .err()
+                .unwrap()
+                .contains("置信度")
+        );
+    }
+
+    #[test]
+    fn split_overlaps_meets_halfway() {
+        let mut hls = vec![
+            vec![Rect {
+                x: 0,
+                y: 0,
+                w: 50,
+                h: 20,
+            }],
+            vec![
+                Rect {
+                    x: 40,
+                    y: 16,
+                    w: 50,
+                    h: 20,
+                },
+                Rect {
+                    x: 200,
+                    y: 10,
+                    w: 9,
+                    h: 9,
+                },
+            ],
+        ];
+        split_overlaps(&mut hls);
+        assert_eq!(hls[0][0].y + hls[0][0].h, hls[1][0].y);
+        assert_eq!(hls[1][0].y + hls[1][0].h, 36);
+        assert_eq!(
+            hls[1][1],
+            Rect {
+                x: 200,
+                y: 10,
+                w: 9,
+                h: 9
+            },
+            "no x overlap, untouched"
+        );
     }
 
     #[test]
     fn parse_tsv_scales_boxes_back() {
-        let words = parse_tsv(&format!("h\n{}", word("x", 30, 60, 1)), 3);
+        let w = parse_tsv(&format!("h\n{}", row("x", 30, 60, 1, 95)), 3);
         assert_eq!(
-            (words[0].left, words[0].top, words[0].right, words[0].bottom),
+            (w[0].left, w[0].top, w[0].right, w[0].bottom),
             (10, 20, 20, 24)
         );
+    }
+
+    #[test]
+    fn escaping_blocks_placeholder_injection() {
+        assert_eq!(
+            esc("{{NOTES}} <b>"),
+            "&#123;&#123;NOTES&#125;&#125; &lt;b&gt;"
+        );
+        assert_eq!(
+            layout_state(r#"<body data-layout="overflow:x">"#),
+            Some("overflow:x")
+        );
+        assert_eq!(layout_state("<body>"), None);
     }
 }

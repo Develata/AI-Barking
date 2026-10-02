@@ -101,8 +101,10 @@ fn issue_key(dir: &Path) -> Option<u32> {
 
 pub fn lint_issue(dir: &Path) -> Vec<Finding> {
     let mut out = Vec::new();
-    // Unrecognised paths get the current rules.
-    let new_format = issue_key(dir).is_none_or(|k| k >= NEW_FORMAT_FROM);
+    // Resolve `.` and relative paths so the YYMM/MMDD components are visible;
+    // unrecognised paths get the current rules.
+    let resolved = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
+    let new_format = issue_key(&resolved).is_none_or(|k| k >= NEW_FORMAT_FROM);
 
     let fc_path = dir.join("sources").join("fact-check.md");
     let fact_check = fs::read_to_string(&fc_path).ok();
@@ -127,8 +129,8 @@ pub fn lint_issue(dir: &Path) -> Vec<Finding> {
         })
         .unwrap_or_default();
     publish.sort();
-    // All publish texts with whitespace removed, for verbatim card checks.
-    let mut bodies = String::new();
+    // Publish-text lines with whitespace removed, for verbatim card checks.
+    let mut body_lines: Vec<String> = Vec::new();
     if publish.is_empty() {
         Sink {
             path: dir,
@@ -143,7 +145,11 @@ pub fn lint_issue(dir: &Path) -> Vec<Finding> {
         };
         match fs::read_to_string(p) {
             Ok(raw) => {
-                bodies.extend(raw.chars().filter(|c| !c.is_whitespace()));
+                body_lines.extend(
+                    raw.lines()
+                        .map(|l| l.chars().filter(|c| !c.is_whitespace()).collect::<String>())
+                        .filter(|l| !l.is_empty()),
+                );
                 lint_publish(&mut sink, &raw, fact_check.as_deref(), new_format);
             }
             Err(e) => sink.error(None, format!("读取失败：{e}")),
@@ -151,7 +157,21 @@ pub fn lint_issue(dir: &Path) -> Vec<Finding> {
     }
 
     lint_images(&dir.join("images"), new_format, &mut out);
-    lint_cards(&dir.join("images"), &bodies, new_format, &mut out);
+    lint_cards(&dir.join("images"), &body_lines, new_format, &mut out);
+    if new_format
+        && fact_check
+            .as_deref()
+            .is_some_and(|fc| !fc.contains("视觉复核"))
+    {
+        Sink {
+            path: &fc_path,
+            out: &mut out,
+        }
+        .warn(
+            None,
+            "事实清单里没有“视觉复核”记录（EDITORIAL.md 省流卡与批注截图）",
+        );
+    }
     out
 }
 
@@ -261,7 +281,11 @@ fn lint_structure(sink: &mut Sink, lines: &[&str], new_format: bool) {
                 sink.error(at(nonempty[k].0), "Slogan 应在省流之后");
             }
             match &nonempty[k + 1..] {
-                [] => {}
+                [] if new_format => {}
+                [] => sink.error(
+                    at(nonempty[k].0),
+                    format!("旧格式期次的 Slogan 后应有一行「{SOURCES_PREFIX}」"),
+                ),
                 [(_, l)] if !new_format && l.starts_with(SOURCES_PREFIX) => {}
                 [(i, _), ..] => sink.error(
                     at(*i),
@@ -463,6 +487,19 @@ fn lint_images(images: &Path, new_format: bool, out: &mut Vec<Finding>) {
         }
     }
 
+    // The 省流卡 is uploaded right after the cover: first in 正式配图.
+    if new_format {
+        let first_formal = md
+            .lines()
+            .skip_while(|l| !l.starts_with("## 正式配图"))
+            .skip(1)
+            .take_while(|l| !l.starts_with("## "))
+            .find_map(|l| image_refs_in_line(l).first().copied());
+        if first_formal.is_some_and(|f| !f.starts_with("00-tldr.")) {
+            sink.warn(None, "“正式配图”第一张应为省流卡 00-tldr.png");
+        }
+    }
+
     let files: Vec<String> = fs::read_dir(images)
         .map(|rd| {
             rd.filter_map(Result::ok)
@@ -495,7 +532,7 @@ fn lint_images(images: &Path, new_format: bool, out: &mut Vec<Finding>) {
 
 /// Card texts must be verbatim (ignoring whitespace) excerpts of the
 /// verified publish text; EDITORIAL.md 省流卡与批注截图.
-fn lint_cards(images: &Path, bodies: &str, new_format: bool, out: &mut Vec<Finding>) {
+fn lint_cards(images: &Path, body_lines: &[String], new_format: bool, out: &mut Vec<Finding>) {
     let path = images.join(card::SPEC_FILE);
     let mut sink = Sink { path: &path, out };
     let spec = match card::load_spec(images) {
@@ -506,24 +543,49 @@ fn lint_cards(images: &Path, bodies: &str, new_format: bool, out: &mut Vec<Findi
         Ok(None) => return,
         Err(e) => return sink.error(None, e),
     };
-    // A card line may join several body excerpts with “；” and end with its
-    // own full stop; each excerpt must appear verbatim.
-    for t in spec.quoted_texts() {
+    for msg in card_text_errors(&spec.quoted_texts(), body_lines) {
+        sink.error(None, msg);
+    }
+    let n = spec.tldr_bark_count();
+    if !spec.tldr.is_empty() && !(2..=3).contains(&n) {
+        sink.warn(None, format!("省流卡吠点共 {n} 条，规范为 2–3 条"));
+    }
+    // Rendered images older than the spec were not re-rendered after an edit.
+    let mtime = |p: &Path| fs::metadata(p).and_then(|m| m.modified()).ok();
+    if let Some(spec_time) = mtime(&path) {
+        for o in spec.outputs() {
+            match mtime(&images.join(o)) {
+                None => sink.error(None, format!("images/{o} 尚未渲染（barking card）")),
+                Some(t) if t < spec_time => sink.warn(
+                    None,
+                    format!("images/{o} 早于 cards.toml，可能需要重新渲染"),
+                ),
+                Some(_) => {}
+            }
+        }
+    }
+}
+
+/// Each card text, split at “；”, must be a verbatim excerpt of one publish
+/// line (whitespace ignored; a trailing full stop allowed). Whether an
+/// excerpt changes the meaning is left to human and visual review.
+fn card_text_errors(texts: &[&str], body_lines: &[String]) -> Vec<String> {
+    let mut errs = Vec::new();
+    for t in texts {
         for seg in t.split('；') {
             let compact: String = seg
                 .trim_end_matches(['。', '，', '！', '？'])
                 .chars()
                 .filter(|c| !c.is_whitespace())
                 .collect();
-            if !compact.is_empty() && !bodies.contains(&compact) {
-                sink.error(None, format!("卡片文字未在正文中逐字出现：「{seg}」（出自「{t}」）"));
+            if !compact.is_empty() && !body_lines.iter().any(|l| l.contains(&compact)) {
+                errs.push(format!(
+                    "卡片文字未在正文同一行中逐字出现：「{seg}」（出自「{t}」）"
+                ));
             }
         }
     }
-    let n = spec.tldr_bark_count();
-    if !spec.tldr.is_empty() && !(2..=3).contains(&n) {
-        sink.warn(None, format!("省流卡吠点共 {n} 条，规范为 2–3 条"));
-    }
+    errs
 }
 
 #[cfg(test)]
@@ -560,12 +622,33 @@ mod tests {
         let extra = format!("{ok}\n多一行\n");
         let two = format!("{legacy}\n多一行\n");
         for new_format in [true, false] {
-            assert!(!structure_errs(&ok, new_format));
             assert!(structure_errs(&extra, new_format));
             assert!(structure_errs(&two, new_format));
         }
-        assert!(!structure_errs(&legacy, false));
+        assert!(!structure_errs(&ok, true));
         assert!(structure_errs(&legacy, true));
+        assert!(!structure_errs(&legacy, false));
+        assert!(structure_errs(&ok, false), "old format keeps its 来源 line");
+    }
+
+    #[test]
+    fn card_texts_must_be_verbatim_within_one_line() {
+        let lines: Vec<String> = ["省流：甲发布了乙。", "吠点：①丙不等于丁，戊未确认。"]
+            .iter()
+            .map(|l| l.to_string())
+            .collect();
+        let ok = ["甲发布了乙。", "丙不等于丁；戊未确认。"];
+        assert!(card_text_errors(&ok, &lines).is_empty());
+        // Spans two lines, or alters a word: rejected.
+        let bad = ["乙。吠点", "丙等于丁"];
+        assert_eq!(card_text_errors(&bad, &lines).len(), 2);
+    }
+
+    #[test]
+    fn issue_key_resolves_dot() {
+        let here = std::env::current_dir().unwrap();
+        let resolved = Path::new(".").canonicalize().unwrap();
+        assert_eq!(resolved.file_name(), here.file_name());
     }
 
     #[test]
