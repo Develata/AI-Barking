@@ -202,7 +202,7 @@ fn lint_publish(sink: &mut Sink, raw: &str, fact_check: Option<&str>) {
     }
 }
 
-/// Required order: 标题 → 固定开场 → 省流 → … → Slogan → 来源（最后一行）.
+/// Required order: 标题 → 固定开场 → 省流 → … → Slogan（最后一行）.
 fn lint_structure(sink: &mut Sink, lines: &[&str]) {
     let nonempty: Vec<(usize, &str)> = lines
         .iter()
@@ -233,15 +233,16 @@ fn lint_structure(sink: &mut Sink, lines: &[&str]) {
             if tldr.is_some_and(|t| t > k) {
                 sink.error(at(nonempty[k].0), "Slogan 应在省流之后");
             }
-            if k + 2 != nonempty.len() {
-                sink.error(at(nonempty[k].0), "Slogan 后应紧跟且只跟一行来源");
+            match &nonempty[k + 1..] {
+                [] => {}
+                // Issues published before 2026-10-02 end with one 来源 line.
+                [(i, l)] if l.starts_with(SOURCES_PREFIX) => sink.warn(
+                    at(*i),
+                    "2026-10-02 起正文不写文末来源行（来源见 sources/README.md）；已发布的旧期次可忽略",
+                ),
+                [(i, _), ..] => sink.error(at(*i), "Slogan 应为最后一行"),
             }
         }
-    }
-    if let Some(&(i, last)) = nonempty.last()
-        && !last.starts_with(SOURCES_PREFIX)
-    {
-        sink.error(at(i), format!("最后一行应以「{SOURCES_PREFIX}」开头"));
     }
 }
 
@@ -475,6 +476,37 @@ mod tests {
         let crlf = "\u{feff}标题\r\n\r\nAI 沸点\r\n";
         assert_eq!(normalize(lf), normalize(crlf));
         assert_eq!(char_count(&normalize(crlf)), 9);
+    }
+
+    fn structure(text: &str) -> Vec<(bool, String)> {
+        let mut out = Vec::new();
+        let lines: Vec<&str> = text.lines().collect();
+        lint_structure(
+            &mut Sink {
+                path: Path::new("t"),
+                out: &mut out,
+            },
+            &lines,
+        );
+        out.into_iter()
+            .map(|f| (f.level == Level::Error, f.msg))
+            .collect()
+    }
+
+    #[test]
+    fn slogan_ends_the_text_and_legacy_sources_line_only_warns() {
+        let ok = format!("标题\n\n{OPENING}\n\n省流：x\n\n{SLOGAN}\n");
+        assert!(structure(&ok).is_empty());
+
+        let legacy = format!("{ok}\n来源：OpenAI\n");
+        let f = structure(&legacy);
+        assert_eq!(f.len(), 1);
+        assert!(!f[0].0, "legacy 来源 line should be a warning");
+
+        let extra = format!("{ok}\n多一行\n");
+        assert!(structure(&extra).iter().any(|(err, _)| *err));
+        let two = format!("{legacy}\n多一行\n");
+        assert!(structure(&two).iter().any(|(err, _)| *err));
     }
 
     #[test]
