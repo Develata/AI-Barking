@@ -156,8 +156,17 @@ pub fn lint_issue(dir: &Path) -> Vec<Finding> {
         }
     }
 
-    lint_images(&dir.join("images"), new_format, &mut out);
-    lint_cards(&dir.join("images"), &body_lines, new_format, &mut out);
+    // Newer issues keep their images only on OpenList; `offsite.tsv` vouches for
+    // the ones a fresh clone lacks.
+    let offsite = offsite_paths(dir);
+    lint_images(&dir.join("images"), new_format, &offsite, &mut out);
+    lint_cards(
+        &dir.join("images"),
+        &body_lines,
+        new_format,
+        &offsite,
+        &mut out,
+    );
     if new_format
         && fact_check
             .as_deref()
@@ -467,7 +476,28 @@ pub fn image_refs_in_line(line: &str) -> Vec<&str> {
     out
 }
 
-fn lint_images(images: &Path, new_format: bool, out: &mut Vec<Finding>) {
+/// Paths (relative to the issue directory) that `sources/offsite.tsv` records as
+/// stored on OpenList. Missing local copies of these are not lint errors.
+fn offsite_paths(dir: &Path) -> BTreeSet<String> {
+    let text = fs::read_to_string(dir.join("sources").join("offsite.tsv")).unwrap_or_default();
+    parse_offsite(&text)
+}
+
+fn parse_offsite(text: &str) -> BTreeSet<String> {
+    text.lines()
+        .filter(|l| !l.starts_with('#'))
+        .filter_map(|l| l.split('\t').next())
+        .filter(|p| !p.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+fn lint_images(
+    images: &Path,
+    new_format: bool,
+    offsite: &BTreeSet<String>,
+    out: &mut Vec<Finding>,
+) {
     let readme = images.join("README.md");
     let mut sink = Sink { path: &readme, out };
     let md = match fs::read_to_string(&readme) {
@@ -481,7 +511,7 @@ fn lint_images(images: &Path, new_format: bool, out: &mut Vec<Finding>) {
             if let Some(name) = Path::new(tok).file_name().and_then(|n| n.to_str()) {
                 referenced.insert(name.to_string());
             }
-            if !images.join(tok).is_file() {
+            if !images.join(tok).is_file() && !offsite.contains(&format!("images/{tok}")) {
                 sink.error(Some(i + 1), format!("配图说明列出的 {tok} 不存在"));
             }
         }
@@ -512,7 +542,11 @@ fn lint_images(images: &Path, new_format: bool, out: &mut Vec<Finding>) {
         ("00-cover-wide.", "2.35:1 横版封面", true),
         ("00-tldr.", "省流卡", new_format),
     ] {
-        if required && !files.iter().any(|f| f.starts_with(stem)) {
+        let remote = format!("images/{stem}");
+        if required
+            && !files.iter().any(|f| f.starts_with(stem))
+            && !offsite.iter().any(|p| p.starts_with(&remote))
+        {
             sink.error(None, format!("缺少{what} images/{stem}*"));
         }
     }
@@ -532,7 +566,13 @@ fn lint_images(images: &Path, new_format: bool, out: &mut Vec<Finding>) {
 
 /// Card texts must be verbatim (ignoring whitespace) excerpts of the
 /// verified publish text; EDITORIAL.md 省流卡与批注截图.
-fn lint_cards(images: &Path, body_lines: &[String], new_format: bool, out: &mut Vec<Finding>) {
+fn lint_cards(
+    images: &Path,
+    body_lines: &[String],
+    new_format: bool,
+    offsite: &BTreeSet<String>,
+    out: &mut Vec<Finding>,
+) {
     let path = images.join(card::SPEC_FILE);
     let mut sink = Sink { path: &path, out };
     let spec = match card::load_spec(images) {
@@ -555,6 +595,7 @@ fn lint_cards(images: &Path, body_lines: &[String], new_format: bool, out: &mut 
     if let Some(spec_time) = mtime(&path) {
         for o in spec.outputs() {
             match mtime(&images.join(o)) {
+                None if offsite.contains(&format!("images/{o}")) => {}
                 None => sink.error(None, format!("images/{o} 尚未渲染（barking card）")),
                 Some(t) if t < spec_time => sink.warn(
                     None,
@@ -591,6 +632,14 @@ fn card_text_errors(texts: &[&str], body_lines: &[String]) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn offsite_manifest_lists_paths_and_skips_comments() {
+        let tsv = "# 注释\nimages/00-tldr.png\t100\tabc\nsources/a.pdf\t5\tdef\n";
+        let set = parse_offsite(tsv);
+        assert!(set.contains("images/00-tldr.png") && set.contains("sources/a.pdf"));
+        assert_eq!(set.len(), 2);
+    }
 
     #[test]
     fn count_ignores_bom_crlf_and_trailing_newline() {

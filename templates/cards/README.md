@@ -30,4 +30,4 @@
 
    每张图写成一个 `--image=` 参数；路径用 `wsl -d Debian -e wslpath -a` 转换。后台运行，等完成通知后读报告。Codex 不可用或超时时，改派 Sonnet 子代理按同一提示词看图复核，并在记录中注明复核方。Claude 逐条核实意见再改，结论记入 `sources/fact-check.md`。
 6. `barking lint`：卡片文字须在正文同一行中逐字出现（error）；省流卡吠点应为 2–3 条、cards.toml 改过而图未重渲、省流卡不在正式配图第一行、`fact-check.md` 没有“视觉复核”记录，均给 warn。
-7. `images/README.md` 的正式配图里，省流卡列第 1 行，批注图替代原截图；`-raw` 底图列入备用图（用途写“批注底图”）。备用图不入 Git，发布后由 `barking offsite --upload` 存 OpenList（路径与 SHA-256 见 `sources/offsite.tsv`）；日后重渲，先从 OpenList 同一路径取回底图。
+7. `images/README.md` 的正式配图里，省流卡列第 1 行，批注图替代原截图；`-raw` 底图列入备用图（用途写“批注底图”）。1002 期起，包括卡片在内的全部图片都不入 Git，发布后由 `barking offsite --upload` 存 OpenList（路径与 SHA-256 见 `sources/offsite.tsv`）；日后重渲，先从 OpenList 同一路径取回底图。

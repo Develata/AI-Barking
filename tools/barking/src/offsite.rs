@@ -1,8 +1,10 @@
-//! `barking offsite`: originals that stay out of git (covers, PDFs, page
-//! archives, screenshots, media; patterns in `.gitignore`; backup images, listed
-//! per issue in `images/.gitignore` by this command) are recorded in
+//! `barking offsite`: files that stay out of git are recorded in
 //! `sources/offsite.tsv` and, with `--upload`, copied to OpenList under
-//! `<OPENLIST_ROOT>/<YYMM>/<MMDD>/`. Workflow: docs/workflow/publish.md.
+//! `<OPENLIST_ROOT>/<YYMM>/<MMDD>/`. From issue 1002 on that is every image under
+//! `images/` plus PDFs, page archives, screenshots and media under `sources/`
+//! (patterns in `.gitignore`). Issues before 1002 keep their formal images in
+//! git; their backup images are listed per issue in `images/.gitignore`, which
+//! this command still writes for them. Workflow: docs/workflow/publish.md.
 
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
@@ -14,9 +16,11 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 const MANIFEST: &str = "offsite.tsv";
-const MANIFEST_HEADER: &str = "# 存于 OpenList 的原件（见 docs/workflow/publish.md；0928 及更早期次的原件、1001 及更早期次的备用图同时留在 Git 中）。列：相对期次目录的路径\t字节数\tSHA-256";
+const MANIFEST_HEADER: &str = "# 存于 OpenList 的文件（见 docs/workflow/publish.md；1002 起全部图片与原件只存网盘；0928 及更早期次的原件、1001 及更早期次的配图同时留在 Git 中）。列：相对期次目录的路径\t字节数\tSHA-256";
 const BACKUP_IGNORE_HEADER: &str = "# 备用图，原件存于 OpenList；未入库的由此保持不入库。由 barking offsite 按 README.md“正式配图”一节生成，勿手改。";
 const USAGE: &str = "用法：barking offsite <期次目录>... [--upload]";
+/// First issue (`YYMMMMDD`) whose images, formal ones included, stay out of git.
+const ALL_IMAGES_OFFSITE_FROM: u32 = 2610_1002;
 
 /// One git-ignored file of an issue. Owned strings: entries are few and are
 /// used after the `git ls-files` output buffer is gone.
@@ -72,7 +76,11 @@ fn process(
     client: &mut Option<OpenList>,
 ) -> Result<usize, String> {
     let (yymm, mmdd) = issue_key(root, dir)?;
-    write_backup_ignore(root, &yymm, &mmdd)?;
+    // `.gitignore` already keeps every image of newer issues out of git; only
+    // older issues need the per-issue list of backup images.
+    if !all_images_offsite(&yymm, &mmdd) {
+        write_backup_ignore(root, &yymm, &mmdd)?;
+    }
     let entries = ignored_files(root, &yymm, &mmdd)?;
     if entries.is_empty() {
         println!("没有不入库的原件");
@@ -123,6 +131,15 @@ fn upload_one(ol: &OpenList, e: &Entry, remote: &str) -> Result<&'static str, St
         Some(s) if s == e.size => Ok("（已上传，远端大小一致）"),
         Some(s) => Err(format!("上传后远端 {s} 字节，本地 {} 字节", e.size)),
         None => Err("上传后远端查不到该文件".into()),
+    }
+}
+
+/// Whether the issue follows the rule that all images stay out of git.
+fn all_images_offsite(yymm: &str, mmdd: &str) -> bool {
+    // `issue_key` guarantees four ASCII digits, so the parses cannot fail.
+    match (yymm.parse::<u32>(), mmdd.parse::<u32>()) {
+        (Ok(m), Ok(d)) => m * 10_000 + d >= ALL_IMAGES_OFFSITE_FROM,
+        _ => false,
     }
 }
 
