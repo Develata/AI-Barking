@@ -1,12 +1,11 @@
 //! `barking offsite`: files that stay out of git are recorded in
 //! `sources/offsite.tsv` and, with `--upload`, copied to OpenList under
-//! `<OPENLIST_ROOT>/<YYMM>/<MMDD>/`. From issue 1002 on that is every image under
-//! `images/` plus PDFs, page archives, screenshots and media under `sources/`
-//! (patterns in `.gitignore`). Issues before 1002 keep their formal images in
-//! git; their backup images are listed per issue in `images/.gitignore`, which
-//! this command still writes for them. Workflow: docs/workflow/publish.md.
+//! `<OPENLIST_ROOT>/<YYMM>/<MMDD>/`: every image under `images/` and the PDFs,
+//! page archives, screenshots and media under `sources/` (patterns in
+//! `.gitignore`). Files are uploaded one by one, never zipped. Workflow:
+//! docs/workflow/publish.md.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
@@ -16,11 +15,8 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 const MANIFEST: &str = "offsite.tsv";
-const MANIFEST_HEADER: &str = "# 存于 OpenList 的文件（见 docs/workflow/publish.md；1002 起全部图片与原件只存网盘；0928 及更早期次的原件、1001 及更早期次的配图同时留在 Git 中）。列：相对期次目录的路径\t字节数\tSHA-256";
-const BACKUP_IGNORE_HEADER: &str = "# 备用图，原件存于 OpenList；未入库的由此保持不入库。由 barking offsite 按 README.md“正式配图”一节生成，勿手改。";
+const MANIFEST_HEADER: &str = "# 存于 OpenList 的文件（见 docs/workflow/publish.md；1002 期起图片与原件不入 Git，更早期次的图片与原件已于历史改写时移出 Git，仍在网盘）。列：相对期次目录的路径	字节数	SHA-256";
 const USAGE: &str = "用法：barking offsite <期次目录>... [--upload]";
-/// First issue (`YYMMMMDD`) whose images, formal ones included, stay out of git.
-const ALL_IMAGES_OFFSITE_FROM: u32 = 2610_1002;
 
 /// One git-ignored file of an issue. Owned strings: entries are few and are
 /// used after the `git ls-files` output buffer is gone.
@@ -76,11 +72,6 @@ fn process(
     client: &mut Option<OpenList>,
 ) -> Result<usize, String> {
     let (yymm, mmdd) = issue_key(root, dir)?;
-    // `.gitignore` already keeps every image of newer issues out of git; only
-    // older issues need the per-issue list of backup images.
-    if !all_images_offsite(&yymm, &mmdd) {
-        write_backup_ignore(root, &yymm, &mmdd)?;
-    }
     let entries = ignored_files(root, &yymm, &mmdd)?;
     if entries.is_empty() {
         println!("没有不入库的原件");
@@ -131,15 +122,6 @@ fn upload_one(ol: &OpenList, e: &Entry, remote: &str) -> Result<&'static str, St
         Some(s) if s == e.size => Ok("（已上传，远端大小一致）"),
         Some(s) => Err(format!("上传后远端 {s} 字节，本地 {} 字节", e.size)),
         None => Err("上传后远端查不到该文件".into()),
-    }
-}
-
-/// Whether the issue follows the rule that all images stay out of git.
-fn all_images_offsite(yymm: &str, mmdd: &str) -> bool {
-    // `issue_key` guarantees four ASCII digits, so the parses cannot fail.
-    match (yymm.parse::<u32>(), mmdd.parse::<u32>()) {
-        (Ok(m), Ok(d)) => m * 10_000 + d >= ALL_IMAGES_OFFSITE_FROM,
-        _ => false,
     }
 }
 
@@ -217,58 +199,6 @@ fn git_ls_files(root: &Path, flags: &[&str], pathspec: &str) -> Result<Vec<Strin
         .filter(|s| !s.is_empty())
         .map(|raw| String::from_utf8(raw.to_vec()).map_err(|_| "git 输出了非 UTF-8 路径".into()))
         .collect()
-}
-
-/// Backup images go offsite too. Formal images are the ones referenced under
-/// `## 正式配图` in `images/README.md`; every other image except the covers is
-/// listed in `images/.gitignore`. That only keeps untracked ones out of git;
-/// already-tracked backups stay committed and are uploaded all the same.
-fn write_backup_ignore(root: &Path, yymm: &str, mmdd: &str) -> Result<(), String> {
-    let images = root.join("docs").join(yymm).join(mmdd).join("images");
-    // A missing README is reported by `barking lint`; nothing to split here.
-    let Ok(md) = fs::read_to_string(images.join("README.md")) else {
-        return Ok(());
-    };
-    let mut formal = BTreeSet::new();
-    let mut in_formal = false;
-    for line in md.lines() {
-        if let Some(h) = line.strip_prefix("## ") {
-            in_formal = h.starts_with("正式配图");
-            continue;
-        }
-        if in_formal {
-            for tok in crate::lint::image_refs_in_line(line) {
-                if let Some(n) = Path::new(tok).file_name().and_then(|n| n.to_str()) {
-                    formal.insert(n.to_string());
-                }
-            }
-        }
-    }
-    if formal.is_empty() {
-        return Err("images/README.md 的“## 正式配图”一节没有图片，无法区分备用图".into());
-    }
-    let mut backups: Vec<String> = fs::read_dir(&images)
-        .map_err(|e| format!("{}: {e}", images.display()))?
-        .filter_map(Result::ok)
-        .filter_map(|e| e.file_name().into_string().ok())
-        .filter(|f| {
-            f.rsplit_once('.').is_some_and(|(_, ext)| {
-                crate::lint::IMAGE_EXTS.contains(&ext.to_ascii_lowercase().as_str())
-            }) && !f.starts_with("00-cover")
-                && !formal.contains(f)
-        })
-        .collect();
-    backups.sort();
-
-    let path = images.join(".gitignore");
-    if backups.is_empty() && !path.exists() {
-        return Ok(());
-    }
-    let mut text = format!("{BACKUP_IGNORE_HEADER}\n");
-    for b in &backups {
-        text.push_str(&format!("/{b}\n"));
-    }
-    write_if_changed(&path, &text, &format!("{} 张备用图", backups.len()))
 }
 
 /// Write `text` unless the file already holds it; the working copy may have
