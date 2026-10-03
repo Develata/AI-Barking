@@ -1,6 +1,6 @@
 # 省流卡与批注截图
 
-规则见 `EDITORIAL.md`“省流卡与批注截图”，命名见 `AGENTS.md`。版式 2026-10-02 经 Develata 认可。
+规则见 `EDITORIAL.md`“省流卡与批注截图”，命名见 `AGENTS.md`。版式 2026-10-02 经 Develata 认可；2026-10-03 起图上不放吠点（与正文重复），省流卡只列事实，批注图只有原文批注与译注。
 
 | 文件 | 作用 |
 |---|---|
@@ -13,7 +13,7 @@
 ## 步骤
 
 1. 每张要批注的截图另存一份底图 `images/NN-name-raw.png`（原始裁切，像素不改）。底图只截标题与关键段落，宽度尽量窄（页面 CSS 宽约 700 px 以内），否则缩进 1080 宽的卡片后英文太小；取证按 2 倍像素比截图，读者放大后仍清晰。
-2. 复制 `example.toml` 为 `images/cards.toml`，填写省流卡与各批注图。省流卡的 `fact`、`barks` 和批注图的 `bark` 都从正文逐字摘取（可加句末标点；不相邻的几段用“；”拼接，每段各自核对；不要断章丢掉同句里改变含义的限定）；`quote` 写英文原句，`gloss` 照 `fact-check.md` 的译法。
+2. 复制 `example.toml` 为 `images/cards.toml`，填写省流卡与各批注图。省流卡的 `fact` 从正文逐字摘取（可加句末标点；不相邻的几段用“；”拼接，每段各自核对；不要断章丢掉同句里改变含义的限定）；`quote` 写英文原句，`gloss` 照 `fact-check.md` 的译法。
 3. 渲染：
 
    ```bash
@@ -29,5 +29,5 @@
    ```
 
    每张图写成一个 `--image=` 参数；路径用 `wsl -d Debian -e wslpath -a` 转换。后台运行，等完成通知后读报告。Codex 不可用或超时时，改派 Sonnet 子代理按同一提示词看图复核，并在记录中注明复核方。Claude 逐条核实意见再改，结论记入 `sources/fact-check.md`。
-6. `barking lint`：卡片文字须在正文同一行中逐字出现（error）；省流卡吠点应为 2–3 条、cards.toml 改过而图未重渲、省流卡不在正式配图第一行、`fact-check.md` 没有“视觉复核”记录，均给 warn。
+6. `barking lint`：卡片文字须在正文同一行中逐字出现（error）；cards.toml 改过而图未重渲、省流卡不在正式配图第一行、`fact-check.md` 没有“视觉复核”记录，均给 warn。
 7. `images/README.md` 的正式配图里，省流卡列第 1 行，批注图替代原截图；`-raw` 底图列入备用图（用途写“批注底图”）。1002 期起，包括卡片在内的全部图片都不入 Git，发布后由 `barking offsite --upload` 存 OpenList（路径与 SHA-256 见 `sources/offsite.tsv`）；日后重渲，先从 OpenList 同一路径取回底图。

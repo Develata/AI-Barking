@@ -602,10 +602,6 @@ fn lint_cards(
     for msg in card_text_errors(&spec.quoted_texts(), body_lines) {
         sink.error(None, msg);
     }
-    let n = spec.tldr_bark_count();
-    if !spec.tldr.is_empty() && !(2..=3).contains(&n) {
-        sink.warn(None, format!("省流卡吠点共 {n} 条，规范为 2–3 条"));
-    }
     // Rendered images older than the spec were not re-rendered after an edit.
     let mtime = |p: &Path| fs::metadata(p).and_then(|m| m.modified()).ok();
     if let Some(spec_time) = mtime(&path) {

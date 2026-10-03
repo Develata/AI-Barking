@@ -41,6 +41,9 @@ pub struct Spec {
 pub struct TldrItem {
     pub tag: String,
     pub fact: String,
+    /// Retired 2026-10-03: images carry no 吠点. Still parsed so a published
+    /// issue's cards.toml (which records what its images said) loads; rendering
+    /// such an entry is an error.
     #[serde(default)]
     pub barks: Vec<String>,
 }
@@ -53,6 +56,7 @@ pub struct Annot {
     pub source: String,
     #[serde(default = "default_lang")]
     pub lang: String,
+    /// Retired like `TldrItem::barks`.
     pub bark: Option<String>,
     pub note: Vec<Note>,
 }
@@ -84,8 +88,15 @@ impl Spec {
             .collect()
     }
 
-    pub fn tldr_bark_count(&self) -> usize {
-        self.tldr.iter().map(|t| t.barks.len()).sum()
+    /// Where the retired 吠点 fields are still filled in, if anywhere.
+    fn retired_barks(&self) -> Option<String> {
+        self.tldr
+            .iter()
+            .find(|t| !t.barks.is_empty())
+            .map(|t| format!("[[tldr]]「{}」的 barks", t.tag))
+            .or_else(|| {
+                (self.annot.iter().find(|a| a.bark.is_some())).map(|a| format!("{} 的 bark", a.out))
+            })
     }
 
     /// Image file names this spec renders.
@@ -135,6 +146,11 @@ fn render_issue(dir: &Path, only: &[String]) -> Result<usize, String> {
             images.join(SPEC_FILE).display()
         )
     })?;
+    if let Some(at) = spec.retired_barks() {
+        return Err(format!(
+            "{at} 已停用：2026-10-03 起图上不放吠点（只留事实、原文批注与译注），从 cards.toml 删去"
+        ));
+    }
     let outputs = spec.outputs();
     for out in &outputs {
         if out.contains(['/', '\\']) || !out.ends_with(".png") {
@@ -187,14 +203,6 @@ fn tldr_html(spec: &Spec) -> Result<String, String> {
             esc(&t.tag),
             esc(&t.fact)
         );
-        for b in &t.barks {
-            let _ = write!(
-                items,
-                r#"<div class="bark"><div class="l">吠点</div><div class="{}">{}</div></div>"#,
-                hang("t", b),
-                esc(b)
-            );
-        }
         items.push_str("</div>\n");
     }
     Ok(TLDR_TEMPLATE
@@ -308,13 +316,6 @@ fn annot_html(a: &Annot, images: &Path, work: &Path) -> Result<String, String> {
             hang("tx", &note.gloss)
         );
     }
-    let bark = a.bark.as_deref().map_or(String::new(), |b| {
-        format!(
-            r#"    <div class="bark"><div class="lab">吠点</div><div class="{}">{}</div></div>"#,
-            hang("tx", b),
-            esc(b)
-        )
-    });
     // Every inserted value is escaped (braces included), so no value can
     // smuggle in a later placeholder.
     Ok(ANNOT_TEMPLATE
@@ -324,7 +325,6 @@ fn annot_html(a: &Annot, images: &Path, work: &Path) -> Result<String, String> {
         .replace("{{H}}", &h.to_string())
         .replace("{{OVERLAYS}}", &overlays)
         .replace("{{NOTES}}", &notes)
-        .replace("{{BARK}}", &bark)
         .replace("{{SOURCE}}", &esc(&a.source)))
 }
 
@@ -767,9 +767,18 @@ mod tests {
         let spec: Spec =
             toml::from_str(include_str!("../../../templates/cards/example.toml")).unwrap();
         assert_eq!(spec.tldr.len(), 2);
-        assert_eq!(spec.tldr_bark_count(), 3);
-        assert_eq!(spec.quoted_texts().len(), 2 + 3 + 1);
+        assert_eq!(spec.quoted_texts().len(), 2);
+        assert!(spec.retired_barks().is_none());
         assert_eq!(spec.outputs(), [TLDR_OUT, "01-openai-dns-pause.png"]);
+    }
+
+    #[test]
+    fn retired_barks_are_parsed_but_flagged() {
+        let spec: Spec =
+            toml::from_str("date = \"d\"\n[[tldr]]\ntag = \"t\"\nfact = \"f\"\nbarks = [\"b\"]\n")
+                .unwrap();
+        assert_eq!(spec.quoted_texts(), ["f", "b"]);
+        assert!(spec.retired_barks().unwrap().contains("barks"));
     }
 
     #[test]
