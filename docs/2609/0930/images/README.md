@@ -43,6 +43,8 @@
 
 ## 封面
 
+抖音替换封面（2026-10-02）：[00-cover-douyin.png](00-cover-douyin.png)（1086×1448，3:4）。本期在抖音、公众号受限后，抖音版删去第二条（GLM-5.3）与第三条（AI 改称 SI）并换此封面；Codex CLI（gpt-6-astra）生成 2 张候选，选第 2 张（看板娘更完整）。逐字核对（Claude）：“五分之一价？”“Sol没降单价”“1/5”“单价同 6-Sol”“汪！拆开看”“AI 吠点”，无 logo、无真人。原封面与正文不变，新封面不用于小红书。
+
 已生成（第二版，2026-09-30，Codex CLI 内置图像生成，gpt-6-astra，参考图 `../../../../common_images/profile_picture.png`）：[00-cover.png](00-cover.png)（1086×1448，3:4，小红书、抖音）、[00-cover-wide.png](00-cover-wide.png)（1921×819，约 2.35:1，公众号）。上传顺序排在所有配图之前。
 
 第一版（标题“五分之一价、100%绕过？拆开看”，价签 + 拆开的“100%”+ AI/SI 铭牌）已生成 2 组并选定，后因 Develata 把标题改为 GLM-5.3 逼近 Mythos-Preview 的角度而作废，不入库。
