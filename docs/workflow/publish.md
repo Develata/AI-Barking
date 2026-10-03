@@ -13,7 +13,7 @@ Develata 在对话中说“已发布”，即授权 Claude 对当期完成下面
 1. **已发过**：在 `daily-scan.md` 末尾“已发过”追加本期一行，按最终发布版的标题和口径写。只在发布后写：未发布的选题一旦写入并推送，就会被定时检索排除。
 2. **检查**（任一不过就停下报告）：
    - `cargo run --release --manifest-path tools/barking/Cargo.toml -- lint <期次目录>`，0 个错误；
-   - 配图无损压缩（可选，减小上传体积）：`oxipng -o 4 --strip safe <期次目录>/images/*.png`，像素不变；
+   - 配图无损压缩（默认执行，2026-10-02 起）：`oxipng -o 4 --strip safe <期次目录>/images/*.png`。像素不变，但文件字节和 SHA-256 会变、文本类元数据会被删，所以必须在 `offsite` 生成清单和上传**之前**做，已上传的期次不再压；不加 `-a`（它会改全透明像素的颜色值，不是严格无损）；只压 PNG，JPEG、WebP 不动；需要逐字节保留的原件放进 `sources/` 或单独跳过；
    - 大文件：`cargo run --release --manifest-path tools/barking/Cargo.toml -- offsite <期次目录>` 生成 `sources/offsite.tsv`（全部图片与原件都在清单里）；待提交文件中没有单个超过 1 MB 的，有就先问；
    - 身份：按 `templates/codex-evidence.md` 第 7 条，grep 抓取者的头像链接、显示名与 handle，确认未入库；
    - 凭据与会话状态（`.env`、cookies、storage-state）未入库。
