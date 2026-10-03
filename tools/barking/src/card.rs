@@ -196,14 +196,16 @@ fn tldr_html(spec: &Spec) -> Result<String, String> {
         .as_deref()
         .ok_or("cards.toml 有 [[tldr]] 但缺少 date")?;
     let mut items = String::new();
-    for t in &spec.tldr {
-        let _ = write!(
+    for (i, t) in spec.tldr.iter().enumerate() {
+        // Colour cycles through the four highlighter colours (.c1 … .c4), as the
+        // note markers on annotated screenshots do.
+        let _ = writeln!(
             items,
-            r#"    <div class="item"><span class="k">{}</span><div class="fact">{}</div>"#,
+            r#"    <div class="item c{}"><span class="k">{}</span><div class="fact">{}</div></div>"#,
+            i % MAX_NOTES + 1,
             esc(&t.tag),
             esc(&t.fact)
         );
-        items.push_str("</div>\n");
     }
     Ok(TLDR_TEMPLATE
         .replace("{{DATE}}", &esc(date))
