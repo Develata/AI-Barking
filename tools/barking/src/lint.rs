@@ -9,7 +9,7 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::card;
+use crate::card::{self, Kind};
 
 const TITLE_MAX: usize = 20;
 const TOTAL_MAX: usize = 1000;
@@ -28,6 +28,12 @@ const BANNED: [&str; 5] = [
 /// no trailing 来源 line, and a 省流卡 `images/00-tldr.*`. Older, published
 /// issues keep their original format (EDITORIAL.md 纠错: no rewrites).
 const NEW_FORMAT_FROM: u32 = 2610_1002;
+/// Issues from this date carry a 速览聚合图 `images/00-roundup.png`
+/// (EDITORIAL.md 速览).
+const ROUNDUP_FROM: u32 = 2610_1004;
+/// The only attributions a 速览 entry from an L4 report may use: the outlet is
+/// not named, but the source type stays accurate (EDITORIAL.md 速览).
+const ROUNDUP_L4_WORDING: [&str; 2] = ["据外媒报道", "据媒体报道"];
 const PLACEHOLDERS: [&str; 6] = ["TODO", "TBD", "待补", "待核", "【图", "[图"];
 pub const IMAGE_EXTS: [&str; 5] = ["png", "jpg", "jpeg", "webp", "gif"];
 /// Characters that mark a number as a quantity or date rather than a version.
@@ -104,7 +110,23 @@ pub fn lint_issue(dir: &Path) -> Vec<Finding> {
     // Resolve `.` and relative paths so the YYMM/MMDD components are visible;
     // unrecognised paths get the current rules.
     let resolved = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
-    let new_format = issue_key(&resolved).is_none_or(|k| k >= NEW_FORMAT_FROM);
+    let key = issue_key(&resolved);
+    let new_format = key.is_none_or(|k| k >= NEW_FORMAT_FROM);
+    let roundup_era = key.is_none_or(|k| k >= ROUNDUP_FROM);
+
+    let images = dir.join("images");
+    let spec = match card::load_spec(&images) {
+        Ok(s) => s,
+        Err(e) => {
+            Sink {
+                path: &images.join(card::SPEC_FILE),
+                out: &mut out,
+            }
+            .error(None, e);
+            None
+        }
+    };
+    let kind = spec.as_ref().map_or(Kind::Main, |s| s.kind);
 
     let fc_path = dir.join("sources").join("fact-check.md");
     let fact_check = fs::read_to_string(&fc_path).ok();
@@ -150,7 +172,7 @@ pub fn lint_issue(dir: &Path) -> Vec<Finding> {
                         .map(|l| l.chars().filter(|c| !c.is_whitespace()).collect::<String>())
                         .filter(|l| !l.is_empty()),
                 );
-                lint_publish(&mut sink, &raw, fact_check.as_deref(), new_format);
+                lint_publish(&mut sink, &raw, fact_check.as_deref(), new_format, kind);
             }
             Err(e) => sink.error(None, format!("读取失败：{e}")),
         }
@@ -159,14 +181,21 @@ pub fn lint_issue(dir: &Path) -> Vec<Finding> {
     // Newer issues keep their images only on OpenList; `offsite.tsv` vouches for
     // the ones a fresh clone lacks.
     let offsite = offsite_paths(dir);
-    lint_images(&dir.join("images"), new_format, &offsite, &mut out);
-    lint_cards(
-        &dir.join("images"),
-        &body_lines,
+    let era = Era {
         new_format,
-        &offsite,
-        &mut out,
-    );
+        roundup: roundup_era,
+    };
+    lint_images(&images, era, spec.as_ref(), &offsite, &mut out);
+    lint_cards(&images, &body_lines, era, spec.as_ref(), &offsite, &mut out);
+    if let Some(spec) = &spec {
+        let mut sink = Sink {
+            path: &fc_path,
+            out: &mut out,
+        };
+        for msg in roundup_fact_errors(spec, fact_check.as_deref()) {
+            sink.error(None, msg);
+        }
+    }
     if new_format
         && fact_check
             .as_deref()
@@ -198,7 +227,13 @@ pub fn char_count(s: &str) -> usize {
     s.chars().count()
 }
 
-fn lint_publish(sink: &mut Sink, raw: &str, fact_check: Option<&str>, new_format: bool) {
+fn lint_publish(
+    sink: &mut Sink,
+    raw: &str,
+    fact_check: Option<&str>,
+    new_format: bool,
+    kind: Kind,
+) {
     let text = normalize(raw);
     let lines: Vec<&str> = text.lines().collect();
     let title = lines.first().map_or("", |l| l.trim());
@@ -221,7 +256,7 @@ fn lint_publish(sink: &mut Sink, raw: &str, fact_check: Option<&str>, new_format
         sink.error(None, format!("全文 {total} 字，超过上限 {TOTAL_MAX}"));
     }
 
-    lint_structure(sink, &lines, new_format);
+    lint_structure(sink, &lines, new_format, kind);
 
     let fc_compact: Option<String> =
         fact_check.map(|fc| fc.chars().filter(|c| !c.is_whitespace()).collect());
@@ -258,8 +293,9 @@ fn lint_publish(sink: &mut Sink, raw: &str, fact_check: Option<&str>, new_format
 }
 
 /// Required order: 标题 → 固定开场 → 省流 → … → Slogan（最后一行）.
-/// Old-format issues may end with one extra 来源 line after the Slogan.
-fn lint_structure(sink: &mut Sink, lines: &[&str], new_format: bool) {
+/// Old-format issues may end with one extra 来源 line after the Slogan. A
+/// 速览专帖 has no main post, so no 省流 paragraph is required.
+fn lint_structure(sink: &mut Sink, lines: &[&str], new_format: bool, kind: Kind) {
     let nonempty: Vec<(usize, &str)> = lines
         .iter()
         .enumerate()
@@ -279,6 +315,7 @@ fn lint_structure(sink: &mut Sink, lines: &[&str], new_format: bool) {
         .position(|(_, l)| l.starts_with(TLDR_PREFIX));
     let slogan = nonempty.iter().rposition(|(_, l)| *l == SLOGAN);
     match tldr {
+        None if kind == Kind::Roundup => {}
         None => sink.error(None, format!("缺少「{TLDR_PREFIX}」段")),
         Some(k) if k < 2 => sink.error(at(nonempty[k].0), "省流应在固定开场之后"),
         _ => {}
@@ -508,12 +545,23 @@ fn parse_offsite(text: &str) -> BTreeSet<String> {
         .collect()
 }
 
+/// Which dated rules an issue falls under.
+#[derive(Clone, Copy)]
+struct Era {
+    /// 2026-10-02 format: 省流卡, no 来源 line.
+    new_format: bool,
+    /// 2026-10-04: 速览聚合图.
+    roundup: bool,
+}
+
 fn lint_images(
     images: &Path,
-    new_format: bool,
+    era: Era,
+    spec: Option<&card::Spec>,
     offsite: &BTreeSet<String>,
     out: &mut Vec<Finding>,
 ) {
+    let kind = spec.map_or(Kind::Main, |s| s.kind);
     let readme = images.join("README.md");
     let mut sink = Sink { path: &readme, out };
     let md = match fs::read_to_string(&readme) {
@@ -533,16 +581,25 @@ fn lint_images(
         }
     }
 
-    // The 省流卡 is uploaded right after the cover: first in 正式配图.
-    if new_format {
-        let first_formal = md
-            .lines()
-            .skip_while(|l| !l.starts_with("## 正式配图"))
-            .skip(1)
-            .take_while(|l| !l.starts_with("## "))
-            .find_map(|l| image_refs_in_line(l).first().copied());
-        if first_formal.is_some_and(|f| !f.starts_with("00-tldr.")) {
-            sink.warn(None, "“正式配图”第一张应为省流卡 00-tldr.png");
+    // Right after the cover come the 省流卡, then the 速览聚合图; a 速览专帖
+    // has only the latter.
+    let mut lead: Vec<(&str, &str)> = Vec::new();
+    if era.new_format && kind == Kind::Main {
+        lead.push(("00-tldr.", "省流卡 00-tldr.png"));
+    }
+    if era.roundup {
+        lead.push(("00-roundup.", "速览聚合图 00-roundup.png"));
+    }
+    let formal: Vec<&str> = md
+        .lines()
+        .skip_while(|l| !l.starts_with("## 正式配图"))
+        .skip(1)
+        .take_while(|l| !l.starts_with("## "))
+        .filter_map(|l| image_refs_in_line(l).first().copied())
+        .collect();
+    for (k, (stem, what)) in lead.iter().enumerate() {
+        if formal.get(k).is_some_and(|f| !f.starts_with(stem)) {
+            sink.warn(None, format!("“正式配图”第 {} 张应为{what}", k + 1));
         }
     }
 
@@ -556,7 +613,8 @@ fn lint_images(
     for (stem, what, required) in [
         ("00-cover.", "3:4 封面", true),
         ("00-cover-wide.", "2.35:1 横版封面", true),
-        ("00-tldr.", "省流卡", new_format),
+        ("00-tldr.", "省流卡", era.new_format && kind == Kind::Main),
+        ("00-roundup.", "速览聚合图", era.roundup),
     ] {
         let remote = issue_rel("images", stem);
         if required
@@ -585,20 +643,27 @@ fn lint_images(
 fn lint_cards(
     images: &Path,
     body_lines: &[String],
-    new_format: bool,
+    era: Era,
+    spec: Option<&card::Spec>,
     offsite: &BTreeSet<String>,
     out: &mut Vec<Finding>,
 ) {
     let path = images.join(card::SPEC_FILE);
     let mut sink = Sink { path: &path, out };
-    let spec = match card::load_spec(images) {
-        Ok(Some(spec)) => spec,
-        Ok(None) if new_format => {
-            return sink.warn(None, "缺少 images/cards.toml：省流卡文字无法与正文自动比对");
+    let Some(spec) = spec else {
+        if era.roundup {
+            sink.error(None, "缺少 images/cards.toml：速览聚合图由它渲染");
+        } else if era.new_format {
+            sink.warn(None, "缺少 images/cards.toml：省流卡文字无法与正文自动比对");
         }
-        Ok(None) => return,
-        Err(e) => return sink.error(None, e),
+        return;
     };
+    for msg in spec.structure_errors() {
+        sink.error(None, msg);
+    }
+    if era.roundup && spec.roundup.is_empty() {
+        sink.error(None, "缺少 [[roundup]]：2026-10-04 起每期都有速览聚合图");
+    }
     for msg in card_text_errors(&spec.quoted_texts(), body_lines) {
         sink.error(None, msg);
     }
@@ -626,16 +691,110 @@ fn card_text_errors(texts: &[&str], body_lines: &[String]) -> Vec<String> {
     let mut errs = Vec::new();
     for t in texts {
         for seg in t.split('；') {
-            let compact: String = seg
-                .trim_end_matches(['。', '，', '！', '？'])
-                .chars()
-                .filter(|c| !c.is_whitespace())
-                .collect();
-            if !compact.is_empty() && !body_lines.iter().any(|l| l.contains(&compact)) {
+            let c = compact(seg);
+            if !c.is_empty() && !body_lines.iter().any(|l| l.contains(&c)) {
                 errs.push(format!(
                     "卡片文字未在正文同一行中逐字出现：「{seg}」（出自「{t}」）"
                 ));
             }
+        }
+    }
+    errs
+}
+
+/// Whitespace removed and trailing sentence punctuation dropped, for verbatim
+/// comparison of card texts.
+fn compact(s: &str) -> String {
+    s.trim()
+        .trim_end_matches(['。', '，', '！', '？'])
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect()
+}
+
+/// One row of the 速览 table in fact-check.md.
+struct FactRow<'a> {
+    fact: &'a str,
+    level: Option<u8>,
+    result: &'a str,
+}
+
+/// Table rows under the first heading that names 速览, up to the next heading.
+/// Columns follow EDITORIAL.md: 文中事实 | 级 | 结果 | 一手来源 | 备注.
+fn roundup_rows(fact_check: &str) -> Option<Vec<FactRow<'_>>> {
+    let mut lines = fact_check
+        .lines()
+        .skip_while(|l| !(l.starts_with('#') && l.contains("速览")));
+    lines.next()?;
+    let rows = lines
+        .take_while(|l| !l.starts_with('#'))
+        .filter_map(|l| {
+            let cells: Vec<&str> = l
+                .trim()
+                .strip_prefix('|')?
+                .trim_end_matches('|')
+                .split('|')
+                .map(str::trim)
+                .collect();
+            let (fact, level, result) = (*cells.first()?, *cells.get(1)?, *cells.get(2)?);
+            if fact == "文中事实" || fact.starts_with("---") {
+                return None;
+            }
+            // `L4`, `L4 权威媒体`, … → 4.
+            let level = level
+                .split_once('L')
+                .and_then(|(_, r)| r.chars().next())
+                .and_then(|c| c.to_digit(10))
+                .and_then(|d| u8::try_from(d).ok());
+            Some(FactRow {
+                fact,
+                level,
+                result,
+            })
+        })
+        .collect();
+    Some(rows)
+}
+
+/// Each non-main 速览 entry is not in the publish text, so it must be listed
+/// verbatim in fact-check.md's 速览 table, at a level its wording matches:
+/// L1–L3 verified ✅; L4 only with an unnamed-outlet attribution; never L5–L7,
+/// never ❌, never 网传 (EDITORIAL.md 速览).
+fn roundup_fact_errors(spec: &card::Spec, fact_check: Option<&str>) -> Vec<String> {
+    let entries: Vec<&card::RoundupItem> = spec.other_entries().collect();
+    if entries.is_empty() {
+        return Vec::new();
+    }
+    let Some(rows) = fact_check.and_then(roundup_rows) else {
+        return vec!["fact-check.md 缺少“速览”一节：速览条目须逐条列入".into()];
+    };
+    let mut errs = Vec::new();
+    for e in entries {
+        let t = &e.text;
+        if t.contains("网传") {
+            errs.push(format!("速览条目「{t}」：速览不收社交转述与传闻（网传）"));
+        }
+        let Some(row) = rows.iter().find(|r| compact(r.fact) == compact(t)) else {
+            errs.push(format!(
+                "速览条目「{t}」未在 fact-check.md“速览”一节的“文中事实”列中逐字出现"
+            ));
+            continue;
+        };
+        let has_l4_wording = ROUNDUP_L4_WORDING.iter().any(|w| t.contains(w));
+        match row.level {
+            _ if row.result.contains('❌') => {
+                errs.push(format!("速览条目「{t}」在事实清单中标为 ❌"));
+            }
+            None => errs.push(format!("速览条目「{t}」在事实清单中缺少级别（L1–L4）")),
+            Some(1..=3) if !row.result.contains('✅') => {
+                errs.push(format!("速览条目「{t}」为 L1–L3，但事实清单结果不是 ✅"));
+            }
+            Some(4) if !has_l4_wording => errs.push(format!(
+                "速览条目「{t}」出自 L4 媒体报道，须写「{}」或「{}」",
+                ROUNDUP_L4_WORDING[0], ROUNDUP_L4_WORDING[1]
+            )),
+            Some(1..=4) => {}
+            Some(l) => errs.push(format!("速览条目「{t}」为 L{l}，速览只收 L1–L4")),
         }
     }
     errs
@@ -672,7 +831,7 @@ mod tests {
     }
 
     /// Whether `lint_structure` reports any error.
-    fn structure_errs(text: &str, new_format: bool) -> bool {
+    fn structure_errs_as(text: &str, new_format: bool, kind: Kind) -> bool {
         let mut out = Vec::new();
         let lines: Vec<&str> = text.lines().collect();
         lint_structure(
@@ -682,8 +841,67 @@ mod tests {
             },
             &lines,
             new_format,
+            kind,
         );
         out.iter().any(|f| f.level == Level::Error)
+    }
+
+    fn structure_errs(text: &str, new_format: bool) -> bool {
+        structure_errs_as(text, new_format, Kind::Main)
+    }
+
+    #[test]
+    fn roundup_post_needs_no_tldr_paragraph() {
+        let bare = format!("AI 速览｜10月4日\n\n{OPENING}\n\n{SLOGAN}\n");
+        assert!(structure_errs(&bare, true));
+        assert!(!structure_errs_as(&bare, true, Kind::Roundup));
+    }
+
+    fn roundup_spec(others: &[&str]) -> card::Spec {
+        let mut toml = String::from("kind = \"roundup\"\ndate = \"d\"\n");
+        for t in others {
+            toml.push_str(&format!("[[roundup]]\ntag = \"x\"\ntext = \"{t}\"\n"));
+        }
+        toml::from_str(&toml).unwrap()
+    }
+
+    #[test]
+    fn roundup_entries_need_a_matching_fact_check_row() {
+        let fc = "\
+# 事实清单
+
+| 文中事实 | 级 | 结果 | 一手来源 | 备注 |
+|---|---|---|---|---|
+| 正文里的事 | L1 | ✅ | u | 甲乙 丙 |
+
+## 速览
+
+| 文中事实 | 级 | 结果 | 一手来源 | 备注 |
+|---|---|---|---|---|
+| 甲 发布了乙。 | L1 | ✅ | u | |
+| 据外媒报道，丙推迟 | L4 | ⚠️ | u | 彭博 |
+| 据彭博社报道，丁 | L4 | ⚠️ | u | |
+| 戊 | L2 | ⚠️ | u | |
+| 己 | L6 | ⚠️ | u | |
+| 庚 | L1 | ❌ | u | |
+
+## 其他
+| 辛 | L1 | ✅ | u | |
+";
+        let ok = roundup_spec(&["甲发布了乙", "据外媒报道，丙推迟"]);
+        assert!(roundup_fact_errors(&ok, Some(fc)).is_empty());
+        // Named outlet, unverified L2, L6, ❌, a row outside the 速览 section,
+        // a sentence found only in another section's notes column.
+        for bad in ["据彭博社报道，丁", "戊", "己", "庚", "辛", "甲乙丙"] {
+            let errs = roundup_fact_errors(&roundup_spec(&[bad]), Some(fc));
+            assert_eq!(errs.len(), 1, "{bad}: {errs:?}");
+        }
+        assert_eq!(
+            roundup_fact_errors(&roundup_spec(&["网传甲发布了乙"]), Some(fc)).len(),
+            2
+        );
+        assert!(roundup_fact_errors(&ok, Some("# 事实清单\n"))[0].contains("缺少"));
+        assert!(roundup_fact_errors(&roundup_spec(&[]), None).is_empty());
     }
 
     #[test]

@@ -1,4 +1,5 @@
-//! `barking card`: render one issue's 省流卡 and annotated screenshots from
+//! `barking card`: render one issue's 省流卡, 速览聚合图 and annotated
+//! screenshots (plus the template covers of a 速览专帖) from
 //! `images/cards.toml`, filling the HTML templates in `templates/cards/` and
 //! screenshotting them with headless Chrome.
 //!
@@ -19,21 +20,64 @@ use serde::Deserialize;
 
 const TLDR_TEMPLATE: &str = include_str!("../../../templates/cards/tldr.html");
 const ANNOT_TEMPLATE: &str = include_str!("../../../templates/cards/annot.html");
+const ROUNDUP_TEMPLATE: &str = include_str!("../../../templates/cards/roundup.html");
+const COVER_TEMPLATE: &str = include_str!("../../../templates/cards/cover.html");
 pub const SPEC_FILE: &str = "cards.toml";
 pub const TLDR_OUT: &str = "00-tldr.png";
+pub const ROUNDUP_OUT: &str = "00-roundup.png";
+pub const COVER_OUT: &str = "00-cover.png";
+pub const COVER_WIDE_OUT: &str = "00-cover-wide.png";
+/// Mascot on the template covers, relative to the repo root.
+const AVATAR: &str = "common_images/profile_picture.png";
+/// 速览 entries per issue, main-post entries included (EDITORIAL.md 速览).
+pub const ROUNDUP_MIN: usize = 5;
+pub const ROUNDUP_MAX: usize = 10;
+/// Character caps (every scalar counts) that keep ten entries legible at
+/// 36 px on one card: a main-post title stays on one line, others on two.
+const ROUNDUP_MAIN_MAX: usize = 20;
+const ROUNDUP_TEXT_MAX: usize = 44;
+const TAG_MAX: usize = 12;
+/// Cards and the 3:4 cover; the wide cover has its own size.
+const CARD_SIZE: (u32, u32) = (1080, 1440);
+const WIDE_SIZE: (u32, u32) = (1880, 800);
 /// Highlight colours defined in annot.html (`.c1` … `.c4`).
 const MAX_NOTES: usize = 4;
 /// Below this Tesseract confidence a matched word is not trusted.
 const MIN_CONF: f32 = 60.0;
 
+/// What the issue publishes. A 速览专帖 has no main post: no 省流卡, and its
+/// covers come from the fixed template instead of image generation.
+#[derive(Deserialize, Default, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum Kind {
+    #[default]
+    Main,
+    Roundup,
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Spec {
+    #[serde(default)]
+    pub kind: Kind,
     pub date: Option<String>,
     #[serde(default)]
     pub tldr: Vec<TldrItem>,
     #[serde(default)]
+    pub roundup: Vec<RoundupItem>,
+    #[serde(default)]
     pub annot: Vec<Annot>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RoundupItem {
+    pub tag: String,
+    pub text: String,
+    /// A main-post entry: a short title, verbatim from the publish text,
+    /// pointing back to the 省流卡.
+    #[serde(default)]
+    pub main: bool,
 }
 
 #[derive(Deserialize)]
@@ -77,7 +121,8 @@ fn default_lang() -> String {
 }
 
 impl Spec {
-    /// Card texts that must appear verbatim in the publish text.
+    /// Card texts that must appear verbatim in the publish text. Other 速览
+    /// entries are not in the body; lint checks them against fact-check.md.
     pub fn quoted_texts(&self) -> Vec<&str> {
         self.tldr
             .iter()
@@ -85,7 +130,73 @@ impl Spec {
                 std::iter::once(t.fact.as_str()).chain(t.barks.iter().map(String::as_str))
             })
             .chain(self.annot.iter().filter_map(|a| a.bark.as_deref()))
+            .chain(self.main_entries().map(|r| r.text.as_str()))
             .collect()
+    }
+
+    pub fn main_entries(&self) -> impl Iterator<Item = &RoundupItem> {
+        self.roundup.iter().filter(|r| r.main)
+    }
+
+    pub fn other_entries(&self) -> impl Iterator<Item = &RoundupItem> {
+        self.roundup.iter().filter(|r| !r.main)
+    }
+
+    /// Violations of the card rules decidable from cards.toml alone. Shared by
+    /// `barking card` (refuses to render) and `barking lint` (errors).
+    pub fn structure_errors(&self) -> Vec<String> {
+        let mut errs = Vec::new();
+        if self.kind == Kind::Roundup {
+            if !self.tldr.is_empty() {
+                errs.push("kind = \"roundup\"（速览专帖）没有主帖，不应有 [[tldr]]".into());
+            }
+            if self.roundup.is_empty() {
+                errs.push("kind = \"roundup\" 需要 [[roundup]] 条目".into());
+            }
+            if self.roundup.iter().any(|r| r.main) {
+                errs.push("速览专帖没有主帖，[[roundup]] 不应写 main = true".into());
+            }
+        }
+        if self.roundup.is_empty() {
+            return errs;
+        }
+        let n = self.roundup.len();
+        if !(ROUNDUP_MIN..=ROUNDUP_MAX).contains(&n) {
+            errs.push(format!(
+                "速览共 {n} 条，应为 {ROUNDUP_MIN}–{ROUNDUP_MAX} 条（主帖条目也算）"
+            ));
+        }
+        // Main-post entries come first, in the main post's order.
+        let lead = self.roundup.iter().take_while(|r| r.main).count();
+        if self.main_entries().count() != lead {
+            errs.push("main = true 的主帖条目须连续排在 [[roundup]] 最前".into());
+        }
+        if self.kind == Kind::Main {
+            let main_tags: Vec<&str> = self.main_entries().map(|r| r.tag.as_str()).collect();
+            let tldr_tags: Vec<&str> = self.tldr.iter().map(|t| t.tag.as_str()).collect();
+            if main_tags != tldr_tags {
+                errs.push(format!(
+                    "速览的主帖条目 tag {main_tags:?} 须与省流卡 [[tldr]] 的 tag {tldr_tags:?} 一一对应、顺序相同"
+                ));
+            }
+        }
+        for r in &self.roundup {
+            let len = r.text.chars().count();
+            let max = if r.main {
+                ROUNDUP_MAIN_MAX
+            } else {
+                ROUNDUP_TEXT_MAX
+            };
+            if r.text.trim().is_empty() || r.tag.trim().is_empty() {
+                errs.push(format!("速览条目「{}」的 tag 或 text 为空", r.tag));
+            } else if len > max {
+                errs.push(format!("速览条目「{}」{len} 字，超过上限 {max}", r.text));
+            }
+            if r.tag.chars().count() > TAG_MAX {
+                errs.push(format!("速览 tag「{}」超过 {TAG_MAX} 字", r.tag));
+            }
+        }
+        errs
     }
 
     /// Where the retired 吠点 fields are still filled in, if anywhere.
@@ -101,8 +212,17 @@ impl Spec {
 
     /// Image file names this spec renders.
     pub fn outputs(&self) -> Vec<&str> {
+        let covers: &[&str] = match self.kind {
+            Kind::Roundup => &[COVER_OUT, COVER_WIDE_OUT],
+            Kind::Main => &[],
+        };
         let tldr = (!self.tldr.is_empty()).then_some(TLDR_OUT);
-        tldr.into_iter()
+        let roundup = (!self.roundup.is_empty()).then_some(ROUNDUP_OUT);
+        covers
+            .iter()
+            .copied()
+            .chain(tldr)
+            .chain(roundup)
             .chain(self.annot.iter().map(|a| a.out.as_str()))
             .collect()
     }
@@ -151,6 +271,10 @@ fn render_issue(dir: &Path, only: &[String]) -> Result<usize, String> {
             "{at} 已停用：2026-10-03 起图上不放吠点（只留事实、原文批注与译注），从 cards.toml 删去"
         ));
     }
+    let errs = spec.structure_errors();
+    if !errs.is_empty() {
+        return Err(errs.join("\n"));
+    }
     let outputs = spec.outputs();
     for out in &outputs {
         if out.contains(['/', '\\']) || !out.ends_with(".png") {
@@ -175,13 +299,29 @@ fn render_issue(dir: &Path, only: &[String]) -> Result<usize, String> {
     let wanted = |name: &str| only.is_empty() || only.iter().any(|o| o == name);
 
     let mut n = 0;
+    if spec.kind == Kind::Roundup {
+        let avatar = file_url(&repo_root(dir)?.join(AVATAR))?;
+        for (out, size) in [(COVER_OUT, CARD_SIZE), (COVER_WIDE_OUT, WIDE_SIZE)] {
+            if wanted(out) {
+                let html = cover_html(&spec, size, &avatar)?;
+                render(&chrome, &work, &html, size, &images.join(out))?;
+                n += 1;
+            }
+        }
+    }
     if !spec.tldr.is_empty() && wanted(TLDR_OUT) {
-        render(&chrome, &work, &tldr_html(&spec)?, &images.join(TLDR_OUT))?;
+        let html = tldr_html(&spec)?;
+        render(&chrome, &work, &html, CARD_SIZE, &images.join(TLDR_OUT))?;
+        n += 1;
+    }
+    if !spec.roundup.is_empty() && wanted(ROUNDUP_OUT) {
+        let html = roundup_html(&spec)?;
+        render(&chrome, &work, &html, CARD_SIZE, &images.join(ROUNDUP_OUT))?;
         n += 1;
     }
     for a in spec.annot.iter().filter(|a| wanted(&a.out)) {
         let html = annot_html(a, &images, &work).map_err(|e| format!("{}：{e}", a.out))?;
-        render(&chrome, &work, &html, &images.join(&a.out))?;
+        render(&chrome, &work, &html, CARD_SIZE, &images.join(&a.out))?;
         n += 1;
     }
     if n == 0 {
@@ -210,6 +350,69 @@ fn tldr_html(spec: &Spec) -> Result<String, String> {
     Ok(TLDR_TEMPLATE
         .replace("{{DATE}}", &esc(date))
         .replace("{{ITEMS}}", &items))
+}
+
+fn roundup_html(spec: &Spec) -> Result<String, String> {
+    let date = spec
+        .date
+        .as_deref()
+        .ok_or("cards.toml 有 [[roundup]] 但缺少 date")?;
+    let mut items = String::new();
+    for (i, r) in spec.roundup.iter().enumerate() {
+        let (class, see) = if r.main {
+            (" main", r#"<span class="see">详见前页</span>"#)
+        } else {
+            ("", "")
+        };
+        let _ = writeln!(
+            items,
+            r#"    <div class="item c{}{class}"><div class="n">{}</div><div class="tx"><span class="k">{}</span>{}{see}</div></div>"#,
+            i % MAX_NOTES + 1,
+            i + 1,
+            esc(&r.tag),
+            esc(&r.text)
+        );
+    }
+    Ok(ROUNDUP_TEMPLATE
+        .replace("{{DATE}}", &esc(date))
+        .replace("{{ITEMS}}", &items))
+}
+
+/// One of the two template covers of a 速览专帖. It shows only the date, the
+/// entry count and the tags, so it carries no claim of its own.
+fn cover_html(spec: &Spec, (w, h): (u32, u32), avatar: &str) -> Result<String, String> {
+    let date = spec
+        .date
+        .as_deref()
+        .ok_or("cards.toml 缺少 date（封面要写日期）")?;
+    let mut tags: Vec<&str> = Vec::new();
+    for r in &spec.roundup {
+        if !tags.contains(&r.tag.as_str()) {
+            tags.push(&r.tag);
+        }
+    }
+    let tags: String = tags
+        .iter()
+        .map(|t| format!("<span>{}</span>", esc(t)))
+        .collect();
+    let class = if w > h { "wide" } else { "tall" };
+    Ok(COVER_TEMPLATE
+        .replace("{{CLASS}}", class)
+        .replace("{{W}}", &w.to_string())
+        .replace("{{H}}", &h.to_string())
+        .replace("{{DATE}}", &esc(date))
+        .replace("{{COUNT}}", &spec.roundup.len().to_string())
+        .replace("{{TAGS}}", &tags)
+        .replace("{{AVATAR}}", &esc(avatar)))
+}
+
+/// The repository root: the nearest ancestor of `dir` holding EDITORIAL.md.
+fn repo_root(dir: &Path) -> Result<PathBuf, String> {
+    let abs = std::path::absolute(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    abs.ancestors()
+        .find(|p| p.join("EDITORIAL.md").is_file())
+        .map(Path::to_path_buf)
+        .ok_or_else(|| format!("{} 不在 AI-Barking 仓库内", dir.display()))
 }
 
 fn annot_html(a: &Annot, images: &Path, work: &Path) -> Result<String, String> {
@@ -396,7 +599,7 @@ fn find_chrome() -> Result<PathBuf, String> {
     .ok_or_else(|| "找不到 Chrome / Edge；用环境变量 BARKING_CHROME 指定可执行文件".into())
 }
 
-fn chrome_cmd(chrome: &Path, work: &Path) -> Command {
+fn chrome_cmd(chrome: &Path, work: &Path, (w, h): (u32, u32)) -> Command {
     let mut cmd = Command::new(chrome);
     cmd.args([
         "--headless=new",
@@ -404,8 +607,8 @@ fn chrome_cmd(chrome: &Path, work: &Path) -> Command {
         "--hide-scrollbars",
         "--force-device-scale-factor=1",
         "--allow-file-access-from-files",
-        "--window-size=1080,1440",
     ])
+    .arg(format!("--window-size={w},{h}"))
     // Own profile: never hand the job to a running Chrome.
     .arg(format!(
         "--user-data-dir={}",
@@ -415,14 +618,20 @@ fn chrome_cmd(chrome: &Path, work: &Path) -> Command {
     cmd
 }
 
-fn render(chrome: &Path, work: &Path, html: &str, out: &Path) -> Result<(), String> {
+fn render(
+    chrome: &Path,
+    work: &Path,
+    html: &str,
+    size: (u32, u32),
+    out: &Path,
+) -> Result<(), String> {
     let name = out.file_stem().and_then(|n| n.to_str()).unwrap_or("card");
     let page = work.join(format!("{name}.html"));
     fs::write(&page, html).map_err(|e| format!("{}: {e}", page.display()))?;
     let url = file_url(&page)?;
 
     // The page script records `data-layout` on <body>: "ok" or "overflow:…".
-    let dom = chrome_cmd(chrome, work)
+    let dom = chrome_cmd(chrome, work, size)
         .arg("--dump-dom")
         .arg(&url)
         .output()
@@ -449,7 +658,7 @@ fn render(chrome: &Path, work: &Path, html: &str, out: &Path) -> Result<(), Stri
 
     let out_abs = std::path::absolute(out).map_err(|e| format!("{}: {e}", out.display()))?;
     let started = SystemTime::now();
-    let status = chrome_cmd(chrome, work)
+    let status = chrome_cmd(chrome, work, size)
         .arg(format!("--screenshot={}", out_abs.display()))
         .arg(&url)
         .stdout(Stdio::null())
@@ -769,9 +978,55 @@ mod tests {
         let spec: Spec =
             toml::from_str(include_str!("../../../templates/cards/example.toml")).unwrap();
         assert_eq!(spec.tldr.len(), 2);
-        assert_eq!(spec.quoted_texts().len(), 2);
+        // Two 省流 facts and the two main-post 速览 titles.
+        assert_eq!(spec.quoted_texts().len(), 4);
         assert!(spec.retired_barks().is_none());
-        assert_eq!(spec.outputs(), [TLDR_OUT, "01-openai-dns-pause.png"]);
+        assert!(spec.structure_errors().is_empty());
+        assert_eq!(
+            spec.outputs(),
+            [TLDR_OUT, ROUNDUP_OUT, "01-openai-dns-pause.png"]
+        );
+    }
+
+    fn roundup(toml_head: &str, items: &[(&str, &str, bool)]) -> Spec {
+        let mut s = format!("date = \"d\"\n{toml_head}");
+        for (tag, text, main) in items {
+            s.push_str(&format!(
+                "[[roundup]]\ntag = \"{tag}\"\ntext = \"{text}\"\nmain = {main}\n"
+            ));
+        }
+        toml::from_str(&s).unwrap()
+    }
+
+    #[test]
+    fn roundup_structure_rules() {
+        let tldr = "[[tldr]]\ntag = \"A\"\nfact = \"f\"\n[[tldr]]\ntag = \"B\"\nfact = \"g\"\n";
+        let others = [("x", "t", false); 3];
+        let ok = [&[("A", "a", true), ("B", "b", true)][..], &others].concat();
+        assert!(roundup(tldr, &ok).structure_errors().is_empty());
+
+        // Main entries out of the 省流卡 order, or not leading.
+        let swapped = [&[("B", "b", true), ("A", "a", true)][..], &others].concat();
+        assert_eq!(roundup(tldr, &swapped).structure_errors().len(), 1);
+        let late = [&others[..], &[("A", "a", true), ("B", "b", true)]].concat();
+        assert!(!roundup(tldr, &late).structure_errors().is_empty());
+
+        // Too few, too long.
+        assert_eq!(roundup("", &others).structure_errors().len(), 1);
+        let long = "字".repeat(ROUNDUP_TEXT_MAX + 1);
+        let mut five = vec![("x", "t", false); 4];
+        five.push(("x", &long, false));
+        assert_eq!(roundup("", &five).structure_errors().len(), 1);
+
+        // 速览专帖: no 省流卡, no main entries; covers come from the template.
+        let solo = roundup("kind = \"roundup\"\n", &[("x", "t", false); 5]);
+        assert!(solo.structure_errors().is_empty());
+        assert_eq!(solo.outputs(), [COVER_OUT, COVER_WIDE_OUT, ROUNDUP_OUT]);
+        assert!(
+            !roundup(&format!("kind = \"roundup\"\n{tldr}"), &ok)
+                .structure_errors()
+                .is_empty()
+        );
     }
 
     #[test]
