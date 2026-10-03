@@ -134,6 +134,19 @@ impl Spec {
             .collect()
     }
 
+    /// Every text the rendered cards show that the account wrote itself (not
+    /// the screenshots): checked for platform names that trigger 风控.
+    pub fn own_texts(&self) -> Vec<&str> {
+        let tldr = self.tldr.iter().flat_map(|t| [t.tag.as_str(), &t.fact]);
+        let roundup = self.roundup.iter().flat_map(|r| [r.tag.as_str(), &r.text]);
+        let annot = self.annot.iter().flat_map(|a| {
+            [a.title.as_str(), &a.source]
+                .into_iter()
+                .chain(a.note.iter().map(|n| n.gloss.as_str()))
+        });
+        tldr.chain(roundup).chain(annot).collect()
+    }
+
     pub fn main_entries(&self) -> impl Iterator<Item = &RoundupItem> {
         self.roundup.iter().filter(|r| r.main)
     }

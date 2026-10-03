@@ -31,9 +31,19 @@ const NEW_FORMAT_FROM: u32 = 2610_1002;
 /// Issues from this date carry a 速览聚合图 `images/00-roundup.png`
 /// (EDITORIAL.md 速览).
 const ROUNDUP_FROM: u32 = 2610_1004;
-/// The only attributions a 速览 entry from an L4 report may use: the outlet is
-/// not named, but the source type stays accurate (EDITORIAL.md 速览).
-const ROUNDUP_L4_WORDING: [&str; 2] = ["据外媒报道", "据媒体报道"];
+/// Platforms unreachable from mainland China, never named in the publish text
+/// or the card texts (风控; EDITORIAL.md 事实分级). Screenshots may show them.
+/// Matched case-insensitively as whole words, so `xAI` and `SpaceX` pass;
+/// X itself only as a capital `X`, so a stray `x` does not count.
+const BLOCKED_PLATFORMS: [&str; 6] = [
+    "twitter",
+    "youtube",
+    "facebook",
+    "instagram",
+    "telegram",
+    "x.com",
+];
+const BLOCKED_PLATFORMS_ZH: [&str; 3] = ["推特", "油管", "脸书"];
 const PLACEHOLDERS: [&str; 6] = ["TODO", "TBD", "待补", "待核", "【图", "[图"];
 pub const IMAGE_EXTS: [&str; 5] = ["png", "jpg", "jpeg", "webp", "gif"];
 /// Characters that mark a number as a quantity or date rather than a version.
@@ -127,6 +137,10 @@ pub fn lint_issue(dir: &Path) -> Vec<Finding> {
         }
     };
     let kind = spec.as_ref().map_or(Kind::Main, |s| s.kind);
+    let era = Era {
+        new_format,
+        roundup: roundup_era,
+    };
 
     let fc_path = dir.join("sources").join("fact-check.md");
     let fact_check = fs::read_to_string(&fc_path).ok();
@@ -172,7 +186,7 @@ pub fn lint_issue(dir: &Path) -> Vec<Finding> {
                         .map(|l| l.chars().filter(|c| !c.is_whitespace()).collect::<String>())
                         .filter(|l| !l.is_empty()),
                 );
-                lint_publish(&mut sink, &raw, fact_check.as_deref(), new_format, kind);
+                lint_publish(&mut sink, &raw, fact_check.as_deref(), era, kind);
             }
             Err(e) => sink.error(None, format!("读取失败：{e}")),
         }
@@ -181,10 +195,6 @@ pub fn lint_issue(dir: &Path) -> Vec<Finding> {
     // Newer issues keep their images only on OpenList; `offsite.tsv` vouches for
     // the ones a fresh clone lacks.
     let offsite = offsite_paths(dir);
-    let era = Era {
-        new_format,
-        roundup: roundup_era,
-    };
     lint_images(&images, era, spec.as_ref(), &offsite, &mut out);
     lint_cards(&images, &body_lines, era, spec.as_ref(), &offsite, &mut out);
     if let Some(spec) = &spec {
@@ -227,13 +237,8 @@ pub fn char_count(s: &str) -> usize {
     s.chars().count()
 }
 
-fn lint_publish(
-    sink: &mut Sink,
-    raw: &str,
-    fact_check: Option<&str>,
-    new_format: bool,
-    kind: Kind,
-) {
+fn lint_publish(sink: &mut Sink, raw: &str, fact_check: Option<&str>, era: Era, kind: Kind) {
+    let new_format = era.new_format;
     let text = normalize(raw);
     let lines: Vec<&str> = text.lines().collect();
     let title = lines.first().map_or("", |l| l.trim());
@@ -270,6 +275,11 @@ fn lint_publish(
         }
         for p in PLACEHOLDERS.iter().filter(|p| line.contains(*p)) {
             sink.error(n, format!("编辑占位符「{p}」"));
+        }
+        if era.roundup {
+            for name in blocked_platforms(line) {
+                sink.error(n, blocked_msg(&name));
+            }
         }
         if i > 0 {
             for issue in spacing_issues(line) {
@@ -667,6 +677,13 @@ fn lint_cards(
     for msg in card_text_errors(&spec.quoted_texts(), body_lines) {
         sink.error(None, msg);
     }
+    if era.roundup {
+        for t in spec.own_texts() {
+            for name in blocked_platforms(t) {
+                sink.error(None, format!("卡片文字「{t}」：{}", blocked_msg(&name)));
+            }
+        }
+    }
     // Rendered images older than the spec were not re-rendered after an edit.
     let mtime = |p: &Path| fs::metadata(p).and_then(|m| m.modified()).ok();
     if let Some(spec_time) = mtime(&path) {
@@ -700,6 +717,43 @@ fn card_text_errors(texts: &[&str], body_lines: &[String]) -> Vec<String> {
         }
     }
     errs
+}
+
+/// Blocked platform names on one line, as written.
+pub fn blocked_platforms(line: &str) -> Vec<String> {
+    let mut out: Vec<String> = BLOCKED_PLATFORMS_ZH
+        .iter()
+        .filter(|w| line.contains(*w))
+        .map(|w| w.to_string())
+        .collect();
+    let cs: Vec<char> = line.chars().collect();
+    for r in ascii_runs(&cs) {
+        let run: String = cs[r.start..r.end].iter().collect();
+        // Split `X/YouTube` and drop edge punctuation such as `(X)`, keeping
+        // the dot of a domain.
+        for word in run.split(['/', ',', ';', '(', ')', '"', '\'']) {
+            let w = word.trim_matches(|c: char| !c.is_ascii_alphanumeric());
+            let lower = w.to_ascii_lowercase();
+            let bare = lower.strip_prefix("www.").unwrap_or(&lower);
+            let hit = w == "X"
+                || BLOCKED_PLATFORMS.contains(&bare)
+                || BLOCKED_PLATFORMS
+                    .iter()
+                    .any(|p| bare.strip_prefix(p).is_some_and(|r| r.starts_with('.')))
+                || bare.starts_with("x.com/")
+                || bare.starts_with("t.me");
+            if hit && !out.iter().any(|o| o == w) {
+                out.push(w.to_string());
+            }
+        }
+    }
+    out
+}
+
+fn blocked_msg(name: &str) -> String {
+    format!(
+        "「{name}」是中国大陆无法访问的平台，正文与卡片文字不写（截图可以）：官方账号发言写“某公司称”，媒体报道写“据外媒报道”"
+    )
 }
 
 /// Whitespace removed and trailing sentence punctuation dropped, for verbatim
@@ -780,7 +834,8 @@ fn roundup_fact_errors(spec: &card::Spec, fact_check: Option<&str>) -> Vec<Strin
             ));
             continue;
         };
-        let has_l4_wording = ROUNDUP_L4_WORDING.iter().any(|w| t.contains(w));
+        // “据彭博社报道”“据外媒报道”: some attribution, outlet named or not.
+        let has_l4_wording = t.contains('据') && t.contains("报道");
         match row.level {
             _ if row.result.contains('❌') => {
                 errs.push(format!("速览条目「{t}」在事实清单中标为 ❌"));
@@ -790,8 +845,7 @@ fn roundup_fact_errors(spec: &card::Spec, fact_check: Option<&str>) -> Vec<Strin
                 errs.push(format!("速览条目「{t}」为 L1–L3，但事实清单结果不是 ✅"));
             }
             Some(4) if !has_l4_wording => errs.push(format!(
-                "速览条目「{t}」出自 L4 媒体报道，须写「{}」或「{}」",
-                ROUNDUP_L4_WORDING[0], ROUNDUP_L4_WORDING[1]
+                "速览条目「{t}」出自 L4 媒体报道，须写「据某媒体报道」（来源在大陆无法访问的平台上时写「据外媒报道」）"
             )),
             Some(1..=4) => {}
             Some(l) => errs.push(format!("速览条目「{t}」为 L{l}，速览只收 L1–L4")),
@@ -881,6 +935,7 @@ mod tests {
 | 甲 发布了乙。 | L1 | ✅ | u | |
 | 据外媒报道，丙推迟 | L4 | ⚠️ | u | 彭博 |
 | 据彭博社报道，丁 | L4 | ⚠️ | u | |
+| 丁推迟 | L4 | ⚠️ | u | 未署名 |
 | 戊 | L2 | ⚠️ | u | |
 | 己 | L6 | ⚠️ | u | |
 | 庚 | L1 | ❌ | u | |
@@ -888,11 +943,11 @@ mod tests {
 ## 其他
 | 辛 | L1 | ✅ | u | |
 ";
-        let ok = roundup_spec(&["甲发布了乙", "据外媒报道，丙推迟"]);
+        let ok = roundup_spec(&["甲发布了乙", "据外媒报道，丙推迟", "据彭博社报道，丁"]);
         assert!(roundup_fact_errors(&ok, Some(fc)).is_empty());
-        // Named outlet, unverified L2, L6, ❌, a row outside the 速览 section,
-        // a sentence found only in another section's notes column.
-        for bad in ["据彭博社报道，丁", "戊", "己", "庚", "辛", "甲乙丙"] {
+        // L4 without attribution, unverified L2, L6, ❌, a row outside the 速览
+        // section, a sentence found only in another section's notes column.
+        for bad in ["丁推迟", "戊", "己", "庚", "辛", "甲乙丙"] {
             let errs = roundup_fact_errors(&roundup_spec(&[bad]), Some(fc));
             assert_eq!(errs.len(), 1, "{bad}: {errs:?}");
         }
@@ -902,6 +957,20 @@ mod tests {
         );
         assert!(roundup_fact_errors(&ok, Some("# 事实清单\n"))[0].contains("缺少"));
         assert!(roundup_fact_errors(&roundup_spec(&[]), None).is_empty());
+    }
+
+    #[test]
+    fn blocked_platforms_are_whole_words() {
+        assert_eq!(
+            blocked_platforms("据 X 上的帖子，(YouTube) 与推特；x.com/a"),
+            ["推特", "X", "YouTube", "x.com"]
+        );
+        assert_eq!(
+            blocked_platforms("www.facebook.com 与 t.me/x"),
+            ["www.facebook.com", "t.me"]
+        );
+        assert!(blocked_platforms("xAI 的 Grok、SpaceX、GPT-6.1-Astra、Meta、Xbox").is_empty());
+        assert!(blocked_platforms(SLOGAN).is_empty());
     }
 
     #[test]
