@@ -11,7 +11,7 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { width: 1080px; height: 1440px; background: #f6f4ef; font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif; color: #1b1b1b; position: relative; overflow: hidden; }
   .head { position: absolute; left: 60px; top: 44px; right: 60px; display: flex; align-items: center; gap: 16px; }
-  .tag { background: #1b1b1b; color: #fff; font-size: 26px; font-weight: 700; padding: 6px 16px; border-radius: 6px; flex: none; }
+  .tag { background: #1f4fd1; color: #fff; font-size: 26px; font-weight: 700; padding: 6px 16px; border-radius: 6px; flex: none; }
   .head .t { font-size: 30px; font-weight: 700; }
   /* --s is the screenshot scale; markers and underlines divide by it to keep a fixed on-card size. */
   .shot { --s: 1; position: absolute; left: 70px; top: 116px; transform-origin: 0 0; background: #fff; box-shadow: 0 0 0 1px #d9d5cc; }
@@ -29,9 +29,11 @@
   .mk.c3, .n.c3 { background: #2f9e44; }
   .mk.c4, .n.c4 { background: #7048e8; }
   .panel { position: absolute; left: 60px; right: 60px; bottom: 90px; }
-  .row { display: flex; gap: 18px; margin-bottom: 18px; }
+  /* 译注 sit in one blue box (the accent the old 吠点 box had), one 译注 label on top. */
+  .notes { border-left: 8px solid #1f4fd1; background: #e8edfb; padding: 14px 24px 2px 20px; border-radius: 0 10px 10px 0; }
+  .row { display: flex; gap: 18px; margin-bottom: 16px; }
   .n { flex: none; width: 46px; height: 46px; border-radius: 50%; color: #fff; font-size: 26px; font-weight: 700; line-height: 46px; text-align: center; margin-top: 2px; }
-  .lab { font-size: 22px; font-weight: 700; color: #6b665c; letter-spacing: 1px; }
+  .lab { font-size: 22px; font-weight: 700; color: #1f4fd1; letter-spacing: 2px; margin-bottom: 8px; }
   .tx { font-size: 32px; line-height: 1.42; font-weight: 500; }
   .tx em { font-style: normal; background: linear-gradient(transparent 62%, rgba(214, 51, 108, .28) 0); }
   .q { text-indent: -.45em; }
@@ -43,9 +45,9 @@
     <img src="{{IMG}}" alt="">
 {{OVERLAYS}}
   </div>
-  <div class="panel">
+  <div class="panel"><div class="notes"><div class="lab">译注</div>
 {{NOTES}}
-  </div>
+  </div></div>
   <div class="foot"><span>来源：{{SOURCE}}；原图未改，标注为本号所加</span><span>AI 吠点</span></div>
   <script>
     // Fit the screenshot into the space between the header and the panel:
@@ -57,7 +59,13 @@
     shot.style.setProperty('--s', s);
     shot.style.transform = `scale(${s})`;
     shot.style.left = `${Math.round((1080 - W * s) / 2)}px`;
-    // Space markers at least 44 card px apart, top to bottom, in note order.
+    // A short screenshot leaves a hole between it and the panel: keep them together
+    // and split the free height 35% above the screenshot, 65% below the panel.
+    const slack = Math.max(0, avail - H * s);
+    const above = Math.round(0.35 * slack);
+    shot.style.top = `${TOP + above}px`;
+    document.querySelector('.panel').style.bottom = `${90 + Math.round(slack) - above}px`;
+    // Space markers at least 44 card px apart (they move with the screenshot), top to bottom, in note order.
     let prev = -Infinity;
     for (const mk of document.querySelectorAll('.mk')) {
       const y = Math.max(Number(mk.dataset.y), prev + 44 / s);

@@ -312,7 +312,7 @@ fn annot_html(a: &Annot, images: &Path, work: &Path) -> Result<String, String> {
         };
         let _ = writeln!(
             notes,
-            r#"    <div class="row"><div class="n c{c}">{c}</div><div><div class="lab">译注</div><div class="{}">{gloss}</div></div></div>"#,
+            r#"    <div class="row"><div class="n c{c}">{c}</div><div class="{}">{gloss}</div></div>"#,
             hang("tx", &note.gloss)
         );
     }
