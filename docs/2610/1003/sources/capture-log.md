@@ -154,4 +154,5 @@ Web 搜索用于发现链接，不能作为一手事实证据；正式采用页�
 
 21 个编号条目、允许的状态词、全部引用文件存在、01–22 连续编号、宽度不超过 1400 px 均通过；DAYJOB 30 行与官方 HTML 逐行一致。隐私关键词扫描没有抓取者身份或本机用户路径；avatar/gravatar 命中是公开作者资料及网站通用说明。git status 仅本期目录和原有派工单；未 commit/push。
 
-- 未入库：`a-nilradical-commit.json`（1.25 MB，GitHub commit API 响应）超过单文件 1 MB 入库上限，经 Develata 同意只留本地；对应 commit 公开可查：https://github.com/alunik/kourovka-lean/commit/5a6b2c18e326b7b0281f00b64cade629acbfe1f5
+- 未入库：`a-nilradical-commit.json`（1.25 MB，GitHub commit API 响应）超过单文件 1 MB 入库上限，经 Develata 同意不入 Git，原件存 OpenList（见 offsite.tsv）；对应 commit 公开可查：https://github.com/alunik/kourovka-lean/commit/5a6b2c18e326b7b0281f00b64cade629acbfe1f5
+- `a-original-kida.html`：De Gruyter 返回 HTTP 202、正文为空（0 字节），百度网盘拒收空文件，已删除并从 offsite.tsv 移除；Kida 2024 论文元数据见 `a-kida-metadata.json`（Crossref）。
