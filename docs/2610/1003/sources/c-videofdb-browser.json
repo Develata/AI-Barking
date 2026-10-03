@@ -1,0 +1,80 @@
+{
+  "url": "https://research.nvidia.com/labs/amri/projects/video-fdb/",
+  "title": "VideoFDB — Evaluating Full-Duplex Vision-Speech Capabilities in Conversational Agents",
+  "text": "VideoFDB —\nEvaluating Full-Duplex Vision-Speech\nCapabilities in Conversational Agents\n\nThe first benchmark for full-duplex audio-visual-to-audio-visual conversation.\n\nAmrita Mazumdar1, Seonwook Park1, Rajarshi Roy1, Nikhil Srihari1, Shengze Wang1, Yuhao Zhou2, Julia Wang2, Koki Nagano1, Shalini De Mello1\n\n1NVIDIA  ·  2David AI\n\nLeaderboard\narXiv\nPaper (PDF)\nDataset (Hugging Face)\nABSTRACT\n\nNatural human conversation is full-duplex and audio-visual: people simultaneously speak, listen, and signal through gaze, gesture, and affect. VideoFDB is the first benchmark to evaluate full-duplex audio-visual-to-audio-visual conversational agents — and we find that today's vision-speech models systematically miss the nonverbal turn.\n\nExisting full-duplex benchmarks evaluate speech alone, while audio-visual benchmarks evaluate split-role or turn-based interaction. Neither captures the continuous, overlapping co-construction of meaning that defines natural dyadic conversation. VideoFDB closes that gap with 237 dyadic clips from real video calls spanning 11 nonverbal conversational dynamics, a taxonomy separating perception from generation, and a rubric-based LM-as-judge framework that scores agents along interpretable axes.\n\nEvaluating leading open- and closed-source vision-speech agents, we find two systematic failure modes: captioning collapse (the model describes the user's appearance rather than conversing with them) and visual-stream ignorance (the audio-only and audio-visual outputs are paraphrases of each other). Cascaded speech-to-avatar pipelines preserve turn-yielding discipline but cannot insert nonverbal cues during the user's turn, with latencies 2.8–3.5 seconds behind human ground truth.\n\nTo protect participant identity, we do not visualize clip samples on this page. The full evaluation dataset is available on Hugging Face.\nLEADERBOARD\n\nBest and second-best non-human entries are in bold and underlined. Timing reports TOR-Alignment percentage above median latency below. Full per-dynamic breakdowns are in the paper appendix.\n\nPerception\nGeneration\nMODEL\tFLUENCY ↑\tCONV. FLOW ↑\tVIS. GROUND. ↑\tOVERALL ↑\tTIMING ↑\nHuman reference\t4.16\t4.20\t4.24\t4.20\t90% / 1400 ms\nCLOSED-SOURCE FULL-DUPLEX AV2AV MODELS\nTavus Griffin Lite\t3.60\t3.67\t3.92\t3.73\t73.8% / 2232 ms\nCLOSED-SOURCE FULL-DUPLEX SPEECH-VISION (AV2A)\nGemini 2.5 Flash Native\t3.33\t2.81\t3.37\t3.17\t72% / 3160 ms\nGemini 3.1 Flash Live\t3.15\t2.20\t3.16\t2.84\t66% / 1720 ms\nOpenAI gpt-realtime-mini\t2.91\t2.37\t2.90\t2.73\t66% / 5320 ms\nOpenAI gpt-realtime\t2.72\t2.50\t3.02\t2.75\t72% / 5400 ms\nOPEN-SOURCE FULL-DUPLEX SPEECH-VISION (AV2A)\nMiniCPM-o 4.5\t3.03\t3.54\t3.63\t3.40\t73% / 720 ms\nMiniOmni2\t0.65\t1.37\t1.54\t1.19\t64% / 3080 ms\nVITA-1.5\t1.19\t1.57\t2.53\t1.76\t58% / 400 ms\nAUDIO-ONLY BASELINES (A2A; SAME AGENTS, VIDEO WITHHELD)\nGemini 2.5 Flash Native\t3.35\t2.98\t3.17\t3.17\t73% / 2760 ms\nGemini 3.1 Flash Live\t3.40\t2.64\t3.03\t3.03\t69% / 1240 ms\nOpenAI gpt-realtime-mini\t3.05\t2.48\t3.12\t2.88\t69% / 5000 ms\nOpenAI gpt-realtime\t2.93\t2.37\t3.59\t2.97\t67% / 4440 ms\nMiniCPM-o 4.5\t3.45\t3.76\t3.10\t3.44\t72% / 920 ms\nMiniOmni2\t1.48\t1.70\t2.15\t1.72\t69% / 2760 ms\nVITA-1.5\t1.62\t1.37\t3.02\t2.00\t61% / 800 ms\nTable 1. Performance breakdown across Perception rubrics. AV2A and A2A runs are paired on the same clips to isolate the visual contribution.\nSubmit your model's results on VideoFDB.\n\nContact us at amritam@nvidia.com with your model's per-sample outputs and we'll score them and produce a leaderboard row. We'll soon release an automated evaluation pipeline to make submission easier and more accessible.\n\nGet the evaluation dataset\nCONTRIBUTIONS\nA benchmark grounded in human communication science.\n237 expert-annotated dyadic clips from natural video calls, spanning 11 conversational dynamics drawn from established interpersonal-communication research — turn-taking, backchannels, gaze aversion, adaptors, affect displays, and more.\nA perception/generation taxonomy with interpretable rubrics.\nPerception axes score whether the agent reads the situation; generation axes score whether the agent's own audio-visual output coheres. Three rubric axes per category, each scored 0–5 by an LM judge with stable cross-judge agreement (77–89% within 1 point).\nNext steps for research:\nWe identify captioning collapse, visual-stream ignorance, and the lack of full-duplex avatar pipelines as key opportunities for future work in Interactive Agentic AI.\nMOTIVATION\n\nConsider a brief pause in the middle of a sentence (Figure 1). An audio-only agent may treat it as a turn handoff and start speaking. But with both audio and video together, the same moment has more context: a shifted gaze and raised head can signal the user is still thinking, so the right response is to wait.\n\nFigure 1. VideoFDB curates evaluation samples from natural two-person video calls and evaluates perception and generation across 11 dynamic categories.\n\nWhat an agent does while the user is still speaking matters as much as what it says next and when. Most evaluations split dialogue into turns and focus on the response latency or audio quality, but real conversations are continuous, with bidirectional verbal and nonverbal cues. Full-duplex speech benchmarks measure performance from audio alone and would interrupt the user's pause. Video QA benchmarks reward identifying gaze direction, but not using it to guide turn-taking. VideoFDB evaluates the intersection between these two approaches: whether agents continuously use visual signals during two-way conversation.\n\nTAXONOMY\n\nWe organize the benchmark around the four nonverbal channels human-communication research identifies as central to dyadic interaction — dialogue, eye gaze, face, and body — and select dynamics that directly govern conversational floor management, listener feedback, social-affective signaling, and conversational body movement.\n\nPERCEPTION\nGaze Avoidance with Pause\nD · G\nPause Handling\nD · G\nAdaptor Handling\nB\nNonverbal Interruption\nD · B\nFace Emotion Display\nG · F\nNonverbal Backchanneling\nD · F\nLaughter\nD · F\nGENERATION\nFace Emotion Display\nG · F\nNonverbal Backchanneling\nD · F\nLaughter\nD · F\nVerbal Interruption\nD\nVerbal Backchanneling\nD · F\nTurn-taking\nD\nEmotion Matching\nF\nD\nDialogue\nG\nEye Gaze\nF\nFace\nB\nBody\nPERCEPTION\nGaze Avoidance with Pause\nGaze aversion paired with a pause, often indicating thinking or processing — not a turn yield.\nSAMPLE INPUT\nUser trails off mid-sentence, looks up and away from the camera with a slight head-tilt, then is silent for ~2 seconds.\nEXPECTED AGENT BEHAVIOR\nAgent stays silent and waits. The gaze cue distinguishes \"still thinking\" from \"your turn\"; speaking up here interrupts the user's own thought.\n\nEach clip is centered on a human-annotated dynamic event window [t_start, t_end], with 1–3 lead-in turns and up to one follow-up turn preserved as context. Clips are mined from a held-out corpus of two-person video calls and validated through a three-pass annotation pipeline (candidate discovery → timestamp/type validation → final quality review).\n\nFigure 2. Evaluation flow. We stream user audio/video to the agent, then score the recorded response on category-specific rubric axes.\nFINDINGS\nINSIGHT 1\nCurrent models remain well below human conversational naturalness.\n\nNo evaluated agent approaches the human reference on VideoFDB. The largest deficits concentrate in fast social-coordination dynamics — Pause Handling, Nonverbal Backchanneling, Gaze Avoidance with Pause — with aggregate human–model gaps up to 0.85 on the 0–5 scale. Conversational Flow shows the widest gap: humans 4.20, closed-source AV2A 2.20–2.81, best AV2A (MiniCPM-o 4.5) 3.54. On timing, humans hit 90% TOR-Alignment at 1.4 s median latency; the next-best model lands at 73% / 720 ms.\n\nINSIGHT 2\nVisual frame rate prevents capture of nonverbal signals.\n\nAudio is processed at millisecond resolution, but AV2A models typically take video at 1 FPS — missing nonverbal dynamics that unfold within 1–2 seconds. Nonverbal Interruption requires yielding within 1.5 s, yet Gemini 3.1 lands 1.7 s late and Gemini 2.5 worse. Pushing MiniCPM-o-4.5's user-controllable FPS higher (the only model exposing this knob) degrades performance past 2 FPS, with fluency falling from 3.55 to 2.33 as the cross-modal attention budget overloads.\n\nINSIGHT 3\nNo system uses the visual channel for both timing and content.\n\nComparing audio-only and audio-visual runs of the same agents, AV2A scores worse than A2A on perception rubrics in every model family we tested. We observe two dominant failure modes:\n\nFigure 3. When given AV input, Mini-Omni2 captions the user 87% of the time; VITA-1.5 issues capability disclaimers and doubles tokens on most clips.\nCAPTIONING COLLAPSE\n\nThe agent treats visual input as a captioning prompt: \"I can see you're…\", \"you look…\". Mini-Omni2 does this on 87% of AV clips but reverts to dialogue in audio-only mode. Even gpt-realtime shows a milder version of the pattern.\n\nVISUAL-STREAM IGNORANCE\n\ngpt-realtime-mini produces AV2A and A2A outputs that are near-paraphrases of each other — the visual stream rarely shifts response timing or content. The model is consuming the bytes but not using them.\n\nINSIGHT 4\nCascaded speech-to-avatar pipelines structurally cannot supply real-time nonverbal cues.\n\nWe evaluate Gemini 2.5 Flash Native driving two avatar generation methods. Relative to human ground truth, cascaded avatars show only a modest Fluency drop (4.42 → 3.43–3.48) but a large drop in Nonverbal Cue Appropriateness (3.18 → 1.13–1.71). The reason is architectural: audio-driven avatars are effectively turn-based: motion follows produced speech only, so they cannot add nonverbal cues during the user's turn. Cascade latency (2.8–3.5 s) is far above the threshold for interactive nonverbal timing. Cascaded A2AV remains fundamentally limited; closing the gap requires end-to-end speech-vision models or avatar layers that emit nonverbal motion independently of speech.\n\nCITE\nCopy citation\n@misc{mazumdar2026videofdb,\n      title         = {VideoFDB: Evaluating Full-Duplex Vision-Speech Capabilities in Conversational Agents},\n      author        = {Mazumdar, Amrita and Park, Seonwook and Roy, Rajarshi and Srihari, Nikhil and Wang, Shengze and Zhou, Yuhao and Wang, Julia and Nagano, Koki and De Mello, Shalini},\n      year          = {2026},\n      eprint        = {2605.30256},\n      archivePrefix = {arXiv},\n      primaryClass  = {cs.CV},\n      url           = {https://arxiv.org/abs/2605.30256}\n}\n\nVideoFDB · NVIDIA & David AI · 2026\n\nQuestions: amritam@nvidia.com",
+  "links": [
+    {
+      "text": "Amrita Mazumdar",
+      "url": "https://amritamaz.net/"
+    },
+    {
+      "text": "Seonwook Park",
+      "url": "https://swook.net/"
+    },
+    {
+      "text": "Rajarshi Roy",
+      "url": "https://scholar.google.com/citations?user=FtoCDKEAAAAJ&hl=en"
+    },
+    {
+      "text": "Shengze Wang",
+      "url": "https://mcmvmc.github.io/"
+    },
+    {
+      "text": "Yuhao Zhou",
+      "url": "https://henryzhou7.github.io/"
+    },
+    {
+      "text": "Koki Nagano",
+      "url": "https://luminohope.org/"
+    },
+    {
+      "text": "Shalini De Mello",
+      "url": "https://research.nvidia.com/person/shalini-de-mello"
+    },
+    {
+      "text": "Leaderboard",
+      "url": "https://research.nvidia.com/labs/amri/projects/video-fdb/#leaderboard"
+    },
+    {
+      "text": "arXiv",
+      "url": "https://arxiv.org/abs/2605.30256"
+    },
+    {
+      "text": "Paper (PDF)",
+      "url": "https://arxiv.org/pdf/2605.30256"
+    },
+    {
+      "text": "Dataset (Hugging Face)",
+      "url": "https://huggingface.co/datasets/nvidia/video-full-duplex-benchmark"
+    },
+    {
+      "text": "Hugging Face",
+      "url": "https://huggingface.co/datasets/nvidia/video-full-duplex-benchmark"
+    },
+    {
+      "text": "amritam@nvidia.com",
+      "url": "mailto:amritam@nvidia.com"
+    },
+    {
+      "text": "Get the evaluation dataset",
+      "url": "https://huggingface.co/datasets/nvidia/video-full-duplex-benchmark"
+    },
+    {
+      "text": "amritam@nvidia.com",
+      "url": "mailto:amritam@nvidia.com"
+    }
+  ],
+  "meta": [
+    "<meta property=\"og:type\" content=\"website\">",
+    "<meta property=\"og:site_name\" content=\"NVIDIA Research\">",
+    "<meta property=\"og:url\" content=\"https://research.nvidia.com/labs/amri/projects/video-fdb/\">",
+    "<meta property=\"og:title\" content=\"VideoFDB — The first benchmark for full-duplex audio-visual conversation\">",
+    "<meta property=\"og:description\" content=\"Natural conversation is full-duplex and audio-visual: people simultaneously speak, listen, and signal through gaze, gesture, and affect. VideoFDB evaluates full-duplex audio-visual conversational agents — and finds today's vision-speech models systematically miss the nonverbal turn.\">",
+    "<meta property=\"og:image\" content=\"https://research.nvidia.com/labs/amri/projects/video-fdb/og/videofdb-sunburst.png\">",
+    "<meta property=\"og:image:secure_url\" content=\"https://research.nvidia.com/labs/amri/projects/video-fdb/og/videofdb-sunburst.png\">",
+    "<meta property=\"og:image:type\" content=\"image/png\">",
+    "<meta property=\"og:image:width\" content=\"2400\">",
+    "<meta property=\"og:image:height\" content=\"1260\">",
+    "<meta property=\"og:image:alt\" content=\"VideoFDB — the first benchmark for full-duplex audio-visual conversation, with its perception/generation dynamics taxonomy.\">"
+  ]
+}

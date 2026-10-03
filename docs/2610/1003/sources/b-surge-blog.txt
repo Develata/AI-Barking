@@ -1,0 +1,347 @@
+DAYJOB: Can Agents Survive a 9 to 5? | Surge AI
+New
+Frontier data and RL environments, off the shelf
+Blog
+benchmarks
+Off-the-Shelf
+Training
+experts
+Products
+Enterprise
+Research
+Careers
+Contact
+Login
+Menu
+Close
+THE SURGE AI BLOG
+DAYJOB: Can Agents Survive a 9 to 5?
+Introducing DAYJOB: Healthcare and DAYJOB: Finance
+September 26, 2026
+September 23, 2026
+No items found.
+TL;DR
+DAYJOB
+is our evolution of GDPval for
+long-horizon, economically valuable agents
+. It's built around the messy reality of knowledge work: realistic requests, complex environments, and end-to-end professional judgment.
+Rather than telling models exactly what to do, DAYJOB asks whether agents can figure out what needs to be done, and reason through it until the end.
+The strongest models score less than 25% on both
+DAYJOB: Healthcare
+and
+DAYJOB: Finance
+.
+Benchmarks
+DAYJOB: Healthcare
+DAYJOB: Finance
+Resources
+Hugging Face: Healthcare
+Hugging Face: Finance
+GitHub
+Table of contents
+Case Study Llama
+Analysis of Individual writings
+Appendix
+AI agents are getting very good at well-specified tasks. Give them a clear objective, detailed instructions, and a clean set of inputs, and frontier models can do remarkable work.
+But nobody at the office ever makes it that easy. The hard part is often figuring out what the task even is. Real work sounds more like:
+“@bob is that ready yet?”
+And then you have to figure out what
+that
+means.
+So you find the analysis your colleague sent last week. Open the financial model the team has been working from. Notice that the spreadsheet and the latest memo disagree. Decide which source to trust. Update the analysis. And check everything again.
+Two days later, you have something your boss can actually use.
+Can an agent handle that messiness too?
+That's the question behind
+DAYJOB
+, our new benchmark suite for professional knowledge work. Today we're releasing the first two benchmarks in the family:
+DAYJOB: Healthcare
+and
+DAYJOB: Finance
+, comprising
+130 expert assignments
+across two of the most economically valuable areas of professional work.
+And today's frontier agents are still a long way from being able to work a 9 to 5.
+The strongest models score less than 25% on both DAYJOB: Healthcare and DAYJOB: Finance.
+Where GDPval falls short
+OpenAI’s GDPval was an important step toward evaluating economically valuable work. But many of its tasks differ from real professional work in two important ways: they often test
+routine execution rather than professional judgment
+, and they
+spell out in detail
+what the model must do.
+1. Many tasks test routine execution, not professional reasoning and judgment
+Many GDPval tasks emphasize
+mechanical execution
+rather than the core reasoning and judgment associated with the profession being evaluated. They center on document production, formatting, transcription, copy-editing, and other routine forms of work.
+One
+retail-supervisor task
+, for example, is largely a PDF-generation exercise. The model is given a
+Word document
+containing daily duties, and the prompt asks it to turn those duties into a structured task list in a prescribed format. OpenAI’s
+expert-produced reference deliverable
+is essentially that formatted checklist.
+Almost none of the professional judgment is left to the model:
+the content is supplied, the structure and output are set by the prompt. What remains is primarily layout and transcription.
+A
+Private Investigation Supervisor task
+is similarly centered on editing and formatting a surveillance report rather than conducting investigative analysis.
+These tasks may resemble things professionals sometimes do, but that is different from testing the capabilities that make those professionals valuable. Formatting documents, copy-editing, and following a straightforward list of instructions are useful skills. They are not the same as
+open-ended professional reasoning: figuring out what matters, what to do, and why.
+2. The tasks often specify the step-by-step solution in advance
+GDPval also frequently tells models not just what outcome to produce, but how to produce it.
+Consider one
+task
+for a regional grocery-store director. The model is asked to build a promotion-planning form and training deck. But the prompt already specifies most of the solution:
+“Make a PowerPoint deck titled ‘Promo Projection Form’ to train Meat Team Leaders on how to use the new form. Keep it to under 8 slides. The deck should explain what this new tool is, why we’re using it, how stores will get the form and where to find it, what sections they’re expected to fill out, and how the process will work. Please include a sample version of the form with some mock data so they can see exactly how it looks when filled out. End with a recap and leave room for discussion or questions.”
+The model is not being asked to reason through what an effective training deck should contain. Much of that work has already been done in the prompt. Its job is to execute a strategy that has already been specified.
+OpenAI's own experiments show why this matters. They created shortened GDPval prompts that removed details about where information lived, how to approach the task, and how the output should be formatted. Model performance dropped: in OpenAI's words, models particularly struggled to “figure out context.”
+But figuring out context is a central part of professional work.
+Real professionals often have to determine what the actual problem is, what information matters, what is missing, what constraints apply, and what a good solution should look like before they can begin producing an answer.
+3. Other data and evaluation problems
+Our audit found additional issues:
+The input data can be inconsistent or unrealistic.
+For example, one task asks the model to
+compare 39 stores
+even though every store has identical sales data.
+The rubrics are frequently flawed.
+Only about
+20% of the criteria we reviewed were good as-is
+. Tasks contain vague criteria, redundancy, poor atomization, inconsistent standards, and criteria that expect incorrect answers.
+The expert-produced reference deliverables are often flawed.
+They include hallucinated values, irrelevant information, missing requested sections, and other basic errors.
+Some tasks expire.
+GDPval includes tasks dependent on live websites, current prices, or time-bound events. Some links in the dataset are
+already broken
+.
+GDPval partly sidesteps its rubric problems by using human preference judgments between final deliverables. But automated versions replace those experts with LLM judges, which are themselves imperfect graders with biases around style, framing, and model family.
+The broader problem is that successful professional work is not just the ability to execute a well-specified task. Benchmarks that supply the context, decompose the problem, and prescribe the structure omit the
+difficult, real-world reasoning that precedes
+.
+From benchmark prompts to real assignments
+Consider the difference between:
+“Open the latest forecast model. Update revenue using the assumptions in the Q3 operating report, revise the downside case, calculate the resulting leverage ratio, and summarize the changes in a one-page memo.”
+and:
+“Can you update the forecast before tomorrow's meeting?”
+The first assumes you’re a junior intern. It tells you what matters, where to look, what analysis to perform, and what to produce. The second is how you talk to your colleagues at a real job.
+DAYJOB is built around the second kind of request, leading to three major differences:
+1. Shorter, more realistic requests.
+DAYJOB prompts are dramatically shorter:
+81
+words on average in Finance and
+49
+in Healthcare, compared with
+337
+words in GDPval. We deliberately leave more of the scoping, interpretation, and planning to the agent.
+2. Much larger working environments.
+A DAYJOB task contains an average of
+25.7
+input files in Finance and
+19.8
+in Healthcare. GDPval averages just
+1.2
+. The agent has to determine which files matter, connect information across them, and keep the work coherent as it progresses.
+3. Much longer horizons.
+A DAYJOB Finance task is estimated to take a human professional
+21.6 hours
+on average; Healthcare averages
+19.6 hours
+. By comparison, the full GDPval set has a median estimated human completion time of
+4 hours
+.
+Built by experts on the job
+DAYJOB tasks were built by experts with firsthand experience doing the work being evaluated. We asked them to create assignments grounded in the problems, source materials, decisions, and deliverables they encounter in their fields. Every task then went through a three-layer review process for correctness, completeness, and solvability.
+The experts behind DAYJOB include people like:
+A senior portfolio manager at BlackRock specializing in institutional asset management, quantitative portfolio construction, and systematic investing, with an MBA from Wharton.
+A finance professional who has structured debt for large-scale infrastructure and renewable energy projects at HSBC, with an MSc in Economics from the London School of Economics.
+A pediatric endocrinologist and epidemiologist focused on diabetes care in children and adolescents, with an MD and MPH from the University of Michigan and a faculty role at a major children’s hospital.
+What does a DAYJOB task look like?
+DAYJOB: Healthcare
+measures healthcare agents across clinical decision support, diagnosis and treatment planning, medication management, patient safety, care coordination, payer workflows, operations, and compliance.
+DAYJOB: Finance
+measures finance agents across corporate finance, banking, credit, investing, and real assets.
+The easiest way to understand them is to look at where frontier agents fail.
+Finance: missing $25.7 million
+In one DAYJOB: Finance task, an agent reviewed a fund’s reports before they were sent to a new client. The assignment was simple:
+find anything that should stop the reports from going out.
+Prompt
+‍
+Caldervane Emerging Markets Fund is a new client's first fund with us and we are delivering our first reports for it today for COB June 30th. The client wants the initial reports as soon as they are available, so they can review these BAU deliverables in detail. Go through the attached pack and let me know if there are any issues stopping me sending the reports to the client as they are. Write it up as a short .md memo.
+Environment:
+a mix of policy documents, vendor price files, Geneva system reports, broker quotes, and emails.
+One position had been priced manually from a Bloomberg screenshot. The screenshot showed the price in South African cents (“ZAr”), but the value had been entered as rand.
+That one unit error made a roughly $260,000 position appear to be worth $26 million.
+GPT-5.6 found two real pricing-source errors worth a net $132,000 and correctly recommended holding the reports until they were fixed. But it missed the much larger problem: “No other release blocker was identified.”
+It still missed the
+$25.7 million overstatement
+.
+Only 2 of 66 runs across 22 model configurations caught the cents-versus-rand error. Both were Claude Opus 5 runs. The successful reviews noticed the unit on the source screenshot, recalculated the position value, and in one case traced the mistake back to an incomplete pricing-system setup.
+Healthcare: uncaught dangers
+In one DAYJOB: Healthcare task, an urgent-care clinician described a patient’s facial weakness as “textbook Bell’s palsy” and asked the agent to check his laboratory results before discharge.
+Prompt
+The patient in 2B came in with facial weakness, textbook Bell's Palsy. He is diabetic, so I sent labs before starting steroids. Everything else is done. If his labs look good, discharge him on prednisone. Leave me a written note in the chart with your read on the labs and whether we're good to discharge
+One of the charts in the environment showed difficulty speaking and neck pain after moving heavy furniture, and the facial examination was incomplete. Those findings raised concerns that warranted further assessment before discharge.
+GPT-5.6 noticed this in its reasoning. It recognized that the combination of facial weakness and neck pain could have a vascular cause. But it decided “I shouldn't question the diagnosis unless necessary.”
+A Grok run reviewing the same record did challenge the plan. It connected the incomplete exam and neck pain after physical strain to a possible arterial injury and recommended holding discharge for emergency evaluation and vascular imaging.
+These examples capture what makes DAYJOB different. Agents are already very good at calculations, extraction, and other well-specified steps. The harder part is
+professional judgment
+: knowing which details matter, what assumptions to make and which to throw out, and which issues are important enough to change a decision.
+Frontier agents still have a long way to go
+DAYJOB uses task-specific rubrics to measure what the agent completed. The median task has 57.5 criteria in Finance and 47.5 in Healthcare.
+On DAYJOB: Healthcare, the strongest model succeeds on
+24.7%
+of assignments.
+On DAYJOB: Finance, the strongest model succeeds on
+23.9%
+.
+Pour yourself a cup of ambition
+Models can already do impressive work when the task is clear: summarize a document, clean up writing, run a calculation, build a slide.
+The next milestone is
+end-to-end professional judgment
+: figuring out what needs to be done, making judgment calls, and reasoning through the work over days. That’s what DAYJOB measures.
+Today we’re launching
+DAYJOB: Healthcare
+and
+DAYJOB: Finance
+, with more domains to follow.
+Navier–Stokes is now easy; Bob's job is still hard. Will AI ever survive a 9 to 5?
+Explore
+DAYJOB: Healthcare
+and
+DAYJOB: Finance.
+Reach out to benchmarks@surgehq.ai if you'd like full access.
+Github:
+https://github.com/surge-ai/dayjob
+Hugging Face Samples:
+https://huggingface.co/datasets/surgeai/DAYJOB-healthcare
+and
+https://huggingface.co/datasets/surgeai/DAYJOB-finance
+Follow us
+/surge-ai
+@hellosurgeai
+GDP.xlsx: Can Agents Understand the Spreadsheets That Run the World?
+What Does GDP.pdf Teach — Beyond PDFs?
+DAYJOB: Can Agents Survive a 9 to 5?
+Helping Anthropic Build Automated Alignment Researchers
+Hill-Climbing a SWE Agent: What 1,700 Coding Tasks Taught Kimi K2.7
+Fable 5.1, Muse Spark 1.3, and Gemini 3.8 Flash on the Tuesday Work Index
+DeepSeek V4 Pro Scores 59.7 on the Tuesday Work Index
+Qwen 3.8 Max Scores 58.7 on the Tuesday Work Index
+Introducing the Tuesday Work Index: Can AI Get Through an Ordinary Day?
+We Trained a Model on Office Work. It Also Got Better at Coding.
+Chartography: A Benchmark for Professional Chart Understanding
+OpenAI cites GDP.pdf in its GPT-5.6 release
+Training on ComplexConstraints: +10.1 on MultiChallenge, +8.5 on AdvancedIF
+HANDBOOK.md Benchmark: Can Agents Follow 100-Page Company Policies?
+Anthropic cited GDP.pdf and Riemann-bench in their Fable 5 and Mythos 5 system card
+ComplexConstraints: A Benchmark for Entangled Instruction Following
+Microsoft used Surge human evaluations to benchmark MAI-Thinking-1
+Training on Long-Horizon Agent Tasks: +9.6 on Toolathlon, +5.3 on τ²-Bench
+Antidote Leaderboard: Optimizing for You
+GDP.pdf Benchmark: Can Frontier Models Master the Documents that Run the World?
+Riemann-bench: A Benchmark for Moonshot Mathematics
+EnterpriseBench: CoreCraft – Measuring AI Agents in Chaotic, Enterprise RL Environments
+Hemingway-bench: The AI Writing Leaderboard Judged by Expert Writers
+Building AdvancedIF: Evolving Instruction Following Beyond IFEval and “Avoid the Letter C”
+LMArena is a cancer on AI
+RL Environments and the Hierarchy of Agentic Capabilities
+How do frontier models perform on real-world finance problems?
+A Product Take on Sonnet 4.5
+Is Sonnet 4.5 the best coding model in the world?
+The Human/AI Frontier: A Conversation with Bogdan Grechuk
+SWE-Bench Failures: When Coding Agents Spiral Into 693 Lines of Hallucinations
+Benchmarks are broken
+Unsexy AI Failures: The PDF That Broke ChatGPT
+Bringing light to the GPT-4o vs. GPT-5 personality controversy
+DALL·E 3 and Midjourney Fail Astral Codex Ten's Image Generation Bet
+How Anthropic uses Surge AI to Train and Evaluate Claude
+We Evaluated ChatGPT vs. Google on 500 Search Queries
+AI Red Teams for Adversarial Training: How to Make ChatGPT and LLMs Adversarially Robust
+HellaSwag or HellaBad? 36% of this popular LLM benchmark contains errors
+How TikTok is Evolving the Next Generation of Search
+Evaluating Generative AI: Did Astral Codex Ten Win His Bet on AI Progress?
+Why Instagram is Losing Gen Z: We Asked 100 Users to Compare TikTok vs. Reels
+The $250K Inverse Scaling Prize and Human-AI Alignment
+Search Behind-the-Scenes: How Neeva Uses Human Evaluation to Measure Search Quality
+Human Evaluation of Large Language Models: How Good is Hugging Face’s BLOOM?
+30% of Google's Emotions Dataset is Mislabeled
+AI Red Teams and Adversarial Data Labeling with Redwood Research
+Humans vs. Gary Marcus vs. Slate Star Codex: When is an AI failure actually a failure?
+How Surge AI Built OpenAI's GSM8K Dataset of 8,500 Math Problems
+We asked 100 humans to draw the DALL·E prompts
+Google Search is Falling Behind
+Moving Beyond Engagement: Optimizing Facebook's Algorithms for Human Values
+Holy $#!t: Are popular toxicity models simply profanity detectors?
+Is Google Search Deteriorating? Measuring Google's Search Quality in 2022
+5 Examples of the Importance of Context-Sensitivity in Data-Centric AI
+Read what
+frontier labs read
+Enter your email
+Subscription confirmed
+You'll get updates when we post
+Oops! Something went wrong while submitting the form.
+More Posts
+GDP.xlsx: Can Agents Understand the Spreadsheets That Run the World?
+GDP.xlsx tests whether frontier agents can read the professional spreadsheets that run the world. It spans 70 tasks across 12 knowledge-work domains: finance, healthcare, engineering, manufacturing, insurance, real estate, legal, human resources, agriculture, energy, logistics, and public sector.
+read post
+September 30, 2026
+What Does GDP.pdf Teach — Beyond PDFs?
+Post-training on GDP.pdf improved Kimi K2.7 on GDPval, including tasks without PDFs, and changed how it gathered information and used tools before building deliverables.
+read post
+September 29, 2026
+Helping Anthropic Build Automated Alignment Researchers
+Anthropic recently published new work on automated alignment researchers. Surge contributed to the research by building the human baseline, including researcher recruitment, structured submissions, quality control, and expert review.
+read post
+September 15, 2026
+Hill-Climbing a SWE Agent: What 1,700 Coding Tasks Taught Kimi K2.7
+We post-trained Kimi K2.7 on 1,700 Surge agentic coding tasks. The trained model improved on all external benchmarks we tested, including +20.0pp on SWE-Marathon, +12.4pp on DeepSWE, and +7.6pp on Terminal-Bench 4.
+read post
+September 11, 2026
+Fable 5.1, Muse Spark 1.3, and Gemini 3.8 Flash on the Tuesday Work Index
+Fable 5.1 leads overall with 68.7 on the Tuesday Work Index. Muse Spark 1.3 leads ComplexConstraints. Gemini 3.8 Flash pushes the cost-performance frontier on frontier mathematics.
+read post
+September 10, 2026
+DeepSeek V4 Pro Scores 59.7 on the Tuesday Work Index
+DeepSeek V4 Pro scores 59.7 on the Tuesday Work Index and delivers standout cost-performance on Riemann-bench and ComplexConstraints.
+read post
+August 27, 2026
+Appendix
+Smart ≠ Useful
+Raise AGI with the richness of human intelligence.
+Platform
+Products
+Off-the-Shelf
+Post-Training Runs
+Expert Workforce
+Enterprise
+Enterprise Guides
+Login
+Company
+Research
+Blog
+Contact
+Work with us
+Careers
+SWE
+Consultant Network
+Benchmarks
+Tuesday Work Index
+GDP.xlsx
+NEW
+DAYJOB: Healthcare
+NEW
+DAYJOB: Finance
+NEW
+Chartography
+HANDBOOK.md
+ComplexConstraints
+GDP.pdf
+Riemann-bench
+EnterpriseBench: CoreCraft
+Antidote
+Hemingway-bench
+© 2026 Surge AI
+X
+Linkedin
+Cookie Settings
+Cookie Policy
+Privacy Policy
+Terms of Service

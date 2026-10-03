@@ -1,0 +1,1191 @@
+DAYJOB: A Benchmark for Long-Horizon Professional Work
+Report GitHub Issue
+×
+Title:
+Content selection saved. Describe the issue below:
+Description:
+Submit without GitHub
+Submit in GitHub
+arXiv is now an independent nonprofit!
+Learn more
+×
+Back to arXiv
+Why HTML?
+Report Issue
+Back to Abstract
+Download PDF
+Abstract
+1
+Introduction
+2
+Related work
+Evaluations of economically valuable work.
+Agent benchmarks.
+Healthcare and finance.
+Rubrics and model judges.
+3
+The DAYJOB benchmark
+3.1
+Task definition
+3.2
+Design principles
+Requests.
+Workspaces.
+Rubrics.
+3.3
+An example task
+3.4
+Composition
+Coverage.
+3.5
+Construction, selection, and release
+4
+Evaluation protocol
+4.1
+Harness
+4.2
+Models and attempts
+4.3
+Grading
+4.4
+Metrics
+5
+Results
+5.1
+Main results
+5.2
+Relaxed thresholds
+5.3
+Cost and tokens
+6
+Case studies
+Unchallenged premises.
+Wrong inputs in consistent analyses.
+7
+Conclusion
+References
+A
+Strict pass@1 by configuration
+License: CC BY 4.0
+arXiv:2610.01306v1 [cs.AI] 01 Oct 2026
+DAYJOB: A Benchmark for Long-Horizon Professional Work
+Thanks:
+Correspondence to:
+benchmarks@surgehq.ai
+. Tasks:
+https://huggingface.co/datasets/surgeai/DAYJOB-healthcare
+and
+https://huggingface.co/datasets/surgeai/DAYJOB-finance
+. Harness:
+https://github.com/surge-ai/dayjob
+. Leaderboards:
+https://surgehq.ai/benchmarks/dayjob-healthcare
+and
+https://surgehq.ai/benchmarks/dayjob-finance
+.
+Stephanie Finley
+Liudas Panavas
+Thomas Mikkelson
+Cam Hinton
+Stacey Ganss
+Affiliation:
+Bradley Monton, Emily Kendall, Michelle Spradlin, Lydia Bye, Michael O’Brien,
+Affiliation:
+Lauren Ylvisaker, Derek Ray, Suhaas Garre, Sushant Mehta, Edwin Chen
+Affiliation:
+Surge AI
+Abstract
+Professional work often starts with a brief request that leaves the professional to work out what is needed, which documents matter, and whether the request’s premise holds. We introduce DAYJOB, a benchmark of 130 tasks built by professionals in healthcare (50) and finance (80). The tasks are estimated to take a professional 13.6 hours on average in healthcare and 16.6 in finance. Each task is a containerized Harbor environment with an expert rubric of binary criteria (median 47.5 and 57.5 per task) that an agentic judge applies to the delivered files, and an attempt passes only if it meets every criterion. Across 30 model configurations from 13 developers, the strongest, Claude Opus 5.5, passes 24.7% of healthcare and 23.9% of finance attempts, and the median configuration passes 0.6% and 2.5%. In case studies, agents accept premises that the record contradicts and carry wrong inputs through otherwise consistent analyses. We release all healthcare tasks, 50 of the 80 finance tasks, the evaluation harness, and the leaderboard.
+1
+Introduction
+Requests at work assume shared context. Someone preparing a new client’s first fund reports asks whether anything should stop the reports from going out today. An urgent-care clinician asks for a read on the labs before discharging a patient with “textbook Bell’s Palsy” on prednisone. Neither request mentions the problem it contains. In the fund’s reporting pack, an equity price quoted in South African cents on a Bloomberg screen was entered as rand, so a position worth about $260,000 appears to be worth $26 million. The patient’s chart records right-sided neck pain after moving heavy furniture, slightly slurred speech, and a facial examination that does not document the forehead or eyelid closure, and the task’s rubric requires ruling out an arterial dissection before any discharge. Both are DAYJOB tasks (Section
+6
+).
+GDPval
+[
+22
+]
+builds tasks from the work of experienced professionals and gives the model a detailed brief: prompts in its public gold subset average 337.2 words, and 75% of its tasks include at most one reference file. GDPval also reports that GPT-5 performed worse when the prompts omitted where to find data and how to approach the problem. Agent benchmarks supply interactive environments, mostly for software, web, and desktop tasks
+[
+11
+,
+35
+,
+31
+,
+32
+]
+, and healthcare and finance benchmarks mostly test knowledge, question answering, or bounded tool use
+[
+12
+,
+1
+,
+10
+,
+3
+,
+9
+,
+2
+]
+.
+DAYJOB pairs realistic requests of the kind a colleague would send with a workspace of the files they implicitly refer to, mostly PDFs, spreadsheets, and Word documents, and with a rubric of binary criteria that describes a competent deliverable. Rubrics credit actions the request leaves unsaid, such as recommending urgent transfer to a stroke-capable emergency department, and prohibit specific errors. Tasks run as containerized Harbor environments
+[
+7
+]
+with network access limited to the model provider’s API. After the agent finishes, an agentic judge in the same container opens the delivered files, recomputes values where needed, and returns a verdict with evidence for every criterion. An attempt passes only if every criterion is met.
+We evaluate 30 configurations from 13 developers with five attempts per task. Claude Opus 5.5 (adaptive/max) leads both domains, passing 24.7% of healthcare and 23.9% of finance attempts. The median configuration passes 0.6% and 2.5%, and 19 configurations score below 5% in both domains. We release all 50 healthcare tasks, 50 of the 80 finance tasks, the harness, and the leaderboard.
+2
+Related work
+Evaluations of economically valuable work.
+GDPval
+[
+22
+]
+spans 1,320 tasks from 44 occupations in the nine sectors that contribute most to U.S. GDP and releases a 220-task gold subset, 89% of which its expert graders rated as well specified. Experts compare model deliverables with human ones in blinded pairwise judgments. APEX
+[
+28
+]
+grades responses to 400 held-out cases, 100 each from investment banking, management consulting, big law, and primary care, against expert rubrics. On the Remote Labor Index
+[
+15
+]
+, a collection of real freelance projects, the best agent achieves an automation rate of 2.5%, and SWE-Lancer
+[
+19
+]
+values freelance software tasks by their real payouts. TheAgentCompany
+[
+32
+]
+simulates a software company with internal web services and simulated colleagues. DAYJOB differs in giving the agent a brief request and a large workspace, and in requiring a task-specific rubric to be met in full.
+Agent benchmarks.
+Interactive benchmarks measure goal completion in software engineering
+[
+11
+]
+, web navigation
+[
+35
+,
+4
+]
+, operating systems
+[
+31
+]
+, tool use with simulated users
+[
+33
+]
+, general assistance
+[
+18
+]
+, and long-horizon tasks across many applications
+[
+14
+]
+. Enterprise benchmarks place agents in CRM systems
+[
+8
+]
+and a simulated customer-support organization
+[
+17
+]
+, or test adherence to long company policies
+[
+21
+]
+. Time-horizon measurements relate agent success to how long tasks take skilled humans
+[
+13
+]
+. DAYJOB gives the agent only general tools: a terminal, a file editor, and a task tracker.
+Healthcare and finance.
+Medical evaluation has moved from licensing-exam questions
+[
+12
+]
+to physician-written rubrics for 5,000 conversations
+[
+1
+]
+, simulated clinical encounters
+[
+23
+]
+, and 300 agent tasks in a FHIR electronic health record
+[
+10
+]
+. Financial evaluation spans numerical reasoning over reports
+[
+3
+]
+, question answering over company filings
+[
+9
+]
+, and research questions answered with search and EDGAR tools
+[
+2
+]
+. DAYJOB tasks end in work products, such as chart notes, appeal letters, credit memos, and audit workpapers, built from heterogeneous records, and many healthcare tasks concern payer, pharmacy, compliance, and operations work.
+Rubrics and model judges.
+Rubric-based grading with model judges is common for open-ended work
+[
+1
+,
+24
+,
+6
+,
+5
+,
+16
+]
+. Strong model judges can match the agreement between human raters on open-ended conversation
+[
+34
+]
+. Agent-as-a-Judge
+[
+36
+]
+lets the judge act in the environment to verify the work, as the DAYJOB judge does.
+3
+The DAYJOB benchmark
+3.1
+Task definition
+A task
+i
+i
+consists of a request
+q
+i
+q_{i}
+, an environment
+E
+i
+E_{i}
+, and a rubric
+R
+i
+=
+{
+c
+i
+​
+1
+,
+…
+,
+c
+i
+​
+K
+i
+}
+R_{i}=\{c_{i1},\dots,c_{iK_{i}}\}
+of
+K
+i
+K_{i}
+binary criteria. The environment is a container image whose working directory holds the task’s input files. The agent receives an instruction made of a preamble shared by all tasks followed by
+q
+i
+q_{i}
+, works inside
+E
+i
+E_{i}
+without human interaction, and ends with a final message. Its deliverables are the files it creates or modifies and, when the task asks for a written answer, the final message. A judge inspects the final workspace and the agent’s trajectory and assigns a verdict
+g
+i
+​
+j
+∈
+{
+0
+,
+1
+}
+g_{ij}\in\{0,1\}
+to every criterion. The attempt’s reward is the fraction of criteria met,
+r
+=
+1
+K
+i
+​
+∑
+j
+=
+1
+K
+i
+g
+i
+​
+j
+r=\frac{1}{K_{i}}\sum_{j=1}^{K_{i}}g_{ij}
+; the attempt passes strictly if
+r
+=
+1
+r=1
+and passes at threshold
+τ
+\tau
+if
+r
+≥
+τ
+r\geq\tau
+.
+3.2
+Design principles
+Requests.
+The shortest healthcare request reads, in full, “Please draft a brief document for this case for the upcoming M&M.” Others name the deliverable and its format and leave the rest to the files: “Take a look at the IVIG denial. Find the root cause of the denial and draft the appeal you’d recommend. Give me both in .docx”. Longer requests add background or several deliverables. One asks for a physician-facing patient summary of at most 3,000 words, a family-facing version, and letters to the patient’s primary care pediatrician and to the subspecialists named in the chart. The preamble shared by all tasks (in each task’s
+instruction.md
+) tells the agent to infer its role, workplace, and deliverables from the files and to produce its best-supported output without asking for clarification, and the solvability review (Section
+3.5
+) checks that the files suffice.
+Workspaces.
+Input files are the documents the work draws on: charts and encounter notes, claims exports, laboratory reports, policies, vendor price files, general-ledger extracts, loan agreements, and email. Most are PDFs (80% in healthcare and 70% in finance), and most of the rest are spreadsheets and Word documents. Relevant and irrelevant material sit side by side: in the urgent-care task, seven of the nine PDFs are administrative forms, and the chart in a skilled-nursing task includes maintenance and fire-drill records. Workspaces also contain stale or conflicting sources, such as a 2019 site evaluation in a 2026 expansion proposal, or a bank memo’s 3.25% borrowing rate that the chief financial officer’s later chat message, supplied as a screenshot, raises to 5.25%. Some evidence exists only in images (Section
+3.3
+).
+Rubrics.
+Criteria are binary statements about the delivered work. Most check substance, often a value within a stated tolerance. Others check actions the request never mentions or the internal consistency of a set of deliverables. Prohibitions fail an attempt that makes a specific, plausible error, such as flagging a correctly priced post-split equity as a release blocker, recommending surgical debridement of a wound whose presentation suggests pyoderma gangrenosum, or fabricating results for tests that were never performed. We count a criterion as a prohibition when its main clause is negated, as in criteria that begin “Does not”. By this count, all 50 healthcare rubrics and 43 of the 50 public finance rubrics contain at least one prohibition, and prohibitions make up 16% and 8% of criteria.
+3.3
+An example task
+Table
+1
+excerpts a finance task whose request asks whether anything should stop the first reports for a new client’s fund. The workspace holds 13 files: the firm’s pricing-source hierarchy and approved broker register, a broker quote recap, five price and exchange-rate files from four sources, three reports exported from the fund-accounting system, and two emails. The ten equity prices were keyed by hand from Bloomberg screens attached to one of the emails. The screen for Nerovexa quotes the price in ZAr, South African cents, while the email’s typed price table gives the currency as ZAR, and the price was entered as rand. The 20 criteria require finding and quantifying this error and two pricing-hierarchy exceptions, withholding the reports until the Nerovexa price is corrected, recognizing the manual keying as a control weakness, and not raising false alarms about prices that follow policy.
+Table 1:
+Excerpt of a DAYJOB: Finance task (
+finance_9148d239
+): six of its 20 criteria, abridged.
+Request.
+“Caldervane Emerging Markets Fund is a new client’s first fund with us and we are delivering our first reports for it today for COB June 30th. The client wants the initial reports as soon as they are available, so they can review these BAU deliverables in detail. Go through the attached pack and let me know if there are any issues stopping me sending the reports to the client as they are. Write it up as a short .md memo.”
+Criteria
+Identifies that the Bloomberg screen quotes the Nerovexa price of 261.200 in South African cents rather than rand.
+States that the Nerovexa position is overstated by about $25.7 million (accept $25.5m–$25.9m).
+Recommends not sending the reports until the Nerovexa position is corrected; a hold that lifts once the quotation basis is confirmed does not satisfy the criterion.
+Identifies that the Kingdom of Saudi Arabia 4.500% 2046 bond was priced from BVAL when ICE supplied a current evaluation.
+Does not call the Dravena position quantity or its 1,242.000 CZK price incorrect, and does not treat the stock split as a reason to withhold the reports.
+Identifies that the 30 June equity prices were keyed manually because the equity price schedule was not assigned to the new portfolio, and treats this as a control weakness.
+3.4
+Composition
+Table 2:
+DAYJOB compared with the GDPval gold subset. Counts come from each benchmark’s task files (request text, input workspace, and rubric). Finance statistics describe the 50 public tasks.
+‡
+Healthcare hours average the task creators’ range estimates at range midpoints, with “more than 40 hours” counted as 40; the GDPval figure is the mean validated self-reported completion time on the gold subset (404 minutes) reported by
+Patwardhan et al. [22]
+.
+§
+Average reported on the finance dataset card
+[
+26
+]
+.
+DAYJOB: Healthcare
+DAYJOB: Finance
+GDPval gold subset
+Tasks
+50
+80
+220
+Request length, words (mean / median)
+48.9 / 42.5
+80.7 / 62.5
+337.2 / 307
+Input files per task (mean / median)
+19.8 / 16.5
+25.7 / 20.5
+1.19 / 1
+Input files per task (range)
+8–50
+8–122
+0–17
+Rubric criteria per task (mean / median)
+55.7 / 47.5
+66.1 / 57.5
+47.5 / 47
+Estimated hours per task (mean)
+‡
+13.6
+16.6
+§
+6.7
+Rubric format
+binary criteria
+binary criteria
+weighted items
+Grading
+agentic model judge, all criteria required
+pairwise expert comparison
+Figure 1:
+Cumulative distributions of (a) request length and (b) the number of input files per task. The shortest GDPval request (100 words) is longer than 94% of healthcare requests and 70% of public finance requests, and 43% of GDPval tasks have no input file.
+Table
+2
+and Figure
+1
+compare DAYJOB with the GDPval gold subset. GDPval requests are 6.9 times as long on average as healthcare requests and 4.2 times as long as finance requests, while DAYJOB workspaces hold 17 and 22 times as many files, including files that are irrelevant by design. Most tasks have at least ten input files (94% in healthcare and 98% in finance). Rubric sizes are comparable, with medians of 47.5 and 57.5 criteria against 47 GDPval rubric items, but every DAYJOB criterion must be met.
+Task creators estimated the time a professional would need for each healthcare task, choosing one of eight ranges from 1–2 hours to more than 40 hours (Table
+2
+). The median task falls in the 5–10 hour range, and 32% of tasks are estimated at 20 hours or more.
+Coverage.
+Healthcare tasks include clinical decision support (discharge decisions, ICU admission notes, workup plans, medication reconciliation), pharmacy dispensing and parenteral nutrition, revenue-cycle and payer work (denial appeals, prior authorization, inpatient coding, contract negotiation), quality, safety, and compliance reviews (morbidity and mortality, a HIPAA breach audit, a trauma registry), and allied-health documentation. Finance tasks include valuation and corporate finance (discounted cash flow, accretion and dilution, capital structure), credit (term-loan requests, watchlist memos, covenant compliance), real estate and project finance (acquisition underwriting, construction draws), fund operations (net asset value, pricing review, rebalancing), treasury (cash forecasts, hedge close), and close and audit work (lease accounting, tie-out workpapers).
+3.5
+Construction, selection, and release
+Tasks were created by professionals with firsthand experience of the work, among them a senior portfolio manager in institutional asset management, a finance professional who has structured debt for infrastructure and renewable-energy projects, and a pediatric endocrinologist
+[
+25
+]
+. Every task went through three layers of review for correctness, completeness, and solvability.
+All 50 healthcare tasks and 50 of the 80 finance tasks are public on Hugging Face under the MIT license
+[
+26
+]
+, and the remaining finance tasks are available on request
+[
+25
+]
+. The harness is released under Apache 2.0, and the scripts behind every statistic, table, and figure in this paper are included as ancillary files. Each task directory holds the instruction, input files, rubric, and judge prompt, together with a benchmark-specific canary string and a SHA-256 hash of its file tree, and the dataset cards ask that tasks and their derivatives be excluded from training and from checkpoint selection.
+4
+Evaluation protocol
+4.1
+Harness
+Every attempt runs the released harness: an agent loop built on the OpenHands Software Agent SDK
+[
+30
+,
+29
+]
+(version 1.43.1) that executes inside the task container through a Harbor adapter (Harbor 0.22.0). The agent has a terminal, a file editor, and a task tracker. Models with vision support can view image files through the editor, and images embedded in PDFs must first be extracted or rendered. The SDK’s finish and think tools are disabled, so an attempt ends at the first reply that contains text and no tool call. The instruction is the first user message, and the system prompt is the SDK’s default. When the history exceeds 240 events or the model’s input limit, a summarizing condenser that calls the evaluated model replaces older events with a summary. Each attempt is limited to 1,000 agent turns, 6 hours, and 600 seconds per model call. The container has 2 CPUs and 4 GB of memory and provides Python 3.12 with document libraries (openpyxl, python-docx, pdfplumber, PyMuPDF, and others), LibreOffice, Poppler, Tesseract OCR, and Ghostscript. Network egress is limited to the model provider’s API host, so web search, package installation, and lookup of the released tasks are unavailable.
+4.2
+Models and attempts
+We evaluate the 30 configurations from 13 developers on the launch leaderboard of September 2026
+[
+27
+]
+(Table
+3
+). Parenthesized labels give the reasoning setting passed to the provider, and “adaptive/max” denotes adaptive thinking at maximum effort. Each configuration attempts every task five times, and Harbor reruns an attempt up to three times after a provider rate-limit error. Attempts that end in an error, such as a time-out or a provider failure, are excluded from their task’s mean.
+4.3
+Grading
+After the agent phase, the verifier runs an agentic judge in the same container: the OpenCode agent
+[
+20
+]
+(version 1.18.31), run by rewardkit 0.1.7 with Claude Opus 4.8 as its model. In a single session the judge receives its instructions (
+tests/prompt_template.md
+in each task), the request, the names of the input files, and all criteria. It can open any file, run code, and read the agent’s trajectory, and it returns a binary verdict with reasoning for each criterion. The instructions tell it to grade the files the agent created or modified and, when the task calls for a written answer, the final message; to cite the file and content behind each verdict; to recompute values instead of trusting a formula or script; and to inspect rendered outputs. Claims in the final message about what a file contains are not evidence. The judge may take 90 seconds per criterion, with a minimum of 40 minutes.
+4.4
+Metrics
+For configuration
+m
+m
+, domain
+d
+d
+with task set
+𝒯
+d
+\mathcal{T}_{d}
+, and the scored attempts
+A
+m
+​
+i
+A_{mi}
+of task
+i
+i
+(at most five), pass@1 at threshold
+τ
+\tau
+is
+pass
+@
+1
+τ
+(
+m
+,
+d
+)
+=
+1
+|
+𝒯
+d
+|
+∑
+i
+∈
+𝒯
+d
+1
+|
+A
+m
+​
+i
+|
+∑
+a
+∈
+A
+m
+​
+i
+[
+r
+m
+​
+i
+​
+a
+≥
+τ
+]
+,
+\mathrm{pass@1}_{\tau}(m,d)\;=\;\frac{1}{|\mathcal{T}_{d}|}\sum_{i\in\mathcal{T}_{d}}\frac{1}{|A_{mi}|}\sum_{a\in A_{mi}}\mathbf{1}\!\left[r_{mia}\geq\tau\right],
+(1)
+where
+r
+m
+​
+i
+​
+a
+r_{mia}
+is the reward of attempt
+a
+a
+. The headline metric is
+strict pass@1
+,
+τ
+=
+1
+\tau=1
+. We also report
+τ
+∈
+{
+0.95
+,
+0.90
+}
+\tau\in\{0.95,0.90\}
+and pass@1 (
+N
+−
+1
+N{-}1
+), which accepts attempts that fail at most one criterion. At
+τ
+=
+0.95
+\tau=0.95
+an attempt may miss
+⌊
+0.05
+​
+K
+i
+⌋
+\lfloor 0.05K_{i}\rfloor
+criteria, between 1 and 6 in healthcare. Tasks are weighted equally within a domain.
+Criteria are not weighted by importance, so a lower threshold accepts attempts that miss a decisive one. In the task of Table
+1
+, an attempt that finds the $25.7 million overstatement but lifts its hold once the quotation basis is confirmed can fail only the release criterion, the third in the table, and still pass at 95%.
+5
+Results
+5.1
+Main results
+Table 3:
+Launch leaderboard (September 2026): strict pass@1 (%) and rank on 50 healthcare and 80 finance tasks, five attempts per task. Rows are ordered by the mean of the two scores, and equal displayed scores share a rank.
+DAYJOB: Healthcare
+DAYJOB: Finance
+Configuration
+Developer
+Strict
+Rank
+Strict
+Rank
+Claude Opus 5.5 (adaptive/max)
+Anthropic
+24.7
+1
+23.9
+1
+GPT-6 Astra (max)
+OpenAI
+11.6
+2
+21.5
+2
+Claude Fable 5.1 (adaptive/max)
+Anthropic
+9.6
+3
+19.8
+3
+Grok 4.7 (xhigh)
+xAI
+8.4
+4
+14.5
+5
+Muse Spark 1.3 (max)
+Meta
+7.8
+6
+14.8
+4
+Claude Opus 5 (adaptive/max)
+Anthropic
+8.4
+4
+11.3
+7
+Grok 4.6 (xhigh)
+xAI
+2.8
+9
+12.8
+6
+Claude Fable 5 (adaptive/max)
+Anthropic
+5.6
+7
+9.0
+9
+GPT-6 Sol (max)
+OpenAI
+3.6
+8
+9.3
+8
+GPT-5.6 Sol (max)
+OpenAI
+1.6
+12
+5.5
+11
+GLM 5.3 (max)
+Zhipu AI
+0.4
+16
+6.0
+10
+Qwen 3.8 Max (xhigh)
+Alibaba Cloud
+2.0
+10
+3.0
+13
+Kimi K3 (max)
+Moonshot AI
+1.2
+14
+3.8
+12
+Muse Spark 1.2 (xhigh)
+Meta
+2.0
+10
+2.3
+16
+Gemini 3.8 Flash (high)
+Google
+0.8
+15
+2.8
+14
+GPT-5.6 Terra (xhigh)
+OpenAI
+1.6
+12
+1.8
+20
+Gemini 3.7 Flash (high)
+Google
+0.0
+21
+2.8
+14
+GLM 5.3 Flash (max)
+Zhipu AI
+0.4
+16
+2.3
+16
+Claude Sonnet 5 (adaptive/max)
+Anthropic
+0.0
+21
+2.3
+16
+GPT-6 Luna (max)
+OpenAI
+0.0
+21
+2.3
+16
+GPT-5.6 Luna (max)
+OpenAI
+0.4
+16
+1.8
+20
+DeepSeek V4 Pro (max)
+DeepSeek
+0.4
+16
+1.0
+22
+Hy3 (high)
+Tencent
+0.4
+16
+0.3
+23
+DeepSeek V4 Flash (max)
+DeepSeek
+0.0
+21
+0.0
+24
+Gemini 3.1 Pro (high)
+Google
+0.0
+21
+0.0
+24
+Inkling (max)
+Thinking Machines
+0.0
+21
+0.0
+24
+Kimi K2.7 Code (max)
+Moonshot AI
+0.0
+21
+0.0
+24
+Mistral Large 3
+Mistral AI
+0.0
+21
+0.0
+24
+Muse Glimmer 30B (xhigh)
+Meta
+0.0
+21
+0.0
+24
+Nemotron 3 Ultra
+NVIDIA
+0.0
+21
+0.0
+24
+Table
+3
+lists strict pass@1 for all 30 configurations, and Figure
+4
+(Appendix
+A
+) plots it. Claude Opus 5.5 (adaptive/max) leads both domains, with 24.7% in healthcare and 23.9% in finance. In healthcare the next configuration, GPT-6 Astra (max), scores 11.6%, 13.1 points lower. In finance the top three configurations lie within 4.1 points (23.9%, 21.5%, and 19.8%). The median configuration scores 0.6% in healthcare and 2.5% in finance. In healthcare 10 configurations never pass an attempt, and in finance 7 never do.
+The two domains order configurations similarly: among the 23 configurations with a nonzero score in either domain, the Spearman correlation between domains is
+ρ
+=
+0.82
+\rho=0.82
+. Scores are higher in finance for 21 configurations and higher in healthcare for 2, Claude Opus 5.5 (adaptive/max) and Hy3 (high).
+5.2
+Relaxed thresholds
+Figure 2:
+(a) Strict pass@1 of the 30 configurations, sorted within each domain. (b) Pass@1 as the required share of criteria is relaxed, for the leader and for the median across configurations at each threshold.
+In healthcare 7 configurations reach 5% strict pass@1, and in finance 11 (Figure
+2
+a). Counting attempts that meet 95% of criteria multiplies the scores of the top five configurations by 2.7 in healthcare and 1.8 in finance on average. At 90% the leader reaches 62.4% and 58.3%, and the median configuration 6.4% and 10.4% (Figure
+2
+b; all values are in the ancillary data). Under pass@1 (
+N
+−
+1
+N{-}1
+) the leader reaches 37.8% and 32.9%. The leader is first at every threshold, and rankings at 95% agree closely with strict rankings (Kendall
+τ
+b
+=
+0.85
+\tau_{b}=0.85
+in healthcare and 0.92 in finance).
+5.3
+Cost and tokens
+Figure 3:
+Strict pass@1 against mean cost per attempt. Colored points are the configurations on the cost frontier, and the step line gives the best strict score available at or below each cost; gray points are the other configurations. Costs exclude the judge.
+Mean cost per attempt ranges from $0.02 to $8.70 in healthcare and from $0.04 to $14.76 in finance (Figure
+3
+). It covers the agent’s and the condenser’s model calls at litellm’s prices, or at provider billing where litellm has no price, and excludes the judge. In both domains the cost frontier ends at Claude Opus 5.5 (adaptive/max), at $7.10 per healthcare attempt and $11.47 per finance attempt, and includes GPT-6 Astra (max) and Muse Spark 1.3 (max) at lower cost. The most expensive configuration, Claude Fable 5.1 (adaptive/max), is not on it. The leader processes 9.8 million tokens per healthcare attempt and 17.8 million per finance attempt, 94% and 95% of them cached input.
+6
+Case studies
+The failed attempts below are published on the leaderboard pages with their requests, response excerpts, and rubric verdicts
+[
+27
+]
+.
+Unchallenged premises.
+In the urgent-care task (
+healthcare_a6b300f3
+), GPT-5.6 Sol (max) read the labs and found it reasonable to start prednisone and discharge the patient. Its reasoning noted that facial weakness with neck pain could have a vascular cause, then concluded, “I shouldn’t question the diagnosis unless necessary”
+[
+25
+]
+. The rubric requires the note to challenge the diagnosis, to withhold prednisone until cervicocephalic artery dissection or another acute ischemic event is excluded, and to recommend urgent transfer to a stroke-capable emergency department. An attempt by a Grok model on the same record connected the incomplete examination and the neck pain to a possible arterial injury and recommended holding the discharge for emergency evaluation and vascular imaging
+[
+25
+]
+. In a second task, the request asks for an SBAR transfer summary for a patient going to surgery for debridement of an amputation stump. The chart describes two small papules at the incision that opened into an enlarging ulcer with dusky, irregular edges, 7/10 pain at dressing changes, and no response to two courses of oral antibiotics. Grok 4.6 (xhigh) gathered these facts and recommended aggressive surgical debridement. The rubric expects the summary to raise pyoderma gangrenosum, which surgical trauma can worsen, and to advise holding debridement until a biopsy or specialist evaluation.
+Wrong inputs in consistent analyses.
+In the fund-reporting task of Table
+1
+, GPT-5.6 Sol (max) found both pricing-hierarchy exceptions, which net to a $132,000 understatement, and recommended holding the reports. It did not question the Nerovexa price, and its final message stated “No other release blocker was identified,” leaving the $25.7 million overstatement in place. Asked whether a furniture retailer should fund a 2026 expansion and how to finance it, Grok 4.6 (xhigh) built discounted cash flows for three candidate sites and recommended opening one store with new senior debt, at a pro-forma leverage of about 2.66
+×
+\times
+against a 3.00
+×
+\times
+covenant. The existing-store forecasts it relied on add returns and allowances to gross sales for five stores instead of subtracting them, which inflates the earnings in its leverage test. With the signs corrected, the debt-funded buildout breaches the covenant. Asked for an annual cost comparison of in-house and outsourced check processing for 2021–2025, Qwen 3.8 Max (xhigh) counted electronic disbursements such as payroll and tax payments as printed checks, and so used 2,838 checks for 2025 against a true volume of 138. It recommended outsourcing, which at the true 2025 volume costs more than processing checks in-house.
+7
+Conclusion
+DAYJOB tests whether agents can turn the kind of request a colleague would send in realistic workspaces into deliverables that meet an expert rubric in full. Its 130 tasks come from the work of healthcare and finance professionals and test whether an agent can decide what the task is, find the facts that matter, and recognize when a request’s premise is wrong.
+The strongest of 30 model configurations passes 24.7% of healthcare and 23.9% of finance attempts, the median configuration passes 0.6% and 2.5%, and 19 configurations score below 5% in both domains. In the case studies, agents accept diagnoses and treatment plans that the record contradicts and build consistent analyses on wrong inputs. Because the judge returns a verdict with evidence for every criterion, each failed attempt shows which fact or decision the agent missed.
+We release all healthcare tasks and 50 of the 80 finance tasks with the evaluation harness and the leaderboard, and will extend DAYJOB to further professional domains in the same format.
+References
+[1]
+R. K. Arora, J. Wei, R. S. Hicks, P. Bowman, J. Quiñonero-Candela, et al.
+HealthBench: Evaluating large language models towards improved
+human health.
+arXiv preprint arXiv:2505.08775
+, 2025.
+[2]
+A. Bigeard, L. Nashold, R. Krishnan, and S. Wu.
+Finance Agent Benchmark: Benchmarking LLMs on real-world
+financial research tasks.
+arXiv preprint arXiv:2508.00828
+, 2025.
+[3]
+Z. Chen, W. Chen, C. Smiley, S. Shah, I. Borova, D. Langdon, R. Moussa,
+M. Beane, T.-H. Huang, B. Routledge, and W. Y. Wang.
+FinQA: A dataset of numerical reasoning over financial data.
+In
+Proceedings of the Conference on Empirical Methods in
+Natural Language Processing (EMNLP)
+, 2021.
+[4]
+A. Drouin, M. Gasse, M. Caccia, I. H. Laradji, M. Del Verme, T. Marty,
+L. Boisvert, M. Thakkar, Q. Cappart, D. Vazquez, N. Chapados, and A. Lacoste.
+WorkArena: How capable are web agents at solving common knowledge
+work tasks?
+In
+International Conference on Machine Learning (ICML)
+, 2024.
+[5]
+S. Garre, E. Ritchie, S. Mehta, and E. Chen.
+GDP.pdf: Benchmarking grounded multimodal reasoning over
+professional PDF documents.
+arXiv preprint arXiv:2607.11192
+, 2026.
+[6]
+A. Gunjal, A. Wang, E. Lau, V. Nath, Y. He, B. Liu, and S. Hendryx.
+Rubrics as rewards: Reinforcement learning beyond verifiable domains.
+arXiv preprint arXiv:2507.17746
+, 2025.
+[7]
+Harbor Framework Team.
+Harbor: A framework for evaluating and optimizing agents and models
+in container environments.
+https://doi.org/10.5281/zenodo.20953922
+, 2026.
+Version 0.22.0.
+[8]
+K.-H. Huang, A. Prabhakar, O. Thorat, D. Agarwal, et al.
+CRMArena-Pro: Holistic assessment of LLM agents across diverse
+business scenarios and interactions.
+arXiv preprint arXiv:2505.18878
+, 2025.
+[9]
+P. Islam, A. Kannappan, D. Kiela, R. Qian, N. Scherrer, and B. Vidgen.
+FinanceBench: A new benchmark for financial question answering.
+arXiv preprint arXiv:2311.11944
+, 2023.
+[10]
+Y. Jiang, K. C. Black, G. Geng, D. Park, J. Zou, A. Y. Ng, and J. H. Chen.
+MedAgentBench: A virtual EHR environment to benchmark medical
+LLM agents.
+NEJM AI
+, 2, 2025.
+doi:
+10.1056/AIdbp2500144
+.
+[11]
+C. E. Jimenez, J. Yang, A. Wettig, S. Yao, K. Pei, O. Press, and K. Narasimhan.
+SWE-bench: Can language models resolve real-world GitHub issues?
+In
+International Conference on Learning Representations
+(ICLR)
+, 2024.
+[12]
+D. Jin, E. Pan, N. Oufattole, W.-H. Weng, H. Fang, and P. Szolovits.
+What disease does this patient have? A large-scale open domain
+question answering dataset from medical exams.
+Applied Sciences
+, 11(14):6421, 2021.
+[13]
+T. Kwa, B. West, J. Becker, A. Deng, K. Garcia, et al.
+Measuring AI ability to complete long software tasks.
+In
+Advances in Neural Information Processing Systems
+(NeurIPS)
+, 2025.
+[14]
+J. Li, W. Zhao, J. Zhao, W. Zeng, H. Wu, et al.
+The Tool Decathlon: Benchmarking language agents for diverse,
+realistic, and long-horizon task execution.
+In
+International Conference on Learning Representations
+(ICLR)
+, 2026.
+[15]
+M. Mazeika, A. Gatti, C. Menghini, U. M. Sehwag, S. Singhal, et al.
+Remote Labor Index: Measuring AI automation of remote work.
+arXiv preprint arXiv:2510.26787
+, 2025.
+[16]
+S. Mehta, L. Panavas, S. Garre, and E. Chen.
+ComplexConstraints and beyond: Expert rubrics for RLVR.
+arXiv preprint arXiv:2606.09118
+, 2026a.
+[17]
+S. Mehta, L. Ritchie, S. Garre, I. Niebres, N. Heiner, and E. Chen.
+EnterpriseBench Corecraft: Training generalizable agents on
+high-fidelity RL environments.
+arXiv preprint arXiv:2602.16179
+, 2026b.
+[18]
+G. Mialon, C. Fourrier, C. Swift, T. Wolf, Y. LeCun, and T. Scialom.
+GAIA: A benchmark for general AI assistants.
+In
+International Conference on Learning Representations
+(ICLR)
+, 2024.
+[19]
+S. Miserendino, M. Wang, T. Patwardhan, and J. Heidecke.
+SWE-Lancer: Can frontier LLMs earn $1 million from real-world
+freelance software engineering?
+In
+International Conference on Machine Learning (ICML)
+, 2025.
+[20]
+OpenCode.
+OpenCode: An open-source AI coding agent.
+https://opencode.ai
+, 2026.
+Version 1.18.31.
+[21]
+L. Panavas, S. Minus, B. Monton, D. Ray, S. Garre, S. Mehta, and E. Chen.
+HANDBOOK.md: A benchmark for long-context agentic instruction
+following.
+arXiv preprint arXiv:2607.25398
+, 2026.
+[22]
+T. Patwardhan, R. Dias, E. Proehl, G. Kim, M. Wang, et al.
+GDPval: Evaluating AI model performance on real-world
+economically valuable tasks.
+arXiv preprint arXiv:2510.04374
+, 2025.
+[23]
+S. Schmidgall, R. Ziaei, C. Harris, E. Reis, J. Jopling, and M. Moor.
+AgentClinic: A multimodal agent benchmark to evaluate AI in
+simulated clinical environments.
+arXiv preprint arXiv:2405.07960
+, 2024.
+[24]
+G. Starace, O. Jaffe, D. Sherburn, J. Aung, J. S. Chan, et al.
+PaperBench: Evaluating AI’s ability to replicate AI research.
+In
+International Conference on Machine Learning (ICML)
+, 2025.
+[25]
+Surge AI.
+DAYJOB: Can agents survive a 9 to 5?
+https://surgehq.ai/blog/dayjob
+, Sept. 2026a.
+[26]
+Surge AI.
+DAYJOB: Healthcare and DAYJOB: Finance task releases.
+https://huggingface.co/datasets/surgeai/DAYJOB-healthcare
+and
+https://huggingface.co/datasets/surgeai/DAYJOB-finance
+,
+2026b.
+Hugging Face datasets with dataset cards.
+[27]
+Surge AI.
+DAYJOB leaderboards: Healthcare and finance.
+https://surgehq.ai/benchmarks/dayjob-healthcare
+and
+https://surgehq.ai/benchmarks/dayjob-finance
+, 2026c.
+Launch snapshot of September 23, 2026.
+[28]
+B. Vidgen, A. Fennelly, E. Pinnix, J. Benchek, D. Khan, et al.
+The AI Productivity Index (APEX).
+arXiv preprint arXiv:2509.25721
+, 2025.
+Version 6 (APEX-v1-extended).
+[29]
+X. Wang, B. Li, Y. Song, F. F. Xu, X. Tang, M. Zhuge, J. Pan, Y. Song, B. Li,
+J. Singh, H. H. Tran, F. Li, R. Ma, M. Zheng, B. Qian, Y. Shao,
+N. Muennighoff, Y. Zhang, B. Hui, J. Lin, R. Brennan, H. Peng, H. Ji, and
+G. Neubig.
+OpenHands: An open platform for AI software developers as
+generalist agents.
+In
+International Conference on Learning Representations
+(ICLR)
+, 2025a.
+[30]
+X. Wang, S. Rosenberg, J. Michelini, C. Smith, H. Tran, E. Nyst, R. Malhotra,
+X. Zhou, V. Chen, R. Brennan, and G. Neubig.
+The OpenHands Software Agent SDK: A composable and extensible
+foundation for production agents.
+arXiv preprint arXiv:2511.03690
+, 2025b.
+[31]
+T. Xie, D. Zhang, J. Chen, X. Li, S. Zhao, R. Cao, T. J. Hua, Z. Cheng,
+D. Shin, F. Lei, Y. Liu, Y. Xu, S. Zhou, S. Savarese, C. Xiong, V. Zhong, and
+T. Yu.
+OSWorld: Benchmarking multimodal agents for open-ended tasks in
+real computer environments.
+In
+Advances in Neural Information Processing Systems (NeurIPS),
+Datasets and Benchmarks Track
+, 2024.
+[32]
+F. F. Xu, Y. Song, B. Li, Y. Tang, K. Jain, M. Bao, Z. Z. Wang, X. Zhou,
+Z. Guo, M. Cao, M. Yang, H. Y. Lu, A. Martin, Z. Su, L. Maben, R. Mehta,
+W. Chi, L. Jang, Y. Xie, S. Zhou, and G. Neubig.
+TheAgentCompany: Benchmarking LLM agents on consequential real
+world tasks.
+In
+Advances in Neural Information Processing Systems (NeurIPS),
+Datasets and Benchmarks Track
+, 2025.
+[33]
+S. Yao, N. Shinn, P. Razavi, and K. Narasimhan.
+τ
+\tau
+-bench: A benchmark for tool-agent-user interaction in
+real-world domains.
+In
+International Conference on Learning Representations
+(ICLR)
+, 2025.
+[34]
+L. Zheng, W.-L. Chiang, Y. Sheng, S. Zhuang, Z. Wu, Y. Zhuang, Z. Lin, Z. Li,
+D. Li, E. P. Xing, H. Zhang, J. E. Gonzalez, and I. Stoica.
+Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena.
+In
+Advances in Neural Information Processing Systems (NeurIPS),
+Datasets and Benchmarks Track
+, 2023.
+[35]
+S. Zhou, F. F. Xu, H. Zhu, X. Zhou, R. Lo, A. Sridhar, X. Cheng, T. Ou,
+Y. Bisk, D. Fried, U. Alon, and G. Neubig.
+WebArena: A realistic web environment for building autonomous
+agents.
+In
+International Conference on Learning Representations
+(ICLR)
+, 2024.
+[36]
+M. Zhuge, C. Zhao, D. Ashley, W. Wang, D. Khizbullin, et al.
+Agent-as-a-Judge: Evaluate agents with agents.
+In
+International Conference on Machine Learning (ICML)
+, 2025.
+Appendix A
+Strict pass@1 by configuration
+Figure 4:
+Strict pass@1 for all 30 configurations, in the order of Table
+3
+.
+Experimental support, please
+view the build logs
+for errors. Generated by
+L
+A
+T
+E
+xml
+.
+Instructions for reporting errors
+We are continuing to improve HTML versions of papers, and your feedback helps enhance accessibility and mobile
+      support. To report errors in the HTML that will help us improve conversion and rendering, choose any of the
+      methods listed below:
+Click the "Report Issue"
+(
+)
+button, located in the page header.
+Tip:
+You can select the relevant text first, to include it in your report.
+Our team has already identified
+the following issues
+. We appreciate your time reviewing and reporting rendering errors we
+      may not have found yet. Your efforts will help us improve the HTML versions for all readers, because disability
+      should not be a barrier to accessing research. Thank you for your continued support in championing open access for
+      all.
+Have a free development cycle? Help support accessibility at arXiv! Our collaborators at LaTeXML maintain a
+list of packages that need conversion
+, and welcome
+developer contributions
+.
+We gratefully acknowledge support from
+        our
+major funders
+,
+member institutions
+,
+,
+        and all contributors.
+About
+·
+Help
+·
+Contact
+·
+Subscribe
+·
+Copyright
+·
+Privacy
+·
+Accessibility
+·
+Operational Status
+(opens in new tab)
+Major funding support from

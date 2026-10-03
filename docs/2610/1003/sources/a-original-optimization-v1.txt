@@ -1,0 +1,1757 @@
+                                          The complete edge relaxation for binary polynomial optimization
+
+                                                          Alberto Del Pia ∗     Aida Khajavirad †
+
+                                                                    July 16, 2025
+
+arXiv:2507.12831v1 [math.OC] 17 Jul 2025                                                                  Abstract
+
+                                                      We consider the multilinear polytope defined as the convex hull of the feasible region of
+                                                  a linearized binary polynomial optimization problem. We define a relaxation in an extended
+                                                  space for this polytope, which we refer to as the complete edge relaxation. The complete edge
+                                                  relaxation is stronger than several well-known relaxations of the multilinear polytope, including
+                                                  the standard linearization, the flower relaxation, and the intersection of all possible recursive
+                                                  McCormick relaxations. We prove that the complete edge relaxation is an extension of the
+                                                  multilinear polytope if and only if the corresponding hypergraph is α-acyclic; i.e., the most
+                                                  general type of hypergraph acyclicity. This is in stark contrast with the widely-used standard
+                                                  linearization which describes the multilinear polytope if and only if the hypergraph is Berge-
+                                                  acyclic; i.e., the most restrictive type of hypergraph acyclicity. We then introduce a new class
+                                                  of facet-defining inequalities for the multilinear polytope of α-cycles of length three, which serve
+                                                  as the generalization of the well-known triangle inequalities for the Boolean quadric polytope.
+
+                                              Key words: Binary polynomial optimization; Multilinear polytope; Complete edge relaxation;
+                                          Hypergraph acyclicity; Extended formulations; Generalized triangle inequalities.
+
+                                          1 Introduction
+
+                                          Problem statement. Binary polynomial optimization, i.e., the problem of finding a binary vec-
+                                          tor maximizing a multivariate polynomial function, is a fundamental N P -hard problem in discrete
+                                          optimization. To formally define this problem, we employ a hypergraph representation scheme that
+                                          we first introduced in [10]. A hypergraph G is a pair (V, E), where V is a finite set of nodes and
+                                          E is a set of subsets of V of cardinality at least two, called the edges of G. With any hyper-
+                                          graph G = (V, E), and the cost vector c ∈ RV ∪E, we associate the binary polynomial optimization
+                                          problem:
+
+                                                            max              cvzv + ce zv,         (BPO)
+
+                                                          z∈{0,1}V  v∈V         e∈E v∈e
+
+                                          where, without loss of generality, we assume that each node is contained in at least one edge, and
+                                          ce̸ = 0 for all e ∈ E. With the objective of constructing LP relaxations for Problem BPO, we
+                                          proceed with linearizing the objective function by introducing a new variable for each product term
+
+                                              ∗Department of Industrial and Systems Engineering & Wisconsin Institute for Discovery, University of Wisconsin-
+                                          Madison. E-mail: delpia@wisc.edu.
+
+                                              †Department of Industrial and Systems Engineering, Lehigh University. E-mail: aida@lehigh.edu.
+
+                                                                             1
+to obtain an equivalent reformulation of Problem BPO in a lifted space:
+
+max         cvzv + ceze
+ s.t.
+       v∈V           e∈E
+
+       ze = zv            ∀e ∈ E,                                        (ℓ-BPO)
+                          ∀v ∈ V.
+                v∈e
+
+       zv ∈ {0, 1}
+
+To understand the complexity of Problem BPO, we study the facial structure of the convex hull
+of its feasible region. In the same vein as our previous work [10], we define multilinear set as the
+feasible region of Problem ℓ-BPO and refer to its convex hull as multilinear polytope:
+
+MP(G) := conv z ∈ {0, 1}V ∪E : ze = zv, ∀e ∈ E .
+
+                                                                    v∈e
+
+The McCormick relaxation. If the objective function of Problem BPO is quadratic, then the
+hypergraph G is a graph, and the multilinear polytope coincides with the well-known Boolean
+quadric polytope BQP(G) introduced first by Padberg in 1989 in the context of binary quadratic
+optimization [21], and later investigated by many others to study the maximum cut problem [1,15].
+In [21], Padberg introduced a simple relaxation of BQP(G) obtained by replacing each bilinear
+equation z{u,v} = zuzv over {0, 1}2 by its convex hull:
+
+BQPLP(G) = z ∈ RV ∪E : z{u,v} ≥ 0, z{u,v} ≥ zu + zv − 1, z{u,v} ≤ zu, z{u,v} ≤ zv,
+                                   ∀{u, v} ∈ E .
+
+The polytope BQPLP(G) is often referred to as the McCormick relaxation of BQP(G). Padberg
+then proved the following result regarding the tightness of the McCormick relaxation:
+
+Proposition 1 ( [21]). BQP(G) = BQPLP(G) if and only if G is an acyclic graph.
+
+    Observe that BQPLP(G) is defined by 4|E| inequalities, implying that binary quadratic op-
+timization over acyclic graphs can be solved in polynomial-time. Padberg then considered the
+simplest graph for which BQP(G) ⊊ BQPLP(G), i.e., a cycle of length three, and introduced tri-
+angle inequalities, a class of facet-defining inequalities for the Boolean quadric polytope whose
+addition significantly strengthens BQPLP(G). In [5] the authors show that triangle inequalities
+are Chv´atal-Gomory (CG) cuts for the McCormick relaxation. Furthermore, if G is a complete
+graph, they proved that the addition of triangle inequalities to the McCormick relaxation gives the
+CG-closure of BQPLP(G).
+
+The standard linearization. It is natural to ask whether the multilinear polytope of acyclic
+hypergraphs has a simple structure as well. Interestingly, unlike graphs, the notion of cycle and
+acyclicity in hypergraphs is not unique. The most well-known types of acyclic hypergraphs, in
+increasing order of generality, are Berge-acyclic, γ-acyclic, β-acyclic, and α-acyclic hypergraphs [2,
+16, 17]. In a similar vein to the McCormick relaxation, a simple relaxation of the multilinear
+polytope can be constructed by replacing each multilinear equation ze = v∈e zv over zv ∈ {0, 1}
+for all v ∈ e by its convex hull:
+
+            MPLP(G) = z ∈ RV ∪E : zv ≤ 1, ∀v ∈ V, ze ≥ 0, ze ≥ zv − |e| + 1, ∀e ∈ E,
+
+                                                                                                                     v∈e
+
+            2
+                                              ze ≤ zv, ∀e ∈ E, ∀v ∈ e .
+
+The above relaxation is known as the standard linearization and has been widely used in the liter-
+ature [7]. The standard linearization has often been regarded as the generalization of McCormick
+relaxation for higher-degree binary polynomial optimization problems. In [11], we prove the fol-
+lowing result regarding the tightness of the standard linearization:
+
+Theorem 1 ( [11]). MP(G) = MPLP(G) if and only if G is a Berge-acyclic hypergraph.
+
+    Henceforth, given a hypergraph G, we define the rank of G, denoted by r, as the maximum
+cardinality of an edge in E. Observe that MPLP(G) is defined by at most |V |+(r+2)|E| inequalities,
+implying that Problem BPO over Berge-acyclic hypergraphs can be solved in polynomial time.
+However, recall that Berge-acyclicity is the most restrictive type of hypergraph acyclicity, and
+indeed, the standard linearization is a very weak relaxation for the multilinear polytope of general
+hypergraphs. Next, we introduce a different generalization of the McCormick relaxation that is
+significantly stronger than the standard linearization.
+
+The complete edge relaxation. Let G = (V, E) be a hypergraph and let V ′ ⊆ V . We define
+subhypergraph of G induced by V ′ as hypergraph GV ′ with node set V ′ and with edge set {e ∩ V ′ :
+e ∈ E, |e ∩ V | ≥ 2}. A hypergraph G is complete if its edge set consists of all possible subsets of V
+of cardinality at least two. Given a hypergraph G = (V, E), we say that an edge e ∈ E is maximal
+of G if it is not contained in any other edge in E. Clearly, in a graph, every edge is a maximal edge.
+Then, for a graph G, the McCormick relaxation of the Boolean quadric polytope BQP(G) can be
+described as follows. For each maximal edge e of G, consider the subgraph Ge of G induced by this
+edge. The McComick relaxation is then obtained by putting together the descriptions of BQP(Ge)
+for all e ∈ E. While this interpretation of McCormick relaxation seems unnecessarily complicated,
+applying the same scheme to hypergraphs of rank r > 2 yields an interesting relaxation of the
+multilinear polytope, in a higher-dimensional space, which we describe next.
+
+    To work with relaxations in higher-dimensional spaces, we need to introduce some terminology.
+An extension of a polyhedron P ⊆ Rn is a polyhedron Q ⊆ Rn+d, with d ≥ 0, such that P =
+
+ x ∈ Q : ∃y ∈ Rd, (x, y) ∈ Q . Any description of Q by linear equalities and inequalities is called
+an extended formulation of P . In this paper, the size of an extended formulation is the size of the
+system of linear inequalities, as defined in [22].
+
+    Let G = (V, E) be a hypergraph and denote by Emax ⊆ E the set of maximal edges of G.
+For each e ∈ Emax, denote by Ke the complete hypergraph with the node set e. Then MP(Ke)
+is an extension of MP(Ge), where as before Ge is the subhypergraph of G induced by e. While
+characterizing MP(Ge) is difficult in general, the explicit description of MP(Ke) can be readily
+obtained using the Reformulation Linearization Technique (RLT) [24]. We can then construct
+a relaxation for MP(G), in a higher-dimensional space, by putting together the descriptions of
+MP(Ke) for all e ∈ Emax. To formally define this relaxation, we next present the explicit description
+for the multilinear polytope of a complete hypergraph.
+
+Proposition 2 ( [24]). Let G = (V, E) be a complete hypergraph. For any U ⊆ V , define
+
+ψ(U, V ) :=             z(V \U)∪W −            z(V \U)∪W ,                (1)
+
+              W ⊆U :                 W ⊆U :
+             |W | even               |W | odd
+
+where we define z∅ := 1. Then the multilinear polytope MP(G) is given by
+
+             ψ(U, V ) ≥ 0, ∀U ⊆ V.                                        (2)
+
+                        3
+    Henceforth, given a hypergraph G = (V, E), we define the completion of G as the hypergraph
+cl(G) = (V, cl(E)), where cl(E) := {f ⊆ e, |f | ≥ 2, ∃e ∈ E}. We then define the complete edge
+relaxation of MP(G), denoted by CER(G), as the polytope defined by the following system of
+inequalities:
+
+                        CER(G) = z ∈ RV ∪cl(E) : ψ(U, e) ≥ 0, ∀U ⊆ e, ∀e ∈ Emax ,
+
+where ψ(U, e) is defined by (1). Notice that we have CER(G) = CER(cl(G)). In this paper, we
+settle the tightness of the complete edge relaxation. Our main result is as follows:
+
+Theorem 2. CER(G) is an extension of MP(G) if and only if G is an α-acyclic hypergraph.
+
+    Therefore, the complete edge relaxation is tight if and only if the hypergraph G exhibits the
+most general form of acyclicity. In fact, given any hypergraph G, the hypergraph obtained from G
+by adding one edge that contains all nodes of G is α-acyclic. From Proposition 2, it follows that
+CER(G) is defined by at most 2r|Emax| variables and inequalities. Therefore, if the rank of the
+hypergraph is bounded; i.e., r ∈ O(log poly(|V |, |E|)), where poly(|V |, |E|) denotes a polynomial
+function in |V |, |E|, then the complete edge relaxation is of polynomial-size and can be constructed
+in polynomial time. This implies that Problem BPO over α-acyclic hypergraphs of bounded rank
+can be solved in polynomial-time. Recall that the rank of the hypergraph G corresponds to the
+degree of the binary polynomial optimization problem, which is a small number in almost all
+applications. Hence, assuming r ∈ O(log poly(|V |, |E|)) is reasonable for all practical purposes.
+In [9], the authors prove that solving Problem BPO over α-acyclic hypergraphs is, in general,
+strongly N P -hard. This result implies that, unless P = N P , one cannot construct, in polynomial
+time, a polynomial-size extended formulation of the multilinear polytope of α-acyclic hypergraphs.
+
+    The ‘if’ statement in Theorem 2 is the simpler one. In fact, in [3,20], the authors present a similar
+result but stated in terms of the concept of primal treewidth, rather than α-acyclicity. Moreover,
+the connection between treewidth and α-acyclicity is detailed in [13], which together with the result
+of [3, 20] implies the ‘if’ statement in Theorem 2. In this paper, we present a simple proof of this
+result that does not involve treewidth and makes direct use of α-acyclicity. Our main contribution,
+however, is to prove the ‘only if’ direction; that is, to show that α-acyclicity is necessary for the
+tightness of the complete edge relaxation. Proving this result is fairly involved and requires the
+building of new tools in both hypergraph theory and polyhedral theory. First, we obtain a novel
+characterization of α-acyclic hypergraphs in terms of simple cycles. This new characterization
+is essential to prove our main result and is of independent interest. Second, we introduce several
+operations on hypergraphs, namely node fixing, node contraction, and node expansion; we show how
+the multilinear polytope and the complete edge relaxation are transformed under these operations.
+Through a recursive application of these operations, we are able to show that it is enough to limit
+our attention to hypergraphs with simple cycles of length three, a structure that can be tackled
+directly.
+
+    In this paper, we propose the complete edge relaxation as the generalization of McCormick re-
+laxation for binary polynomial optimization problems of bounded degree. While Theorem 2 serves
+as the main theoretical justification for the strength of the complete edge relaxation, this relax-
+ation has several other desirable properties, which we briefly describe next. In [19] the authors
+prove that the existing cutting planes for the multilinear polytope, i.e., flower inequalities [11], and
+running-intersection inequalities [13] are implied by the complete edge relaxation. By the results
+in [13, 18, 23], this further implies that, for general hypergraphs, the complete edge relaxation is
+stronger than the intersection of all possible recursive McCormick relaxations of MP(G). On the
+computational side, the authors of [19] show that for degree three, four, and five binary polynomial
+
+                                                                4
+optimization problems arising from image restoration and decoding error-correcting codes, opti-
+mizing over CER(G) can be done very efficiently. Furthermore, for the image restoration problem,
+their computational experiments indicate that optimizing over the complete edge relaxation almost
+always yields a binary solution.
+
+    Next, we show that the complete edge relaxation can further be used to obtain new classes of
+facet-defining inequalities for the multilinear polytope of hypergraphs that do not exhibit any degree
+of acyclicity. Namely, we introduce a new class of facet-defining inequalities for the multilinear
+polytope of hypergraphs with α-cycles of length three. These inequalities serve as the generalization
+of the well-known triangle inequalities [21]. We prove that the proposed inequalities are CG-cuts
+for the complete edge relaxation, while they are not CG-cuts for the standard linearization, hence,
+demonstrating the superiority of the complete edge relaxation.
+
+Organization. The remainder of this paper is organized as follows. In Section 2, we introduce a
+novel characterization of α-acyclic hypergraphs, which is key to prove the reverse direction in The-
+orem 2. Sections 3-4 are devoted to proving Theorem 2. Namely, in Section 3, we prove the
+sufficiency of α-acyclicity, while in Section 4, we prove the necessity of α-acyclicity. In Section 5
+we introduce a new class of facet-defining inequalities for the multilinear polytope corresponding
+to α-cycles of length three.
+
+2 A new characterization of α-acyclic hypergraphs
+
+As we mentioned earlier, α-acyclic hypergraphs are the most general type of acyclic hypergraphs.
+In [17], the author presents twelve equivalent characterizations of α-acyclic hypergraphs, which
+have been used widely ever since. We start by presenting one of these characterizations that we
+will use to prove the sufficiency of α-acyclicity in Theorem 2:
+
+Definition 1 (α-acyclic hypergraph). Let G be a hypergraph. We say that G is α-acyclic if its
+edge set has the running-intersection property.
+
+Recall that a set F of subsets of a finite set V has the running intersection property if there
+
+exists an ordering f1, f2, . . . , fm of the sets in F such that for each k = 2, . . . , m, there exists j < k
+
+such that
+
+           fk ∩                                fi ⊆ fj.
+
+                                          i<k
+
+Such an ordering is called a running intersection ordering of F . Interestingly, none of the charac-
+terizations in [17] is in terms of α-cycles. More than twenty years later, in [25], for the first time,
+the author introduced the notion of α-cycles and proved that a hypergraph G is α-acyclic if and
+only if it does not contain any α-cycles. Below, we give the definition of α-cycles as defined in [25].
+
+Definition 2 (α-cycle). Let G = (V, E) be a hypergraph. Let C = e1, e2, . . . , eℓ, eℓ+1 be a sequence
+of edges with e1 = eℓ+1 for some ℓ ≥ 3. Define si := ei ∩ ei+1 for all i ∈ [ℓ]. We say that C is an
+α-cycle of G of length ℓ if the following conditions are satisfied:
+
+           ei \ ej̸ = ∅                                  ∀i̸ = j ∈ [ℓ],                         (A1)
+           (si−1 ∪ si ∪ si+1) \ e̸ = ∅                   ∀i ∈ [ℓ], ∀e ∈ E,                      (A2)
+
+where the indices in (A2) are modulus ℓ.
+
+Observation 1. Consider the sets si, i ∈ [ℓ] in Definition 2. We have si̸ = ∅ for all i ∈ [ℓ].
+
+                                          5
+    e1                                         e1
+
+                                                         e4
+
+e2           e3                            e2                e3
+
+        (a)                                        (b)
+
+Figure 1: Removing α-cycles by adding edges to the hypergraph. (a) The hypergraph has an α-
+cycle e1, e2, e3, e1. (b) The hypergraph is α-acyclic because e4 ⊇ s1 ∪ s2 ∪ s3.
+
+Proof. For ease of notation, in this proof the indices are modulus ℓ. Condition (A2) implies
+
+             (si ∪ si+1 ∪ si+2) \ ei+2̸ = ∅.
+
+However, si+1 ∪ si+2 ⊆ ei+2, thus si \ ei+2̸ = ∅, implying that si̸ = ∅.
+
+    From Definition 2 one observes a stark contrast between α-cycles and other types of cycles in
+hypergraphs, i.e., Berge-cycles, γ-cycles, and β-cycles. Namely, while all other types of cycles are
+defined in terms of the edges of the cycle, the definition of an α-cycle depends on the entire edge
+set of the hypergraph. That is, while all other cycles are defined “locally”, α-cycles are defined
+“globally”; i.e., over the entire hypergraph. This implies that α cycles have a significantly more
+complex structure than other types of cycles. Additionally, notice that given a graph (resp. hyper-
+graph) G, one can obtain an acyclic graph (resp, Berge-acyclic, γ-acyclic, β-acyclic hypergraph) by
+removing edges from G and hence removing cycles. In contrast, to remove α-cycles and obtain an
+α-acyclic hypergraph, one could add edges to G. For example, from (A2) it follows that if G has
+an edge containing all its node set, then G has no α-cycles. See Figure 1 for an illustration.
+
+    In this paper, we present a novel characterization of α-acyclicity, based on a “simpler” notion
+of cycles. This new notion will enable us to prove the necessity of α-acyclicity in Theorem 2. We
+start by defining a new type of cycle in hypergraphs, which we refer to as simple cycle.
+
+Definition 3 (simple-cycle). Let G = (V, E) be a hypergraph. Let C = e1, e2, . . . , eℓ, eℓ+1 be a
+sequence of edges with e1 = eℓ+1 for some ℓ ≥ 3. Define si := ei ∩ ei+1 for all i ∈ [ℓ]. We say that
+C is a simple-cycle of G, and of length ℓ if:
+
+    (si ∪ sj ∪ sk) \ e̸ = ∅ ∀1 ≤ i < j < k ≤ ℓ, ∀e ∈ E.                                       (S)
+
+    The key differences between definition of a simple cycle and an α-cycle are that condition (A1)
+is omitted, and the indices in condition (A2) are no longer required to be contiguous. While these
+differences may appear minor, they play a crucial role in our proof of Theorem 2. We are now
+ready to state our new characterization for α-acyclic hypergraphs.
+
+Theorem 3. A hypergraph G is α-acyclic if and only if it does not contain a simple cycle.
+
+    To prove Theorem 3, we make use of the following lemmata relating simple cycles to those
+α-cycles that cannot be “shortened.” We first show that a simple cycle is an α-cycle.
+
+Lemma 1. A simple cycle is an α-cycle.
+
+                                        6
+Proof. Let G = (V, E) be a hypergraph and let C = e1, e2, . . . , eℓ, eℓ+1 with eℓ+1 = e1 and for some
+ℓ ≥ 3 be a simple cycle of G. We show that C satisfies conditions (A1) and (A2) implying that it
+is an α-cycle. We first consider (A2). Letting i = j − 1 and k = j + 1 in (S) we deduce that C
+satisfies condition (A2) for 2 ≤ i ≤ ℓ − 1. Letting i = 1, j = 2 and k = ℓ (resp. i = 1, j = ℓ − 1
+and k = ℓ) in (S) we deduce that C satisfies condition (A2) for i = 1 (resp. i = ℓ). Therefore, C
+satisfies (A2).
+
+    Next, consider condition (A1); that is, for any i̸ = j ∈ [ℓ] we want to show that ei \ ej̸ = ∅.
+Recall that for any i ∈ [ℓ], we have ei ⊇ si−1 ∪ si. Let q = min(i, j) and p = max(i, j). First assume
+that q > 1; in this case letting i = q − 1, j = q, k = p and e = eq in (S), we obtain sp \ eq̸ = ∅,
+which implies that ep \ eq̸ = ∅ for all 2 ≤ q < p ≤ ℓ. Next, let q = 1; in this case letting i = 1, j = p,
+k = ℓ and e = e1 in (S) we obtain sp \ e1̸ = ∅, which implies that ep \ e1̸ = ∅ and ep+1 \ e1̸ = ∅ for
+all 1 < p ≤ ℓ − 1. Therefore, ep \ e1̸ = ∅ for all p ∈ [ℓ] \ {1}. Hence, C satisfies condition (A1) and
+as a result it is a simple cycle.
+
+    We say that an α-cycle C = e1, e2, . . . , eℓ, eℓ+1 is chordless if for every 1 ≤ i < j ≤ ℓ with
+j − i ≤ ℓ − 3 and for every e˜ ∈ E \ {ei, . . . ej}, the edge sequence ei, ei+1, . . . , ej, e˜, ei is not an
+α-cycle. Clearly, an α-cycle of length three is chordless. As for chordless cycles in graphs, chordless
+α-cycles are α-cycles that cannot be “shortened.” We next prove a property of chordless α-cycles
+which relates them to simple cycles:
+
+Lemma 2. Let G = (V, E) be a hypergraph and let C = e1, e2, . . . , eℓ, eℓ+1, for some ℓ ≥ 4, be an
+α-cycle of G. Define si = ei ∩ ei+1 for i ∈ [ℓ]. If C is chordless, then for every e ∈ E, we have
+
+(si ∪ sj) \ e̸ = ∅ ∀i < j ∈ [ℓ] : j − i > 1, (i, j)̸ = (1, ℓ), ∀e ∈ E.                     (C)
+
+Proof. Denote by e˜ a maximal edge of G that does not satisfy (C). Notice that if there is an edge
+in E that violates (C), then any maximal edge of G containing this edge also violates (C). Denote
+by L the set of indices i ∈ [ℓ] for which we have e˜ ⊇ si. We then have e˜ ⊇ ∪i∈Lsi. Notice that we
+have |L| ≥ 2. Let i1 be the smallest index in L and let i2 be the second smallest. If i2 − i1 > 1,
+then we set p = i1, q = i2. Notice that by (C), we must have (i1, i2)̸ = (1, ℓ). If i2 − i1 = 1, then L
+should contain at least three elements because by assumption e˜ violates assumption (C). Denote
+by i3 the third smallest index in L. We then set p = i2, q = i3. In this case, since C is an α-cycle,
+by (A2) we must have i3 − i2 > 1.
+
+    We claim that the edge sequence C′ = e˜, ep+1, ep+2, . . . , eq, e˜ is an α-cycle, which contradicts
+the assumption that C is chordless. Since e˜ is a maximal edge of G, to verify condition (A1) it
+suffices to show that ei \ e˜̸ = ∅ for all i ∈ {p + 1, . . . , q}. This follows since, by definition of L, e˜
+does not contain any si for p < i < q and we have si = ei ∩ ei+1. Notice that since by assumption
+q − p > 1, C′ has at least three distinct edges. Then, to prove that C′ is an α-cycle, it suffices to
+check if condition (A2) holds. We consider two cases:
+
+    • If q − p > 2, then we need to show that for every e ∈ E:
+
+((e˜ ∩ ep+1) ∪ sp+1 ∪ sp+2) \ e̸ = ∅, (sq−2 ∪ sq−1 ∪ (eq ∩ e˜)) \ e̸ = ∅.
+
+   Since by assumption e˜ ⊇ sp ∪ sq, it follows that e˜ ∩ ep+1 ⊇ sp, and eq ∩ e˜ ⊇ sq. Since C is an
+   α-cycle, by (A2), the above relations are valid.
+
+• If q − p = 2, then we need to show that for every e ∈ E:
+
+((e˜ ∩ ep+1) ∪ sp+1 ∪ (eq ∩ e˜)) \ e̸ = ∅,
+
+whose validity follows from (A2) since e˜ ∩ ep+1 ⊇ sp, eq ∩ e˜ ⊇ sq, and C is an α-cycle.
+
+7
+        e1      e2
+
+e6          e7          e3
+
+    e5              e4
+
+Figure 2: The edge sequence C = e1, e2, · · · , e6, e1 is an α-cycle. However, C is not a simple cycle
+because e7 ⊇ s2 ∪ s4 ∪ s6. The sequence e1, e2, e7e1 is a simple cycle.
+
+                                                                                 e1
+
+                                                                e4 e5 e2
+
+                                                                                e3
+
+Figure 3: The edge sequence C = e1, e2, e3, e4, e1 is a simple cycle which also satisfies condition (C).
+However, C is not a chordless α-cycle because it can be shortened; i.e., e1, e2, e5, e1 is a shorter
+α-cycle.
+
+    We then obtain the following.
+
+Lemma 3. A chordless α-cycle is a simple cycle.
+
+Proof. Let G = (V, E) be a hypergraph and let C = e1, e2, . . . , eℓ, eℓ+1, with eℓ+1 = e1, be a
+chordless α-cycle of G. If ℓ = 3, the definitions of α-cycles, chordless α-cycles, and simple cycles
+coincide. Hence, let ℓ ≥ 4. We show that any chordless α-cycle C satisfies condition (S), implying
+that it is a simple cycle. Consider any i, j, k ∈ [ℓ] satisfying i < j < k. Notice that k − i > 1. If
+(i, k)̸ = (1, ℓ), then the statement follows since by (C) we have (si ∪ sk) \ e̸ = ∅ for every e ∈ E.
+Now suppose that (i, k) = (1, ℓ). Since i < j < k and ℓ ≥ 4, we either have j − i ≥ 2 or k − j ≥ 2,
+in which case by (C) we get (si ∪ sj) \ e̸ = ∅ for all e ∈ E or (sj ∪ sk) \ e̸ = ∅, respectively. Hence,
+condition (S) holds for C.
+
+    Figures 2 and 3 illustrate the difference between α-cycles, chordless α-cycles, and simple cycles.
+    Thanks to Lemma 1 and Lemma 3, we can now easily prove Theorem 3.
+
+Proof. If a hypergraph contains an α-cycle, then it contains a chordless α-cycle and by Lemma 3,
+it contains a simple cycle. If a hypergraph does not contain an α-cycle, by Lemma 1, it does not
+contain a simple cycle either.
+
+3 Sufficiency of α-acyclicity
+
+In this section, we prove the “easy” direction of Theorem 2:
+
+Theorem 4. Let G = (V, E) be an α-acyclic hypergraph. Then CER(G) is an extension of MP(G).
+
+                                                                8
+                                                                                      fm
+fm
+
+fj                                                                                        fj
+
+    Figure 4: An illustration of the proof technique for Theorem 4.
+
+    As we discussed earlier, Theorem 4 is implied by the results in [3, 20] and [13]. In [3, 20], the
+authors give extended formulations for the convex hull of the feasible set of (possibly constrained)
+binary polynomial optimization problems. The size of these extended formulations is parameterized
+in terms of the “treewidth” of their so-called intersection graphs. As we detail in [13], in the
+unconstrained case, their result can be equivalently stated as: Let G be an α-acyclic hypergraph of
+rank r. Then MP(G) has an extended formulation with at most 2r|Emax| variables and inequalities.
+While not stated explicitly, the proofs in [3, 20] imply that CER(G) is an extended formulation for
+MP(G).
+
+    Here, we present a simple proof that does not involve treewidth and makes direct use of α-
+acyclicity. Our proof relies on a result of [12] regarding the decomposability of the multilinear
+polytope. To state this result, we introduce some terminology. Given a hypergraph G = (V, E),
+and V ′ ⊆ V , the section hypergraph of G induced by V ′ is the hypergraph G′ = (V ′, E′), where
+E′ = {e ∈ E : e ⊆ V ′}. Given hypergraphs G1 = (V1, E1) and G2 = (V2, E2), we denote by G1 ∩ G2
+the hypergraph (V1 ∩ V2, E1 ∩ E2), and we denote by G1 ∪ G2, the hypergraph (V1 ∪ V2, E1 ∪ E2). In
+the following, we consider a hypergraph G, and two distinct section hypergraphs of G, denoted by
+G1 and G2, such that G1 ∪ G2 = G. We say that MP(G) is decomposable into MP(G1) and MP(G2)
+if the system comprised of a description of MP(G1) and a description of MP(G2), is a description
+of MP(G).
+
+Theorem 5 ( [12]). Let G1,G2 be section hypergraphs of a hypergraph G such that G1 ∪ G2 = G
+and G1 ∩ G2 is a complete hypergraph. Then, MP(G) is decomposable into MP(G1) and MP(G2).
+
+    In the following, we will often use the fact that, for hypergraphs, adding or removing edges inside
+a maximal edge preserves α-acyclicity. This follows, for example, from the definition of acyclicity
+(page 483) and theorem 3.4 in [2]. In particular, this fact implies that G is α-acyclic if and only if
+cl(G) is α-acyclic. We are now ready to present our proof. See Figure 4 for an illustration of our
+proof technique.
+
+Proof. To prove Theorem 4 we show that, if the hypergraph G = (V, E) satisfying G = cl(G) is
+α-acyclic, then CER(G) = MP(G). We prove this statement by induction on |Emax|, where Emax
+denotes the set of maximal edges of G. The base |Emax| = 1 case follows from Proposition 2.
+
+    In the remainder of the proof we show the step case, and we assume |Emax| ≥ 2. The hypergraph
+(V, Emax) is α-acyclic. By definition of α-acyclicity, there is a running intersection ordering of Emax,
+say f1, f2, . . . , fm. In particular, there exists j < m, such that fm ∩ (f1 ∪ f2 ∪ . . . ∪ fm−1) ⊆ fj. Let
+G1 be the section hypergraph of G induced by fm. The hypergraph G1 is complete, therefore from
+Proposition 2 implies CER(G1) = MP(G1).
+
+    9
+    Let G2 be the section hypergraph of G induced by f1 ∪ f2 ∪ . . . ∪ fm−1. We claim that the set
+of maximal edges of G2 is Emax \ {fm}. Clearly, f1, f2, . . . , fm−1 are maximal edges of G2. Since
+every edge of G2 is also an edge of G, we only need to show that no edge f of G2 with f ⊆ fm is a
+maximal edge of G2. So let f be an edge of G2 with f ⊆ fm. Then f ⊆ f1 ∪ f2 ∪ . . . ∪ fm−1. Hence,
+f = f ∩ (f1 ∪ f2 ∪ . . . ∪ fm−1) ⊆ fm ∩ (f1 ∪ f2 ∪ . . . ∪ fm−1) = fj. Since fj is an edge of G2, f is
+not a maximal edge of G2.
+
+    We also observe that G2 is α-acyclic, since the running intersection ordering f1, f2, . . . , fm of
+Emax directly implies that f1, f2, . . . , fm−1 is a running intersection ordering of Emax \ {fm}, which
+we showed is the set of maximal edges of G2. So G2 is α-acyclic, has m − 1 maximal edges, and
+clearly G2 = cl(G2). Thus by induction CER(G2) = MP(G2).
+
+    Observe that G1 ∪G2 = G, since every node of G is contained in at least one edge of G, and each
+edge of G is contained in at least one edge among f1, f2, . . . , fm. Furthermore, G1 ∩G2 is a complete
+hypergraph, due to the definition of H, since G1 is complete. We can now apply Theorem 5 and
+obtain that MP(G) is decomposable into MP(G1) and MP(G2). Since CER(G1) = MP(G1) and
+CER(G2) = MP(G2), the system comprised of a description of CER(G1) and a description of
+CER(G2), that is precisely the description of CER(G), is a description of MP(G).
+
+    In [11], we give a polynomial-size extended formulation of the multilinear polytope of γ-acyclic
+hypergraphs with at most |V | + 2|E| variables and at most |V | + (r + 2)|E| inequalities. In [14], we
+further generalize this result by obtaining a polynomial-size extended formulation of the multilinear
+polytope of β-acyclic hypergraphs with at most (r − 1)|V | + |E| variables and at most (3r − 4)|V | +
+4|E| inequalities. From Theorem 4, the complete edge relaxation is also an extended formulation
+of the multilinear polytope of γ-acyclic and β-acyclic hypergraphs, because α-acyclicity subsumes
+β-acyclicity and γ-acyclicity. However, the extended formulations of [11, 14] grow linearly in the
+rank r, while the size of the complete edge relaxation is exponential in the rank. Recall that
+CER(G) is defined by at most 2r|Emax| variables and inequalities. Therefore, for the multilinear
+polytope of γ-acyclic or β-acyclic hypergraphs with unbounded rank, the aforementioned extended
+formulations are of polynomial-size while CER(G) is not. It is worth mentioning that CER(G) is
+simpler to construct in the sense that it requires only the knowledge of the set of maximal edges
+of G. On the other hand, the extended formulation in [11] requires G to be γ-acyclicity as it uses
+laminar hypergraphs as its building block, and the extended formulation in [14] requires G to be
+β-acyclic together with knowledge of a nest-point elimination ordering.
+
+4 Necessity of α-acyclicity
+
+In this section, we prove the main result of this paper:
+
+Theorem 6. Let G = (V, E) be a hypergraph and suppose that CER(G) is an extension of MP(G).
+Then G is an α-acyclic hypergraph.
+
+    To prove Theorem 6, we show that if G has a simple cycle, then CER(G) is not an extension
+of MP(G). To this end, we first introduce some operations on hypergraphs; namely, node fixing,
+node contraction, and node expansion. We show how the multilinear polytope and the complete
+edge relaxation are transformed under these operations. Through a recursive application of these
+operations, we then prove that one can reduce the length of simple cycles. This in turn implies
+that we can limit our attention to hypergraphs containing simple cycles of length three, a structure
+that can be tackled directly.
+
+                                                               10
+4.1 The node fixing operator
+
+Consider a hypergraph G = (V, E) and let V ′ ⊆ V . Recall that the subhypergraph of G induced by
+
+V ′ is the hypergraph GV ′ with node set V ′ and with edge set EV ′ := {e ∩ V ′ : e ∈ E, |e ∩ V ′| ≥ 2}.
+For every edge e of GV ′, there may exist several edges e′ of G satisfying e = e′ ∩ V ; we denote by
+e′(e) one such arbitrary edge of G. For ease of notation, we identify an edge e of GV ′ with an edge
+e′(e) of G. Define
+
+LV ′ := z ∈ RV ∪E : zv = 1 ∀v ∈ V \ V ′ .                     (3)
+
+Let R(G) denote a convex relaxation of MP(G). Denote by projGV ′ (R(G) ∩ LV ′) the set obtained
+from R(G) ∩ LV ′ by projecting out all variables zv, for v ∈ V \ V ′, and ze, for e ∈ E \ E′, where
+E′ := {e′(e) ∈ E : e ∈ EV ′}. Define
+
+L¯V ′ := z ∈ RV ∪cl(E) : zv = 1 ∀v ∈ V \ V ′ .                (4)
+
+Let R(cl(G)) denote a convex relaxation of MP(cl(G)). Denote by projGV ′ (R(cl(G)) ∩ L¯V ′) the set
+obtained from R(cl(G)) ∩ L¯V ′ by projecting out all variables zv for all v ∈ V \ V ′, and zf for all
+f ⊆ e such that f̸ ⊆ V ′ all e ∈ E. We then have the following result.
+
+Lemma 4. Let G = (V, E) be a hypergraph and let LV ′ and L¯V ′ with V ′ = V \ {v′} for some v′ ∈ V
+be defined by (3) and (4), respectively. Then we have:
+
+  (i) MP(GV ′ ) = projGV ′ (MP(G) ∩ LV ′ ).
+
+ (ii) CER(GV ′) = projGV ′ (CER(G) ∩ L¯V ′).
+
+Proof. Let S(G) denote the multilinear set associated with G. First, consider Part (i). Denote
+by projGV ′ (S(G) ∩ LV ′) the set obtained from S(G) ∩ LV ′ by projecting out variables zv′, and ze,
+e ∈ E \ E′. From the definition of the subhypergraph it follows that S(GV ′) = projGV ′ (S(G) ∩ LV ′),
+implying that MP(GV ′) = projGV ′ conv(S(G) ∩ LV ′). Moreover, the set MP(G) ∩ LV ′ is a face of
+MP(G) defined by the valid inequality zv′ ≤ 1, implying that MP(G) ∩ LV ′ = conv(S(G) ∩ LV ′).
+We then deduce that MP(GV ′) = projGV ′ (MP(G) ∩ LV ′).
+
+    Next, consider Part (ii). We start by characterizing the polytope projGV ′ (CER(G) ∩ L¯V ′)
+and then show that it coincides with CER(GV ′). Denote by Emax the set of maximal edges of
+G. Recall that CER(G) is obtained by putting together the inequalities defining MP(Ke¯) for all
+e¯ ∈ Emax, where Ke¯ denotes the complete hypergraph with node set e¯ and MP(Ke¯) is obtained
+using Proposition 2:
+
+                                                  ψ(U, e¯) ≥ 0, ∀U ⊆ e¯,
+
+and where ψ(U, e¯) is defined by (1). Now consider any edge e¯ ∈ Emax such that e¯ ∋ v′, and let
+U¯ denote the set of subsets of e¯ such that for any U ∈ U¯ , we have U ∋ v′. Since by definition
+ze = v∈e zv for all e ⊆ e¯, it follows that ψ(U, e¯) = v∈U (1 − zv) v∈e¯\U zv. We then deduce that
+
+     ψ(U, e¯) = 1 − zv′ = 0,
+
+U ∈U¯
+
+which together with ψ(U, e¯) ≥ 0 for all U ∈ U¯ implies that
+
+                              ψ(U, e¯) = 0, ∀U ∈ U¯ .         (5)
+
+                              11
+First consider U = {v′}. In this case (5) simplifies to:
+
+                      ze¯ = ze¯\{v′}.                                                           (6)
+
+Then for any v ∈ e¯ \ {v′}, consider U = {v, v′}. Substituting in (5) and using (6) we obtain:
+
+                      ze¯\{v} = ze¯\{v,v′}, ∀v ∈ e¯ \ {v′}.                                     (7)
+
+Next for any u̸ = v ∈ e¯ \ {v′}, consider U = {u, v, v′}. Substituting in (5) and using (6) and (7)
+
+yields ze¯\{u,v} = ze¯\{u,v,v′} for all u̸ = v ∈ e¯ \ {v′}. Applying this argument recursively, we deduce
+that for each e¯ ∈ Emax with e¯ ∋ v′ the polytope MP(Ke¯) ∩ {z : zv′=1} is given by:
+
+                      ze = ze\{v′}, ∀e ⊆ e¯ : |e| ≥ 2, e ∋ v′                                   (8)
+
+                      ψ(U, e¯ \ {v′}) ≥ 0, ∀U ⊆ e¯ \ {v′}.                                      (9)
+
+Notice that by Proposition 2, inequalities (9) define the polytope MP(Ke¯\{v′}), where Ke¯\{v′}
+denotes the complete hypergraph with node set e¯ \ {v′}. Moreover, the relaxation CER(GV ′) is
+
+obtained by putting together the descriptions of MP(Ke¯\{v′}) for all edges e¯ ∈ Emax with e¯ ∋ v′
+and MP(Ke¯) for all edges e¯ ∈ Emax with e¯̸ ∋ v′. Hence, using equalities (8) to project out variables
+ze, for any edge e ∋ v′, we obtain CER(GV ′) = projGV ′ (CER(G) ∩ L¯V ′).
+
+    Thanks to Lemma 4, we can show that the tightness of the complete edge relaxation is preserved
+under the node fixing operation.
+
+Proposition 3. Let G = (V, E) be a hypergraph and let V¯ ⊆ V . If CER(G) is an extension of
+MP(G), then CER(GV¯ ) is an extension of MP(GV¯ ).
+
+Proof. Consider the affine set LV ′ (resp. L¯V ′) defined by (3) (resp. (4) ) with V ′ = V \ {v′} for
+some v′ ∈ V . Denote by projG(CER(G)) the set obtained from CER(G) by projecting out variables
+ze, for all e ∈ cl(E) \ E. Since projG(CER(G)) = MP(G), we have projG(CER(G)) ∩ LV ′ =
+projG(CER(G) ∩ L¯V ′) = MP(G) ∩ LV ′, where the first equality follows since the operator projG(·)
+does not project out variables zv, v ∈ V \ V ′. This in turn implies that
+
+   projGV ′ (projG(CER(G) ∩ L¯V ′)) = projG(projGV ′ (CER(G) ∩ L¯V ′)) = projGV ′ (MP(G) ∩ LV ′).
+
+Therefore, by Parts (i) and (ii) of Lemma 4, we deduce that projG(CER(GV ′)) = MP(GV ′). The
+proof then follows from a recursive application of this argument.
+
+4.2 The node contraction operator
+
+Let G = (V, E) be a hypergraph, and let u, w ∈ V such that there exists e ∈ E with e ∋ u, w.
+We say that the hypergraph Gw→u = (Vw→u, Ew→u) is obtained from G by contracting w to u, if
+Vw→u = V \ {w}, and
+
+Ew→u = {e ∈ E : e̸ ∋ w} ∪ {(e \ {w}) ∪ {u} : e ∈ E \ {u, w}, e ∋ w} .
+
+Define the subspace:
+
+                      Qw→u := z ∈ RV ∪E : zw = zu .                                             (10)
+
+                      12
+Let R(G) denote a convex relaxation of MP(G). Denote by projGw→u(R(G) ∩ Qw→u) the set
+obtained from R(G) ∩ Qw→u by projecting out variables zw and ze, e ∈ E such that e = {u, w} or
+
+e ∋ w and (e \ {w}) ∪ {u} ∈ E. Define
+
+Q¯w→u := z ∈ RV ∪cl(E) : zw = zu .                                      (11)
+
+Let R(cl(G)) denote a convex relaxation of MP(cl(G)). Denote by projGw→u(R(cl(G)) ∩ Q¯w→u) the
+set obtained from R(cl(G)) ∩ Q¯w→u by projecting out variables zw and ze for all e ∈ cl(E) such
+that e = {u, w} or e ∋ w and (e \ {w}) ∪ {u} ∈ cl(E). We then have the following result.
+
+Lemma 5. Let G = (V, E) be a hypergraph, let u, w ∈ V , let Gw→u be the hypergraph obtained
+from G by contracting w to u, and let Qw→u and Q¯w→u be defined by (10) and (11), respectively.
+We then have:
+
+(i) MP(Gw→u) = projGw→u (MP(G) ∩ Qw→u).
+(ii) CER(Gw→u) ⊆ projGw→u (CER(G) ∩ Q¯w→u).
+
+Proof. Let S(G) denote the multilinear set associated with G. First, consider Part (i). Define
+G˜ := (V, E˜), where E˜ := E ∪ {{u, w}}. Clearly, if {u, w} ∈ E, then the two hypergraphs G and
+G˜ coincide. Define Q˜w→u := {z ∈ RV ∪E˜ : zw = zu}. Denote by projG˜w→u(S(G˜) ∩ Q˜w→u) the set
+obtained from S(G˜) ∩ Q˜w→u by projecting out variables zw and ze, e ∈ E such that e = {u, w}
+
+or e ∋ w and (e \ {w}) ∪ {u} ∈ E. From the definition of the contraction operator it follows that
+S(Gw→u) = projG˜w→u (S(G˜) ∩ Q˜w→u), implying that MP(Gw→u) = projG˜w→u conv(S(G˜) ∩ Q˜w→u).
+Moreover, the inequality zu + zw ≥ 2z{u,w} is valid for S(G˜) and is satisfied tightly at a binary
+point z only if zw = zu. It then follows that MP(G˜) ∩ Q˜w→u is a face of MP(G˜) defined by this
+inequality, and therefore we have MP(G˜) ∩ Q˜w→u = conv(S˜(G) ∩ Q˜w→u). We then deduce that
+
+MP(Gw→u) = projG˜w→u (MP(G˜) ∩ Q˜w→u)                                   (12)
+
+Now consider MP(G); if {u, w} ∈ E, then MP(G˜) = MP(G) and we are done. Otherwise, MP(G)
+is obtained by projecting out the variable z{u,w} from the description of MP(G˜). Let us denote this
+operation as MP(G) = projG(MP(G˜)). We then have
+
+projGw→u (MP(G) ∩ Qw→u) = projGw→u (projG(MP(G˜)) ∩ Qw→u)
+                                    = projGw→u (projG(MP(G˜) ∩ Q˜w→u))
+                                    = projG˜w→u (MP(G˜) ∩ Q˜w→u),
+
+where the second equality follows since the operator projG(·) does not project out variables zu, zw.
+Together with (12), this in turn implies that MP(Gw→u) = projGw→u(MP(G) ∩ Qw→u).
+
+    Next, consider Part (ii). We first define a polyhedral relaxation of S(G) ∩ Qw→u in the extended
+space RV ∪cl(E), which we denote by CER(G), satisfying CER(G) ⊆ CER(G)∩Q¯w→u. Subsequently,
+we show that CER(Gw→u) = projGw→u(CER(G)). This in turn implies that CER(Gw→u) ⊆
+projGw→u (CER(G) ∩ Q¯w→u).
+
+    Let us start by defining CER(G); Denote by Emax the set of maximal edges of G. For each
+e¯ ∈ Emax, as before denote by Ke¯ the complete hypergraph with the node set e¯. Then CER(G) is
+obtained by intersecting the following polyhedral descriptions for all e¯ ∈ Emax:
+
+13
+1. For each e¯ ∈ Emax such that e¯̸ ∋ w, the multilinear polytope MP(Ke¯) obtained using Propo-
+   sition 2.
+
+2. For each e¯ ∈ Emax such that e¯ ∋ w and e¯̸ ∋ u, the multilinear polytope MP(Ke¯) obtained
+   using Proposition 2 together with the equality constraint zw = zu.
+
+3. For each e¯ ∈ Emax such that e¯ ⊇ {u, w}, the convex hull of the set
+
+              S=(Ke¯) := z ∈ {0, 1}P (e¯)\{∅} : ze = zv, ∀e ⊆ e¯, |e| ≥ 2, zu = zw ,
+
+                                                                                      v∈e
+
+using RLT [24], where P (e¯) denotes the power set of e¯.
+
+    Notice that the difference between CER(G) ∩ Q¯w→u and CER(G) is in Case (3) above. That is,
+while to construct CER(G) ∩ Q¯w→u for each maximal edge e¯ ⊇ {u, w}, we first construct MP(Ke¯)
+using RLT and then intersect this polyhedron with zu = zw, to construct CER(G), we directly
+construct the convex hull of the set S=(Ke¯), which can be written as S=(Ke¯) = S(Ke¯) ∩ {z ∈
+{0, 1}P (e¯)\{∅} : zu = zw}, using RLT. It then follows that CER(G) ⊆ CER(G) ∩ Q¯w→u. In the
+remainder of the proof, we show that CER(Gw→u) = projGw→u(CER(G)). This equivalence follows
+trivially for Cases 1 and 2, above. Henceforth, we prove it for Case 3.
+
+    Next, we characterize the convex hull of the set S=(Ke¯) using RLT [24]. The product factors
+in this case are given by ψ(U, e¯) = v∈U (1 − zv) v∈e¯\U zv for all U ⊆ e¯. In addition to imposing
+nonnegativity on all product factors, we should multiply the equality constraint zu = zw by the
+product factors. Two cases arise:
+
+    • If u ∈ U and w ∈/ U or if u ∈/ U and w ∈ U , multiplying zu = zw by ψ(U, e¯), we obtain
+       ψ(U, e¯) = 0.
+
+    • If u, w ∈/ U (resp. u, w ∈ U ), then multiplying zu = zw by ψ(U, e¯) yields ψ(U, e¯) = ψ(U, e¯)
+       (resp. 0 = 0).
+
+Therefore, the convex hull of S=(Ke¯) is given by:
+
+ψ(U, e¯) = 0, ∀U ⊆ e¯ : |U ∩ {u, w}| = 1                                                   (13)
+
+ψ(U, e¯) ≥ 0, ∀U ⊆ e¯ : |U ∩ {u, w}| = 0 or 2.                                             (14)
+
+First, let U = U1 = {w}; substituting in (13), we get ψ(U1, e¯) = (1 − zw) v∈e¯\{w} zv = 0, which
+after linearization can be written as:
+
+ze¯ = ze¯\{w}, ∀e¯ ∈ Emax : e¯ ⊃ {u, w}.                                                   (15)
+
+Next, for any v′ ∈ e¯ \ {u}, let U = U2 = {w, v′}; substituting in (13) we get ψ(U2, e¯) = (1 −
+
+zw)(1 − zv′ ) v∈e¯\{w,v′} zv = (1 − zw) v∈e¯\{w,v′} zv − ψ(U1, e¯) = 0, which in turn implies that
+ψ′(U2, e¯) := ψ(U2, e¯) + ψ(U1, e¯) = (1 − zw) v∈e¯\{w,v′} zv = 0, and this after linearization can be
+equivalently written as:
+
+ze¯\{v} = ze¯\{w,v}, ∀v ∈ e¯ \ {u}, ∀e¯ ∈ Emax : e¯ ⊃ {u, w}.                              (16)
+
+Next, for any v′̸ = v′′ ∈ e¯ \ {u}, let U = U3 = {w, v′, v′′}; substituting in (13) we get ψ(U3, e¯) =
+(1 − zw)(1 − zv′ )(1 − zv′′ ) v∈e¯\{w,v′,v′′} zv = (1 − zw) v∈e¯\{w,v′,v′′} zv − ψ′(U2, e¯) − ψ(U2, e¯) = (1 −
+
+14
+zw) v∈e¯\{w,v′,v′′} zv −ψ(U1, e¯)−2ψ(U2, e¯) = 0. This in turn implies that (1−zw) v∈e¯\{w,v′,v′′} zv =
+0, which after linearization can be equivalently written as:
+
+                     ze¯\{v,v′} = ze¯\{w,v,v′}, ∀v̸ = v′ ∈ e¯ \ {u}, ∀e¯ ∈ Emax : e¯ ⊃ {u, w}.            (17)
+
+Therefore, by a recursive application of the above argument we find that for each e¯ ∈ Emax with
+
+e¯ ⊃ {u, w} we have:
+
+                              ze = ze\{w}, ∀e ⊆ e¯ : e ⊇ {u, w}.                                          (18)
+
+Now  let  U  =  U′   =  {u};  substituting  in  (13)  and  linearizing  we  get  ze¯  =  ze¯\{u},  which  together
+
+                  1
+
+with (15) implies that
+
+                              ze¯\{u} = ze¯\{w}, ∀e¯ ∈ Emax : e¯ ⊃ {u, w}.
+
+Similarly, replacing w by u in U2 and U3 and following a similar line of arguments and using (18),
+for each e¯ ∈ Emax with e¯ ⊃ {u, w} we get:
+
+                              ze = z(e\{w})∪{u}, ∀e ⊆ e¯ : e ∋ w, e̸ ∋ u.                                 (19)
+
+Therefore, the convex hull of S=(Ke¯) for any e¯ ∈ Emax with e¯ ⊃ {u, w} can be written as:
+
+                        ze = ze\{w}, ∀e ⊆ e¯ : |e| ≥ 2, e ⊃ {u, w}                                        (20)
+
+                        ze = z(e\{w})∪{u}, ∀e ⊆ e¯ : |e| ≥ 2, e ∋ w, e̸ ∋ u                               (21)
+
+                        ψ(U, e¯ \ {w}) ≥ 0, ∀U ⊆ e¯ \ {w}.                                                (22)
+
+By Proposition 2, inequalities (22) coincide with the description of MP(Ke¯\{w}), where Ke¯\{w} is
+the complete hypergraph with node set e¯ \ {w}, which can be obtained from Ke¯ by contracting w
+to u. By using equations (20) and (21) to project out variables ze for e ⊆ e¯ with e ∋ w, we conclude
+that CER(Gw→u) = projGw→u(CER(G)). This together with CER(G) ⊆ CER(G) ∩ Q¯w→u implies
+that CER(Gw→u) ⊆ projGw→u (CER(G) ∩ Q¯w→u).
+
+    Thanks to Lemma 5, we can show that the tightness of the complete edge relaxation is preserved
+under the node contraction operation.
+
+Proposition 4. Let G = (V, E) be a hypergraph, let u, w ∈ V , and let Gw→u be the hypergraph
+obtained from G by contracting w to u. If CER(G) is an extension of MP(G), then CER(Gw→u)
+is an extension of MP(Gw→u).
+
+Proof. Denote by projG(CER(G)) the set obtained from CER(G) by projecting out variables ze,
+e ∈ cl(E) \ E. By assumption, we have projG(CER(G)) = MP(G). Therefore, projG(CER(G)) ∩
+Qw→u = projG(CER(G) ∩ Q¯w→u) = MP(G) ∩ Qw→u, where the first equality follows since the
+operator projG(·) does not project out variables zu, zw. We then deduce that
+
+                projGw→u (projG(CER(G) ∩ Q¯w→u)) = projG(projGw→u (CER(G) ∩ Q¯w→u))
+                                                               = projGw→u (MP(G) ∩ Qw→u).
+
+By Part (i) of Lemma 5 we have projGw→u(MP(G) ∩ Qw→u) = MP(Gw→u), and by Part (ii)
+of Lemma 5 we have projGw→u(CER(G) ∩ Q¯w→u) ⊇ CER(Gw→u). These together imply that
+MP(Gw→u) ⊇ projG(CER(Gw→u)). However, by definition MP(Gw→u) ⊆ projG(CER(Gw→u)).
+
+Hence, we deduce that MP(Gw→u) = projG(CER(Gw→u)).
+
+                                                      15
+4.3 The node expansion operator
+
+Let G = (V, E) be a hypergraph, let w ∈ V , and let f be a nonempty set of nodes disjoint from V .
+We define the hypergraph obtained from G by expanding w to f as the hypergraph G′ = (V ′, E′),
+
+where:  V ′ := V \ {w} ⊎ f,
+
+        E′ := {f } ⊎ {e ∈ E : w ∈/ e} ⊎ {e \ {w} ⊎ f : e ∈ E, w ∈ e},
+
+and where ⊎ denotes the disjoint union of sets. In the following we show how the multilinear
+polytope and the complete edge relaxation are transformed under the node expansion operator. To
+this end, we use the following result from [8], which allows us to combine perfect formulations that
+overlap in only one variable.
+
+Lemma 6 ( [8]). Let m1, m2, n1, n2 be nonnegative integers with m1, m2 ≥ 1. Let A ∈ Rm1×(n1+1),
+b ∈ Rm1 , C ∈ Rm2×(n2+1), d ∈ Rm2 , and define
+
+        P := {(x, y) ∈ Rn1 × R : A(x, y) ≤ b} ,
+        Q := {(y, z) ∈ R × Rn2 : C(y, z) ≤ d} .
+
+Assume that P and Q are polytopes with binary vertices. Then the following polytope has binary
+vertices:
+
+                          R = {(x, y, z) ∈ Rn1 × R × Rn2 : A(x, y) ≤ b, C(y, z) ≤ d} .
+
+    The next theorem shows how an extended formulation for the multilinear polytope is trans-
+formed under the node expansion operator and is of independent interest. The result is similar in
+nature to theorem 4 in [8]. However, it concerns general extended formulations, instead of only for-
+mulations in the original space. In the following, given a hypergraph G = (V, E) and an edge f ∈ E,
+by the standard linearization of f , we imply the system of inequalities in variables y ∈ Rf⊎{f}:
+
+        yf ≥ yv − |f | + 1,
+
+        v∈f
+
+                                 yf ≤ yv ∀v ∈ f,                       (23)
+
+                                 yf ≥ 0,
+
+                                 yv ≤ 1 ∀v ∈ f.
+
+Theorem 7. Let G = (V, E) be a hypergraph, let w ∈ V , let f be a nonempty set of nodes
+disjoint from V , and let G′ = (V ′, E′) be the hypergraph obtained from G by expanding w to f .
+Let A(x, u) ≤ b be an extended formulation of MP(G), where x ∈ RV ⊎E are the original variables,
+and where u ∈ RU denote the extended variables. Let Cy ≤ d be the system (23), in variables
+y ∈ Rf⊎{f}. Then, an extended formulation of the multilinear polytope MP(G′), with original
+variables z ∈ RV ′⊎E′ and extended variables u ∈ RU , is obtained from A(x, u) ≤ b, Cy ≤ d by
+renaming the x variables in A(x, u) ≤ b as follows:
+
+        xw → zf ,
+
+        xv → zv ∀v ∈ V \ {w} , (24)
+        xe → ze                  ∀e ∈ E, w ∈/ e,
+
+        xe → ze\{w}⊎f ∀e ∈ E, w ∈ e,
+
+and by renaming the y variables in Cy ≤ d as follows:
+
+                             yf → zf , (25)
+                             yv → zv ∀v ∈ f.
+
+                                 16
+Proof. Let Vx := V \ {w}, and observe that V ′ = Vx ⊎ f . Let Ex := {e ∈ E : w ∈/ e} ⊎ {e \ {w} ⊎ f :
+e ∈ E, w ∈ e}, and observe that E′ = Ex ⊎ {f }.
+
+    Next, we consider the extended formulation of MP(G) given by the system A(x, u) ≤ b. We
+rename the x variables as in (24), and obtain the system A(z, u) ≤ b in variables z ∈ RVx⊎Ex⊎{f}
+and u ∈ RU . Let P be the polyhedron defined by
+
+                                 P := (z, u) ∈ RVx⊎Ex⊎{f} × RU : A(z, u) ≤ b .
+
+Let P˜ be obtained from P by projecting out variables u ∈ RU , i.e.,
+
+                           P˜ := z ∈ RVx⊎Ex⊎{f} : ∃u ∈ RU such that A(z, u) ≤ b .
+
+By assumption, P˜ is obtained from MP(G), in variables x ∈ RV ⊎E, by renaming variables as in
+(24). In particular, P˜ is a polytope with binary vertices. Denote by A˜z ≤ ˜b a system of linear
+inequalities, in variables z ∈ RVx⊎Ex⊎{f}, describing P˜, i.e.,
+
+                                           P˜ = z ∈ RVx⊎Ex⊎{f} : A˜z ≤ ˜b .
+
+    Next, consider the standard linearization of the edge f , given by the system Cy ≤ d. We rename
+the y variables as in (25), and obtain the system Cz ≤ d in variables z ∈ Rf⊎{f}. Let Q be the
+polyhedron defined by
+
+                                             Q := z ∈ Rf⊎{f} : Cz ≤ d .
+
+If we denote by H the hypergraph H = (f, {f }), it is well-know that Q is obtained from MP(H), in
+variables y ∈ Rf⊎{f}, by renaming variables as in (25). In particular, Q is a polytope with binary
+vertices.
+
+    Observe that P˜ and Q share only one common variable, namely variable zf . In P˜, such variable
+was obtained by renaming variable xw, while in Q it was obtained by renaming variable yf . We
+can then apply Lemma 6 to P˜ and Q, and obtain that the following polytope has binary vertices:
+
+                                    R = z ∈ RVx⊎f⊎Ex⊎{f} : A˜z ≤ ˜b, Cz ≤ d
+                                       = z ∈ RV ′⊎E′ : A˜z ≤ ˜b, Cz ≤ d . (26)
+
+    Recall that the system A˜z ≤ ˜b is obtained from the system A(z, u) ≤ b by projecting out
+variables u ∈ RU . Since the variables u ∈ RU are not present in the system Cz ≤ d, projecting
+out variables u ∈ RU from the system A(z, u) ≤ b, Cz ≤ d, results in the system A˜z ≤ ˜b, Cz ≤ d.
+Therefore, A(z, u) ≤ b, Cz ≤ d is an extended formulation of R. More precisely,
+
+                        R = z ∈ RV ′⊎E′ : ∃u ∈ RU such that A(z, u) ≤ b, Cz ≤ d .
+
+To conclude the proof, we need to show that R coincides with MP(G′). We already know that both
+R and MP(G′) have binary vertices, so we only need to check that they contain the same binary
+vectors. The remainder of the proof is devoted to proving this claim.
+
+    Let z¯ be a binary vector in MP(G′). We prove z¯ ∈ R. From (26), it suffices to show that the
+restriction of z¯ to RVx⊎Ex⊎{f} is in P˜, and the restriction of z¯ to Rf⊎{f} is in Q. To do so, we define
+
+                                                               17
+binary vectors x¯ ∈ RV ⊎E and y¯ ∈ Rf⊎{f} using the inverse of (24) and (25), and prove x¯ ∈ MP(G)
+and y¯ ∈ MP(H). Specifically, x¯ ∈ RV ⊎E is defined by
+
+    x¯w := z¯f ,
+
+    x¯v := z¯v ∀v ∈ V \ {w} , (27)
+    x¯e := z¯e                                            ∀e ∈ E, w ∈/ e,
+
+    x¯e := z¯e\{w}⊎f ∀e ∈ E, w ∈ e,
+
+and y¯ ∈ Rf⊎{f} is defined by
+                                                   y¯f := z¯f , (28)
+                                                   y¯v := z¯v ∀v ∈ f.
+
+We have y¯ ∈ MP(H) because
+
+    y¯f = z¯f = z¯v = y¯v.
+
+                                                          v∈f    v∈f
+
+Furthermore, we have x¯ ∈ MP(G) because, for every e ∈ E with w ∈/ e,
+
+          x¯e = z¯e = z¯v = x¯v,
+
+                                                          v∈e    v∈e
+
+and for every e ∈ E with w ∈ e,                                   
+                                                     
+
+x¯e = z¯e\{w}⊎f =                                        z¯v  z¯v
+
+                 v∈e\{w}                                        v∈f
+                                                                      
+
+=        z¯v z¯f =                                                   x¯v x¯w = x¯v.
+
+v∈e\{w}                                                        v∈e\{w}       v∈e
+
+    Now, let z¯ be a binary vector not in MP(G′). We prove z¯ ∈/ R. From (26), it suffices to show
+that either the restriction of z¯ to RVx⊎Ex⊎{f} is not in P˜, or the restriction of z¯ to Rf⊎{f} is not in
+Q. To do so, we define binary vector x¯ ∈ RV ⊎E as in (27), and y¯ ∈ Rf⊎{f} as in (28), and prove
+x¯ ∈/ MP(G) or y¯ ∈/ MP(H). If z¯f̸ = v∈f z¯v, then
+
+    y¯f = z¯f̸ = z¯v = y¯v,
+
+                                                          v∈f    v∈f
+
+and y¯ ∈/ MP(H). Thus, we now assume z¯f = v∈f z¯v. Since z¯ is not in MP(G′), there exists an
+edge g′ ∈ E′ with g′̸ = f such that z¯g′̸ = v∈g′ z¯v. Let g be the edge of G corresponding to g′, i.e.,
+g = g′ if g′ ∩ f = ∅ and g = g′ ⊎ {w} \ f if f ⊆ g′. Note that in the first case we have w ∈/ g, while
+in the second case we have w ∈ g and g′ = g \ {w} ⊎ f . We now show x¯ ∈/ MP(G). In fact, if w ∈/ g,
+
+then
+
+    x¯g = z¯g′̸ = z¯v = x¯v.
+
+                                                          v∈g′   v∈g
+
+On the other hand, if w ∈ g, then                                 
+                                                       
+
+x¯g = z¯g\{w}⊎f = z¯g′̸ = z¯v =                                 z¯v  z¯v =
+
+    v∈g′                                                v∈g\{w}         v∈f
+
+                                                          18
+                             
+
+=       z¯v z¯f =            x¯v x¯w = x¯v.
+
+v∈g\{w}                v∈g\{w}     v∈g
+
+    Thanks to Theorem 7, we can show that the tightness of the complete edge relaxation is pre-
+served under the node expansion operation.
+
+Proposition 5. Let G = (V, E) be a hypergraph, let w ∈ V , let f be a nonempty set of nodes
+disjoint from V , and let G′ be the hypergraph obtained from G by expanding w to f . If CER(G) is
+an extension of MP(G), then CER(G′) is an extension of MP(G′).
+
+Proof. By assumption, CER(G) is an extension of MP(G). Denote by x the original variables and
+by u the extended variables in such extended formulation. By Theorem 7, an extended formulation
+of MP(G′), in original variables z and extended variables u, is obtained from the description of
+CER(G) and (23) by renaming the x variables in the description of CER(G) as in (24) and renaming
+the y variables in (23) as in (25). Let us consider the obtained formulation of MP(G′). By
+construction, each inequality in this formulation contains variables corresponding to nodes and
+edges inside some maximal edge of G′. Moreover from the definition of complete edge relaxation,
+as well as Proposition 2, the description of CER(G′) is obtained by putting together the convex hull
+description for each subhypergraph of G′ induced by a maximal edge. It follows that all inequalities
+in the obtained extended formulation of MP(G′) are implied by some inequalities in the description
+of CER(G′). Therefore, CER(G′) is an extension of MP(G′).
+
+4.4 Reducing the length of simple cycles
+
+Thanks to the node contraction and node expansion operators introduced earlier, we are now able
+“reduce” the length of simple cycles. This in turn enables us to limit our attention to simple cycles
+of length three. The following theorem is of independent interest in hypergraph theory.
+
+Theorem 8. Let G = (V, E) be a hypergraph, assume that it contains a simple cycle, and let ℓ
+denote the minimum length of a simple cycle in G. If ℓ ≥ 4, through a sequence of expansion and
+contraction operations, we can obtain, from G, a new hypergraph G′ that contains a simple cycle
+of length at most ℓ − 1.
+
+Proof. Let C = e1, e2, . . . , eℓ, eℓ+1, for some ℓ ≥ 4, be a simple cycle of G of minimum length.
+As before, define si := ei ∩ ei+1 for every i ∈ [ℓ]. In the following, we define the expansion and
+contraction operations that enable us to reduce the length of a simple cycle.
+
+    Expansion. Recursively, we expand each node v ∈ s1 ∪s2 to a set of new nodes fv of cardinality
+|s1 ∪ s2|. Since, for every node v ∈ s1 ∪ s2, there is a bijection between the nodes in fv and the
+nodes in s1 ∪ s2 (including v itself), we can label each node in fv with the corresponding node in
+s1 ∪ s2.
+
+    Contraction. For each pair of distinct nodes v, w ∈ s1 ∪ s2, we recursively contract the node
+in fv labeled by w to the node in fw labeled by v; we denote the resulting node by uvw, where vw
+is an unordered pair. Note that each such contraction can be performed since each such pair of
+nodes, after expansion, is contained in e2. Denote by G′ = (V ′, E′) the obtained hypergraph and
+by
+
+                                         U := {uvw : v, w ∈ s1 ∪ s2, v̸ = w} .
+
+                                                               19
+For every node v ∈ s1 ∪ s2, we identify the node in fv labeled by v (which has not been contracted)
+with the original node v. In this way, we have that V ′ is the disjoint union of V and U .
+
+    The new simple cycle. For every i = 1, . . . , ℓ, let e′i be the edge of G′ that originated from
+the edge ei of G. More precisely, e′i is the edge of G′ given by
+
+                                                        ei′ := ei ∪ {uvw ∈ U : ei ∩ {v, w}̸ = ∅} .                                                                   (29)
+
+    Define     C′  :=     e′  ,  e′  ,  e′  ,  .  .  .  ,  e  ′  ,  e′ℓ+1  .  Define       s′  :=  e′    ∩   e′   and,       for      every    i  =  3, . . . , ℓ,  define
+                                                              ℓ
+                           1      3      4                                                  1       1         3
+s′i := e′i ∩ e′i+1. In the remainder of the proof, we show that C′ is a simple cycle of G′ of length
+ℓ − 1. From Definition 3, it suffices to show that C′ satisfies condition (S).
+
+    Let i, j, l ∈ [ℓ] \ {2} with i < j < l and e′ ∈ E′. We need to show (s′i ∪ s′j ∪ s′l) \ e′̸ = ∅. For a
+contradiction, assume (s′i ∪ s′j ∪ s′l) ⊆ e′.
+
+    First, assume that e′ is an edge of G′ contained in U . In this case, we obtain (s′i∪s′j ∪s′l) ⊆ e′ ⊆ U .
+
+In particular,
+
+                                                                                      sj′ ⊆ U.
+
+Note that j ≥ 3. Applying (29) to e′j and e′j+1, we obtain
+
+                                                                              sj = sj′ \ U = ∅,
+
+which contradicts Lemma 1 and Observation 1.
+    It remains to consider the case in which e′ is an edge of G′ that is not contained in U . In this
+
+case, e′ is an edge that is originated from an edge of G. More precisely, there exists e ∈ E such
+
+that
+
+                                                           e′ := e ∪ {uvw ∈ U : e ∩ {v, w}̸ = ∅} .                                                                   (30)
+
+Claim 1. For every k ∈ {3, 4, . . . , ℓ}, sk \ e̸ = ∅ implies s′k \ e′̸ = ∅.
+
+Proof of claim. By assumption, there exists v ∈ sk \ e. We show that v ∈ s′k \ e′.
+    Applying (29) to ek and ek+1, we obtain sk ⊆ s′k, thus v ∈ sk implies v ∈ s′k. On the other
+hand, v ∈ sk implies v ∈ V and v ∈/ U . Since v ∈/ e, from (30) we obtain v ∈/ e′.
+                                                                                                                                                                        ⋄
+
+Claim      2.  s1  \e   ̸=  ∅    and       s2     \e       ̸=       ∅  imply   s′  \ e′    ̸=  ∅.
+
+                                                                                1
+
+Proof of claim. By assumption, there exist v ∈ s1 \ e and w ∈ s2 \ e.
+
+    Consider       the  case     v      =   w.       In       this      case,     we  show     v   ∈  s′  \  e′.  First,        observe       that   v  ∈  s′1.  In  fact,
+
+                                                                                                       1     e′     e′          e′    ⊆ s′1.
+
+by  assumption,        v  ∈ s1 ∩ s2               = e1 ∩ e2 ∩ e3.                 From     (29),      v  ∈    1  ∩   2   ∩       3             On    the   other    hand,
+
+from v ∈ V , v ∈/ e, and (30), we obtain v ∈/ e′. This concludes the proof for the case v = w.
+
+    Next,  consider         the  case          v     ̸=    w.       In  this   case,  we       show   uvw    ∈    s′  \  e′  .  First,     observe      that  uvw    ∈  s′1.
+
+                                                                                                                   1            e′2.
+                                                                                                                    e′
+In  fact,  by  assumption,              v  ∈      s1       =     e1 ∩ e2,     thus    from     (29),     uvw     ∈       ∩            Similarly,     by   assumption,
+                                                                                                                     1
+                                                                              e′     e′3.                                e′         e′     e′  ⊆ s′1.
+w   ∈ s2   = e2 ∩ e3,     thus       from         (29),             uvw    ∈      ∩        Therefore,        uvw    ∈           ∩       ∩               On    the   other
+                                                                               2                                          1          2      3
+hand, we have uvw ∈/ e′. In fact, from v ∈/ e, w ∈/ e, and (30), we obtain uvw ∈/ e′. This concludes
+
+the proof for the case v̸ = w.                                                                                                                                          ⋄
+
+    Recall that, in order to obtain a contradiction, we assumed (s′i ∪ s′j ∪ s′l) ⊆ e′. For k ∈ {i, j, l},
+we then have s′k ⊆ e′. From Claim 1, if k ∈ {3, 4, . . . , ℓ}, then sk ⊆ e. From Claim 2, if k = 1, then
+s1 ⊆ e or s2 ⊆ e. We have therefore obtained p, q, r ∈ [ℓ] with p < q < r such that (sp ∪ sq ∪ sr) ⊆ e,
+
+which gives us a contradiction.
+
+                                                                                         20
+4.5 The key structure
+
+By Theorem 8 to prove Theorem 6, it essentially suffices to consider hypergraphs containing simple
+cycles of length three. As we show in the next section, all such hypergraphs contain a subhypergraph
+with n nodes whose maximal edges consist of all subsets of cardinality n − 1. In the following,
+we show that for such subhypergraphs, the complete edge relaxation is not an extension of the
+multilinear polytope.
+
+Proposition 6. Let G = (V, E) be a hypergraph; let n := |V | ≥ 3, and let the set of maximal edges
+of G consist of all subsets of V of cardinality n − 1. Then CER(G) is not an extension of MP(G).
+
+Proof. Denote by Emax the set of maximal edges of G. Consider the following inequality:
+
+                                               zv −             ze ≤ |V | − 2.                                          (31)
+
+                                          v∈V        e∈Emax
+
+We claim that (31) is a valid inequality for MP(G). To see this, notice that there are two cases in
+which this inequality can be violated:
+
+• zv = 1 for all v ∈ V : in this case we also have ze = 1 for all e ∈ E. Substituting this point
+   in (31) we get |V | − |Emax| = |V | − |V | ≤ |V | − 2.
+
+• zv = 1 for all v ∈ V ′ ⊂ V , with |V ′| = |V | − 1: in this case we have ze = 1 for some maximal
+   edge e ∈ Emax, with e = V ′. Substituting this point in (31) we get |V | − 1 − 1 ≤ |V | − 2.
+
+Hence, we conclude that (31) is a valid inequality for MP(G). Now consider the following fractional
+
+point z˜ ∈ RV ∪cl(E):
+                                         z˜p = n − 1 − |p| , ∀p ∈ V ∪ cl(E). (32)
+                                                    n−1
+
+First, consider the projection zˆ of z˜ onto the space RV ∪Emax; zˆv            =  n−2        for all v ∈ V   and zˆe = 0
+                                                                                   n−1
+                                                                                n( n−2 n−1 )               n
+for all e ∈ Emax.     Substituting    zˆ  in  inequality  (31)  we  obtain                    =  n  −    n−1  ̸≤ n − 2, since
+
+  n  ≤  3  for  n  ≥  3.  Therefore,  zˆ  violates  the  valid  inequality  (31).  In  the       following,   we  show  that
+n−1     2
+
+z˜ ∈ CER(G) implying CER(G) is not an extension of MP(G). The relaxation CER(G) is defined
+
+by the following inequalities:
+
+                                          ψ(U, e) ≥ 0, ∀U ⊆ e, ∀e ∈ Emax,                                               (33)
+
+where ψ(U, e) is defined by (1). Define m := |U |. Substituting (32) into ψ(U, e), we obtain:
+
+     ψ(U, e) = m − m m − 1 + m m − 2 − . . . + (−1)m−1 m                                              1 + (−1)m(0)
+                   n−1 1 n−1 2 n−1                                                 m−1 n−1
+
+                = 1 m − 2 m + 3 m − 4 m + . . . + (−1)m−1m m
+                   n−1          2              3          4                                   m
+
+                = 1 (−1)k−1 m k m .
+                   n−1                    k
+                          k=1
+
+where the second equality follows from the identity             n  (n − k)  =   (k + 1)           n   .  Moreover,  we  have
+                                                                k                                k+1
+
+                                (−1)k−1 m k m =           1 if m = 1;
+                                                  k       0 if m = 0 or m > 1.
+
+                               k=1
+
+Therefore, point (32) satisfies inequalities (33), implying that z˜ ∈ CER(G). We conclude that
+CER(G) is not an extension of MP(G).
+
+                                                          21
+    Letting n = 3 in Proposition 6, the hypergraph G simplifies to a graph consisting of a cycle of
+length three. Let V = {u, v, w}. In this case inequality (31) simplifies to the following “triangle”
+inequality [21]:
+
+                                    zu + zv + zw − z{u,v} − z{u,w} − z{v,w} ≤ 1.
+
+In fact, for any n ≥ 3, the set of maximal edges Emax of G in Proposition 6 forms a simple cycle. To
+see this, consider an ordering of the edges in Emax denoted by e1, e2, . . . , en, en+1, with en+1 = e1.
+We then have si ∪ sj ∪ sk = V , and by construction e \ V̸ = ∅ for all e ∈ E.
+
+4.6 Proof of necessity
+
+We are now ready to prove Theorem 6.
+
+Proof. We prove that if G is not α-acyclic, then CER(G) is not an extension of MP(G). Suppose
+that G is not α-acyclic; then by Theorem 3, G contains a simple cycle. Denote by C = e1, e2, . . . eℓ+1,
+where eℓ+1 = e1, for some ℓ ≥ 3, a simple cycle of minimal length in G. Our proof is by induction
+on the length ℓ of C. Recall that si = ei ∩ ei+1 for i ∈ [ℓ].
+
+Base case. Suppose that G contains a simple cycle of length three; C = e1, e2, e3, e1. Define
+V¯ := s1 ∪ s2 ∪ s3, and let LV¯ denote the affine set as defined by (3). Denote by GV¯ = (V¯ , E¯) the
+subhypergraph of G induced by V¯ . By Proposition 3, to prove that CER(G) is not an extension
+
+of MP(G), it suffices prove that CER(GV¯ ) is not an extension of MP(GV¯ ). The hypergraph GV¯ is
+not α-acyclic because it contains a simple cycle C = e¯1, e¯2, e¯3, e¯1, where e¯i = ei ∩ V¯ for i ∈ {1, 2, 3}.
+In the following, for notational simplicity, instead of e¯i we write ei for all i ∈ [ℓ + 1]. We show that
+CER(GV¯ ) is not an extension of MP(GV¯ ). Letting ℓ = 3 in condition (S), we deduce that V¯ is not
+an edge of GV¯ , and that the following sets are nonempty:
+
+s¯1 := (e1 ∩ e2) \ e3, s¯2 := (e2 ∩ e3) \ e1, s¯3 := (e1 ∩ e3) \ e2.  (34)
+
+We consider two cases separately.
+
+Case 1. In this case, we assume that there exist three nodes v1 ∈ s¯1, v2 ∈ s¯2, v3 ∈ s¯3 such
+that {v1, v2, v3} is not contained in an edge of E¯. Let V˜ = {v1, v2, v3} and denote by GV˜ the
+subhypergraph of GV¯ (or G) induced by V˜ . By Proposition 3, it suffices to show that CER(GV˜ )
+is not an extension of MP(GV˜ ). Clearly, GV˜ is a graph consisting of a cycle of length three. By
+letting n = 3 in Proposition 6, it follows that CER(GV˜ ) is not an extension of MP(GV˜ ), which in
+turn implies that CER(G) is not an extension of MP(G).
+
+Case 2. In this case, we assume that for any three nodes v1 ∈ s¯1, v2 ∈ s¯2, v3 ∈ s¯3, the set
+{v1, v2, v3} is contained in some edge of E¯. Recall that from condition (S) it follows that there is
+no edge e ∈ E¯ such that e = V¯ . First, consider all subsets of V¯ of cardinality |V¯ | − 1. If all these
+
+subsets are edges of GV¯ , then by Proposition 6 we conclude that CER(GV¯ ) is not an extension
+of MP(GV¯ ). Otherwise, take a subset of V¯ of cardinality |V¯ | − 1, denoted by V¯ −1, which is not
+an edge of GV¯ . Notice that V¯ −1 contains at least one node from each of s¯1, s¯2, s¯3, since otherwise
+it coincides with one of the three edges e1, e2, e3, implying that V¯ −1 is an edge of GV¯ . If all
+subsets of V¯ −1 of cardinality |V¯ | − 2 are contained in some edge of E¯ and hence are edges of GV¯ −1,
+then by Proposition 6 we conclude that CER(GV¯ −1) is not an extension of MP(GV¯ −1). Otherwise,
+we choose a subset of V¯ −1 with cardinality |V¯ | − 2 that is not contained in any edge of E¯. We
+
+                                   22
+apply the above argument recursively, until we find a subset V¯ −q of cardinality |V¯ | − q for some
+q ∈ {1, . . . , |V¯ | − 4} satisfying the following properties:
+
+  (i) V¯ −q is not contained in any edge in E¯, and
+  (ii) each subset of V¯ −q of cardinality |V¯ −q| − 1 is contained in some edge of E¯.
+
+    We claim that we can always find a subset satisfying the two conditions above. To see this,
+consider any V ′ ⊆ V¯ such that |V ′| = 4 and V ′̸ ⊆ e for any e ∈ E¯. It then follows that V ′ must
+contain three nodes v1 ∈ s¯1, v2 ∈ s¯2, v3 ∈ s¯3. By assumption, we have {v1, v2, v3} ⊆ e for some
+e ∈ E¯. Denote by vˆ the fourth node of V ′. Define s∩ = e1 ∩ e2 ∩ e3. We then have s¯i = si \ s∩,
+i ∈ {1, 2, 3}. Two cases arise:
+
+    • vˆ ∈ s¯i for some i ∈ {1, 2, 3}: without loss of generality, let vˆ ∈ s¯1. Then by assumption,
+       we have {vˆ, v2, v3} ⊆ e for some e ∈ E¯. Moreover, by construction, {vˆ, v1, v2} ⊆ e2 and
+       {vˆ, v1, v3} ⊆ e1.
+
+    • vˆ ∈ s∩: in this case, we have {vˆ, v1, v2} ⊆ e2, {vˆ, v1, v3} ⊆ e1, and {vˆ, v2, v3} ⊆ e3.
+
+    Now consider the subhypergraph GV ′ of G induced by V ′. By assumption V ′ is not an edge
+of GV ′. By the above argument, all subsets of cardinality three of V ′ are edges of GV ′. Hence,
+letting n = 4 in Proposition 6, we deduce that MP(GV ′) ⊂ projGV ′ (CER(GV ′)). Therefore, we
+conclude that CER(GV¯ −q ) is not an extension of MP(GV¯ −q ), where q ∈ {1, . . . , |V¯ | − 4}. Hence,
+by Proposition 3, if G contains a simple cycle of length three, CER(G) is not an extension of
+MP(G).
+
+The inductive step. Now suppose that the minimal length of a simple cycle in G is ℓ ≥ 4.
+Suppose that for any hypergraph G that contains a simple cycle of length at most ℓ − 1, CER(G)
+is not an extension of MP(G). Then we would like to prove that for any hypergraph G containing
+a simple cycle of length ℓ, CER(G) is not an extension of MP(G) either.
+
+    Let C be a simple cycle of minimal length ℓ in G for some ℓ ≥ 4. Then by Theorem 8, through
+a sequence of expansion and contraction operations, we can obtain a hypergraph G′ such that G′
+contains a simple cycle of length at most ℓ − 1. By the induction hypothesis, CER(G′) is not
+an extension of MP(G′). Then by a repeated application of Proposition 4 and Proposition 5, we
+deduce that CER(G) is not an extension of MP(G) and this completes the proof.
+
+5 Generalized triangle inequalities
+
+In [21], Padberg introduced triangle inequalities, a class of facet-defining inequalities for the Boolean
+quadric polytope. Let G be a graph. Then for any cycle of length three in G with nodes denoted
+by u, v, w, we define the following triangle inequalities:
+
+z{u,v} + z{u,w} ≤ zu + z{v,w}                 (35a)
+z{u,v} + z{v,w} ≤ zv + z{u,w}                 (35b)
+z{u,w} + z{v,w} ≤ zw + z{u,v}                 (35c)
+zu + zv + zw − z{u,v} − z{u,w} − z{v,w} ≤ 1.  (35d)
+
+23
+Padberg proved that inequalities (35) define facets of BQP(G). He further generalized triangle
+inequalities to odd-cycle inequalities, a family of facet-defining inequalities corresponding to chord-
+less cycles of any length. Subsequently, he showed that the polytope obtained by adding odd-cycle
+inequalities to the standard linearization coincides with the Boolean quadratic polytope if G is a
+series-parallel graph. In [5] the authors showed that triangle inequalities are Chv´atal-Gomory (CG)
+cuts for the McCormick relaxation. Furthermore, if G is a complete graph, they proved that the
+addition of triangle inequalities to the McCormick relaxation gives the CG-closure of BQPLP(G).
+On the computational front, triangle inequalities have had a significant impact on the performance
+of mixed-integer quadratic programming solvers [4].
+
+    In this section, with the goal of strengthening the complete edge relaxation, we generalize
+triangle inequalities (35) to obtain a family of facet-defining inequalities for simple cycles of length
+three. Notice that for cycles of length three, simple cycles coincide with α-cycles. We show that the
+proposed inequalities are CG-cuts for the complete edge relaxation, while they are not CG cuts for
+the standard linearization. Throughout this section, we consider hypergraphs satisfying G = cl(G);
+i.e., the space in which the complete edge relaxation is constructed.
+
+5.1 The switching operation for the multilinear polytope
+
+To define the new inequalities, we make use of the switching operation for the multilinear polytope,
+which has been employed in [6, 10]. This operation enables us to convert valid linear inequalities
+into other valid linear inequalities that induce faces of the same dimension. A similar operator has
+been introduced by several authors independently for Boolean quadric and cut polytopes [1, 21].
+Consider a hypergraph G = (V, E) with G = cl(G). Let T ⊆ V . The characteristic vector for T ,
+denoted by χT ∈ {0, 1}V ∪E, is defined by
+
+                      χvT := 1 if v ∈ T                ∀v ∈ V,
+                                 0 if v ∈/ T           ∀e ∈ E.
+
+                      χeT := 1 if e ⊆ T
+                                 0 if e ⊈ T
+
+Clearly, the multilinear set of G is precisely the set of all χT , for T ⊆ V . Then, for any U ⊆ V , the
+corresponding switching of χT is defined as
+
+                      ϕU (χT ) := χT ∆U .
+
+The term ‘switching’ naturally refers to flipping the value of each binary variable zv, for every
+v ∈ U . It is shown in theorem 4.3 in [6] that, due to our assumption G = cl(G), each switching can
+be extended to an affine automorphism of MP(G) (and of RV ∪E) given by:
+
+ϕU (zv) =  1 − zv                           if v ∈ U            ∀v ∈ V,  (36)
+           zv                               if v ∈ V \ U
+
+ϕU (ze) =             z(e\U)∪W −            z(e\U )∪W           ∀e ∈ E,  (37)
+
+           W ⊆e∩U                 W ⊆e∩U
+           |W | even              |W | odd
+
+where we define z∅ := 1. For any U ⊆ V , we define the U -switching of an inequality az ≤ β in
+RV ∪E, as the image of the inequality under ϕU . We also refer to a U -switching of an inequality
+az ≤ β, for some U ⊆ V , simply as a switching of az ≤ β. Notice that if we set U = ∅, the U -
+
+switching of az ≤ β coincides with az ≤ β. It then follows from the above discussion (see corollary
+
+                                  24
+4.5 in [6]) that an inequality az ≤ β is valid for MP(G) if and only if any of its switchings is valid
+for MP(G), and the former is facet-defining for MP(G) if and only if the latter is. We also refer to
+all switchings of αz ≤ β as the system of U -switchings of az ≤ β, for all U ⊆ V .
+
+    Observe that the transformation defined by (36) and (37) is also an affine automorphism of the
+complete edge relaxation CER(G). In fact, the system of inequalities defining CER(G) is precisely
+the system obtained by putting together all switchings of the inequality ze ≥ 0, for every e ∈ Emax.
+This implies that an inequality az ≤ β is valid for CER(G) if and only if any of its switchings is
+valid for CER(G). Since switchings preserve the integrality of the coefficients and the integrality
+of the right-hand side, we deduce that an inequality az ≤ β is a CG cut for CER(G) if and only if
+any of its switchings is a CG-cut for CER(G).
+
+Observation 2. Let us consider Padberg’s triangle inequalities for the Boolean quadric polytope.
+It can be checked that every inequality in (35) is a switching of inequality (35a): Inequality (35b)
+can be obtained with U = {w}, inequality (35c) with U = {v}, and inequality (35d) with U = {u}.
+In fact, system (35) consists of all switchings of any of its inequalities.
+
+5.2 The new inequalities
+
+In the following, given an α-cycle C = e1, e2, e3, e1, we define the support hypergraph of C as the
+hypergraph GC = (VC , EC ), where
+
+                 VC := ∪i∈[ℓ]ei, EC := e ⊆ ei : |e| ≥ 2, ∀i ∈ [ℓ] .                  (38)
+
+We are now ready to present our new inequalities, which serve as the generalization of triangle
+inequalities, to the multilinear polytope.
+
+Proposition 7. Let G be a hypergraph with G = cl(G), and let C = e1, e2, e3, e1 be an α-cycle of
+
+G. Suppose that
+
+                 e1 \ (e2 ∪ e3) = ∅, e2 \ (e1 ∪ e3) = ∅, e3 \ (e1 ∪ e2) = ∅.         (39)
+
+Then all switchings of the following inequalities are valid for MP(G):
+
+                 ze1 + ze2 ≤ ze1∩e2 + ze3                                            (40a)
+                 ze1 + ze3 ≤ ze1∩e3 + ze2                                            (40b)
+                 ze2 + ze3 ≤ ze2∩e3 + ze1                                            (40c)
+                 ze1∩e2 + ze1∩e3 + ze2∩e3 − ze1 − ze2 − ze3 ≤ ze1∩e2∩e3 ,            (40d)
+
+where we define z∅ := 1. Moreover, all switchings of inequalities (40) define facets of MP(GC).
+
+Proof. First, we show that it suffices to consider inequality (40a) by proving that every other
+inequality in the system (40) is a switching of (40a). Let U = e1 \ e2; then the U -switching of (40a)
+is given by
+
+                                   ze1∩e2 − ze1 + ze2 ≤ ze1∩e2 + ze3\(e1\e2) − ze3 .
+
+First note that e3 \ (e1 \ e2) = (e2 ∩ e3) ∪ (e3 \ e1). Moreover, by assumption (39) we have
+e3 \ (e1 ∪ e2) = ∅, implying that (e2 ∩ e3) ∪ (e3 \ e1) = e2 ∩ e3. Substituting into the above inequality
+we get ze2 + ze3 ≤ ze2∩e3 + ze1, i.e., inequality (40c). Similarly, we can prove that inequality (40b)
+is the U -switching of inequality (40a) with U = e2 \ e1. Next, let U = (e1 ∩ e2) \ e3; then the
+U -switching of inequality (40a) is given by:
+
+                 ze1\(e2\e3) − ze1 + ze2\(e1\e3) − ze2 ≤ ze1∩e2∩e3 − ze1∩e2 + ze3 .
+
+                 25
+Again, from assumption (39) it follows that e1 \ (e2 \ e3) = e1 ∩ e3 and e2 \ (e1 \ e3) = e2 ∩ e3.
+Substituting into the above inequality yields inequality (40d).
+
+    Henceforth, in the remainder of the proof, we consider inequality (40a):
+
+−ze1∩e2 + ze1 + ze2 − ze3 ≤ 0.                                                   (41)
+
+We start by proving the validity of inequality (41) for MP(G). Two cases arise:
+
+• if ze1 = 1 and ze2 = 0 (or ze1 = 0 and ze2 = 1), then we have ze1∩e2 = 1, implying the validity
+   of (41).
+
+• if ze1 = ze2 = 1, then we have ze1∩e2 = 1, and by assumption (39) we have ze3 = 1, implying
+   the validity of (41).
+
+Therefore, inequality (41) is valid for MP(G).
+
+    Next, we show that inequality (41) defines a facet of MP(GC), where GC = (VC, EC) and VC, EC
+are defined by (38). To this end, denote by az ≤ α a nontrivial valid inequality for MP(GC) that
+is satisfied tightly by all binary points in MP(GC) that are binding for inequality (41). We show
+that the two inequalities coincide up to a positive scaling, which by the full dimensionality of
+MP(GC) [10] implies that inequality (41) defines a facet of MP(GC). Define s¯1 := (e1 ∩ e2) \ e3,
+s¯2 := (e2 ∩ e3) \ e1, s¯3 := (e1 ∩ e3) \ e2, and s∩ = e1 ∩ e2 ∩ e3. From assumption (39) it follows that
+ei = s¯i ∩ s∩, i ∈ {1, 2, 3}. Recall that from condition (S) it follows that s¯i̸ = ∅ for i ∈ {1, 2, 3}. In
+the following, by a tight point, we imply a binary point in MP(GC) that satisfies inequality (41)
+tightly.
+
+    First, consider a tight point with zv = 0 for all v ∈ VC. Substituting into az ≤ α yields:
+
+α = 0.                                                                           (42)
+
+Next, consider a tight point with zv˜ = 1 for some v˜ ∈ s¯2 ∪s¯3 ∪s∩ and zv = 0 otherwise. Substituting
+into az ≤ α and using (42) and the fact that s¯1̸ = ∅, we obtain:
+
+av = 0, ∀v ∈ s¯2 ∪ s¯3 ∪ s∩.                                                     (43)
+
+If |e1 ∩e2| > 1, consider a tight point with zv˜ = 1 for some v˜ ∈ s¯1 and zv = 0 otherwise. Substituting
+into az ≤ α and using (42), we obtain:
+
+av = 0, ∀v ∈ s¯1, if |e1 ∩ e2| > 1.                                              (44)
+
+If |e3| > 2, let e˜ ⊂ e3 be an edge of cardinality two. Consider a tight point with zv = 1 for
+all v ∈ e˜ and zv = 0 otherwise. Substituting into az ≤ α and using (42) and (43), we obtain
+ae˜ = 0. If |e3| > 3, let e˜ ⊂ e3 be an edge of cardinality three. Again, consider a tight point as
+constructed above. Substituting into az ≤ α and using the above result, we get ae˜ = 0. By a
+recursive application of this argument, we get
+
+ae = 0, ∀e ∈ EC : e ⊊ e3.                                                        (45)
+
+If |e1| > 2 (resp. |e2| > 2), let e˜ ⊂ e1 (resp. e˜ ⊂ e2) be an edge of cardinality two such that
+e˜̸ ⊇ e1 ∩ e2. Consider a tight point with zv = 1 for all v ∈ e˜ and zv = 0 otherwise. Substituting
+into az ≤ α and using (42) and (44) we obtain ae˜ = 0. Next we let e˜ to an edge of cardinality three
+such that e˜̸ ⊇ e1 ∩ e2. Applying this argument recursively, we obtain:
+
+ae = 0, ∀e ∈ EC : e ⊊ e1 or e ⊊ e2 : e̸ ⊇ e1 ∩ e2.                               (46)
+
+26
+If |s¯3| > 1, consider a tight point with zv = 1 for all v ∈ e2 and zv = 0, otherwise. Substituting
+into az ≤ α and using (42)- (44) and (46) we get:
+
+                                              ae = 0.           (47)
+
+                                 e∈EC : e⊆e2,
+                                   e⊇e1∩e2
+
+Now, let v˜ ∈ s¯3. Consider a tight point with zv = 1 for all v ∈ e2 ∪ {v˜} and zv = 0, otherwise.
+Substituting into az ≤ α and using (42)- (46) we obtain:
+
+                                                         ae + a(e1∩e2)∪{v˜} = 0,
+
+                                                             e∈EC :e⊆e2,
+                                                               e⊇e1∩e2
+
+which together with (47) implies that a(e1∩e2)∪{v˜} = 0. Next we should let v˜, v¯ ∈ s¯3 and construct
+a tight point as above to get a(e1∩e2)∪{v˜,v¯} = 0. Using this argument recursively together with a
+symmetric argument, we deduce that:
+
+            ae = 0, ∀e ⊊ e1 or e ⊊ e2 : e ⊃ e1 ∩ e2.            (48)
+
+Next, consider a tight point zv = 1 for all v ∈ e1 and zv = 0, otherwise. Substituting into az ≤ α
+
+and using (42)- (48) we obtain:
+
+                                 ae1∩e2 + ae1 = 0.              (49)
+
+Moreover, by symmetry we have:
+
+                                 ae1∩e2 + ae2 = 0.              (50)
+
+Consider a tight point with zv = 1 for all v ∈ VC. Substituting into az ≤ α and using (42)- (48)
+
+we obtain:
+
+                                 ae1∩e2 + ae1 + ae2 + ae3 = 0.  (51)
+
+Finally, consider a point zv = 1 for all v ∈ e3 and zv = 0 otherwise. Since by assumption s¯1̸ = ∅,
+substituting this point in az ≤ α and using (42)- (51) we get ae3 ≤ 0. Since az ≤ α is a nontrivial
+valid inequality for MP(GC), from (42)- (51), we deduce that this inequality can be equivalently
+written as β(−ze1∩e2 + ze1 + ze2 − ze3) ≤ 0 for some β > 0. Therefore, inequality (41) defines a fact
+of MP(GC) and this completes the proof.
+
+Observation 3. Let us consider assumption (39) of Proposition 7. It is simple to check that if this
+assumption is not satisfied for an α-cycle C in G, then inequalities (40) are not valid for MP(G).
+Now, let G = (V, E) be a hypergraph with G = cl(G), and let C = e1, e2, e3, e1 be an α-cycle of
+G that does not satisfy assumption (39). Define e¯1 = e1 ∩ (e2 ∪ e3), e¯2 = e2 ∩ (e1 ∪ e3), and
+e¯3 = e3 ∩ (e1 ∪ e2). Notice that since by assumption G = cl(G), we have e¯1, e¯2, e¯3 ∈ E. Moreover,
+since e1 ∩ e2 = e¯1 ∩ e¯2, e1 ∩ e3 = e¯1 ∩ e¯3, and e2 ∩ e3 = e¯2 ∩ e¯3, from condition (S) it follows that
+C¯ = e¯1, e¯2, e¯3, e¯1 is an α-cycle of G. Moreover, C¯ satisfies assumption (39) and therefore we can
+write inequalities (40) for C¯ instead.
+
+Observation 4. In [8], the authors introduce odd β-cycle inequalities, a class of valid inequalities
+for the multilinear polytope whose support hypergraph is a β-cycle. Consider odd β-cycle inequalities
+of length three. First, notice that these inequalities are associated with β-cycles of a hypergraph.
+Hence, by construction, many of them are implied by the complete edge relaxation. More precisely,
+for any β-cycle that is not an α-cycle, the corresponding odd β-cycle inequalities are implied by the
+complete edge relaxation. Second, these inequalities are only valid if e1 ∩ e2 ∩ e3 = ∅, a restrictive
+assumption that is not needed for inequalities (40). However, assumption (39) is not needed for odd
+β-cycle inequalities. This is because these inequalities are defined for general sparse hypergraphs
+while generalized triangle inequalities are defined over hypergraphs satisfying G = cl(G).
+
+                                 27
+    As we described in Observation 2, in the case of triangle inequalities, the system (35) represents
+all switchings of any of its inequalities. However, this is not the case for the generalized triangle
+inequalities (40). The following example demonstrates how to obtain new switchings of inequalities
+in (40).
+
+Example 1. Let G be a hypergraph and suppose that C = e1, e2, e3, e1 with e1 = {1, 2, 4}, e2 =
+{2, 3, 4}, e3 = {1, 3, 4} is an α-cycle of G. Inequalities (40) in this case are given by:
+
+                            z{1,2,4} + z{2,3,4} ≤ z{2,4} + z{1,3,4}
+                            z{1,2,4} + z{1,3,4} ≤ z{1,4} + z{2,3,4}
+                            z{2,3,4} + z{1,3,4} ≤ z{3,4} + z{1,2,4}
+                            z{2,4} + z{1,4} + z{3,4} − z{1,2,4} − z{2,3,4} − z{1,3,4} ≤ z4.
+
+Now, let U = {4}. Then the image of the above inequalities under the mapping ϕU defined by (36)
+and (37), is given by:
+
+z{1,2} − z{1,2,4} + z{2,3} − z{2,3,4} ≤ z2 − z{2,4} + z{1,3} − z{1,3,4}
+z{1,2} − z{1,2,4} + z{1,3} − z{1,3,4} ≤ z1 − z{1,4} + z{2,3} − z{2,3,4}
+z{2,3} − z{2,3,4} + z{1,3} − z{1,3,4} ≤ z3 − z{3,4} + z{1,2} − z{1,2,4}
+z1 + z2 + z3 + z4 − z{1,2} − z{1,3} − z{1,4} − z{2,3} − z{2,4} − z{3,4} + z{1,2,4} + z{1,3,4} + z{2,3,4} ≤ 1.
+
+Next, suppose that C = e1, e2, e3, e1 with e1 = {1, 2, 3}, e2 = {1, 2, 4}, e3 = {3, 4} is an α-cycle of
+G. Inequalities (40) in this case are given by:
+
+                                  z{1,2,3} + z{1,2,4} ≤ z{1,2} + z{3,4}
+                                  z{1,2,3} + z{3,4} ≤ z3 + z{1,2,4}
+                                  z{1,2,4} + z{3,4} ≤ z4 + z{1,2,3}
+                                  z{1,2} + z3 + z4 − z{1,2,3} − z{1,2,4} − z{3,4} ≤ 1.
+
+Now, let U = {2}. Then the image of the above inequalities under the mapping ϕU defined by (36)
+and (37), is given by:
+
+                    z{1,3} − z{1,2,3} + z{1,4} − z{1,2,4} ≤ z1 − z{1,2} + z{3,4}
+                    z{1,3} − z{1,2,3} + z{3,4} ≤ z3 + z{1,4} − z{1,2,4}
+                    z{1,4} − z{1,2,4} + z{3,4} ≤ z4 + z{1,3} − z{1,2,3}
+                    z1 + z3 + z4 − z{1,2} − z{1,3} − z{1,4} − z{3,4} + z{1,2,3} + z{1,2,4} ≤ 1.
+
+5.3 Generalized triangle inequalities as CG-cuts
+
+In the following, we show that inequalities (40) can be obtained from the complete edge relaxation
+as CG-cuts. Together with Proposition 7, this demonstrates the usefulness of the complete edge
+relaxation, as it can be used to obtain new families of facet-defining inequalities for the multilinear
+polytope of general hypergraphs. Interestingly, inequalities (40) are not CG-cuts for the standard
+linearization, another reason that conveys the superiority of the complete edge relaxation.
+
+Proposition 8. Let G = (V, E) be a hypergraph with G = cl(G), and let C = e1, e2, e3, e1 be an
+α-cycle of G satisfying assumption (39). Then all switchings of inequalities (40) are CG-cuts for
+the complete edge relaxation CER(G).
+
+                                                               28
+Proof. From our discussion at the beginning of Section 5, it suffices to prove the statement for one
+of the inequalities in (40), for example for inequality (40a).
+
+    Recall that we denote by GC = (VC, EC) the support hypergraph of the α-cycle C, where VC
+and EC are defined by (38). It is simple to check that inequalities defining CER(GC) are implied
+by the inequalities defining CER(G). To complete the proof, it suffices to show that the inequality
+
+                    2ze1∩e2 − 2ze1 − 2ze2 + 2ze3 ≥ −1                                                      (52)
+
+is implied by the inequalities defining CER(GC), since inequality (40a) can then be obtained by
+dividing inequality (52) by 2 and rounding up the right-hand side. To this end, we make use of the
+following two claims:
+
+Claim 3. The following inequalites are obtained by summing up some of the inequalities defining
+CER(GC ):
+
+                    ze1∩e2 − ze1 ≥ 0,                     ze1∩e2 − ze2 ≥ 0                                 (53)
+                    ze1∩e3 − ze1 ≥ 0,                     ze2∩e3 − ze2 ≥ 0.
+
+Proof of claim. By symmetry it suffices to show the statement for ze1∩e2 − ze1 ≥ 0. Consider the
+following inequalities defining CER(GC):
+
+                    ψ e1 \ (e2 ∪ J ), e1 ≥ 0, ∀J ⊊ e1 \ e2.
+
+Summing up all of the above inequalities and using ze = v∈e zv for all e ∈ E we obtain:
+
+                    ψ e1 \ (e2 ∪ J ), e1  =           zv               zv        (1 − zv)
+
+           J ⊊e1\e2                          v∈e1∩e2 J ⊊e1\e2  v∈J v∈e1\(e2∪J)
+
+                                          =           zv 1 −           zv
+
+                                             v∈e1∩e2          v∈e1\e2
+
+                                          =ze1∩e2 − ze1 ≥ 0.
+
+                                                                                                           ⋄
+
+Claim 4. The following inequality is obtained by summing up some of the inequalities defining
+
+CER(GC ):
+
+                    1 − ze1∩e3 − ze2∩e3 + ze3 ≥ 0.                                                         (54)
+
+Proof of claim. Consider the following inequalities defining CER(GC):
+
+                    ψ(e3 \ J, e3) ≥ 0, ∀J ⊂ e3 : J̸ ⊇ e1 ∩ e3, J̸ ⊇ e2 ∩ e3.
+
+Summing up all of the above inequalities and using ze = v∈e zv for all e ∈ E we obtain:
+
+                    ψ(e3 \ J, e3) =1 −               ψ(e3 \ J, e3) −             ψ(e3 \ J, e3) + ψ(∅, e3)
+
+         J ⊆e3 :                            J ⊆e3 :                     J ⊆e3 :
+J̸⊇e1∩e3, J̸⊇e2∩e3                        J ⊇e1∩e3                    J ⊇e2∩e3
+
+                    =1 −                             zv               zv         (1 − zv)
+
+                                          v∈e1∩e3 J ⊆e3\e1     v∈J v∈e3\(e1∪J)
+
+                    −                        zv                zv                (1 − zv) + zv
+
+                                          v∈e2∩e3 J ⊆e3\e2    v∈J v∈e3\(e2∪J)              v∈e3
+
+                                                     29
+                                           =1 − ze1∩e3 − ze2∩e3 + ze3 ≥ 0,
+
+where the first equality follows from assumption (39) and the second equality follows from the
+
+identity J⊆N v∈J zv N\J (1 − zv) = 1 for any N ⊆ V .                                        ⋄
+
+Finally, summing up all of inequalities (53) and inequality (54) and inequality ze3 ≥ 0, we obtain
+inequality (52).
+
+    A natural question is whether inequalities (40) are also CG-cuts for the standard linearization.
+The following example shows that the answer is negative.
+
+Example 2. Let G = (V, E) be a hypergraph with G = cl(G) and the set of maximal edges Emax =
+{e1.e2, e3}, where e1 = {1, 2, 4}, e2 = {2, 3, 4}, e3 = {1, 3, 4}. It can be checked that C = e1, e2, e3, e1
+is an α-cycle of G satisfying (39). A generalized triangle inequality in this case is given by:
+
+                                       z{1,2,4} + z{1,3,4} − z{2,3,4} − z{1,4} ≤ 0.
+
+We now show that the above inequality is not a CG-cut for MPLP(G). Assume, for a contradiction,
+that it is. From Proposition 7 it follows that, this inequality is facet-defining for MP(G). Therefore,
+it is also facet-defining for the CG-closure of MPLP(G). This implies that the strict inequality
+
+                                       z{1,2,4} + z{1,3,4} − z{2,3,4} − z{1,4} < 1
+
+is valid for MPLP(G).        However, the vector z¯ ∈ MPLP(G) defined by z¯i =           1  for i ∈ {1, 2, 3, 4},
+                                                                                         2
+                          1
+z¯{1,2,4}  = z{1,3,4}  =  2  and  z¯e  =0  for  all  e ∈ E \ {e1, e3}  satisfies
+
+                                       z¯{1,2,4} + z¯{1,3,4} − z¯{2,3,4} − z¯{1,4} = 1.
+
+    We would like to conclude this section by acknowledging that we are leaving several questions
+as directions of future research. First, an important question is how to generalize inequalities (40)
+for α-cycles of any length. The resulting inequalities will serve as the generalization of odd-cycle
+inequalities [21]. The next step is to understand the complexity of separation over these inequalities.
+We can then define a new relaxation of the multilinear polytope by adding the proposed α-cycle
+inequalities to the complete edge relaxation and characterize the class of hypergraphs for which
+the new relaxation coincides with the multilinear polytope. Finally, examining the computational
+benefits of these relaxations is a topic of future research.
+
+Funding: A. Del Pia is partially funded by AFOSR grant FA9550-23-1-0433. A. Khajavirad is
+in part supported by AFOSR grant FA9550-23-1-0123. Any opinions, findings, and conclusions or
+recommendations expressed in this material are those of the authors and do not necessarily reflect
+the views of the Air Force Office of Scientific Research.
+
+References
+
+ [1] F. Barahona and A.R. Mahjoub. On the cut polytope. Mathematical Programming, 36(2):157–
+      173, 1986.
+
+ [2] C. Beeri, R. Fagin, D. Maier, and M. Yannakakis. On the desirability of acyclic database
+      schemes. Journal of the ACM, 30:479–513, 1983.
+
+ [3] D. Bienstock and G. Mun˜oz. LP formulations for polynomial optimization problems. SIAM
+      Journal on Optimization, 28(2):1121–1150, 2018.
+
+                                                               30
+ [4] P. Bonami, O. Gu¨nlu¨k, and J. Linderoth. Globally solving nonconvex quadratic programming
+      problems with box constraints via integer programming methods. Mathematical Programming
+      Computation, 10(3):333–382, 2018.
+
+ [5] E. Boros, Y. Crama, and P.L. Hammer. Chv´atal cuts and odd cycle inequalities in quadratic
+      0 − 1 optimization. SIAM Journal on Discrete Mathematics, 5(2):163–177, 1992.
+
+ [6] C. Buchheim and G. Rinaldi. Efficient reduction of polynomial zero-one optimization to the
+      quadratic case. SIAM Journal on optimization, 18(4):1398–1413, 2008.
+
+ [7] Y. Crama. Concave extensions for non-linear 0−1 maximization problems. Mathematical
+      Programming, 61:53–60, 1993.
+
+ [8] A. Del Pia and S. Di Gregorio. Chv´atal rank in binary polynomial optimization. INFORMS
+      Journal on Optimization, 3(4):315–349, 2021.
+
+ [9] A. Del Pia and S. Di Gregorio. On the complexity of binary polynomial optimization over
+      acyclic hypergraphs. Algorithmica, 85:2189–2213, 2023.
+
+[10] A. Del Pia and A. Khajavirad. A polyhedral study of binary polynomial programs. Mathe-
+      matics of Operations Research, 42(2):389–410, 2017.
+
+[11] A. Del Pia and A. Khajavirad. The multilinear polytope for acyclic hypergraphs. SIAM
+      Journal on Optimization, 28(2):1049–1076, 2018.
+
+[12] A. Del Pia and A. Khajavirad. On decomposability of multilinear sets. Mathematical Pro-
+      gramming, Series A, 170(2):387–415, 2018.
+
+[13] A. Del Pia and A. Khajavirad. The running intersection relaxation of the multilinear polytope.
+      Mathematics of Operations Research, 46(3):1008–1037, 2021.
+
+[14] A. Del Pia and A. Khajavirad. A polynomial-size extended formulation for the multilinear
+      polytope of beta-acyclic hypergraphs. Mathematical Programming Series A, pages 1–33, 2023.
+
+[15] M.M. Deza and M. Laurent. Geometry of cuts and metrics, volume 15 of Algorithms and
+      Combinatorics. Springer-Verlag, Berlin Heidelberg New York, 1997.
+
+[16] D. Duris. Some characterizations of γ and β-acyclicity of hypergraphs. Information Processing
+      Letters, 112(16):617–620, 2012.
+
+[17] R. Fagin. Degrees of acyclicity for hypergraphs and relational database schemes. Journal of
+      the ACM (JACM), 30(3):514–550, 1983.
+
+[18] A. Khajavirad. On the strength of recursive McCormick relaxations for binary polynomial
+      optimization. Operations Research Letters, 51(2):146–152, 2023.
+
+[19] A. Khajavirad and Y. Wang. Inference in higher order undirected graphical models and binary
+      polynomial optimization. INFORMS Journal on Computing, 2025.
+
+[20] M. Laurent. Sums of squares, moment matrices and optimization over polynomials. In Emerg-
+      ing Applications of Algebraic Geometry, volume 149 of The IMA Volumes in Mathematics and
+      its Applications, pages 157–270. Springer, 2009.
+
+                                                               31
+[21] M. Padberg. The Boolean quadric polytope: Some characteristics, facets and relatives. Math-
+      ematical Programming, 45(1–3):139–172, 1989.
+
+[22] A. Schrijver. Theory of Linear and Integer Programming. Wiley, Chichester, 1986.
+[23] E. Schutte and M. Walter. Relaxation strength for multilinear optimization: Mccormick strikes
+
+      back. In International Conference on Integer Programming and Combinatorial Optimization,
+      pages 393–404. Springer, 2024.
+[24] H.D. Sherali and W.P. Adams. A hierarchy of relaxations between the continuous and convex
+      hull representations for zero-one programming problems. SIAM Journal of Discrete Mathe-
+      matics, 3(3):411–430, 1990.
+[25] J. Wang. On axioms contituting the foundation of hypergraph theory. Acta Mathematicae
+      Applicatae Sinica, 21:495–498, 2005.
+
+                                                               32
+

@@ -1,0 +1,4206 @@
+THE STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+                                                Aykut Arslan
+
+                                                    with Muse Spark via meta.ai
+
+                                                                Reviewed by
+           Babak Modami, Alexander Roitershtein, Mark Sepanski, and Grigory Sokolov
+
+Abstract. Let x1, . . . , xn be independent N (0, Id) vectors. We study whether there exists a
+
+positive semidefinite matrix S such that xiT Sxi = d for every 1 ≤ i ≤ n. We prove a sharp threshold
+
+at n ∼ d2/4.
+
+If  lim supd→∞      n(d)  <  41 ,  then  with  probability  tending  to  one  such  an  S  exists,  with  S  in  fact
+                     d2
+
+positive definite.
+
+If  lim infd→∞      n(d)  >  41 ,  then  with  probability  tending  to  one  no  such  S  exists.  We    make   no
+                     d2
+claim when n(d)/d2 → 1/4. We remark on the use of AI in this research, see Statement of AI Use.
+
+                                               Contents
+
+1 Introduction and statement of the main result . . . . . . . . . . . . . . . . . . . . . . 2
+2 Overview and notation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 3
+
+             Part I. Feasibility below the threshold
+
+3 Previous work: Approximate-fitting theorem . . . . . . . . . . . . . . . . . . . . . . . 5
+4 A convex robust-loss estimator and its residual bounds . . . . . . . . . . . . . . . . . 5
+5 The arbitrary-center small-ball estimate . . . . . . . . . . . . . . . . . . . . . . . . . 8
+6 A localized uniform estimate for small coefficients . . . . . . . . . . . . . . . . . . . . 14
+7 A multiscale estimate for the large coordinates . . . . . . . . . . . . . . . . . . . . . 18
+8 How the bilinear block enters the centered adjoint map . . . . . . . . . . . . . . . . . 31
+9 The uniform estimate for small-coordinate vectors . . . . . . . . . . . . . . . . . . . 33
+10 The uniform estimate for the large-coordinate part . . . . . . . . . . . . . . . . . . . 34
+11 Combining the large and small coordinates . . . . . . . . . . . . . . . . . . . . . . . 34
+12 Exact correction and preservation of positive definiteness . . . . . . . . . . . . . . . 37
+
+             Part II. Infeasibility above the threshold
+
+13 Leave-one-row interpolation for diffuse positive semidefinite matrices . . . . . . . . . 39
+14 The comparison estimate extracted from the preceding calculation . . . . . . . . . . 56
+15 Applying the comparison uniformly over diffuse matrices and nuisance vectors . . . . 56
+16 From diffuse matrices to the full positive semidefinite cone . . . . . . . . . . . . . . . 57
+17 Conclusion . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 62
+
+2020 Mathematics Subject Classification. 60B20, 52A20, 90C22.
+
+                                               1
+       STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+       1. Introduction and statement of the main result
+
+Human      We consider the following problem. Given n random points in Rd, when do they lie on the
+       boundary of an ellipsoid? For small n and a standard Gaussian setting such an event has a high
+
+       likelihood, while for sufficiently large n it is unlikely to occur. The main regime of interest is
+       therefore near the phase transition, which turns out to be n ≍ d2 [BM25, MK24, SPW13].
+
+           We study the random setting in which
+
+                                                          x1, . . . , xn ∼ N (0, Id)
+       are independent. Since ∥xi∥22 is typically close to d, the sphere already gives an approximate fit.
+       The question is whether it can be deformed into a centered ellipsoid so that all of the points lie
+       exactly on its boundary.
+
+           Saunderson, Parrilo, and Willsky [SPW13] conjectured that this problem has a sharp transition
+       at n = d2/4. More precisely, for every fixed ε > 0, they predicted feasibility of such an ellipsoid
+
+       with high probability when                                1 − ε d2,
+                                                             n≤  4
+
+       and infeasibility with high probability when
+
+                                                n ≥ 1 + ε d2.
+                                                        4
+
+           The value 1/4 comes from the geometry of the positive semidefinite cone. One way to measure
+       the size of this cone is to take a random Gaussian symmetric matrix, project it onto the cone, and
+       compute the expected squared size of that projection. For d × d matrices, this quantity is d(d + 1)/4,
+       making 1/4 the natural candidate for the asymptotic threshold.
+
+           Earlier work established feasibility in increasingly large ranges of n, eventually reaching n ≤ cd2
+       for a sufficiently small constant c > 0. Maillard and Kunisky [MK24] predicted the sharp transition
+       at 1/4 using the non-rigorous replica method of statistical physics. Bandeira and Maillard [BM25]
+       later proved the 1/4 threshold for an approximate version of the ellipsoid-fitting problem. The
+       corresponding exact fitting problem remained open.
+
+           We prove the exact threshold with fixed margin. No assertion is made for the critical case when
+       n/d2 → 1/4.
+
+       Theorem 1.1 (Strict-threshold theorem). Let n = n(d) be any sequence of positive integers. For
+       each d, let x1, . . . , xn be independent N (0, Id) vectors and define
+
+                                  Fd = {S ⪰ 0 : S⊤ = S and xiT Sxi = d for all 1 ≤ i ≤ n}.
+
+       Then, the following statements hold.
+         (i) If lim supd→∞ n/d2 < 1/4, then
+
+       P  there  exists                      S  ≻  0  with       x  T  S  xi  =  d  for  every  i  −→ 1.
+                                                                    i
+
+       (ii) If lim infd→∞ n/d2 > 1/4, then P(Fd̸ = ∅) → 0.
+
+                                                                 2
+Human                         STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+Human                                             Statement of AI Use
+
+Human      This paper was developed through collaboration between researchers and Muse Spark (AI model)
+       via the meta.ai chat interface. The model helped explore ideas, develop candidate arguments, and
+       draft material. Researchers guided the work, checked and corrected the mathematics, and take
+       ownership for the final manuscript. Following [Sch25], margin markers identify human-drafted
+       (Human) and AI-assisted material (AI) separately.
+
+                                                    Concurrent work
+
+           While completing this work, we became aware of three independent concurrent works. Misi-
+       akiewicz and Wen [MW26], posted on August 10, 2026, proved the sharp d2/4 threshold for Gaussian
+       ellipsoid fitting. De la Cerda, Potechin, Tulsiani, and Xu [dlCPTX26], posted on August 12, 2026,
+       established the Gaussian threshold up to a vanishing multiplicative factor. Koehler and Sohn [KS26],
+       posted on August 27, 2026, proved a more general universality result for independent subgaussian
+       coordinates with a common fourth moment, recovering the Gaussian 1/4 threshold as a special case.
+
+           These works and the present paper establish the Gaussian d2/4 threshold, although their
+       formulations, scope, and proof architectures differ. Misiakiewicz and Wen build directly on the
+       Gaussian-equivalence framework of Bandeira–Maillard. Below the threshold, they use a head–tail
+       decomposition of the dual vector, with exact treatment of the sparse head and Gaussian comparison
+       for the low-influence tail. Above the threshold, they combine a low-rank/diffuse decomposition with
+       conditional Gaussianization and a projected Gordon escape argument.
+
+           Our proof follows a different route. Below the threshold, we begin with the approximate fitting
+       result of Bandeira–Maillard and perturb it to an exact fit using a spectrally constrained robust-loss
+       construction, a sparse/diffuse decomposition of the coefficient vector, and a dyadic multiscale
+       estimate. Above the threshold, we also use Gordon’s Gaussian min–max theorem, but in a different
+       role. We first establish the Gaussian margin and then transfer it to centered rank-one measurements
+       through a leave-one-row Gibbs interpolation, in the spirit of rigorous cavity methods [ASS03, Tal11].
+       A Grassmann-net conditioning argument and a finite large-eigenvalue decomposition then extend
+       the diffuse estimate to the full positive semidefinite cone.
+
+                                              2. Overview and notation
+
+           For k ≥ 1, let Symk denote the space of real symmetric k × k matrices, equipped with the
+       Frobenius inner product
+
+                                                            ⟨A, B⟩ = Tr(AB).
+       Let ∥A∥F , ∥A∥op, and ∥A∥∗ denote the Frobenius, operator, and nuclear norms, respectively, with
+
+                                                         ∥A∥∗ = sup ⟨W, A⟩,
+
+                                                                                          ∥W ∥op≤1
+
+       and write A ⪰ 0 when A is positive semidefinite. Let 1n denote the all-ones vector and
+                                                            Πn = In − 1 1n1nT
+                                                                           n
+
+       the centering projector. Let supp denote support, h = ⌊d/2⌋, and let OP and oP denote the usual
+       probabilistic Landau symbols [vdV98]. Let N (T, εB) denote covering numbers and w(T ) Gaussian
+
+                                                                             3
+                              STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+Human  width [Ver18].
+
+           Let G be a centered Gaussian random matrix in Symp such that
+                                                 E⟨G, A⟩⟨G, B⟩ = ⟨A, B⟩ = Tr(AB)
+
+       for all A, B ∈ Symp, and let
+                                               Pp = {D ∈ Symp : D ⪰ 0, ∥D∥F = 1}.
+
+           For A ∈ Symd, let  Ad(A)i = xiT Axi,                                      xT   Axi  −  Tr  A
+       For S ∈ Symd, let                                                  Qd(A)i =        √              .
+       For y ⊥ 1n, let                                                                 i
+
+                                                                                               2
+
+                                                       xT   Sxi  −  d                      1
+                                                                              Td(S) = √ ΠnAd(S).
+                                                         i
+                              resi(S) = √ ,                                                 d
+                                                            d
+
+                                           ∗           1               T1                 T
+                                           Td y = √ yixixi = √ yi(xixi − Id).
+                                                       di                       di
+
+             For each i, let ai, bi ∈ Rh denote the first and last h coordinate blocks of xi. The vectors are
+
+       mutually independent and each has distribution N (0, Ih). If d is odd, the middle coordinate is
+
+       discarded. Let
+
+                                                                       1             T
+                                                            By = √ yiaibi .
+                                                                          di
+
+             We next briefly outline our proof strategy. Let S ⪰ 0, S̸ = 0, and suppose ΠnQd(S) = 0. Then
+
+       x  T  S  xi  =  c  is  independent  of  i.  If  in  addition    n  ≥  d  and     i xixTi ≻ 0, then c > 0 and (d/c)S ∈ Fd.
+          i
+       When n ≥ d, Gaussian vectors span Rd a.s., so i xixTi ≻ 0 a.s. Thus above 1/4, after discarding
+
+       finitely many d, it suffices to show the centered kernel has no nonzero PSD matrix.
+
+           For the lower bound, fix α0 with lim sup n/d2 < α0 < 1/4 and enlarge to n = ⌊α0d2⌋ by adding
+       independent N (0, Id) vectors; a fit for the larger sample induces one for the smaller. For the upper
+       bound, fix 1/4 < α1 < lim inf n/d2 and keep the first ⌊α1d2⌋ points; they remain i.i.d. and Fn2 ⊆ Fn1
+       for n1 ≤ n2, so infeasibility for ⌊α1d2⌋ points implies that for n points. Hence n = Θ(d2) suffices.
+       Below 1/4, we sta√rt from the approximate fit in Section 3 and upgrade it with the Huber selector to
+       oP(d) ℓ2 and OP( log d) ℓ∞ residuals; we prove ∥Td∗y∥∗ large via determinant small-ball for flat and
+       dyadic multiscale for sparse, mixed by thresholding, and duality gives oP(1) correction S∗d + H ≻ 0.
+
+           Above 1/4, let Pp = {D ⪰ 0 : ∥D∥F = 1} with Gaussian width w(Pp)2 ≤ p(p + 1)/4, so
+       (w/p)2 → 1/4. Let A : Symp → Rr, (AD)j = ⟨Gj, D⟩, where G1, . . . , Gr are independent centered
+       Gaussian random matrices in Symp with the covariance specified above, and r ≥ (1/4 + ε)p2. Then
+       Gordon’s escape-through-a-mesh [Gor88] gives infD∈Pp ∥AD∥2 ≥ γp with high probability. The
+       free energy FX in Section 13.6 stabilizes at positive level; row-delete√d interpolation in Section 13.7
+       transfers this Gaussian bound to rank-one rows Zi = (wiwi⊤ − Ip)/ 2 for ∥D∥op ≤ τ , and peeling
+       S = H + R, rank(H) ≤ K, in Section 16 covers the full PSD cone via fixed-rank and diffuse cases.
+
+                                                                          4
+                  STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+                  PART I. FEASIBILITY BELOW THE THRESHOLD
+
+                  3. Previous work: Approximate-fitting theorem
+
+Human      We use the groundbreaking approximate-fitting theorem of Bandeira and Maillard [BM25,
+       Theorem 1.4] which asserts that if lim sup n/d2 < 1/4, then there are constants
+
+                                        0 < λ− ≤ λ+ < ∞
+
+       such that, for every 1 ≤ r < 4/3 and n = n(d),
+
+                                   min  1n √  d    xTi Sxi − 1  r
+                                                      d            P
+                  λ−I⪯S⪯λ+I n i=1
+                                                                  −→ 0 as d → ∞.
+
+       The residual inside the absolute value is exactly resi(S). Taking r = 1 gives a measurable approximate
+       solution Sd in the fixed spectral interval
+
+                                        Sd = {S : λ−I ⪯ S ⪯ λ+I}
+
+       such that
+
+                                        1                 P
+                                                   | resi(Sd)| −→ 0.
+                                        ni
+
+       The comparator may depend on the full sample. It is used only in pathwise objective comparisons,
+
+       so no independence is required.
+
+                  4. A convex robust-loss estimator and its residual bounds
+
+AI         Let
+       and let
+       Define the unique selector       ϕHub(t) =  t2/2,        |t| ≤ 1,
+
+                                                   |t| − 1/2, |t| > 1,
+
+                                        Rd(S) = τd ∥S − I∥F2 , τd = d−2.
+                                                    2d
+
+                                   Sd∗ = argmin 1 ϕHub(resi(S)) + Rd(S) .
+                                            S∈Sd n i
+
+       For all sufficiently large d, one has n ≥ 2. For such d and each 1 ≤ j ≤ n, define the deleted selector
+                                                                          
+                  (−j)  1 
+                  S∈Sd Sd = argmin  n − 1 i̸=j ϕHub(resi(S)) + Rd(S) .
+
+       Compactness gives existence, ridge gives uniqueness and measurability. In particular Sd(−j) is
+       independent of xj.
+
+       Proposition 4.1. If n/d2 → α0 for fixed 0 < α0 < 1/4, then
+
+                                        1                 ∗2 P
+                                                   resi(Sd) −→ 0,
+                                        ni
+
+                                        ∥Πn res(Sd∗)∥2 = oP(d),
+
+                                                       5
+                   STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  and
+
+                                            ∥Πn res(Sd∗)∥∞ = OP( log d).
+
+    Proof. Put
+
+                                               Hd(S) =     1        ϕHub(resi(S)).
+
+                                                           ni
+
+    Since  ϕHub(t) ≤ |t|  and  Rd(Sd)   is     O(d−2),  optimality         gives           ∗P                Set   aj  = resj(Sd∗),     bj  =
+
+    resj(Sd(−j)). Write G−j(S) = n1                                               Hd(Sd) −→ 0.
+
+                                        i̸=j   ϕHub(resi(S          ))  +  n−1  Rd(S  ).  The             deleted  selector  minimizes  G−j .
+                                                                             n
+
+    Comparing the two exact optimality inequalities gives ϕHub(aj) + Rd(Sd∗) ≤ ϕHub(bj) + Rd(Sd(−j)).
+
+                                                                            b20 τd
+
+    Let b0 = max{|λ− − 1|, |λ+ − 1|}, ϵd = 2 . Then ϕHub(aj) ≤ ϕHub(bj) + ϵd. Comparison of G−j
+    minimizers gives |aj| ≤ |bj| + ed. Put ed = ϕ−Hu1b(ϵd). For all sufficiently large d, one has b0/d ≤ 1,
+
+    and hence
+
+                                                           ed = b0 .
+                                                                  d
+
+    For M ≥ 2ed,
+
+                               1 aj21{|aj|>M} ≤ 2 bj21{|bj|>M/2} + 2ed2.
+                               nj                                nj
+
+    We next prove uniform integrability of the deleted residuals. Put
+
+                                           1        x   i  x  T  ,      Cd = max ∥Σ−j − I∥op.
+                               Σ−j =                          i
+                                        n − 1 i̸=j                                   j
+
+    Deleted optimality against Sd gives, simultaneously for every j,
+
+                   1 ϕHub(resi(Sd(−j))) + Rd(Sd(−j)) ≤ n Hd(Sd) + Rd(Sd) =: rd.
+                n − 1 i̸=j                                                      n−1
+
+                                                                                                    P
+
+    The right side does not depend on j and satisfies rd −→ 0. Using
+
+                                               |t| ≤ 2ϕHub(t) + 2ϕHub(t),
+
+    and Jensen gives, uniformly in j,
+
+                                                 1 | resi(Sd(−j))| ≤ ad,
+                                               n − 1 i̸=j
+
+                √                    P                              (−j)
+    where ad = 2rd + 2rd, so ad −→ 0. Since 0 ⪯ Sd ⪯ λ+I,
+
+                                     1 (−j) Tr(Sd(−j)Σ−j ) − d
+                                               resi(Sd ) =                      √                         .
+                               n − 1 i̸=j                                          d
+
+    Therefore
+
+                                               Tr Sd(−j) ad
+                                        max                      − 1 ≤ λ+Cd + √ .
+                                            j  d                                                       d
+
+                                          T√
+    Let X be n by d with rows xi . Gaussian singular-value [DS01, Thm II.13] with t = d puts every
+                             √                                             d/n except 2e−d/2. Hence ∥n−1XT X −I∥op =
+    singular value of X/ n between 1−2         d/n and 1+2
+
+                                                                    6
+                        STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  OP(d−1/2). Chi-square Chernoff and union over n = O(d2) give maxj ∥xj∥22 = OP(d). Finally,
+
+                                                      n                    I − xjxTj
+                                  Σ−j − I = n − 1 (Σ − I) + n − 1
+
+    gives Cd = OP(d−1/2). Hence                    µ Tr S j = d(−j) √ − d
+                                                                  d
+    satisfies maxj |µj| = OP(1).
+        Conditionally on x−j,
+
+                                                               T (−j)             (−j)
+                                                            xj Sd xj − Tr Sd
+                                bj = Zj + µj,         Zj =                 √            .
+                                                                              d
+
+    Hanson–Wright [RV13, Thm 1.1] gives cHW = cHW(λ+) > 0 with
+                                                                                           √
+
+                                      P(|Zj| > t | x−j) ≤ 2 exp[−cHW min{t2, t d}].
+                                                                      √
+
+    For S ∈ Sd, x ∼ N (0, Id) set ZS = (xT Sx − Tr S)/ d. For fixed K,
+
+                                ρλ+,K (L) = sup E[(ZS + µ)21{|ZS+µ|>L}] → 0
+
+                                                     S∈Sd,|µ|≤K
+
+    as L → ∞. Let Ed,K = {maxj |µj| ≤ K}. Then
+
+                                                              
+
+                                  E 1Ed,K 1 b2j 1{|bj|>L} ≤ ρλ+,K (L).
+                                             nj
+
+    Markov and full-to-deleted comparison give empirical UI of a2j .
+        For fixed M ≥ 1, t21{|t|≤M} ≤ 2M ϕHub(t), so
+
+                                  1             2                             ∗P
+                                      aj 1{|aj|≤M} ≤ 2M Hd(Sd ) −→ 0.
+                                  nj
+
+    First choose K with P(Edc,K ) small, then M with ρλ+,K (M/2) small, then d → ∞.           This proves
+
+    1  j  resj (Sd∗ )2  P   0.  Cauchy–Schwarz  and   contractivity  give
+    n
+                        −→
+
+                                ∥Πn res(Sd∗)∥2     ≤  √        resi(Sd∗)2         1/2
+                                                        n1                               P
+
+                                  d                   d ni                            −→ 0.
+
+    Finally t = C√log d, n ≤ d2 eventually, union bound
+
+                                    P(max |Zj| > C log d) ≤ 2d2 exp[−cHWC2 log d]
+
+                                                        j
+
+    for large d. Choosing C large gives maxj |Zj| = OP(√log d), hence maxj | resj(Sd∗)| = OP(√log d).
+    Since ∥Πnz∥∞ ≤ 2∥z∥∞, L∞ assertion follows.
+
+                                                            7
+         STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+                      5. The arbitrary-center small-ball estimate
+
+AI      The next result is the quantitative small-ball estimate used on the small-coordinate part of a
+    coefficient vector. We prove it here before it is used. The matrix center is arbitrary and deterministic.
+    Later, after conditioning and discretization, this center will represent the contribution of the large
+    coordinates.
+
+    5.1. Capped determinant moments. We begin with the negative determinant estimate used in
+    the bilinear small-ball argument. The proof includes the extremization over all admissible coefficient
+    vectors.
+
+    Lemma 5.1 (Capped simplex extremizer). Let N ≥ 1, let 0 < a < 1, and assume that
+
+                                     WN,a =                          N
+
+                                             w ∈ [0, a]N : wi = 1
+
+                                                                    i=1
+
+    is nonempty. Put
+
+                                             k = ⌊a−1⌋
+
+    and
+
+                                             ρ = 1 − ka.
+
+    Thus 0 ≤ ρ < a. After adding or deleting zero coordinates, define
+
+                                        w∗ = (a, . . . , a, ρ, 0, . . . , 0),
+
+    where a occurs k times and the coordinate ρ is omitted when it is zero. Feasibility of WN,a ensures
+    that this vector has at most N nonzero coordinates. Let g1, . . . , gN be independent N (0, Ir) vectors.
+    For every s > 0,
+
+                                     N       −s            N                       −s
+
+                              E det       wigigiT ≤ E det       wi∗gigiT
+
+                                     i=1                   i=1
+
+    for every w ∈ WN,a, where both sides are understood as extended nonnegative expectations.
+
+    Proof. For ε > 0, define                        N                          −s
+    The map
+                              Φε(w) = E det εIr + wigigiT .
+
+                                                    i=1
+
+                                     A −→ det(A)−s = exp[−s log det A]
+
+    is convex on the positive definite cone. Indeed, − log det A is convex, and the exponential is convex
+    and increasing. Hence Φε is convex in w. It is also invariant under coordinate permutations because
+    the gi are identically distributed.
+
+        We next verify the required majorization directly. Arrange the coordinates of w in decreasing
+    order. For every 1 ≤ j ≤ N ,
+
+                                                                            j
+
+                                                            wi ≤ min{ja, 1}.
+
+                                                                           i=1
+
+    The right side is the sum of the first j coordinates of w∗. Thus w∗ majorizes w. By the finite-
+
+                                                 8
+                STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  dimensional majorization theorem, there is a doubly stochastic matrix D such that w = Dw∗.
+    By the Birkhoff theorem, D is a convex combination of permutation matrices. Convexity and
+    permutation invariance therefore give
+
+                                                         Φε(w) ≤ Φε(w∗).
+
+    As ε decreases to zero, both integrands increase pointwise. Monotone convergence proves the
+    asserted extended-valued inequality.
+
+    Lemma 5.2 (Real Wishart negative moment). Let G be an r by k real matrix with independent
+    N (0, 1) entries and let W = GGT . If s > 0 and
+
+                              k > r + 2s − 1,
+
+    then
+                                        E det(W )−s = 2−rs r Γ((k − j + 1)/2 − s) .
+                                                                 j=1 Γ((k − j + 1)/2)
+
+    If k ≤ r + 2s − 1, the negative moment is infinite.
+
+    Proof. If k < r, then rank(W ) = rank(G) ≤ k < r, so det(W ) = 0 almost surely and E det(W )−s =
+    +∞ for every s > 0. Assume henceforth k ≥ r.
+
+         Apply Gram-Schmidt to the rows of G. For 1 ≤ j ≤ r ≤ k, the squared length of the component
+    of row j orthogonal to the preceding j − 1 rows has a chi-square law with k − j + 1 degrees of freedom.
+    Gaussian orthogonal invariance also makes these squared lengths independent. Consequently,
+
+                                                                                                   r
+                                                                                             d
+
+                                                          det(W ) = Xj,
+
+                                                                                                 j=1
+
+    where the Xj are independent and Xj has a chi-square law with k − j + 1 degrees of freedom.
+        If X has a chi-square law with m degrees of freedom, direct integration of its density gives
+
+                EX−s = 1 m/2  ∞ xm/2−s−1e−x/2dx = 2−s Γ(m/2 − s) .
+                2 Γ(m/2) 0                                                    Γ(m/2)
+
+    This integral is finite exactly when m > 2s. Multiplying the r independent moments proves the
+
+    formula and the finiteness condition.
+                                                                                                        √
+
+    Proposition 5.3 (Uniform capped determinant moment). Fix 0 < θ < 1/ 2. There is Cθ < ∞
+    such that the following holds for every r, N ≥ 1. Let g1, . . . , gN be independent N (0, Ir) vectors and
+    let z ∈ RN satisfy
+
+                              ∥z∥2 = 1
+
+    and
+                                                            √
+                                                               r∥z∥∞ ≤ θ.
+
+    Then, with
+
+                                    N
+
+                              Wz =       z  2  gi  giT                     ,
+                                            i
+
+                                    i=1
+
+    one has
+
+                              E det(Wz)−r/2 ≤ Cθr2 .
+
+                                    9
+                      STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  One may take
+
+                                                Cθ = (1 − 2θ2)−1/2
+
+    for r ≥ 2, after increasing the constant to cover r = 1.
+
+    Proof. Set
+
+                                                θ2     r
+                                         a = r , k = θ2 , ρ = 1 − ka.
+
+    The  weights  wi  =  z2  belong  to  WN,a.  By     Theorem  5.1,                   their  negative  determinant  moment  is  at
+
+                          i
+    most the moment at the capped vector w∗. For independent Gaussian vectors g1, . . . , gk+1,
+
+                                                    k                                         k
+
+                                wi∗gigiT = a gigiT + ρgk+1gk+1 T ⪰ a gigiT .
+
+                             i                  i=1                                           i=1
+
+    When ρ = 0, the last rank-one term is absent. Monotonicity of the determinant on the positive
+    definite cone gives
+
+                                           E det(Wz)−r/2 ≤ a−r2/2E det(Wr,k)−r/2,
+    where Wr,k is a real Wishart matrix with k degrees of freedom.
+
+        Put
+                                                         δθ = θ−2 − 2 > 0.
+
+    The floor in the definition of k gives                   r
+    and therefore                                      k ≥ θ2 − 1
+
+                                                k − 2r + 1 ≥ δθr > 0.
+
+    In particular, k > 2r − 1, so Theorem 5.2 applies with s = r/2. It gives
+
+                                                                                    r     Γ(yj) ,
+
+                                     E det(Wr,k)−r/2 = 2−r2/2
+                                                                j=1 Γ(yj + r/2)
+
+    where                                       yj =   k−j+1−r
+    The same floor estimate yields                                  .
+                                                           2
+
+                                            yj ≥ k − 2r + 1 ≥ δθr .
+                                                       2                               2
+
+    Assume first that r ≥ 2. If X has the gamma distribution with shape yj and unit scale, then
+
+                                                Γ(yj + r/2) = EXr/2.
+                                                    Γ(yj )
+
+    Since r/2 ≥ 1, Jensen’s inequality gives
+
+                                            EXr/2 ≥ (EX)r/2 = yjr/2.
+
+                                                       10
+             STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  Thus
+
+                                         Γ(yj ) ≤ yj−r/2 ≤                  2 r/2
+                                     Γ(yj + r/2)                                     .
+
+                                                                           δθ r
+
+    Multiplication over j now gives
+
+             E det(Wz)−r/2 ≤         1 r2/2        2 r2/2                   1    r2/2
+                                     2a                       =            θ2δθ
+                                                                                      = (1 − 2θ2)−r2/2.
+                                                  δθ r
+
+    This calculation includes the floor in k and does not use an asymptotic replacement of ak by one.
+        For r = 1, the exact expression from Theorem 5.2 is finite because k = ⌊θ−2⌋ ≥ 2. It is a finite
+
+    number depending only on θ. Increasing Cθ to cover this one case completes the proof.
+
+    5.2. Arbitrary-center Frobenius small balls.
+                                                                                     √
+
+    Proposition 5.4 (Determinant small ball). Fix 0 < θ < 1/ 2. There is Cθ < ∞ such that the
+    following holds. Let gi, ki be mutually independent N (0, Ir) vectors, let z ∈ RN satisfy
+
+                                                               ∥z∥2 = 1
+
+    and
+                                                            √
+                                                               r∥z∥∞ ≤ θ,
+
+    and put
+
+                                                                1 T N
+                                                        Yz = √ zigiki .
+
+                                                                  r i=1
+
+    For every deterministic M ∈ Rr×r and every t > 0,
+                                               P(∥Yz − M ∥F ≤ t√r) ≤ (Cθt)r2.
+
+    The same bound holds conditionally when M and z are measurable with respect to a sigma-field
+    independent of all gi, ki, provided the two displayed conditions on z hold almost surely.
+
+    Proof. Condition on g1, . . . , gN and write
+
+                                                  N
+
+                                     Wz =                z  2  gi  giT     .
+                                                            i
+
+                                                  i=1
+
+    The columns of Yz are conditionally independent Gaussian vectors with covariance Wz/r. On the
+    event that Wz is positive definite, their joint density is bounded by
+
+                                                    (2π)−r2/2 det(Wz/r)−r/2.
+
+    The moment estimate in Theorem 5.3 implies that Wz is positive definite almost surely: positive
+    probability of det Wz = 0 would make E det(Wz)−r/2 infinite.
+
+    The Euclidean volume of a ball of radius R in dimension m is at most
+
+                                                  CR m
+                                                  √            .
+                                                     m
+
+    Apply this with m = r2 and R = t√r. The conditional density bound and the volume estimate give,
+
+    uniformly in M ,
+
+                      P(∥Yz − M ∥F ≤ t√r | g1, . . . , gN ) ≤ (Ct)r2 det(Wz)−r/2.
+
+                                                     11
+                   STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  Taking expectation and applying Theorem 5.3 proves the claim. For the conditional statement,
+    condition first on the sigma-field that determines M and z and repeat the same argument pointwise.
+
+                                                                                        √
+    Corollary 5.5 (Scaled Frobenius small ball). Fix 0 < θ < 1/ 2. Let u̸ = 0, let σ = ∥u∥2, and
+    assume
+
+                                                            √r ∥u∥∞ ≤ θ.
+                                                                   σ
+
+    For mutually independent N (0, Ir) vectors gi, ki, define
+
+                                           1               T
+                   Mu = √                            uigiki .
+                                                 di
+
+    Then, uniformly over independent centers C and every t > 0,
+
+                                               r     d     ≤ (Cθt)r2 .
+                   P ∥Mu − C∥F ≤ tσ √
+
+    The same statement holds conditionally when u and C are measurable with respect to a sigma-field
+    independent of the displayed Gaussian vectors.
+
+    Proof. Apply Theorem 5.4 to z = u/σ and use
+
+                                                        r
+                                           Mu = σ d Yz.
+
+    5.3. Nuclear-ball covering and the block estimate. Let BF denote the unit ball in Frobenius
+    norm. For a bounded set T , let N (T, εBF ) be the least number of translates of εBF required to
+    cover T .
+
+    Lemma 5.6 (Nuclear-ball entropy). Let
+
+                   Kr,R = {A ∈ Rr×r : ∥A∥∗ ≤ R}.
+
+    There is a numerical constant C such that, for every ε > 0,
+                                                                                 R2r
+
+                                                   log N (Kr,R, εBF ) ≤ C ε2 .
+                                                  √
+    In particular, for R = νr and ε = t r,
+
+                                                 √            ν2 2
+                   log N (Kr,νr, t rBF ) ≤ C 2 r .
+                                                              t
+
+    Proof. Let G be an r by r matrix with independent N (0, 1) entries. Nuclear and operator norm
+
+    duality gives
+
+                                                  E sup ⟨G, A⟩ = RE∥G∥op.
+
+                                                                       A∈Kr,R
+
+    The Gaussian comparison inequality applied to the process yT Gx, with x, y on the Euclidean unit
+    sphere, gives
+
+                                                                          √
+                                                          E∥G∥op ≤ 2 r.
+
+                                                                   √
+    Thus the Gaussian width of Kr,R is at most 2R r.
+
+                                                 12
+    STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI      Choose a maximal ε-separated subset of Kr,R in Frobenius norm. It is an ε-net. Sudakov’s
+    minoration in the finite-set form [Fer74, Section 2.1] says that an ε-separated set√of cardinality M
+    in the canonical metric of a Gaussian process has expected supremum at least cε log M . Applied
+    here, it gives
+
+                                          ε log N (Kr,R, εBF ) ≤ CE sup ⟨G, A⟩.
+
+                                                                                                          A∈Kr,R
+
+    Squaring and using the width bound proves
+
+                                                                                 R2r
+                                                   log N (Kr,R, εBF ) ≤ C ε2 .
+
+    The stated specialization follows by substitution.
+                                                                                                    √
+
+    Theorem 5.7 (Arbitrary-center nuclear small ball). Fix 0 < θ < 1/ 2. There are constants
+    cθ, νθ > 0 such that the following holds under the hypotheses of Theorem 5.4. For every deterministic
+    M ∈ Rr×r,
+
+                                                 P(∥Yz − M ∥∗ ≤ νθr) ≤ e−cθr2 .
+
+    The same conclusion holds conditionally when M and z are measurable with respect to a sigma-field
+    independent of the driver vectors and the stated conditions on z hold almost surely.
+
+    Proof. Let Cθ be the constant in Lemma 5.4. Choose tθ > 0 so small that
+
+                                                          log(Cθtθ) ≤ −2.
+                                                                               √
+
+    By Lemma 5.6, the nuclear ball Kr,νr has a Frobenius tθ r-net of cardinality at most
+
+                                                                     ν2 2
+                                                           exp C 2 r .
+
+                                                                     tθ
+
+    If ∥Yz − M ∥∗ ≤ νr, then for one center A in this net,
+                                                                                 √
+
+                                                   ∥Yz − (M + A)∥F ≤ tθ r.
+
+    The union bound and Theorem 5.4 therefore give
+
+                          P(∥Yz − M ∥∗ ≤ νr) ≤ exp    ν2 2
+                                                    C 2 + log(Cθtθ) r .
+
+                                                       tθ
+
+    Choose ν = νθ > 0 so small that
+
+                                     C  ν2θ         ≤ 1.
+                                          2
+                                        tθ
+
+    The exponent is then at most −r2, and the theorem follows after changing the constant. The
+
+    conditional statement follows because both the Frobenius small-ball estimate and the covering
+
+    number are uniform in the center.
+                                                                                    √
+
+    Corollary 5.8 (Scaled coordinate block). Fix 0 < θ < 1/ 2. Let u̸ = 0 be deterministic, let
+
+    σ = ∥u∥2, and assume
+
+                                     √r ∥u∥∞ ≤ θ.
+                                            σ
+
+                                          13
+    STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  For mutually independent N (0, Ir) vectors gi, ki, define
+
+    1                                                                      T
+    Mu = √                                           uigiki .
+                                                 di
+
+    If C is deterministic, or is measurable with respect to a sigma-field independent of the displayed
+    Gaussian vectors, then
+
+                                r3/2                                       ≤ e−cθr2 .
+    P ∥Mu − C∥∗ ≤ νθσ √d
+
+    Proof. Apply Theorem 5.7 to z = u/σ and use
+
+                                                                        r
+                                                           Mu = σ d Yz.
+    Rescale the center by the same deterministic factor.
+
+AI                  6. A localized uniform estimate for small coefficients
+
+        We now pass from one deterministic vector to uniform over small-coordinate vectors and admissible
+    centers. With common radius ζ, each V0 has small-ball ≲ (Cθζ)h2 while |NV | ≲ (C/ζ)n; the union
+    is exp[−(h2 − n) log(1/ζ) + O(d2)]. Hence we need the strict gap h2 − n ≥ cd2 from α0 < 1/4 to
+    make fixed small ζ beat entropy.
+
+    6.1. Uniform small-ball estimate after a large/small coordinate split. The proposition
+    below says the following. Fix a support I of at most Kd large coefficients. The contribution
+    from I may be arbitrary and is treated as a random center after freezing GI = σ(ai, bi : i ∈ I):
+    then BU0 and N0 − BU0 √are GI -measurable while the Ic pairs stay independent N (0, Ih), so
+    ∥BV0 − (N0 − BU0)∥F ≤ 3ζ d has arbitrary-center small-ball (Cθζ)h2. The outside coefficients have
+    comparable ℓ2 scale and no single coordinate too large. Uniformly over all such choices the sum
+    cannot have small nuclear norm. The word “localized” refers only to the fixed upper bounds on the
+    two classes.
+
+        Let h = ⌊d/2⌋ and
+                                                                 1 T n
+
+                                                       By = √ yiaibi ,
+                                                                  d i=1
+
+    where all ai, bi are independent N (0, Ih) vectors. For L > 0, define
+                                                                                 √
+
+                                                  Ed(L) = {∥B∥2→F ≤ L d}.
+                                                                                                                          √
+
+    Proposition 6.1 (Uniform conditional small-ball estimate). Fix α0 < 1/4, 0 < θ < 1/ 2, and
+    positive constants A, B, β, K, L. There are constants c, γ > 0, depending only on these fixed
+    parameters, such that the following holds whenever n ≤ α0d2.
+
+        Let Fd,L be the event that there are q > 0, I ⊂ [n], and U, V ∈ Rn satisfying
+
+                                                              |I| ≤ Kd,
+
+                                                             supp U ⊂ I,
+
+                                                            supp V ⊂ Ic,
+
+                                                 14
+                 STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI                             √
+                 ∥U ∥1 ≤ Aq d,
+
+                                                         βq ≤ ∥V ∥2 ≤ Bq,
+                                                        √
+
+                                                           d∥V ∥∞ ≤ θ∥V ∥2,
+
+    but
+
+                                                        ∥B(U + V )∥∗ < cqd.
+
+    Then, for all sufficiently large d,
+
+                                                    P(Fd,L ∩ Ed(L)) ≤ e−γd2 .
+
+    Proof. The assumptions and conclusion are homogeneous in (q, U, V ). Dividing U and V by q
+    reduces the proof exactly to q = 1. Thus no discretization of the scale q is needed.
+
+         Fix I ⊂ [n] with s = |I| ≤ Kd, and define
+                                                                                        √
+
+                                             UI = {U : supp U ⊂ I, ∥U ∥1 ≤ A d}
+
+    and
+                                           VI = {V : supp V ⊂ Ic, β ≤ ∥V ∥2 ≤ B,
+                                                        √
+                                                          d∥V ∥∞ ≤ θ∥V ∥2}.
+
+    Choose
+
+                                                       0 < ζ < min{1, β/6}.
+
+    Let NU (I) be an ℓ1 net of UI at radius ζ/L. A volumetric estimate in the s-dimensional normed
+
+    space gives
+
+                                            √s
+                                      2AL d
+                 |NU (I)| ≤ 1 + ζ .
+
+    Let NV (I) be a maximal internal Euclidean net of VI at radius ζ/L. Since VI lies in the Euclidean
+    ball of radius B in dimension n − s, the packing estimate gives
+
+                                                                        2BL n−s
+                                                   |NV (I)| ≤ 1 + ζ .
+
+    Every center V0 ∈ NV (I) belongs to VI . In particular,
+
+                 β ≤ ∥V0∥2 ≤ B
+
+    and
+                                                       √
+                                                          d∥V0∥∞ ≤ θ∥V0∥2.
+
+    We next construct a deterministic matrix-center net. Put
+
+                                                Kc = {N ∈ Rh×h : ∥N ∥∗ ≤ cd}.
+                                                                                                                       √
+
+    Applying the nuclear-ball covering estimate Lemma 5.6 with r = h, R = cd, and ε = ζ d gives a
+    deterministic Frobenius net N∗(c) of Kc at that radius such that
+
+                                                                           c2 2
+                                                       log |N∗(c)| ≤ C 2 d .
+
+                                                                           ζ
+
+                 15
+                     STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  All three nets are fixed before the Gaussian samples are observed.
+        Suppose that a bad pair (U, V ) exists on Ed(L). Choose U0 ∈ NU (I) and V0 ∈ NV (I) such that
+
+                                          ∥U − U0∥1 ≤ ζ/L
+
+    and
+
+                                          ∥V − V0∥2 ≤ ζ/L.
+
+    On Ed(L),                                    √                                   √
+
+                                   ∥B(U − U0)∥F ≤ L d∥U − U0∥2 ≤ ζ d
+
+    and
+                                                                              √
+
+                                                      ∥B(V − V0)∥F ≤ ζ d.
+
+    Since ∥B(U + V )∥∗ < cd, there is N0 ∈ N∗(c) such that
+
+                                                                                  √
+                                                   ∥B(U + V ) − N0∥F ≤ ζ d.
+
+    It follows that                                                    √
+                                   ∥BV0 − (N0 − BU0)∥F ≤ 3ζ d.
+
+    Fix a deterministic tuple (I, U0, V0, N0) and let
+
+                                                       GI = σ(ai, bi : i ∈ I).
+    The matrix N0 − BU0 is GI measurable. All pairs (ai, bi) with i ∈ Ic are independent of GI . Put
+
+                                              σ0 = ∥V0∥2
+
+    and
+
+                                              z = V0/σ0.
+
+    Then
+
+                                                               ∥z∥2 = 1
+
+    and
+                                                            √
+                                                              d∥z∥∞ ≤ θ.
+
+        We record the normalization from Theorem 5.4. Since h/d → 1/2, the proposition, with r = h,
+    implies after rescaling that there is a constant Cθ < ∞ such that
+
+                                   1          T                           √             h2
+                     P √ ziaibi − M ≤ t d ≤ (Cθt)
+                                   di
+                                                       F
+
+    for every deterministic M ∈ Rh×h and every t > 0. Indeed,
+
+                                       1         T                        h
+                                       √         ziaibi =                 d Yz,
+                                          di
+
+    the coefficient cap for Yz is
+
+                                       √
+                                         h∥z∥∞ ≤ θ h/d < θ,
+
+                                                 16
+    STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI                                  √
+    and a Frobenius radius t d becomes a radius
+
+                                                  d√         √
+
+                                                  t h ≤ 3t h
+                                                  h
+
+    for all sufficiently large d. The constant factor is absorbed into Cθ. The same estimate holds
+    conditionally for a center measurable with respect to a sigma-field independent of the driver vectors.
+
+    After division by σ0, the fixed-tuple bad event implies
+
+                                    1             T N0 − BU0                   √
+                                    √
+                                       d i∈Ic  ziaibi −      σ0 F           ≤ t0 d,
+
+    where
+                                                               3ζ 3ζ
+
+                                                        t0 = σ0 ≤ β < 1.
+    The conditional arbitrary-center small-ball estimate gives, almost surely in GI ,
+
+                                                                       3Cθζ h2
+                           P(the fixed tuple is bad | GI ) ≤ β .
+
+    The bound is uniform in the realized center. Integration over GI gives the same unconditional
+    estimate.
+
+    It remains to pay the deterministic entropy. The support count satisfies
+
+                                       log Nsupp = OK (d log d).
+
+    To see this, if Kd ≤ n/2, then
+
+                           log                 n  ≤ Kd log      en          + OK (d).
+
+                                    s≤Kd s Kd
+
+    If Kd > n/2, then n < 2Kd and the bound 2n = eOK(d) applies. The head entropy satisfies
+
+    log Nhead ≤ Kd log                                       √  = OA,K,L,ζ (d log d).
+                                                       2AL d
+                                                  1+
+
+                                                           ζ
+
+    The tail and matrix-center entropies satisfy
+
+                                                                   2BL
+                                       log Ntail ≤ n log 1 + ζ
+
+    and                                        log Ncenter ≤ C ζ2 c d 2 2.
+    Put
+    The union bound gives  Ξd = h2 log 3Cθζ + n log 1 + 2BL .
+                                                  β                         ζ
+
+                                           c2 2
+    log P(Fd,L ∩ Ed(L)) ≤ Ξd + C 2 d + OA,K,L,ζ (d log d).
+
+                                           ζ
+
+                                                         17
+AI                         STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI      Set
+                                                                1
+
+                                                          g = 4 − α0 > 0.
+    For all sufficiently large d,
+
+                                                            h2 − n ≥ g d2.
+                                                                         2
+
+    There is a constant C0 < ∞, depending only on θ, β, B, L, such that
+                                               Ξd ≤ −(h2 − n) log(1/ζ) + C0d2.
+
+    First choose the fixed ζ so small that
+                                                       g
+                                                       2 log(1/ζ) ≥ 4C0 + 4.
+
+    With this ζ fixed, choose c > 0 so small that
+                                                            c2 g
+
+                                                         C ζ2 ≤ 8 log(1/ζ).
+    Finally take d large enough that
+
+                                               OA,K,L,ζ (d log d) ≤ g d2 log(1/ζ).
+                                                                         8
+
+    The resulting exponent is at most −γd2 for a fixed γ > 0. This proves the proposition.
+
+                      7. A multiscale estimate for the large coordinates
+
+        The small-coordinate estimate does not control a vector concentrated on a few coordinates. The
+    following section treats those vectors by sorting the coefficients into dyadic magnitude classes. We
+    retain a later class only when its support is geometrically larger than the previously retained support.
+    This is only a deterministic bookkeeping rule. The section proves a simultaneous lower bound for
+    every large-coordinate vector, including vectors with arbitrary dynamic range.
+
+    7.1. Statement and notation. This section proves Theorem 10.1. We first state the estimate in
+    the local notation used throughout the proof; the proof is completed at the end of this section in
+    Section 7.11. The result is uniform over all coefficient vectors with at most Kd nonzero coordinates,
+    including vectors whose support, signs, and magnitudes are selected after the Gaussian sample is
+    observed.
+
+        Let h = ⌊d/2⌋. Let
+                                                        a1, . . . , an, b1, . . . , bn
+
+    be mutually independent N (0, Ih) vectors, and define
+                                                                 1 T n
+
+                                                       Bu = √ uiaibi .
+                                                                  d i=1
+
+    For I ⊂ [n], let AI and BI be the h by |I| matrices whose columns are respectively (ai)i∈I and
+    (bi)i∈I , in increasing index order.
+    Theorem 7.1. For every fixed 0 < K, A < ∞, there is cK,A > 0 such that, uniformly over every
+
+                                                                          18
+    STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  integer sequence n = n(d) ≤ Ad2,
+
+                                                             
+
+                                                   ∥Bu∥∗     
+                                   P  inf          √         ≥ cK,A −→ 1.
+                                                       d∥u∥1
+                                      u̸=0
+
+                                      | supp u|≤Kd
+
+    If K+ = max{K, 1}, then there is a constant cms(A) > 0, depending only on A, such that
+
+                                                   cK,A ≥ √ cms(A) .
+                                                                K+(1 + log K+)
+
+    The event is simultaneous over supports and coefficients chosen after all Gaussian samples are
+    observed. No sign, flatness, centering, or dynamic-range condition is imposed on u.
+
+    7.2. The arbitrary-center block estimate.
+
+    Lemma 7.2. Let r ≥ 1 and m ≥ 1 be integers and let z ∈ Rm be deterministic. Fix θ < 1/√2.
+
+    There are csb, νsb > 0 with the following property. Let g1, . . . , gm, k1, . . . , km be mutually independent
+
+    N (0, Ir) vectors and suppose                  √
+                                      ∥z∥2 = 1, r∥z∥∞ ≤ θ.
+
+    Set
+                                                                1 T m
+
+                                                        Yz = √ zigiki .
+                                                                  r i=1
+
+    For every deterministic C ∈ Rr×r,
+                                                P(∥Yz − C∥∗ ≤ νsbr) ≤ e−csbr2 .
+
+    The same statement holds conditionally if C is measurable with respect to a sigma-field independent
+    of all gi, ki.
+
+    Proof. This is the arbitrary-center nuclear small-ball estimate from Theorem 5.7, applied in dimension
+    r. Its conditional form follows because that theorem is uniform in every center measurable with
+    respect to an independent sigma-field.
+
+    Lemma 7.3 (Rectangular pinching). Let L1, . . . , LJ and R1, . . . , RJ be pairwise orthogonal row
+    and column projections. Then, for every matrix M ,
+
+                                                                                         J
+
+                                                     ∥M ∥∗ ≥ ∥LjM Rj∥∗.
+
+                                                                                       j=1
+
+    Proof. For a matrix A, define its partial polar factor by
+
+                                      pol(A) = A(AT A)†/2,
+
+    where the pseudoinverse power is zero on the kernel. It satisfies ∥ pol(A)∥op ≤ 1 and ⟨pol(A), A⟩ =
+    ∥A∥∗. Let Wj = pol(LjM Rj), extended by zero outside the indicated row and column subspaces,
+    so that Wj = LjWjRj. Thus ∥Wj∥op ≤ 1 and
+
+                                                  ⟨Wj, LjM Rj⟩ = ∥LjM Rj∥∗.
+
+                                                       19
+               STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  Put W = j Wj. Orthogonality gives
+
+                                    WTW =          Rj  W   T  Lj  W  j  R  j  ⪯     Rj ⪯ I.
+                                                           j
+
+                                                j                                j
+
+    Hence ∥W ∥op ≤ 1. Nuclear and operator norm duality gives
+
+                                     ∥M ∥∗ ≥ ⟨W, M ⟩ = ∥LjM Rj∥∗.
+
+                                                                         j
+
+    This proves the inequality.
+
+    7.3. Two elementary events that hold for every small support.
+
+    Lemma 7.4 (Uniform bound for individual rank-one terms). There is a fixed CA < ∞ such that
+                                                           P(Eactom) → 0,
+
+    where
+
+                                                           ∥ai∥2∥bi∥2               √
+                                    Eatom = max √
+                                                      i≤n         d           ≤ CA d .
+
+    On Eatom,                                                   √
+                                                ∥Bz∥∗ ≤ CA d∥z∥1
+
+    for every z ∈ Rn simultaneously.
+
+    Proof. Gaussian norm concentration gives
+
+                                                √                             √
+                                 P(∥ai∥2 > C d) + P(∥bi∥2 > C d) ≤ 4e−cd.
+
+    Since n ≤ Ad2, a union bound proves P(Eactom) ≤ 4Ad2e−cd → 0. On this event,
+
+                                 1                 T          1                              √
+               ∥Bz∥∗ ≤ √ |zi|∥aibi ∥∗ = √ |zi|∥ai∥2∥bi∥2 ≤ CA d∥z∥1.
+                                 di                           di
+
+    Lemma 7.5 (Uniform singular-value bound on small supports). There are absolute cs, κ > 0 such
+    that, with
+
+                                                                   d
+                                                      ssp = κ log d ,
+
+    the event
+
+                                                                 √
+               Esp = min{σmin(AI ), σmin(BI )} ≥ cs d for all I ⊂ [n] with 1 ≤ |I| ≤ ssp
+
+    satisfies P(Escp) ≤ e−csd for all large d.
+
+    Proof. For a fixed I ⊂ [n] of size 1 ≤ s ≤ ssp, the Gaussian singular-value inequality [DS01, Theorem
+
+    II.13] gives
+                                            √ P(σ √ min(AI ) ≤ h − s − t) ≤ e−t2/2.
+                                                                          √
+
+    Choose κ small enough that ssp ≤ h/16 and take t = h/4. Then
+
+                                      √√                          1√             √
+
+                                      h − s − t ≥ 2 h ≥ cs d.
+
+                                                              20
+         STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  Therefore, for each fixed support I, the probability that either AI or BI violates the preceding lower
+    bound is at most
+
+                                                         2e−h/32 ≤ 2e−csvd,
+
+    where csv = 1/96. If n ≥ 2ssp, then
+
+         log                           n         ≤ ssp log    en      + O(ssp) ≤ 2κd
+
+              s≤ssp s                                         ssp
+
+    for all large d, since n ≤ Ad2. If n < 2ssp, the number of supports is at most 2n ≤ e2ssp log 2. Choose
+    κ < csv/8. Union over both Gaussian matrices and every support gives
+
+                                                 P(Ecsp) ≤ e−csd
+
+    for all large d, after adjusting cs > 0.
+
+    7.4. Dyadic decomposition with geometrically increasing support sizes. The next con-
+    struction is entirely deterministic. Its purpose is to replace an arbitrary coefficient vector, possibly
+    with an enormous dynamic range, by finitely many groups whose coefficients are comparable in
+    magnitude and whose support sizes grow geometrically. We call a selected dyadic level a support
+    record; this word has no meaning beyond the selection rule in the next paragraph.
+
+        Fix q > 1. For u = 0 set V = W = 0. For u̸ = 0 put λmax = ∥u∥∞ and define
+                                     Bt = {i : 2−t−1λmax < |ui| ≤ 2−tλmax}, t ≥ 0.
+
+    Empty levels are ignored. Let t1 be the first nonempty level. Given tr, let tr+1 be the first later
+    nonempty level satisfying
+
+                                                          |Btr+1 | ≥ q|Btr |,
+    if it exists; otherwise the construction stops and the last group contains all levels after its selected
+    level. Put
+
+                                                Sr = |Btr |, λr = 2−tr−1λmax,
+    and Gr = {t : tr ≤ t < tr+1} with tR+1 = ∞ for the last record R. Every nonempty nonselected
+    level t ∈ Gr \ {tr} satisfies |Bt| < qSr.
+
+    Fix an integer T ≥ 1. In group r, retain only levels whose offset j = t − tr lies in {0, . . . , T − 1}.
+
+    Let Vr be the restriction of u to  T −1   Btr +j  ∩ Gr,  let  Wr  be  the  restriction  to  j≥T Btr+j ∩ Gr, and
+                                       j=0
+
+    put
+
+                                       V = Vr, W = u − V = Wr,
+
+                                              r                           r
+
+         kr = | supp Vr|,                        mr = ∥Vr∥1,      Qr = ∥Vr∥22,  R m2 r = r .
+                                                                                        Qr
+
+    Supports of distinct Vr are disjoint and mr > 0, Qr > 0 because Btr ⊂ supp Vr.
+
+        Every nonselected level in group r has fewer than qSr entries. The base level has entries in
+    (λr, 2λr], while a level at offset j has entries at most 2λr2−j. Therefore
+
+                                                          Sr ≤ kr ≤ T qSr,
+
+                                      λrSr ≤ mr ≤ 2λrSr + 2qλrSr 2−j ≤ 4qλrSr,
+
+                                                                                                        j≥1
+
+                                                      21
+                   STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  and
+                                    λ2rSr ≤ Qr ≤ 4λ2rSr + 4qλ2rSr 4−j ≤ 16q λr2Sr.
+                                                                           j≥1 3
+
+    Consequently,
+
+                    3 Sr ≤ Rr ≤ 16q2Sr.
+                   16q
+
+    Also,
+
+                                                   Qr  ∥Vr ∥2
+                   ∥Vr∥∞ ≤ 2λr ≤ 8q = 8q √ .
+                                                   mr  Rr
+
+    The omitted mass in group r is bounded by
+
+                   ∥Wr∥1 ≤ 2qλrSr 2−j = 4q2−T λrSr ≤ 4q2−T mr.
+
+                                                 j≥T
+
+    Summing gives
+                                                ∥W ∥1 ≤ ϵT ∥u∥1, ϵT = 4q2−T .
+
+    The selected support sizes grow as Sr+1 ≥ qSr. Hence
+                                                                Sl ≤ Sr
+
+                                                           l<r q − 1
+
+    and
+                                                                      Tq
+
+                                                              kl ≤ q − 1 Sr.
+
+                                                                              l<r
+
+    These are deterministic statements. Their constants depend only on q, T and are independent of
+
+    coefficient signs, the number of empty levels, and the dynamic range.
+
+      Remark 7.6 (A small example): Take q = 2 and suppose the nonempty dyadic levels have support
+    sizes 1, 1, 3, 2, 10 at successive levels. The selected support records have sizes 1, 3, 10: the second
+    level is not selected because 1 < 2 · 1, the third is selected because 3 ≥ 2 · 1, the fourth is not
+    selected because 2 < 2 · 3, and the fifth is selected because 10 ≥ 2 · 3. Thus the first two dyadic
+    levels form the first group, the next two form the second, and the final level begins the third. The
+    actual coefficient values and their signs play no role in this selection.
+
+    7.5. One regular dyadic group after removing earlier sample spans.
+
+    Lemma 7.7. Fix crank, Creg > 0. There are constants Clow, cup, cproj > 0, depending only on
+    crank, Creg, for which the following holds. Let H, J ⊂ [n] be disjoint deterministic supports. Let
+    PH , QH project away from the left and right sample spans indexed by H. Suppose their residual
+    ranks are at least crankd.
+
+        Let u be deterministic and supported on J. Put
+
+                                                     m2
+                   m = ∥u∥1, σ = ∥u∥2, R = σ2 .
+
+    Assume
+
+                                     σ
+                   ∥u∥∞ ≤ Creg √ , Clow log d ≤ R ≤ cupd.
+
+                                      R
+
+    Then, almost surely with respect to σ(ai, bi : i ∈ H),                     ≤ e−cprojdR.
+
+                                                             √
+                               P ∥PH BuQH ∥∗ < cproj dm σ(ai, bi : i ∈ H)
+
+    Proof. Choose measurable orthonormal bases of the residual spaces. Conditional on the head
+
+                                               22
+            STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  sigma-field, the projected samples indexed by J have independent standard Gaussian coordinates in
+    those bases.
+
+    Fix θ0 = 1/2. Choose γ > 0 such that
+
+                                          √              √
+                               Creg γ ≤ θ0 < 1/ 2,
+
+    and put r = ⌊γR⌋. Increasing Clow if needed gives r ≥ c log d, while decreasing cup makes r smaller
+    than a fixed fraction of each residual rank.
+
+        Partition each residual coordinate space into
+
+                               J0 = min{rank PH , rank QH }
+                                                      r
+
+    blocks of side r, and pair blocks with the same index. Then J0 ≥ cd/r.
+
+    For a paired block, write                               √
+
+                               1                     T σr
+                               Mj = √            uigij kij = √ Yj ,
+                                          d i∈J                     d
+
+    where
+
+                                       1             ui gij kijT .
+                               Yj = √        r i∈J σ
+
+    The coefficient cap is
+
+                               √r max |ui| ≤ Creg r ≤ θ0.
+                               iσ                        R
+
+    The arbitrary-center estimate Theorem 7.2, with θ = θ0 and center zero, gives
+
+                                                   r3/2
+                            P ∥Mj∥∗ < νsbσ √d σ(ai, bi : i ∈ H) ≤ pr,
+
+    where pr = e−csbr2. The events for different paired blocks are conditionally independent because
+    they use disjoint coordinates of every current ai and bi.
+
+        Let Nbad be the number of bad blocks. For all large d,
+
+            P(Nbad ≥ J0/2 | σ(ai, bi : i ∈ H)) ≤                       J0 prs ≤ 2J0 prJ0/2.
+                                                      s≥J0/2 s
+
+    Since pr = e−csbr2 and J0r ≥ cd, the last expression is at most e−cJ0r2 ≤ e−cdr.
+        On the complementary event, Theorem 7.3 gives
+
+                               J0 J0 r3/2 √
+                            ∥PH BuQH ∥∗ ≥ ∥Mj∥∗ ≥ νsbσ √ ≥ cσ dr.
+                                                      2                d
+                               j=1
+
+            √                                               √
+    Since r ≍ R and σ R = m, the last quantity is at least c dm. Also dr ≍ dR. This proves the
+
+    lemma.
+
+    7.6. The small-support prefix and the point where span removal stops. Let jpre be the
+    largest group index for which
+
+                               kpre :=               kr ≤ ssp.
+
+                                             r≤jpre
+
+                                                 23
+                     STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  If there is no such selected group, put jpre = 0, kpre = 0, and V0 = 0. Otherwise, put V0 =  r≤jpre Vr.
+
+    On Esp,                                                   √
+                                              ∥BV0∥∗ ≥ cs2 d∥V0∥1.
+
+    If selected group jpre + 1 exists, then
+
+                                                                  d
+                                              Sjpre+1 ≥ cq,T log d .
+
+    Indeed, first suppose kpre > ssp/2. The cumulative support estimate gives kpre ≤ Cq,T Sjpre, so
+    geometric growth gives Sjpre+1 ≥ qSjpre ≥ cq,T ssp. If kpre ≤ ssp/2, maximality gives kjpre+1 > ssp/2,
+    while kjpre+1 ≤ T qSjpre+1. The same conclusion follows. This also covers jpre = 0.
+
+    The deterministic dyadic-group estimates imply
+
+                                                             ∥Vr ∥2
+                                              ∥Vr∥∞ ≤ 8q √ .
+
+                                                                 Rr
+
+    Apply Theorem 7.7 with crank = 1/4 and Creg = 8q, and let Clow, cup be the resulting effective-support
+
+    thresholds. Fix
+
+                                                                 1 cup
+                                              0 < ρ < min , 2 .
+
+                                                                 8 32q
+
+    For all sufficiently large d, this gives
+
+                                                                          d
+                                                             h − ρd ≥ .
+
+                                                                          4
+    Starting after the small-support prefix, retain selected groups only while
+
+                                                  kl ≤ ρd.
+
+                                              l≤r
+
+    Before each retained selected group, both residual ranks are at least h − ρd. Moreover, Sr ≤ kr ≤ ρd,
+    so
+
+                                                Rr ≤ 16q2Sr ≤ 16q2ρd < cupd.
+    Every retained selected group outside the small-support prefix also has
+
+                                                                      d
+                                               Rr ≍q Sr ≥ cq,T log d ≥ Clow log d
+    for all sufficiently large d. Thus Theorem 7.7 applies with the displayed fixed parameters.
+
+    If r∗ is the first selected group not treated by span removal, then
+
+                                              Sr∗ ≥ cq,T,ρd.
+
+    Indeed, the support through r∗ exceeds ρd, while
+
+                                                              T q2
+                                              kl ≤ T q Sl ≤ q − 1 Sr∗.
+                     l≤r∗                     l≤r∗
+
+    Since Sr ≤ | supp u| ≤ Kd and the selected support sizes grow by q, the number of remaining groups
+
+    satisfies
+                                                   Jlate ≤ 1 + logq CqKT .
+                                                                             ρ
+
+    7.7. Combining nuclear-norm witnesses on orthogonal subspaces. For each retained group
+    we construct a matrix of operator norm at most one that attains the nuclear norm of that group’s
+    projected contribution. The left and right support spaces for different groups are orthogonal. The
+    witnesses can therefore be added without increasing the operator norm above one.
+
+                                              24
+    STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI      For a matrix M , define
+                                                     pol(M ) = M (M T M )†/2,
+
+    where A†/2 acts by λ−1/2 on every positive eigenspace of A and by zero on its kernel. Thus
+    ∥ pol(M )∥op ≤ 1 and ⟨pol(M ), M ⟩ = ∥M ∥∗. Let L0, R0 project onto the left and right sample spans
+    of the sparse prefix, put M0 = BV0, and define Z0 = pol(M0). Then Z0 = L0Z0R0; set Z0 = 0 when
+    M0 = 0.
+
+        For a selected group r treated by span removal, let Pr−1, Qr−1 project away from every retained
+    sample span preceding r, and let Pr, Qr also remove the current sample spans. Define
+
+                                              Dr = Pr−1 − Pr, Er = Qr−1 − Qr.
+
+    Nestedness makes Dr, Er orthogonal projections, and different increments are pairwise orthogonal.
+    Moreover,
+
+                                             Pr−1BVrQr−1 = DrPr−1BVrQr−1Er.
+    Indeed, nestedness gives PrPr−1 = Pr. For every current index i, one also has Prai = 0. Therefore
+
+                                         DrPr−1ai = (Pr−1 − Pr)Pr−1ai = Pr−1ai.
+
+    The same calculation on the right gives ErQr−1bi = Qr−1bi.
+
+    Put Mr = Pr−1BVrQr−1 and Zr = pol(Mr). Then
+
+    Zr = DrZrEr, ∥Zr∥op ≤ 1.
+
+    The prefix support projections and all increments are mutually orthogonal. Hence, for
+
+    Z = Z0 +                                     Zr ,
+
+              r captured
+
+    the same calculation as in Theorem 7.3 gives ZT Z ⪯ I and therefore
+
+    ∥Z∥op ≤ 1.
+
+    If k < r, every left sample in Vk lies in the span removed before increment Dr. Thus
+
+    ⟨Zr, BVk⟩ = 0.
+
+    All earlier cross terms vanish pathwise. Orthogonal projection and the canonical partial polar map
+    can be chosen as Borel functions of the samples.
+
+    7.8. Controlling cross terms from later coefficient groups. The witness for an earlier group
+    also pairs with later groups. These terms have conditional mean zero but are not bounded almost
+    surely. We use their exact conditional moment generating function. The quantity Bmart below is
+    the reciprocal radius on which that moment generating function is finite; it is not an almost-sure
+    bound on an increment.
+
+        Fix deterministic u and its dyadic decomposition. Let Fk−1 contain all samples in the small-
+    support prefix and in retained groups preceding group k. Let
+
+    Z<k = Z0 +                                   Zr
+
+                    r<k
+                r captured
+
+    and define
+                                                         Xk = ⟨Z<k, BVk⟩.
+
+    Then Z<k is Fk−1-measurable and the current cluster samples are independent of Fk−1.
+
+              25
+        STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI      For independent a, b ∼ N (0, Ih) and fixed Z,
+                                                EeξaT Zb = det(I − ξ2ZZT )−1/2
+
+    when |ξ|∥Z∥op < 1. To verify it, condition on a, integrate in b, and then use the Gaussian
+    quadratic-form formula.
+
+        Independence across coefficient indices gives
+
+        E(etXk | Fk−1) =                         det           t2 (Vk )2i      T    −1/2
+                                                           I−              Z<k Z<k
+                                                                  d                       .
+
+                          i∈supp Vk
+
+    If
+
+                          ∥Vk∥∞∥Z<k∥op 1
+        |t|                                      √         ≤√ ,
+                                                    d             2
+
+    then every eigenvalue in the logarithm is at most 1/2. Since − log(1 − x) ≤ 2x on [0, 1/2],
+
+        E(etXk | F t2Qk∥Z<k∥2 k−1) ≤ exp F .
+                                              d
+
+    Thus the conditional MGF estimate holds for both signs of t.
+
+        Every polar witness has squared Frobenius norm at most its supporting rank. Orthogonality
+
+    and the cumulative support bound give
+
+        ∥Z<k∥2F ≤ kl ≤ Cq,T Sk.
+
+                           l<k
+
+    The deterministic dyadic-group estimates give
+
+                                                                        m2
+                                                             Qk ≤ Cq k
+
+                                                                         Sk
+
+    and
+                                                          ∥Vk∥∞ ≤ Cq mk .
+                                                                           Sk
+
+    Put M = k mk = ∥V ∥1. Let
+                                                        v CQk∥Z<k∥2 k = F .
+                                                                       d
+
+    The predictable variance sum has the deterministic upper bound
+
+           vk ≤ Cq,T                             mk2 ≤ Cq,T M 2 =: Vmart.
+        kd                                    kd
+
+    Every cluster after the sparse prefix has Sk ≥ cq,T d/ log d. Therefore the reciprocal MGF radius is
+
+                                                 ∥Vk ∥∞           M log d
+        Bmart := max √ ≤ Cq,T 3/2 .
+                                           k           d             d
+
+    After the homogeneous normalization M = 1, these are exactly Vmart ≤ Cq,T /d and Bmart ≤
+    Cq,T log d/d3/2. The second quantity is an MGF-radius parameter. It is not an almost-sure
+
+    increment bound.
+
+        For 0 ≤ λ ≤ c/Bmart, iteration of the conditional MGF bound first gives
+
+        E exp −λ Xk − λ2 vk ≤ 1.
+
+                                              k                k
+
+                                                       26
+            STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  Since k vk ≤ Vmart pathwise, it follows that
+
+                               E exp −λ Xk                ≤ eλ2Vmart .
+
+                                                    k
+
+    Markov’s inequality gives
+
+                  P            Xk ≤ −x ≤ inf exp(−λx + λ2Vmart).
+                               k 0≤λ≤c/Bmart
+
+    Choose
+
+                               λ = min            x    ,  c         .
+
+                                                  2Vmart 2Bmart
+
+    Then
+
+                                                                x2      x
+                  k P Xk ≤ −x ≤ exp −c min Vmart , Bmart .
+            √
+    At x = amartM d, where amart > 0 will be chosen below,
+
+                               x2 ≥ cq,T d2, x ≥ c d2 q,T .
+                               Vmart              Bmart          log d
+
+    Thus
+
+                                                  √                     d2
+
+                     k P Xk < −amartM d ≤ exp −cq,T log d .
+
+    7.9. When one remaining dyadic block has macroscopic support. If the groups treated
+    above carry less than half of the coefficient mass, then one of the remaining dyadic blocks has
+    support comparable to d. We condition on every sample outside that block. The other contributions
+    then form an arbitrary measurable matrix center, while the selected block remains independent and
+    can be handled by the arbitrary-center small-ball estimate.
+
+    Lemma 7.8. Fix c0, K > 0. Let S ⊂ [n], s = |S|, suppose
+
+                                                           c0d ≤ s ≤ Kd,
+
+    and suppose
+
+                                                            λ ≤ |ui| ≤ 2λ
+    for i ∈ S. Let C be measurable with respect to
+
+                                      GS = σ(ai, bi : i ∈/ S).
+
+    Then there is a numerical constant cld > 0 such that, for all sufficiently large d (with the starting
+
+    dimension allowed to depend on c0, K), almost surely with respect to GS,
+
+                                                                   
+
+                                           √         min{s, d} GS  ≤ e−cldd min{s,d}.
+               P ∥C + BuS∥∗ < cld d∥uS∥1                 s
+
+    Proof. Put σ = ∥uS∥2 and choose
+                                                         r = ⌊γ min{s, d}⌋
+
+    with a fixed numerical γ > 0 small. Since s ≥ c0d, after increasing the starting dimension if
+
+                                                  27
+                STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  necessary,
+
+                          √                   γ
+    Also, since σ ≥ λ s,                 r ≥ min{s, d}.
+
+                                              2
+
+                                       √r ∥uS∥∞ ≤ 2√γ < 1/√2.
+                                              σ
+
+    Partition both coordinate spaces into J0 ≥ cd/r paired r by r blocks. Conditional on GS, every
+    block of C is fixed and the selected coefficient block uses independent Gaussian coordinates in
+
+    distinct paired coordinate blocks. For each paired block, Theorem 7.2 shows that the conditional
+
+    probability that its nuclear norm is smaller than
+
+                                               r3/2
+                                            cσ √
+
+                                                  d
+
+    is at most e−cr2. Let Ngood denote the number of paired blocks whose nuclear norm is at least this
+    threshold. The binomial calculation in Theorem 7.7 gives
+
+                             P(Ngood < J0/2 | GS ) ≤ e−cJ0r2 ≤ e−cdr.
+
+    On the complementary event, the pinching estimate Theorem 7.3 gives
+
+                                                 d r3/2       √
+                             ∥C + BuS∥∗ ≥ c r σ √d = cσ dr.
+
+                                        √
+    Flatness gives σ ≥ ∥uS∥1/(2 s). Since r ≍ min{s, d}, the last display proves the asserted scale and
+
+    exponent.
+
+        Suppose now that less than half of M = ∥V ∥1 lies in the small-support prefix and the groups
+    treated by span removal. The remaining groups carry more than M/2. There are at most Jlate of
+    them, so one remaining group has mass at least M/(2Jlate). Its base dyadic bin has mass at least a
+    1/(4q) fraction of its group mass, because the group upper bound is 4qλrSr.
+
+    Call this base bin S. It is deterministic once the coefficient vector is fixed. It satisfies
+
+                                         cq,T,ρd ≤ |S| ≤ Kd.
+
+    Reveal GS. The center
+
+                                         C = B(V − uS)
+
+    is GS-measurable, while the samples in the selected block remain independent of GS. The macroscopic-
+
+    block estimate Theorem 7.8, applied with c0 = cq,T,ρ and the preceding fixed K, therefore gives,
+
+    almost surely with respect to GS,       √
+
+                             P ∥BV ∥∗ <   cld d        M GS   ≤ e−cq,T,ρ,K d2 .
+                                         √
+                                         8q K+Jlate
+
+    7.10. Combining the two alternatives for one fixed coefficient vector. By homogeneity,
+    normalize ∥u∥1 = 1. Let T be specified below and put M = ∥V ∥1 ≥ 1 − ϵT .
+
+    Let Mcap be the mass in the small-support prefix and the groups treated by span removal. If
+
+    Mcap ≥ M/2, the sparse and projected lower bounds give a diagonal polar pairing at least
+                                         √             √
+
+                                         c dMcap ≥ c dM.
+
+                                                 28
+               STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  By Section 7.7, the aggregate witness has operator norm at most one and all backward terms vanish.
+
+    The supermartingale estimate in Section 7.8 gives
+
+                                          √                                d2
+
+               k P Xk < −cM d ≤ exp −cq,T log d .
+
+    Choose amart to be half the diagonal constant. Then
+                                                                        √
+
+                                                         ∥BV ∥∗ ≥ c dM.
+
+    For each projected group r, let Fr be the event that the lower bound from Theorem 7.7 fails. Every
+    such Rr outside the small-support prefix is at least cq,T d/ log d, and there are at most 1 + logq(Kd)
+    groups. The tower property and a union bound give
+
+                                                          d2
+               r P Fr ≤ C log d exp −cq,T log d .
+
+    If Mcap < M/2, let Flate be the event that the following lower bound fails:
+
+                                                       c                   √
+               ∥BV ∥∗ ≥ √K+[1 + logq(CqK+T /ρ)] dM.
+
+    The conditional estimate in Section 7.9, followed by the tower property, gives
+
+                                       P(Flate) ≤ e−cq,T,ρ,K d2 .
+
+    Combining the branches, for every fixed deterministic u,
+
+                                       √                                            d2
+
+               P {∥BV ∥∗ < cret(K, T ) d∥V ∥1} ∩ Esp ≤ C log d exp −cq,T,K log d ,
+
+    where                                                 c
+
+               cret(K, T ) ≥ √            K+[1 + logq(CqK+T /ρ)]               .
+
+    On Eatom,                                              √
+                                       ∥BW ∥∗ ≤ CAϵT d∥u∥1.
+
+    Therefore                                                  √
+               ∥Bu∥∗ ≥ [cret(K, T )(1 − ϵT ) − CAϵT ] d∥u∥1.
+
+    Now fix q = 2 and ρ as above. Set
+
+                                       T = ⌈T0 + 2 log2(eK+)⌉ .
+
+    The lower constants in the small-support-prefix and projected-group arguments depend on q and
+    ρ, but not on T , and the macroscopic-block scale constant cld is numerical. The truncation depth
+    affects the cumulative support factor, the exceptional exponent, the starting dimension, and the
+    number of remaining groups. Thus the retained lower-bound scale loses only the factor 1 + log K+
+    displayed below.
+
+    The ratio
+
+                                          (1 + log(K+T ))
+
+                                          K+3/2
+
+    is bounded on K+ ≥ 1. Hence T0, depending only on the atom constant, can be chosen so that
+
+                                                     1
+                                          CAϵT ≤ 4 cret(K, T )
+
+    for every fixed K. With T0 increased if needed, ϵT ≤ 1/2. Define cms(A) > 0 to be a sufficiently
+
+    small constant depending only on the single-summand bound for aspect parameter A. It follows
+
+                                             29
+          STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  that
+
+          ∥Bu∥∗ ≥ √ cms(A)                                     √
+                                       K+(1 + log K+)            d∥u∥1.
+
+    If Fu denotes the event that this inequality fails, then, for every fixed deterministic u,
+
+                                                                     d2
+          P(Fu ∩ Esp ∩ Eatom) ≤ C log d exp −cq,T,K log d .
+
+    7.11. Uniformity over every support and coefficient vector. Normalize ∥u∥1 = 1. Denote
+    the fixed-vector constant obtained in Section 7.10 by
+
+                                                   cK,A fix = √ cms(A) .
+                                                                K+(1 + log K+)
+
+    For each support S with |S| ≤ Kd, take a deterministic δ-net of its ℓ1 unit sphere in ℓ1 distance,
+    with
+
+                                                                    cK,A f ix
+                                                              δ= .
+
+                                                                    4CA
+    A volumetric packing argument gives at most
+
+                                                             (1 + 4/δ)|S|
+
+    points. Thus
+
+                                          log Ncoef ≤ Kd log(1 + 4/δ) = OA,K (d).
+    If Kd ≤ n/2, then
+
+                                                              en
+                                  log Nsupp ≤ Kd log Kd + OK (d) = OA,K (d log d).
+    If Kd > n/2, then either n = OK (d) and 2n = eOK(d), or one may use the same upper bound after
+    replacing Kd by min{Kd, n}. In every case,
+
+                                                    log Nsupp = OA,K (d log d).
+
+    Each deterministic net point determines its dyadic decomposition. Absolute dyadic locations, gaps
+    between selected support sizes, group partitions, and stopping indices are deterministic functions of
+    that point. Projections and nuclear-norm witnesses are Borel functions of the revealed Gaussian
+    samples and are handled by conditional probability. Thus the support and coefficient nets account
+    for all entropy terms.
+
+    The union-bound exponent is
+
+                                 ′ d2   + CA,K d log d −→ −∞.
+          −cK,A
+                                 log d
+
+    Indeed, if Enet denotes validity at every net point, then
+
+          P(Encet ∩ Esp ∩ Eatom) ≤ exp −c′K,A d + CA,K d log d . 2
+                                                          log d
+
+    If u0 is a net point with ∥u − u0∥1 ≤ δ, then on Eatom,
+
+                                            √                  1 fix √
+
+          ∥B(u − u0)∥∗ ≤ CA dδ ≤ cK,A d.
+                                                               4
+
+    Both u and u0 have ℓ1-norm one, so the net lower bound extends with a fixed factor loss. Combining
+
+                                        30
+               STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  the last three probability estimates gives
+
+                                                                 
+
+                                                 ∥Bu∥∗ 1 fix 
+                                 P  inf          √         < cK,A → 0.
+                                                   d∥u∥1 2
+                                    u̸=0
+
+                                    | supp u|≤Kd
+
+    Renaming the constant proves Theorem 7.1 and hence Theorem 10.1.
+
+               8. How the bilinear block enters the centered adjoint map
+
+AI  Let h = ⌊d/2⌋. Split each sample into independent coordinate halves ai, bi ∈ Rh; if d is odd, the
+
+    middle coordinate is discarded. Define
+
+                                                     1         T
+                                            By = √ yiaibi .
+                                                     di
+
+    The identity matrix has zero off-diagonal block, and rectangular compression is nuclear-norm
+    contractive, so this projection preserves the validity of the lower bound. Hence
+
+                                                ∥Td∗y∥∗ ≥ ∥By∥∗
+
+    for y ⊥ 1n.                                                                                             Uniformly over
+                                                                                                         √
+
+    Lemma 8.1 (Arbitrary-center determinant small ball). Fix 0 < θ < 1/ 2.
+    deterministic z ∈ Rn satisfying
+
+                                                                                θ
+                                                      ∥z∥2 = 1, ∥z∥∞ ≤ √ ,
+
+                                                                                 d
+
+    and deterministic N ∈ Rh×h,
+
+                  1                 T                       √        h2
+               P √ ziaibi − N ≤ t d ≤ (Cθt) , 0 < t < 1.
+                  di
+                                                  F
+
+    Proof. Apply Theorem 5.4 with r = h. The coefficient cap is valid because
+
+                                    √
+                                      h∥z∥∞ ≤ θ h/d < θ.
+
+    Moreover,
+
+                                    1                   T
+                                    √ ziaibi = h/dYz.
+                                            di
+               √                                                     √
+    Thus a Frobenius radius t d on the left becomes a radius t(d/h) h for Yz. Since d/h ≤ 3 for d ≥ 2,
+
+    the factor is absorbed into Cθ. The exact coordinate-block statement used later is Theorem 5.8.
+
+    Lemma 8.2 (Operator norm bound for the bilinear measurement matrix). If n = O(d2), then
+                                                                           √
+
+                                                        ∥B∥2→F = OP( d).
+
+    Proof. Use row vectorization, so that vecr(abT ) = a ⊗ b. If V is the h2 by n matrix with columns
+    ai ⊗ bi, then
+
+                                                                         1
+                                                        vecr(By) = √ V y.
+
+                                                                          d
+
+                                                        31
+                   STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  Consequently,
+
+                                  ∥B∥2→F 2 = 1                  (ai ⊗ bi)(ai ⊗ bi)T .
+                                                d
+                                                             i                       op
+
+    Introduce  independent  real  copies  a  ′  ,  b′  and,  for  s, t  ∈  {−1, 1},  put
+                                             i
+                                                    i
+
+                                  z (ai + isa′ i,s,t = i) ⊗ (bi + itb′i) .
+                                                         2h
+
+    Write
+
+                                                               ai + isa′i
+                                                       ϕi,s = √ ,
+
+                                                                     2h
+
+    and
+                                                                   bi + itb′i
+
+                                                          ψi,t = √ .
+                                                                        2h
+
+    Then zi,s,t = ϕi,s ⊗ ψi,t. Every complex coordinate of either factor has independent real and
+    imaginary parts of variance 1/(2h). Hence
+
+                                                E∥ϕi,s∥22 = E∥ψi,t∥22 = 1.
+
+    Thus, for each fixed (s, t), the vectors zi,s,t are independent tensor products of two complex Gaussian
+    vectors in Ch. Ambainis, Harrow, and Hastings call these two-factor complex Gaussian product
+    states; this is source terminology, and the normalization above is exactly theirs.
+
+        To verify the PSD domination, put
+
+                                                          ui = ai ⊗ bi,
+
+                                                          vi = ai ⊗ b′i,
+
+    and                                                   ri = ai′ ⊗ bi,
+    Then                                                  qi = ai′ ⊗ b′i.
+
+                                  2hzi,s,t = ui + itvi + isri − stqi.
+
+    Since s s = t t = s,t st = 0, summing the four Hermitian rank-one projectors cancels all mixed
+    terms and gives
+
+                                  zi,s,tzi,s,t ∗ = 21 uiuiT + viviT + ririT + qiqiT .
+                                                       h
+                            s,t
+
+    Therefore
+
+                                  (ai ⊗ bi)(ai ⊗ bi)T ⪯ h2 zi,s,tzi,s,t ∗ .
+
+                                                                             s,t
+
+    In the notation of [AHH12] with k = 2, local dim h, fix x0 > sup n/h2 to get fixed aspect
+    Naug/h2 = x0 for Cor 3, put Naug = x0h2, and for each (s, t) augment by Naug − n i.i.d. states;
+    adding PSD terms only increases ∥ · ∥op, so the augmented Ms,t aug dominates the original sum. Denote
+    its normalized version by MNaug,h,2 norm (E∥ϕ∥22 = 1) for the concentration below.
+
+        The distinction between these two ensembles matters in the concentration formula. Corollary 3
+
+                                                                  32
+    STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  gives, at the fixed aspect p/h2 = x0,
+                                             E∥MNaug,h,2 norm ∥op ≤ (1 + √x0)2 + o(1).
+
+    Equation (11) of Ambainis, Harrow, and Hastings states that, for fixed 0 < ϵ ≤ 1 and ∆ > 0,
+
+    P ∥Ms,t aug∥op − E∥MNaug,h,2 norm ∥op ≥ ϵE∥MNaug,h,2 norm ∥op + ∆
+
+    ≤ 4Nauge−hϵ2/16 + 2e−(h−1)∆2/8.
+
+    In particular, by fixing ϵ and ∆, there are constants C, c > 0 such that
+
+      n                                                             
+
+    P  zi,s,tz∗i,s,t > C ≤ e−ch+O(log h).
+
+       i=1                op
+
+    The four sign ensembles are dependent, but a union over four events needs no independence. On
+    their common event, summing the PSD domination over i and using vectorization gives
+
+    ∥B∥22→F ≤ h2                                                     zi,s,tzi,s,t ∗       h2
+                   d s,t                                                             ≤C .
+                              i op d
+
+    Since h = ⌊d/2⌋, this is at most Cd. Hence                       ≤ e−cd+O(log d).
+
+                                                                  √
+                                             P ∥B∥2→F > C d
+
+    This proves the asserted tightness and a stronger fixed-constant high-probability form.
+
+AI                  9. The uniform estimate for small-coordinate vectors
+
+        For R > 0, let
+                                              B∗(R) = {N ∈ Rh×h : ∥N ∥∗ ≤ R}.
+
+    Let BF be the Frobenius unit ball in Rh×h.
+
+        The nuclear-ball covering lemma Lemma 5.6 gives
+                                                                                 R2h
+
+                                                  log N (B∗(R), sBF ) ≤ C s2 .
+    At R = cqd and s = ζq√d, the right side is C(c/ζ)2d2. Homogeneity removes q exactly. This
+    is essential because a scale-dependent low-rank cover would instead introduce an unnecessary
+    d2 log(1/q) cost.
+
+                                                                      √
+    Proposition 9.1. Fix α0 < 1/4, 0 < θ < 1/ 2, and positive constants A, B, β, K, c0, C0, L.
+    Suppose n ≤ α0d2 and work on
+
+                                                                                 √
+                                                   Ed(L) = {∥B∥2→F ≤ L d}.
+
+    Let Fd,L be the event that the simultaneous conclusion below fails. There are c, γ > 0 such that, for
+    all sufficiently large d,
+
+                                                    P(Fd,L ∩ Ed(L)) ≤ e−γd2 .
+    The conclusion is the following. Simultaneously for every c0d−1/2 ≤ q ≤ C0, if I ⊂ [n] and U, V
+
+                              33
+             STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  satisfy
+
+             |I| ≤ Kd, supp U ⊂ I, supp V ⊂ Ic,
+
+                              √
+                ∥U ∥1 ≤ Aq d, βq ≤ ∥V ∥2 ≤ Bq,
+
+    and
+                                                        √
+                                                           d∥V ∥∞ ≤ θ∥V ∥2,
+
+    then
+
+                                                       ∥B(U + V )∥∗ ≥ cqd.
+
+    Proof. This is the restriction of Theorem 6.1 to c0d−1/2 ≤ q ≤ C0. That proposition proves the
+    stronger statement simultaneously for every q > 0, with the same event-level probability bound.
+
+             10. The uniform estimate for the large-coordinate part
+
+AI      This theorem is the global output of Section 7. It contains no flatness assumption and is
+
+    simultaneous over supports and coefficients chosen from the same data. Its dependence on the
+    support-size constant K is displayed because it will be needed when K = η−2 in the next section.
+
+    Theorem 10.1. Fix 0 < K, A < ∞ and assume n ≤ Ad2. Put K+ = max{K, 1}. There is cK,A > 0
+
+    such that, uniformly over every such sequence n = nd,                    
+             
+
+                          ∥Bu∥∗                                             
+             P  inf       √         < cK,A −→ 0.
+                              d∥u∥1
+                u̸=0
+
+             | supp u|≤Kd
+
+    Equivalently, with probability tending to one, uniformly over all u with | supp u| ≤ Kd,
+
+                                                                        √
+                                                      ∥Bu∥∗ ≥ cK,A d∥u∥1.
+
+    Moreover, there is a constant cms(A) > 0, depending only on A, such that
+
+                                                   cK,A ≥ √ cms(A) .
+                                                                K+(1 + log K+)
+
+    Proof. The dyadic coefficient decomposition, projected block estimate, orthogonal witness aggrega-
+    tion, conditional exponential estimate for future cross terms, macroscopic last-block alternative,
+    and deterministic union bound are proved in Section 7.
+
+AI                       11. Combining the large and small coordinates
+
+        The next norm is an infimal convolution of a scaled ℓ1 norm and a scaled Euclidean norm. Its
+    minimizing decomposition automatically separates a vector into a part supported on at most d/η2
+    coordinates and a remaining part with a coordinatewise cap. This deterministic fact is the exact
+    interface between the two preceding probabilistic estimates.
+
+        For 0 < η < 1, define
+                                                                    √
+
+                                             Nη(y) = inf η d∥u∥1 + d∥v∥2 .
+                   √ y=u+v
+    Minimize η d∥y − v∥1 + d∥v∥2 and put u = y − v. If v̸ = 0, subgradient optimality gives,
+
+                              34
+                     STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  coordinatewise,
+
+                                            dvi √
+                                            ∥v∥2 ∈ η d∂|yi − vi|.
+
+    Thus
+
+                                                       η∥v∥2
+                                               |vi| ≤ √ ,
+
+                                                           d
+
+    with equality and matching sign whenever ui̸ = 0. If I = supp u, then
+
+                                ∥v∥22 ≥           vi = |I|2 η2∥v∥22      ,
+
+                                               i∈I d                           √
+
+    so |I| ≤ d/η2. If v = 0, optimality gives an s ∈ ∂∥y∥1 satisfying η d∥s∥2 ≤ d. Since |si| = 1 on
+
+    supp y, the same support bound follows.
+
+AI  For v̸ = 0, put
+
+                          I = supp u, U = yI = u + vI , V = yIc = vIc.
+
+    Then U, V have disjoint supports. Moreover,
+                             √                 √
+
+                             η d∥U ∥1 ≤ η d∥u∥1 + d∥v∥2 = Nη(y),
+
+    where the first inequality uses ∥vI ∥1 ≤ |I|∥v∥2, and ∥V ∥2 ≤ ∥v∥2 ≤ Nη(y)/d. If ∥y∥2 = 1 and
+
+                                               qy = Nη(y) ,
+                                                         d
+
+    then qy ≤ 1 by choosing v = y. Conversely, for every y = u + v,
+                          √                       √                            √
+
+                          η d∥u∥1 + d∥v∥2 ≥ η d(∥u∥2 + ∥v∥2) ≥ η d,
+
+    so
+                                                             η
+                                                            √ ≤ qy ≤ 1,
+                                                              d
+                                                                 √
+
+                                                   ∥U ∥1 ≤ qy d , ∥V ∥2 ≤ qy.
+                                                                 η
+
+    If ∥V ∥2 ≥ βqy, then                    √
+
+                                                      η
+                                               d∥V ∥∞ ≤ β ∥V ∥2.
+
+    On I, the matching-sign relation gives
+
+                                            √ η d∥v ∥vI ∥2 I ∥1 = d 2 .
+                                                               ∥v∥2
+
+    Consequently,
+
+                          √ η d∥U ∥ ∥V ∥2 1 = Nη(y) − d 2 ≥ Nη(y) − d∥V ∥2.
+                                                        ∥v∥2
+
+    Theorem 11.1 (Mixed-norm lower bound for the adjoint map). Assume lim sup n/d2 < 1/4. For
+    every δ > 0, there are fixed constants ηδ, cδ > 0 and events Gd,δ such that
+
+                                            lim sup P(Gcd,δ) ≤ δ
+
+                                                 d
+
+    and, on Gd,δ,
+
+                                            ∥Td∗y∥∗ ≥ cδNηδ (y)
+
+    for every y ⊥ 1n.
+
+                                                  35
+                STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  Proof. By homogeneity, let ∥y∥2 = 1. Tightness in Theorem 8.2 gives, for fixed δ, a fixed Lδ such
+    that
+
+                                      lim sup P(Ed(Lδ)c) ≤ δ.
+
+                                           d
+
+    For the multiscale theorem, use the fixed aspect bound A0 = 1, since n ≤ α0d2 < d2. Its quantitative
+    constant gives, for every 0 < η < 1,
+
+                                      cη−2,A0 ≥      c
+                                                              .
+                                      η          1 + log(1/η)
+
+    Choose η = ηδ so small that
+
+                                         1       c
+                                 2CLδη < 2 1 + log(1/η) (1 − 2η).
+
+    This is possible because η[1 + log(1/η)] → 0. Now set
+
+                                            K = η−2,
+
+                                            β = 2η,
+
+    and
+
+                                                           cH (η) = cK,A0 .
+                                                                         η
+
+                                √
+    Then η/β = 1/2 < 1/ 2, and Theorem 10.1 gives
+
+                                                                         √
+                                                     ∥BU ∥∗ ≥ cK,A0 d∥U ∥1.
+
+    On Ed(Lδ),                               √
+                                 ∥Bz∥∗ ≤ h∥Bz∥F ≤ CLδd∥z∥2.
+
+    The chosen inequality remains true with the actual cH (η) in place of its lower bound. The absorption
+    uses the rescaled large-coordinate constant cH = cK,A0/η, not the unscaled constant cK,A0.
+
+        If ∥V ∥2 ≥ βqy, Theorem 9.1 applies with the fixed parameters
+
+                A = 2/η, B = 1, β = 2η, K = η−2, θ = 1/2, c0 = η, C0 = 1, L = Lδ,
+
+    and gives ∥B(U + V )∥∗ ≥ cNη(y).
+        If ∥V ∥2 < βqy, then
+
+                                      ∥BU ∥∗ ≥ cH (η)(1 − β)Nη(y),
+
+    while
+
+                                                      ∥BV ∥∗ ≤ CLδβNη(y).
+
+    The parameter inequality absorbs this error and leaves half the head contribution. The case v = 0
+    is purely sparse and follows directly from Theorem 10.1.
+
+        Let Elarge(K) be the simultaneous large-coordinate event in Theorem 10.1, and let Fd,Lδ be the
+    bad event in Theorem 9.1 with the parameters displayed above. Define
+
+                                 Gd,δ = Ed(Lδ) ∩ Elarge(K) ∩ Fd,Lδ c .
+
+    Then
+
+                P(Gcd,δ) ≤ P(Ed(Lδ)c) + P(Elarge(K)c) + P(Fd,Lδ ∩ Ed(Lδ)).
+
+                                                 36
+                       STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  The first term has limiting upper bound at most δ, the second tends to zero, and the third is at
+    most e−cδd2. Taking the minimum of the two branch constants proves the theorem on Gd,δ.
+
+              12. Exact correction and preservation of positive definiteness
+
+AI  The dual norm of Nη on the full coefficient space is
+
+                                                     ∗                ∥e∥∞ ∥e∥2
+                                                Nη (e) = max √ ,                      .
+                                                                          ηd d
+
+                                                                                                                                 √
+    Indeed, the polar of the infimal-convolution unit ball is the intersection of the ℓ∞ ball of radius η d
+
+    and  the  Euclidean       ball  of  radius  d.   Restriction  to  1⊥   can  only  reduce   the     dual  support   function,        so
+
+                                                                        n
+
+    the displayed formula remains a valid upper bound there.
+
+        Almost surely the rank-one matrices xixTi are linearly independent whenever n ≤ d(d + 1)/2.
+    This rank event is the nonvanishing of a polynomial, and it is nonempty because the matrices
+
+                                        ejeTj and (ej + ek)(ej + ek)T for 1 ≤ j < k ≤ d
+
+    span  Symd:     subtracting     the  two  relevant  diagonal      matrices  from  the      second  type  recovers  ej eTk  +  e  k  eT  .
+
+                                                                                                                                         j
+
+    Thus Ad is surjective and Td is surjective onto 1⊥n .
+
+    Lemma 12.1 (Finite-dimensional quotient duality). Let T : X → Y be a surjective linear map
+    between finite-dimensional normed spaces. Then, for every e ∈ Y ,
+
+                                                 inf ∥x∥X =            sup      |⟨e, y∗⟩|.
+
+                                                T x=e                 y∗∈Y ∗
+
+                                                                  ∥T ∗y∗∥X∗ ≤1
+
+    The infimum is attained.
+
+    Proof. The left side is the quotient norm induced by X/ ker T . Its dual norm is y∗ → ∥T ∗y∗∥X∗.
+    Duality of a finite-dimensional norm with its polar gives the equality. Attainment follows by
+    intersecting the closed affine fiber T −1(e) with a sufficiently large compact norm ball.
+
+    Define
+
+                                         κd(S) = inf{∥H∥op : Td(H) = −Πn res(S)}.
+
+    For e = Πn res(Sd∗), Lemma 12.1 gives
+
+                                         κd(Sd∗) = inf ∥H∥op = sup |⟨e, y⟩|.
+                                                     Td (H )=−e                 y⊥1n
+
+                                                                              ∥Td∗y∥∗≤1
+
+    On Gd,δ,
+
+                                         ∗      −1            ∥Πn res(Sd∗)∥∞ ∥Πn res(Sd∗)∥2
+                                    κd(Sd) ≤ cδ max                   √         ,                      .
+                                                                  ηδ d                      d
+
+    For every fixed δ, Theorem 4.1 makes the right side tend to zero in probability. Therefore, for every
+
+    r > 0,
+
+                                                     lim sup P(κd(Sd∗) > r) ≤ δ.
+
+                                                          d
+
+    Letting   δ  ↓  0  after  the   d  limit  gives  κd(Sd∗)  P   0.
+
+                                                              −→
+
+        The quotient infimum is attained because the affine constraint is closed and an operator-norm
+    ball is compact in finite dimension. Choose an attainer Hd; no measurable selection is needed for
+
+                                                                      37
+AI                         STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+    the pathwise existence conclusion. Since S∗d ⪰ λ−I,
+
+                                                      Qd = Sd∗ + Hd ⪰ λ− I
+                                                                              2
+
+    with probability tending to one. Also ΠnAd(Qd) = 0, so Ad(Qd) = cd1n. Positivity gives cd > 0.
+    Then
+
+                                                                      d
+                                                             Sd = cd Qd
+    is positive definite and belongs to Fd. This proves the feasible assertion in Theorem 1.1.
+
+                                                                         38
+         STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+       PART II. INFEASIBILITY ABOVE THE THRESHOLD
+
+       13. Leave-one-row interpolation for diffuse positive semidefinite matrices
+
+Human      This section contains the full comparison argument before it is used in the proof of infeasibility.
+       The phrase leave-one-row interpolation means the following concrete construction. During the
+       replacement of row m, we condition on all rows except row m and define one Gibbs measure from
+       those rows. That conditional measure is independent of both possible choices for the current row.
+       The comparison then follows from an exact third-order interpolation identity.
+
+AI     13.1. Uniform lower bound for diffuse matrices. This section proves Theorem 15.1. We begin
+       by restating it with the local notation used in the comparison argument. The theorem is uniform
+       over all diffuse positive semidefinite matrices and all vectors in one fixed low-dimensional subspace.
+       The subspace may be random only after conditioning has made it deterministic and independent of
+       the Gaussian rows; this point is checked explicitly at the end of the section in Section 13.12.
+
+       Theorem 13.1. Fix ϵ > 0, 0 < B < ∞, and 0 < C1 < ∞. There are constants
+
+                                                        0 < τ ≤ 1, c > 0, c′ > 0,
+
+       depending only on ϵ, B, C1, with the following property.
+           Let w1, . . . , wn be independent N (0, Ip) vectors, and put
+
+                                                                    wiwiT − Ip
+                                                             Zi = √ .
+
+                                                                           2
+       Let L ⊆ Rn be a deterministic linear subspace of dimension mL. Assume
+
+                                                         n − mL ≥ 1 + ϵ p2
+                                                                          4
+
+       and
+                                                                 n ≤ C1p2.
+
+       Then, for all sufficiently large p,
+
+                                                                              
+
+                                                1n                              −c′p2
+                         P                 inf         |⟨Zi, D⟩ − vi| < c ≤ e .
+                           D⪰0, ∥D∥F =1, ∥D∥op≤τ n i=1
+                             v∈L, ∥v∥1≤Bn
+
+       The constants and the probability estimate are uniform over the orientation of deterministic L.
+       The result is not simultaneous over subspaces chosen from the same wi without conditioning. The
+       conditional form used in the ellipsoid proof is stated in Section 13.12.
+
+       13.2. Coordinates and the Gaussian comparator. Equip Symp with the Frobenius inner
+       product. For the standard basis e1, . . . , ep, define
+
+                                                 Qaa = eae⊤a
+
+       and, when a < b,
+
+                                                        eae⊤b + ebe⊤a
+                                                 Qab =      √               .
+                                                               2
+
+                                                        39
+                STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  These matrices form an orthonormal basis of Symp.
+
+    Lemma 13.2. For 1 ≤ i ≤ n, let w1, . . . , wn be independent N (0, Ip) vectors and let
+                                                      Zi = (wiwi⊤ − Ip)/√2.
+
+    For any A, B ∈ Symp and 1 ≤ i ≤ n,
+
+                                        E⟨Zi, A⟩⟨Zi, B⟩ = ⟨A, B⟩.
+
+    Proof. To lighten notation we drop the subscript i, 1 ≤ i ≤ n, from Z and w, since the argument
+    holds for any i.
+
+        Instead, in this proof the subscript refers to the specific component of w. For example, wa,
+    1 ≤ a ≤ p, refers to the a-th entry of the vector w which is N (0, 1).
+
+        The coordinates of Z = (ww⊤ − Ip)/√2 are
+
+                                                         w2   −  1
+
+                                                           a
+                                        ⟨Z, Qaa⟩ = √
+                                                              2
+
+    and
+
+                                        ⟨Z, Qab⟩ = wawb.
+
+    For any A ∈ Symp,
+
+                                                     1⊤
+                                        ⟨Z, A⟩ = √ (w Aw − Tr A).
+
+                                                      2
+
+    For w ∼ N (0, Ip), Wick’s identity yields
+
+                                           E[wawbwcwd] = δabδcd + δacδbd + δadδbc,
+    which equals 3 when a = b = c = d, 1 when indices pair up, 0 otherwise. Now,
+
+                            w⊤Aw w⊤Bw =                  AabBcdwawbwcwd.
+
+                                               a,b,c,d
+
+    Taking expectation, one gets
+                          E[w⊤Aw w⊤Bw]
+
+                =           AabBcdδabδcd +           AabBcdδacδbd +           AabBcdδadδbc
+
+                   a,b,c,d                  a,b,c,d                  a,b,c,d
+
+                = Tr A Tr B + Tr(A⊤B) + Tr(AB)
+
+                = Tr A Tr B + 2 Tr(AB).
+
+    Since E[w⊤Aw] = Tr A and E[w⊤Bw] = Tr B,
+                        E[(w⊤Aw − Tr A)(w⊤Bw − Tr B)] = E[w⊤Aw w⊤Bw] − Tr A Tr B
+                                                                       = 2 Tr(AB).
+
+    Therefore,
+
+                E⟨Z, A⟩⟨Z, B⟩ = 1 E[(w⊤Aw − Tr A)(w⊤Bw − Tr B)] = Tr(AB).
+                                      2
+
+                                                     40
+                STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI      Thus, if we define G = a≤b gab Qab where gab are independent N (0, 1), then
+                                      E[G] = 0 and E⟨G, A⟩⟨G, B⟩ = Tr(AB),
+
+    i.e., G is a covariance-matched isonormal Gaussian version of Z on Symp.
+
+        From now on, we write G1, . . . , Gn for the copies of G corresponding to wi, 1 ≤ i ≤ n, and use
+    single-index subscript {Qa}1≤a≤p(p+1)/2 to enumerate the basis of Symp.
+    Lemma 13.3. Let
+
+                                         Pp = {D ∈ Symp : D ⪰ 0 and ∥D∥F = 1}.
+    Then its Gaussian width, w(Pp), satisfies
+
+                w(Pp) ≤      p(p + 1)
+                                       .
+
+                                 4
+
+    Proof. Recall that the Gaussian width of Pp is defined as
+
+                w(Pp) = E sup ⟨H, D⟩
+
+                                   D∈Pp
+
+    where H is a symmetric isonormal Gaussian operator. Now,
+
+                H = H+ − H−, H± ⪰ 0, H+H− = 0, ∥H∥2F = ∥H+∥2F + ∥H−∥F2 .
+
+    Therefore,
+
+                                                       sup ⟨H, D⟩ ≤ ∥H+∥F
+
+                                                                         D∈Pp
+
+    and
+
+                                                E∥H∥2F = E∥H+∥2F + E∥H−∥F2 .
+
+    Now, since the law of H is invariant under H → −H,
+
+                E∥H+∥F2 = 1 E∥H∥F2 = p(p + 1) .
+                2                                              4
+
+    By Jensen’s inequality, the Gaussian width satisfies
+
+                w(Pp) ≤      p(p + 1)
+                                       .
+
+                                 4
+
+    Lemma 13.4. Let G1, . . . , Gn be mutually independent isonormal Gaussian operators on Symp.
+    Let L ⊆ Rn be a deterministic linear subspace of dimension mL. Fix a deterministic retained row
+    set J ⊆ [n] with |J| = m. Let LJ = {vJ : v ∈ L}. If UJ is deterministic and has orthonormal rows
+    spanning L⊥J , then UJ GJ is an rJ -row isonormal Gaussian operator, where
+
+                                                  rJ = m − dim LJ ≥ m − mL.
+
+    Proof. Since L is deterministic, so is LJ , and dim LJ ≤ dim L = mL by the rank-nullity theorem.
+    Hence
+
+                                                  rJ = m − dim LJ ≥ m − mL.
+
+    If rJ = 0 there is nothing else to prove, so assume rJ ≥ 1.
+
+                         41
+           STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI      Recall that {Qa}a is an orthonormal basis of Symp and write ξia = ⟨Gi, Qa⟩ = Gi(Qa). Since
+    G1, . . . , Gn are independent isonormal, then ξia are independent N (0, 1) in a, with
+
+                                                         E[ξiaξjb] = δij δab.
+
+    Put GJ = (Gj)j∈J . Then
+
+                                (UJ GJ )r = UrjGj,            (UJ ξ)ra = Urjξja,
+
+                                                     j∈J                         j∈J
+
+    and
+
+                              E[(UJ ξ)ra(UJ ξ)sb] = UrjUskE[ξjaξkb]
+
+                                                                              j,k
+
+                                                      = Urj Usj δab = (UJ UJ⊤)rsδab = δrsδab,
+
+                                                                               j
+
+    since rows are orthonormal.
+        Jointly Gaussian with identity covariance implies that (UJ ξ)ra are independent N (0, 1) in r, a,
+
+    and the claim follows.
+
+    13.3. Gaussian escape inequality. For completeness, the exact Gaussian escape inequality used
+    here follows from the Gaussian min-max comparison. Recall that
+
+                                         Pp = {D ∈ Symp : D ⪰ 0 and ∥D∥F = 1}.
+
+    Lemma 13.5. Let G1, . . . , Gr be independent isonormal Gaussians on Symp, and let A : Symp → Rr
+    be a random linear operator defined by
+
+                                (AD)j = ⟨Gj, D⟩ for j = 1, . . . , r.
+
+    Let gr ∼ N (0, Ir) be independent of A.                            ≤ e−t2/2.
+        Then for t > 0
+
+                                     P inf ∥AD∥2 < E∥gr∥2 − w(Pp) − t
+
+                                                      D∈Pp
+
+    Proof. For any O : Symp → Rr define
+
+                                f (O) = inf ∥OD∥2.
+
+                                              D∈Pp
+
+    It is not hard to see that
+
+                                f (O) = inf sup ⟨y, OD⟩,
+
+                                              D∈Pp y∈Sr−1
+
+    where
+
+                                Sr−1 = {y ∈ Rr : ∥y∥2 = 1},
+
+    so f is 1-Lipschitz.
+        Let h be isonormal on Symp, independent of A and gr. On Pp × Sr−1 set
+
+           XD,y = ⟨gr, y⟩ + ⟨h, D⟩,                                                         r
+
+                                                          YD,y = ⟨y, AD⟩ = yj⟨Gj, D⟩.
+
+                                                                                          j=1
+
+    Both are centred Gaussian, continuous in (D, y) for fixed A, so finite Theorem A [Gor88, Theorem
+
+                                                          42
+                   STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  A] extends to compact sets as in [Gor88, Cor 1.2]. Theorem A states that if
+
+                           E|Xij − Xik|2 ≤ E|Yij − Yik|2,                            for i̸ = ℓ,
+                           E|Xij − Xℓk|2 ≥ E|Yij − Yℓk|2
+
+    then E mini maxj Xij ≤ E mini maxj Yij. Equal variances are not required, only increments. In our
+    case i = D, j = y.
+
+        Put a = ⟨y, y′⟩ ∈ [−1, 1], b = ⟨D, D′⟩F ∈ [0, 1] for D, D′ ⪰ 0. For ∥D∥F = 1, ∥y∥2 = 1,
+
+                                       E⟨Gj, D⟩⟨Gj, D′⟩ = b,
+                           E(yj⟨Gj, D⟩ − yj′ ⟨Gj, D′⟩)2 = yj2 + yj′2 − 2byjyj′ .
+
+    Summing in j,
+
+                    E|YD,y − YD′,y′ |2 = 2(1 − ab),
+                   E|XD,y − XD′,y′ |2 = ∥y − y′∥22 + ∥D − D′∥2F = 2(1 − a) + 2(1 − b).
+
+    Hence
+                                     E|X − X′|2 − E|Y − Y ′|2 = 2(1 − a)(1 − b) ≥ 0
+
+    with equality if D′ = D (b = 1) or y′ = y (a = 1). Thus, conditions of Theorem A hold, and
+
+                           E min max XD,y ≤ E min max YD,y.
+                           Dy                                                    Dy
+
+    Now maxy∈Sr−1⟨gr, y⟩ = ∥gr∥2, maxy⟨y, AD⟩ = ∥AD∥2, so
+
+                       max XD,y = ∥gr∥2 + ⟨h, D⟩,                                max YD,y = ∥AD∥2,
+
+                          y                                                         y
+
+    therefore
+
+                       min max XD,y = ∥gr∥2 + inf⟨h, D⟩,                         min max YD,y = f (A).
+                       Dy                                                 D
+                                                                                   Dy
+
+                                                                       d
+
+    With w(Pp) = E supD⟨h, D⟩ and −h = h,
+
+                           E inf⟨h, D⟩ = −w(Pp)
+
+                               D
+
+    and gr ⊥ h, hence
+
+                       Ef (A) = E min max Y ≥ E min max X = E∥gr∥2 − w(Pp).
+                           Dy                                                Dy
+
+        Since f is 1-Lipschitz, by Gaussian concentration [Gor88, Theorem 3.2],
+                                        P f (A) < Ef (A) − t ≤ e−t2/2 for t > 0.
+
+    Therefore,
+                                      P inf ∥AD∥2 < E∥gr∥2 − w(Pp) − t ≤ e−t2/2.
+
+                                                         D
+
+    13.4. A robust Gaussian loss margin.
+    Lemma 13.6. Let G1, . . . , Gn be mutually independent isonormal Gaussian operators on Symp.
+
+                                                                             43
+                    STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  Fix ϵ > 0 and 0 < C1 < ∞. Let L ⊆ Rn be a deterministic linear subspace of dimension mL, and
+    assume that
+
+                                            n − mL ≥ a0p2 and n ≤ C1p2,
+
+    where
+                                                                     1
+
+                                                              a0 = 4 + ϵ.
+    Then, there exists γ = γ(ϵ) > 0, such that except on an event of probability at most
+
+                                      exp −                 γ2p2   ,
+
+                                                                4
+
+    the inequality
+
+                     inf inf ∥(⟨Gi, D⟩ − vi)i∈J ∥2 ≥ γp
+
+                    D∈Pp v∈L
+
+    holds simultaneously for all retained row sets J ⊆ [n] with |J| = m.
+
+    Proof. Set
+
+                                                        ∆=  1ϵ1
+    Choose 0 < θ < 1/2 small enough so that                   + −.
+
+                                                            422
+
+                    ϵ                                                 1 ∆2
+                    θ C1 ≤ 2 and C1H2(θ) ≤ 8 4 ,
+
+    where H2(t) = −t log(t) − (1 − t) log(1 − t). This is possible because H2(t) → 0 as t ↓ 0. Define
+
+                          ∆
+                    γ = , k = ⌊θn⌋, m = n − k.
+
+                          4
+
+    Lemma 13.4, the dimensional assumptions, and the choice of θ give
+
+                    rJ = m − dim LJ ≥ n − mL − k ≥ 1 + ϵ p2.
+                                                                    42
+
+                                                                      2                      √
+    Since, ∥ · ∥2 is 1-Lipschitz, so Var ∥grJ ∥2 ≤ 1 and E∥grJ ∥2 = rJ , whence E∥grJ ∥2 ≥ rJ − 1.
+
+    Consequently, combining the bounds above with Lemma 13.3, for all sufficiently large p,
+
+                       E∥grJ ∥2 − w(Pp) ≥ 2γp.
+
+    Using t = γp in Lemma 13.5 gives
+
+                    P inf inf ∥(⟨Gi, D⟩ − vi)i∈J ∥2 < γp ≤ e−γ2p2/2.
+
+                          D∈Pp v∈L
+
+        There are at most
+                                                             n ≤ enH2(θ)
+                                                             k
+
+    possible retained sets. Moreover,
+                                                 nH2(θ) ≤ C1p2H γ2p2 2(θ) < .
+                                                                                   4
+
+                                                            44
+                      STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  Hence, except on an event of probability at most
+                                                          exp −γ2p2/4 ,
+
+    the inequality
+                                               inf inf ∥(⟨Gi, D⟩ − vi)i∈J ∥2 ≥ γp
+
+                                                             D∈Pp v∈L
+
+    holds simultaneously for all J with |J| = m.
+
+        Following the notation used in the proof, define the fixed coordinate threshold
+                                                                      γ
+
+                                                             a= √ .
+                                                                   2 C1
+
+        Fix D ∈ Pp and v ∈ L. If at most k residual coordinates
+
+                                                         ri = ⟨Gi, D⟩ − vi
+
+    satisfied |ri| ≥ a, one could select m = n − k coordinates with |ri| < a. On this retained set,
+                                                                    √ γp
+
+                                                       ∥rJ ∥2 < a n ≤ 2 ,
+    contradicting the simultaneous lower bound. Thus more than k coordinates satisfy |ri| ≥ a. Since
+    k + 1 > θn, their fraction is larger than θ.
+
+       Choose a fixed smooth function χ : [0, ∞) → [0, 1] such that χ(s) = 0 for s ≤ 1/4 and χ(s) = 1
+
+    for s ≥ 1, and put
+
+                                                     ℓ(t) = χ(t2/a2).                    (13.1)
+
+       Then ℓ ∈ C3(R; [0, 1]), ℓ(t) = 1 when |t| ≥ a, and
+
+                                           ℓ(t) ≤ Cℓ|t|,                 2
+                                                                  Cℓ = a .
+
+    On the preceding Gaussian event,
+
+                                                     1n      ℓ(⟨Gi, D⟩ − vi) ≥ θ.        (13.2)
+                                     inf inf
+                                    D∈Pp v∈L n          i=1
+
+    This is the required robust Gaussian bounded-loss margin. Every parameter in it depends only on ϵ
+
+    and C1.
+
+    13.5. The empirical Frobenius-to-ℓ1 event. In the previous section we established a lower
+
+    bound  for  the  worst-case  scenario  of     1  n    ℓ(⟨Gi,  D⟩  −  vi).  However, Gi’s are only covariance-
+                                                  n  i=1
+
+    matched isonormal Gaussian versions of Zi’s. To start bridging that gap, in this section we provide
+
+    a  uniform  O(1)  bound  on  1  n    |⟨Zi  ,  D⟩|.
+                                 n  i=1
+
+    Lemma 13.7. Define
+
+                                           Λp = sup           1n   |⟨Zi, A⟩|.
+
+                                                     A∈Symp n i=1
+
+                                                     ∥A∥F =1
+
+    Then there exist A∗ = A∗(ϵ) < ∞ and a universal constant c2 > 0, such that
+
+                                         P(Λp > A∗) ≤ 2 exp(−c2 a0 p2).
+
+                                                              45
+               STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  Proof. For a fixed A ∈ Symp with ∥A∥F = 1, Hanson-Wright inequality gives
+                                           P(|⟨Zi, A⟩| > t) ≤ 2 exp[−c0 min(t2, t)],
+
+    where c0 is a universal constant since ∥A∥F = 1 implies that ∥A∥op ≤ 1. Recall that the subexpo-
+    nential norm is defined as
+
+                                ∥X∥ψ1 = inf{t > 0 : E exp(|X|/t) ≤ 2}.
+
+    The preceding tail bound implies ∥⟨Zi, A⟩∥ψ1 ≤ C0 uniformly in A, and from Lemma 13.2 and
+    Jensen one has E|⟨Zi, A⟩| ≤ 1.
+
+        Let Yi(A) = |⟨Zi, A⟩|. To lighten notation we drop the explicit dependence of Yi(A) on A and
+    just write Yi. Then Y¯i = Yi − EYi is centered subexponential with ∥Y¯i∥ψ1 ≤ 2C0, since centering at
+    most doubles the ψ1-norm: ∥Y − EY ∥ψ1 ≤ 2∥Y ∥ψ1 because |EY | ≤ ∥Y ∥ψ1. Therefore, Bernstein’s
+    inequality [Ver18, Theorem 2.8.1] gives
+
+                                   1  n
+                                P
+                                n i=1    Y¯i > s ≤ 2 exp[−c1n min(s2, s)]
+
+    with c1 = c1(C0). Since Y1, . . . , Yn are i.i.d. and EY1 ≤ 1,
+
+               1 n 1 ¯ n                                                1 ¯ n
+                      Yi > 1 + s ⊂              Yi > s + 1 − EY1 ⊂             Yi > s .
+               n i=1                     n i=1                          n i=1
+
+    Hence
+
+               P 1 |⟨Zi, A⟩| > 1 + s ≤ 2 exp[−c1n min(s2 n , s)].
+                   n i=1
+
+    Let dp = p(p + 1)/2. A Frobenius 1/2-net N of the unit sphere in Symp can be chosen with
+
+                                            |N | ≤ 5dp .
+
+    By the assumption of Lemma 13.6, n ≥ a0p2 and a0 ≥ 1/4, so
+
+                                         dp p(p + 1) 1
+                                         ≤       2 ≤ ≤ 4,
+                                         n 2a0p           a0
+
+    hence there exists a universal constant c2 > 0 and a large enough s0 depending only on ϵ via a0,
+
+    such that
+
+               c1 min(s02, s0) − dp log(5) ≥ c1 min(s02, s0) − log(5) ≥ c2 > 0.
+                                      n                             a0
+
+    The union bound then gives
+
+                           1    n     |⟨Zi, A0⟩| > 1 + s0 ≤ 2e−c2n ≤ 2e−c2a0p2 .
+               P max
+                      A0∈N n i=1
+
+                                                46
+           STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  For any Frobenius-unit A, choose A0 = A0(A) ∈ N with ∥A − A0∥F ≤ 1/2. By homogeneity,
+
+                                               1n  |⟨Zi, A0⟩| + |⟨Zi, A − A0⟩|
+                              Λp ≤ sup
+
+                                     A∈Symp n i=1
+
+                                        ∥A∥F =1
+
+                                          1 ′ n 1
+                              ≤ max          |⟨Zi, A0⟩| + Λp,
+                                                              2
+                                       ′
+                              A0∈N n i=1
+
+    thus, since Λp < ∞ a.s.,
+
+           {Λp > 2(1 + s0)} ⊂                      max    1n   |⟨Zi, A0⟩| > 1 + s0 .
+
+                                                   A0∈N n i=1
+
+    Taking A∗ = 2(1 + s0), depending only on ϵ through s0, one gets
+
+                                          P(Λp > A∗) ≤ 2e−c2a0p2 .
+
+    13.6. Discretization and an approximation to the minimum. Section 13.4 gives a uniform
+    positive lower bound for the Gaussian model, and Theorem 13.7 gives that, with high probability,
+    Λp ≤ A∗. Both are infima/suprema over a continuum with a non-smooth extremum. This section
+    replaces the continuum by a finite collection and the extremum by a smooth average suitable for
+    interpolation. We show that both the discretization and smoothing errors can be made small, both
+    a small fraction of the Gaussian margin with fixed constants.
+
+        For the moment keep τ ∈ (0, 1] symbolic, and let
+                                    Kτ = {D ∈ Symp : D ⪰ 0, ∥D∥F = 1, ∥D∥op ≤ τ }.
+
+    If this class is empty, Theorem 13.1 is immediate. Assume below that it is nonempty, forcing
+            √
+
+    τ ≥ 1/ p.
+
+        Fix 0 < B < ∞ and let
+                                                    V = L ∩ {v : ∥v∥1 ≤ Bn}
+
+    be the radius-(Bn) ball in the mL-dimensional normed space (L, ∥ · ∥1).
+
+    Lemma 13.8. For 0 < r ≤ 1, 0 < s ≤ B there is a maximal r-net ND ⊂ Kτ in Frobenius norm
+    with centers in Kτ and an (sn)-net NL ⊂ V in ℓ1-norm intrinsic to L such that for C = ND × NL,
+
+                                             log(|C|)
+                                                n ≤ R∗,
+
+    where
+
+                                          1        3             2B
+                              R∗ = a0 log r + log 1 + s .
+
+    Proof. Kτ lies in the Frobenius unit ball of dimension dp. A maximal r-net has disjoint r/2-balls,
+    volume comparison gives
+
+                              |ND|(r/2)dp ≤ (1 + r/2)dp,
+
+    i.e.,
+
+           log(|ND|) ≤ dp log(1 + 2/r) ≤ dp log(3/r) for r ≤ 1.
+
+                                                      47
+                    STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  V is a (Bn)-ball in (L, ∥ · ∥1), covered by (1 + 2B/s)mL balls of radius (sn), thus
+                                                                             2B
+
+                                            log(|NL|) ≤ mL log 1 + s .
+
+    Therefore,
+
+                                            3                2B
+                            log(|C|) ≤ dp log r + mL log 1 + s .
+
+    Since mL ≤ n and Theorem 13.6 implies that dp ≤ p2 and n ≥ a0p2, the claim follows.
+
+        A candidate u = (Ru, vu) ∈ C has row shift ciu = −(vu)i. For a row ensemble X = (X1, . . . , Xn),
+    define the total bounded loss
+
+                                                                                     n
+
+                                                 HX (u) = ℓ(⟨Xi, Ru⟩ + ciu)
+
+                                                                                   i=1
+
+    and its normalized log-sum-exp approximation
+
+                                  1            1        e−βHX (u) .
+                            FX = − log
+                               βn              |C| u∈C
+
+    Lemma 13.9. Let H∗ = minu HX (u), Lj = ∥ℓ(j)∥∞, choose the mesh radii
+
+                                        θ      and s ≤ min B,         θ     ,
+                    r ≤ min 1,
+                                                                      64L1
+                                    64L1A∗
+
+    and β ≥ (16R∗)/θ. Then
+
+                               H∗ ≤ FX ≤ H∗ + θ .
+                               n                   n 16
+
+    Proof. We have
+
+                            e−βH∗ 1            e−βHX (u) ≤ e−βH∗ .
+                                     ≤
+                            |C| |C| u
+
+    Taking −(βn)−1 times the logarithm proves the exact inequalities
+
+                            H∗ ≤ FX ≤ H∗ + log(|C|) .
+                            n                  n         βn
+
+    Then                                    log |C| θ
+    and the claim follows.                           ≤,
+
+                                              βn 16
+
+        The order is important: first choose the Gaussian margin and ℓ, then the two fixed mesh radii, and
+    then the fixed β. The covering estimate is uniform in τ . The telescoping argument in Section 13.11
+    chooses τ after β, and the net is then instantiated inside that chosen class.
+
+    13.7. One conditional Gibbs law shared by both current-row distributions. Let G1, . . . , Gn
+    be independent isonormal Gaussian rows, independent of Z1, . . . , Zn. Define
+
+                                X(m) = (Z1, . . . , Zm, Gm+1, . . . , Gn) for 0 ≤ m ≤ n.
+
+                                               48
+                   STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  Then X(n) = Z, X(0) = G, and
+
+                                         n
+
+                   E[FZ ] − E[FG] =               E[FX(m) − FX(m−1) ].
+
+                                      m=1
+
+    Fix m and set
+
+                   F−m = σ(Z1, . . . , Zm−1, Gm+1, . . . , Gn).
+
+    The rows Zm and Gm are mutually independent and are both independent of F−m. Every hybrid
+    row other than the m-th is F−m-measurable. Define the row-deleted Gibbs distribution on the net
+    C = ND × NL. For u = (Ru, vu) ∈ C, ciu = −(vu)i,
+
+                   ν−m(u) =        e−β i̸=m ℓ(⟨Xi,Ru⟩+ciu)
+                                                                    .
+
+                                   v∈C e−β i̸=m ℓ(⟨Xi,Rv⟩+civ)
+
+    Because the sum excludes i = m, ν−m is F−m-measurable.
+
+        The other hybrid rows are identical on both sides of the replacement. Therefore the same
+    conditional law governs both replacements; no Gibbs object depending on either current row is used
+    in the conditioning step.
+
+        Let
+
+                                               H−m(u) = ℓ(⟨Xi, Ru⟩ + ciu),
+
+                                                                                    i̸=m
+
+    where Xi is the common Xi(m) = Xi(m−1). Then
+
+                      e−βHX (u) =     e−βH−m(v)   · ν−m(u)e−βℓ(⟨Xm,Ru⟩+cmu)
+
+                   u               v                 u
+
+    Hence,
+
+                                   FX = C−m + ϕν (Xm)
+
+    where
+
+                                 1         e−βH−m(v) + 1 log |C|
+                   C−m = − log
+                                   βn v                     βn
+
+    is F−m-measurable and independent of Xm, and
+
+                                   1       ν−m(u)e−βℓ(⟨X,Ru⟩+cmu).
+                   ϕν(X) = − log
+                                   βn u∈C
+
+        C−m cancels in the difference:
+                                           FX(m) − FX(m−1) = ϕν (Zm) − ϕν (Gm).
+
+    Therefore,
+                                 E[FX(m) − FX(m−1) ] = E E[ϕν (Zm) − ϕν (Gm) | F−m] .
+
+        Conditionally on F−m, ν−m is deterministic, Zm and Gm are independent of it and have matching
+    first two moments. The m-th summand is now a one-row comparison problem.
+
+    13.8. Exact derivatives and the independent-draw expansion. For a generic current row X,
+    define
+
+                                                       qu = ⟨X, Ru⟩ + cmu.
+
+                                           49
+                STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  Let µX be the full Gibbs law obtained by tilting ν−m with e−βℓ(qu). Relative to the leave-one-row
+
+    law, it is
+
+                                dµX (u) =       e−βℓ(qu)
+                                dν−m                             .
+
+                                            v ν−m(v)e−βℓ(qv)
+
+    Write
+
+                                                      ⟨f ⟩X = f (u)µX (u)
+
+                                                                                       u∈C
+
+    and
+
+                                CovX (f, g) = ⟨f g⟩X − ⟨f ⟩X ⟨g⟩X .
+
+    For a row direction A ∈ Symp, put
+
+                                aA(u) = ℓ′(qu)⟨A, Ru⟩,
+
+                                bAB(u) = ℓ′′(qu)⟨A, Ru⟩⟨B, Ru⟩,
+
+                cABC (u) = ℓ′′′(qu)⟨A, Ru⟩⟨B, Ru⟩⟨C, Ru⟩.
+
+    For every row-dependent observable f ,
+
+                D⟨f ⟩X [B] = ⟨Df [B]⟩X − β CovX (f, aB).
+
+    The first term is differentiation inside, the second is differentiation of the Gibbs weight itself.
+    Differentiating gives
+
+                                                     1
+                                  Dϕν(X)[A] = n ⟨aA⟩X ,
+                             D2ϕν (X)[A, B] = 1 (⟨bAB⟩X − β[⟨aAaB⟩X − ⟨aA⟩X ⟨aB⟩X ]) .
+
+                                                     n
+    Let cyc denote the three cyclic choices of (A, B, C). Then
+
+                  nD3ϕν (X)[A, B, C] = ⟨cABC ⟩X − β CovX (bAB, aC ) + β2κ3,X (aA, aB, aC ),
+
+                                                                                         cyc
+
+    where
+
+                 κ3,X (a, b, c) = ⟨abc⟩X − ⟨ab⟩X ⟨c⟩X − ⟨ac⟩X ⟨b⟩X − ⟨bc⟩X ⟨a⟩X + 2⟨a⟩X ⟨b⟩X ⟨c⟩X .
+    The ℓ′′′ group is the one-independent-draw from the same Gibbs probability measure term
+
+                                                              ⟨cABC ⟩X .
+    For each of the three cyclic choices, the ℓ′′ℓ′ group is
+
+                                       CovX (bAB, aC ) = ⟨bABaC ⟩X − ⟨bAB⟩X ⟨aC ⟩X ,
+    which is respectively a one-independent-draw term and a two-independent-draw term. The (ℓ′)3
+    group has one one-independent-draw term, ⟨aAaBaC⟩X , three two-independent-draw terms
+
+                −⟨aAaB⟩X ⟨aC ⟩X , −⟨aAaC ⟩X ⟨aB⟩X , −⟨aBaC ⟩X ⟨aA⟩X ,
+
+    and the three-independent-draw term
+
+                                            2⟨aA⟩X ⟨aB⟩X ⟨aC ⟩X .
+
+    Since 0 ≤ ℓ ≤ 1 by (13.1),
+
+                                            e−β ≤ dµX ≤ eβ.
+                                                     dν−m
+
+                                            50
+          STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  For product measures (one, two, and three independent draws) the exact product bounds are:
+
+                               −kβ dµX kβ ⊗k     for k = 1, 2, 3.
+                              e ≤ ⊗k ≤ e
+
+                                        dν−m
+
+        If we replace an expectation under µX by one under ν−m we pay at most ekβ. Only after these
+    replacements do we take absolute values and use
+
+                                                 |ℓ′| ≤ L1, |ℓ′′| ≤ L2, |ℓ′′′| ≤ L3.
+
+    After this change of measure, independent samples are drawn from ν−m, which is F−m-measurable
+    and independent of both Zm and Gm. Its Ru’s are fixed given F−m.
+
+        Then the scalar part of D3 can be bounded purely by constants. The R-dependent part
+    ⟨A, Ru1⟩⟨B, Ru2⟩⟨C, Ru3⟩ remains, but now ui are independent of X.
+
+        Counting absolute values: Cov gives 2 terms per cyclic, κ3 gives 1 + 1 + 1 + 1 + 2 = 6 terms in
+    absolute value. Hence the total absolute scalar mass is at most
+
+                                                    1 L3 + 6βL1L2 + 6β2L13 .
+                                                    n
+
+    13.9. An exact integration-by-parts identity for centered rank-one r√ows. The next identity
+    is the only point where the non-Gaussian distribution of Z = (ww⊤ − Ip)/ 2 enters. We derive it
+    in coordinates rather than invoking a named interpolation principle. The Hessian term matches
+    the Gaussian row exactly; the remaining error contains the third derivative and is small when all
+    candidate matrices have small operator norm.
+
+    For 1 ≤ a, b ≤ p, define
+
+                                                        S eae⊤ ab = b + ebe⊤a
+                                                                        2
+
+    and
+
+                                       eaw⊤ + we⊤a
+                              Ba(w) =         √                                .
+                                                 2
+
+    Then
+
+                              ∂Z
+                              ∂wa = Ba(w)
+
+    and
+
+                              ∂2Z             √
+                              ∂wa∂wb = 2Sab.
+
+    Let M ∈ Symp be independent of w, let s ≥ 0 be deterministic, and set Y = M + sZ. Consider
+    Φ ∈ C3(Symp) with bounded derivatives, and identify DΦ with the symmetric gradient and D2Φ,
+    D3Φ with the symmetric bi/tri-linear forms.
+
+        Let
+
+                                                     fab(w) = ⟨DΦ(Y ), Sab⟩.
+    Note that since DjΦ is bounded for j = 1, 2, 3, it follows that fab is bounded, and ∂a∂bfab is at most
+    quadratic in w. Since M is independent of w, the requirements of conditional Stein’s lemma, given
+    M , are met; and by the law of total expectation,
+
+                                           E[(wawb − δab)fab(w)] = E[∂a∂bfab(w)].
+
+                                       51
+             STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  Since
+
+                                              1
+                         ⟨Z, DΦ(Y )⟩ = √ (wawb − δab)⟨DΦ(Y ), Sab⟩,
+
+                                               2 a,b
+
+    the chain rule gives, before summing over a, b,
+             ∂a∂bfab(w) = s2D3Φ(Y )[Ba(w), Bb(w), Sab] + s√2D2Φ(Y )[Sab, Sab].
+                                          √                                  √
+    Indeed, ∂aY = sBa(w) and ∂aBb(w) = 2Sab. Multiplication by 1/ 2 and summation over the
+
+    ordered pairs (a, b) therefore gives
+
+             E⟨Z, DΦ(M + sZ)⟩ = s E∆Φ(M + sZ) + s2 ETw(D3Φ(M + sZ)),
+
+    where
+
+                         ∆Φ(Y ) = Tr D2Φ(Y ) = D2Φ(Y )[Qab, Qab]
+
+                                                                    a≤b
+
+    and
+
+                                          1p
+                         Tw(T ) = √                  T [Ba(w), Bb(w), Sab].
+                                          2 a,b=1
+                                                                                         √
+    The Hessian term is exactly the Frobenius Laplacian. Indeed, Saa = Qaa, while Sab = Qab/ 2 for
+
+    a̸ = b, and the two ordered pairs (a, b) and (b, a) give one copy of D2Φ[Qab, Qab].
+
+    For matrices A, B, C ∈ Symp, the ordered pure tensor T = A ⊗ B ⊗ C is the trilinear form
+
+                         T [U, V, W ] = ⟨A, U ⟩⟨B, V ⟩⟨C, W ⟩.
+
+    For this tensor,         Tw(A ⊗ B ⊗ C) = √2w⊤ACBw.
+    This follows from                                √
+    and ⟨C, Sab⟩ = Cab.
+                                   ⟨A, Ba(w)⟩ = 2(Aw)a
+
+        For Φ = ϕν, finiteness of the candidate family and boundedness of the first three derivatives of ℓ
+    give deterministic bounds on DjΦ for 1 ≤ j ≤ 3. The Gaussian variables appearing below have finite
+    moments of every order. Hence, on every interval [δ, 1 − δ], the difference quotients and integration-
+    by-parts integrands admit an integrable dominating function, which justifies differentiating under
+    the expectation. The bound obtained below is uniform in δ and justifies passage to the endpoints
+    by dominated convergence.
+
+    Now set                                  √           √
+
+                                          Yt = t G + 1 − t Z.
+
+    Gaussian integration by parts gives                  √
+
+                                          E⟨G, DΦ(Yt)⟩ = t E∆Φ(Yt).
+                                          √
+    Using the second-chaos identity with s = 1 − t yields
+                                                √
+                         d EΦ(Yt) = − 1 − t ETw(D3Φ(Yt)).
+                         dt                          2
+
+    The right side is uniformly bounded and tends to zero as t ↑ 1. The identity can first be integrated
+
+    on [δ, 1 − δ] and then δ ↓ 0. Thus both endpoints are integrable, and no fourth derivative is used.
+
+                                                     52
+                   STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  13.10. Bounding the third-derivative error for one replaced row. Let R1, R2, R3 be sym-
+    metric and satisfy
+
+                               ∥Rj∥F ≤ 1, ∥Rj∥op ≤ τ ≤ 1.
+
+    For every ordering,
+
+                            | Tr(R1R2R3)| ≤ ∥R1∥F ∥R2R3∥F ≤ τ
+
+    and
+                                         ∥R1R2R3∥F ≤ ∥R1∥op∥R2∥op∥R3∥F ≤ τ 2.
+
+    The symmetric part Q of the ordered product obeys the same bounds. Since
+
+                            E|w⊤Qw| ≤ | Tr Q| + [E|w⊤Qw − Tr Q|2]1/2,
+
+    and
+
+                               E|w⊤Qw − Tr Q|2 = 2∥Q∥2F ,
+
+    we obtain               E|w⊤Qw| ≤ τ + √2τ 2 ≤ (1 + √2)τ.
+
+    Combining this with the termwise change-of-measure bounds and the tensor contraction gives a
+
+    universal C2 such that
+
+                            E|Tw(D ϕν(Yt))| ≤3 C2 e3β τ                 23
+                                                           [L3 + βL1L2 + β L1].
+                                                       n
+
+    Integrating the interpolation and absorbing the constant factors into C2 gives the normalized one-row
+
+    estimate
+
+                                                 C2 e3β τ                      23
+                            |Eϕν(Z) − Eϕν(G)| ≤            [L3 + βL1L2 + β L1].
+                                                       n
+
+    The factor 1/n comes from the free-energy normalization. The estimate is uniform in the leave-one-
+
+    row law, the finite family, the shifts, p, and n.
+
+    13.11. Telescoping, concentration, and continuum extension. Summing the n hybrid-row
+    estimates yields
+
+                                       |EFZ − EFG| ≤ C2e3βτ [L3 + βL1L2 + β2L31].
+    Choose τ ≤ 1 after β so that the right side is at most θ/16. Then for p ≥ τ −2, 1/√p ≤ τ and
+    Kτ̸ = ∅. So a p-independent τ works for all sufficiently large p.
+
+    On the Gaussian robust event, every candidate has HG(u)/n ≥ θ. Since FG ≥ minu HG(u)/n
+
+    and FG ≥ 0 always,
+
+                               EFG ≥ θ[1 − e−γ2p2/4].
+
+    For all sufficiently large p, this is at least 15θ/16. Hence
+
+                                         7θ
+                               EFZ ≥ 8 .
+
+    Replacing one row changes every HX (u) by at most one. The log-sum-exp map therefore changes
+    FX by at most 1/n. The bounded-differences inequality [McD89] gives
+
+                               P(|FZ − EFZ | > t) ≤ 2e−2nt2 .
+
+    With t = θ/8,
+
+                                           3θ             ≤ 2e−nθ2/32.
+                               P FZ < 4
+
+                                                       53
+           STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  The free-energy inequality and the entropy choice imply, on the complement of this event,
+
+                               min HZ(u) ≥ FZ − log |C| ≥ 11θ .
+                               u∈C n                       βn 16
+
+    Now take any D ∈ Kτ and v ∈ L with ∥v∥1 ≤ Bn. Choose net points R and v0 satisfying
+
+                               ∥D − R∥F ≤ r, ∥v − v0∥1 ≤ sn.
+
+    If D = R set A = 0, otherwise put A = (D − R)/∥D − R∥F so ∥A∥F = 1 and D − R = ∥D − R∥F A.
+
+    Then it follows from the definition of Λp that
+
+           1n 1n
+                  |⟨Zi, D − R⟩| = ∥D − R∥F                 |⟨Zi, A⟩| ≤ ∥D − R∥F Λp ≤ rΛp
+           n i=1                                    n i=1
+
+    on {Λp ≤ A∗}, with the convention 0 · Λp = 0. In particular on {Λp ≤ A∗},
+
+                  1n
+                          |⟨Zi, D − R⟩| + |vi − (v0)i| ≤ Λpr + s ≤ A∗r + s.
+
+                  n i=1
+
+    Therefore the Lipschitz property of ℓ gives
+
+           1n θ
+                  |ℓ(⟨Zi, D⟩ − vi) − ℓ(⟨Zi, R⟩ − (v0)i)| ≤ L1(A∗r + s) ≤ ,
+           n i=1                                                                 32
+
+    hence
+
+                               inf               1n θ
+                                                    ℓ(⟨Zi, D⟩ − vi) ≥ .
+                               D∈Kτ n                              2
+                               v∈L,∥v∥1≤Bn i=1
+
+    Since ℓ(t) ≤ Cℓ|t|, the conclusion of Theorem 13.1 holds with
+
+                                                        θ
+                                                 c= .
+
+                                                      2Cℓ
+
+    For large p, the total failure probability is at most
+
+                               2e−nθ2/32 + 2e−c′2n ≤ e−c′p2
+
+    after decreasing c′ > 0, because n ≥ a0p2 and n ≤ C1p2.
+
+    This proves Theorem 13.1.
+
+    13.12. Conditional nuisance-space reduction. Fix a deterministic subspace E0 ⊆ Rd of
+    dimension j ≤ K, and split each sample as
+
+                                                     xi = gi + wi ∈ E0 ⊕ E0⊥.
+
+        Suppose that
+                                                          S0 = H0 + ρD0,
+
+    where H0 is supported on E0, D0 is supported on E0⊥,
+                                         D0 ⪰ 0, ∥D0∥F = 1, ∥D0∥op ≤ τ,
+
+    and ρ ≥ δ.
+
+        Let
+                                                         G = σ(g1, . . . , gn).
+
+                                                    54
+           STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  Conditional on G, the vectors wi are still independent N (0, Ip) vectors with p = d − j. Define
+
+                                            wT   Awi     −  Tr  A
+                                  Qw(A)i =           √             = ⟨Zi, A⟩.
+                                              i
+
+                                                         2
+
+    For A ∈ Sym(E0), also define                     gT  Agi  −  Tr  A
+    Now define                             Qg(A)i =         √           .
+                                                      i
+
+                                                              2
+
+                        L(E0, g) = span{1n} + {Qg(A) : A ∈ Sym(E0)}.
+
+    This is a G-measurable subspace. After conditioning, it is a deterministic subspace independent of
+
+    all tail rows, and
+
+                                                 j(j + 1)               K(K + 1)
+                        dim L(E0, g) ≤ 1 + 2 ≤ 1 +                                .
+                                                                           2
+
+    For every realization of g for which the dimensional inequality holds, define
+                                                                                    
+                                   1 
+                        Estr(g) = D⪰0, ∥D∥F =1, ∥D∥op≤τ inf n ∥Qw(D) − v∥1 ≥ c .
+                                     v∈L(E0,g), ∥v∥1≤Bn
+
+    Then Theorem 13.1 and the empirical continuity estimate give
+
+                        P ((Estr(g) ∩ {Λw ≤ A∗})c | G) ≤ 3e−c′p2 ,
+
+    where
+
+                                                            1
+                                           ∥A∥F =1 Λw = sup n ∥Qw(A)∥1.
+
+    The bound is independent of the orientation of the realized nuisance subspace. Integrating over g
+
+    preserves the same bound. Since the event in Theorem 13.1 takes an infimum over the full classes of
+
+    D and v, both may be measurable functions of the tail rows. This is why the nuisance vector may
+
+    be selected after observing the tail.
+
+        The proof of Theorem 13.1 also gives the joint tail-continuity event
+                                                      1
+                                                     n ∥Qw(A)∥1 ≤ A∗∥A∥F
+
+    for every symmetric A, with conditional failure probability at most e−cp2. In particular,
+                                                        1
+                                                        n ∥Qw(D0)∥1 ≤ A∗.
+
+    For the decomposition S0 = H0 + ρD0, define
+
+                        a¯ = 1 1nT Qd(S0),           v = −Qg(H0/ρ) + a¯1n.
+                             ρn
+
+    Then
+
+                                     Qw(D0) − v = ρ−1ΠnQd(S0).
+
+        Assume B > A∗ + 1, and decrease c if necessary so that 0 < c ≤ 1. On
+
+                                                       Estr(g) ∩ {Λw ≤ A∗},
+
+    if
+                                                       1
+                                                       n ∥ΠnQd(S0)∥1 < ρc,
+
+                                                     55
+               STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  then
+    Moreover,
+                           1
+                           n ∥Qw(D0) − v∥1 < c.
+
+               1  1        1
+               n ∥v∥1 ≤ n ∥Qw(D0)∥1 + n ∥Qw(D0) − v∥1 < A∗ + 1 < B.
+
+    This contradicts the definition of Estr(g). Therefore, on the same good event,
+
+                           1
+                           n ∥ΠnQd(S0)∥1 ≥ ρc ≥ δc.
+
+        Thus the conditional diffuse margin holds uniformly for every deterministic E0 of dimension at
+    most K, with conditional failure probability at most 3e−c′p2.
+
+    14. The comparison estimate extracted from the preceding calculation
+
+AI  Lemma 14.1 (Finite-family leave-one-row comparison). Let Z = (wwT − Ip)/√2, where w ∼
+    N (0, Ip), and let G be the isonormal Gaussian vector on Symp. Let C be a nonempty finite set.
+    For each u ∈ C, let Ru ∈ Symp be deterministic with ∥Ru∥F ≤ 1 and ∥Ru∥op ≤ τ , and let ciu be
+    deterministic. For every fixed β > 0, if 0 ≤ ℓ ≤ 1 is C3 and
+
+                  11 n
+               FX = − log  exp −β ℓ(⟨Xi, Ru⟩ + ciu) ,
+                  βn |C| u∈C i=1
+
+    then
+
+                  |EFZ − EFG| ≤ Ce3βτ L3 + βL1L2 + β2L31 ,
+
+    where Lj = ∥ℓ(j)∥∞. The constant is uniform in p, n, C, and the shifts.
+
+    Proof. This is exactly the finite-family comparison established in Section 13, especially the coordinate
+    Stein identity, the leave-one-row Gibbs construction, the derivative expansion, and the telescoping
+    row replacement.
+
+    15. Applying the comparison uniformly over diffuse matrices and nuisance
+                                                           vectors
+
+AI  Theorem 15.1. Fix ϵ, B, C1 > 0. There are τ, c, c′ > 0 such that the following holds. Let L ⊂ Rn
+    be deterministic, with dimension mL, and assume
+
+                  n − mL ≥ 1 + ϵ p2,                              n ≤ C1p2.
+                                  4
+
+    Let w1, . . . , wn be independent N (0, Ip) vectors, and put
+
+                            wiwiT − Ip  1 ≤ i ≤ n.
+                     Zi = √ ,
+
+                                   2
+
+                              56
+    STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  Then, for all sufficiently large p,
+
+                                                       
+
+                                                       
+                                                       
+                                                       
+                                                       
+                                        1     |⟨Z  i, D⟩ − vi| < c ≤ e−c′p2 .
+    P  inf
+     D⪰0, n i                                          
+    ∥D∥F =1,                                           
+    ∥D∥op≤τ                                           
+       v∈L,                                             
+
+    ∥v∥1≤Bn
+
+    The constants are uniform over the orientation of deterministic L.
+
+    Proof. The Gaussian robust-loss margin, finite-family comparison, leave-one-row construction, exact
+    third-derivative expansion, continuum extension, and conditional nuisance-space form are proved in
+    Section 13.
+
+    16. From diffuse matrices to the full positive semidefinite cone
+
+AI      Peeling Lemma 16.2: S = H + R, rank H ≤ K: either ∥R∥F ≤ δ (low-rank by c∗) or S = H + ρD
+    τ -diffuse (diffuse by Grassmann net and Theorem 15.1).
+
+        We first record a global empirical-continuity estimate. For every fixed 0 < casp ≤ Casp < ∞,
+    define, whenever caspd2 ≤ n ≤ Caspd2,
+
+                                                                     1
+                                                    ∥A∥F =1 Λd = sup n ∥Qd(A)∥1.
+
+    There are constants Ccont < ∞ and ccont > 0, depending only on casp, Casp, such that
+                                                    P(Λd > Ccont) ≤ e−ccontn.
+
+    The fixed-net argument in Section 13 proves this estimate.
+
+    Lemma 16.1 (Universal fixed-rank lower bound). Fix 0 < casp ≤ Casp < ∞. There is a numerical
+
+    c∗ > 0 such that, for every fixed K, there is cK > 0 for which, whenever caspd2 ≤ n ≤ Caspd2,
+
+                                                       
+
+                                           1                                  −cK d2
+    P  inf                                    ∥ΠnQd(A)∥1 < c∗ ≤ e                     .
+       rank A≤K n
+
+       ∥A∥F =1
+
+    Only the starting dimension may depend on fixed K.
+
+    Proof. Pair consecutive observations and put
+
+                                                Yj(A) = Qd(A)2j−1 − Qd(A)2j.
+
+    For ∥A∥F = 1,
+                                                            EYj(A)2 = 2.
+
+    The Gaussian quadratic fourth-moment formula gives
+                                                EQd(A)41 = 3 + 12 Tr(A4) ≤ 15,
+
+                                                  57
+    STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  and hence EYj(A)4 ≤ 36. Paley-Zygmund and Chernoff give, for fixed A,
+
+                             m              
+
+                           P  1 |Yj(A)| < 1  ≤ e−cm, m = ⌊n/2⌋.
+                              m j=1      72
+
+    Here is the covering estimate used to make the preceding bound uniform. For 1 ≤ r ≤ K, write
+                                                        A = U diag(λ)U T ,
+
+    where U ∈ St(d, r) and ∥λ∥2 = 1. A maximal ε/4-separated subset of the Stiefel manifold in
+    Frobenius distance has cardinality at most
+
+                                         √ dr
+                                         8r
+                                     1+         ,
+                                         ε
+
+    by the usual disjoint-ball volume comparison in Rdr, and the unit sphere in Rr has an ε/4-net of
+    cardinality at most (1 + 8/ε)r. For two such parameter pairs,
+
+                              ∥U diag(λ)U T − V diag(µ)V T ∥F ≤ 2∥U − V ∥F + ∥λ − µ∥2.
+
+    Consequently the Frobenius unit sphere of rank-at-most- K symmetric matrices has an ε-net of
+    cardinality
+
+                                                           K CK dr+r
+                                                                              .
+
+                                                          r=1 ε
+    At fixed resolution its entropy is OK(d), whereas the fixed-object failure exponent is Θ(d2). On the
+    continuity event the net extension costs 2Ccont∥A − A0∥F . Finally,
+
+                                                                                                  m
+
+                                                   ∥ΠnQd(A)∥1 ≥ |Yj(A)|.
+
+                                                                                                 j=1
+
+    Choosing a numerical resolution gives a numerical c∗ independent of fixed K.
+
+    Lemma 16.2 (Finite decomposition into large eigenvalues and a diffuse remainder). For fixed
+    0 < τ, δ < 1, choose
+
+                                                               2 log(1/δ)
+                                                      K = τ 2 + 1.
+    Every PSD Frobenius-unit S has one of two decompositions.
+        The low-rank branch is
+
+                           S = H + R, H, R ⪰ 0, HR = 0, rank H ≤ K, ∥R∥F ≤ δ.
+
+    The diffuse branch is
+
+                           S = H + ρD, H, D ⪰ 0, HD = 0, rank H ≤ K,
+
+                                                  ρ > δ, ∥D∥F = 1, ∥D∥op ≤ τ.
+
+    Proof. Start with R0 = S. If ∥Rj∥F ≤ δ, stop in the first branch. If ∥Rj∥op ≤ τ ∥Rj∥F , stop in the
+    second. Otherwise remove a largest eigenvalue and put it in H. Then
+
+                                                   ∥Rj+1∥2F < (1 − τ 2)∥Rj∥F2 .
+
+                                         58
+                STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  After K steps the tail is at most δ, so the alternatives are exhaustive.
+
+    16.0.0.1 Replacing the random leading eigenspace by a deterministic net. The leading
+    eigenspace of S is random. To make the conditioning in Section 13.12 uniform we replace Gr(j, d) by
+    a deterministic net and rotate the approximant to the true subspace with a near-identity orthogonal
+    map.
+
+    Lemma 16.3 (Grassmann ζ-net and near-identity rotation). Let 0 < ζ < 1/2 and equip Gr(j, d)
+
+    with dGr(E, F ) = ∥PE − PF ∥op, where PE is the orthogonal projector onto E. For j ≥ 1, Gr(j, d)
+
+    has a ζ-net of cardinality at most
+
+                                                   √ dj
+                                                   4j
+                                               1+          ,
+                                                   ζ
+
+    and for j = 0 the singleton is a net. If dGr(E, F ) ≤ ζ, there exists O ∈ O(d) with
+                                                                                     √
+
+                                              OE = F and ∥O − I∥op ≤ 2 ζ.
+
+    Proof. Choose a maximal ζ/2-separated set of orthonormal j-frames in Frobenius distance. Disjoint
+                                                                                                                      √
+
+    Frobenius balls of radius ζ/4 around these frames lie in the Euclidean ball of radius j + ζ/4 in
+    Rdj, which proves the displayed cardinality. Maximality makes the set a ζ/2-net, and
+
+                                                ∥U U T − V V T ∥op ≤ 2∥U − V ∥F
+
+    shows that the corresponding subspaces form a ζ- net.
+
+    For the last claim, rotate the principal two-planes from E to F and act as the identity on the
+
+    remaining directions. If θmax is the largest principal angle, then
+
+                sin θmax = ∥PE − PF ∥op,                                             √
+                                               ∥O − I∥op = 2 sin(θmax/2) ≤ 2 sin θmax,
+
+                                                                             √
+    since ζ < 1/2 implies θmax < π/2 and cos(θmax/2) ≥ 1/ 2.
+
+    Theorem 16.4 (Uniform conic lower bound). For fixed 1/4 < α− ≤ α+ < ∞, there are c, C > 0
+    such that, for all sufficiently large d, whenever
+
+                                           α−d2 ≤ n ≤ α+d2,
+
+    one has  
+
+                                          1                   −Cd2
+                P  inf ∥ΠnQd(S)∥1 < c ≤ e .
+                                        S⪰0 n
+
+                ∥S∥F =1
+
+    Proof. Set
+
+                                        1      1
+                ϵ0 = 2 α− − 4                          and C1 = 4α+.
+
+    Let Ccont be the global continuity constant for the aspect interval [α−, α+], let c∗ be the fixed-rank
+    constant, and let A∗ = A∗(ϵ0, C1) be the tail-continuity constant proved in Section 13. Choose
+    0 < δ < 1/2 so that
+
+                                                glr = c∗ 1 − δ2 − 2Ccontδ > 0,
+
+    and set B = A∗ + 2. Apply Theorem 15.1 with parameters (ϵ0, B, C1), and denote its margin and
+    probability constants by cstr and c′str. Let τ be its operator-norm cap, and then choose K = K(τ, δ)
+    by Theorem 16.2.
+
+                                                   59
+                     STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI      By the preced√ing Grassmann cover and rotation statement, the rotation below satisfies ∥O−I∥op ≤
+    COζ with CO = 2. Put Crot = 2COCcont and choose a fixed ζ > 0 such that
+
+                                              Crot ζ ≤ min cstr , 1 .
+                                                          δ             42
+
+    Finally choose
+
+                                                0 < ccone < min glr , δcstr , δ .
+                                                                        2 42
+
+    In the low-rank branch, if n−1∥ΠnQd(S)∥1 < ccone, then
+
+                                          1                        1
+                            c∗∥H∥F ≤ n ∥ΠnQd(H)∥1 ≤ n ∥ΠnQd(S)∥1 + 2Ccont∥R∥F .
+                     √
+    Since ∥H∥F ≥ 1 − δ2, this gives
+
+                                       c∗ 1 − δ2 < ccone + 2Ccontδ < c∗ 1 − δ2,
+
+    a contradiction.
+
+        In the diffuse branch, let j = rank H and E = range H. For each 0 ≤ j ≤ K, fix a deterministic
+    ζ-net of Gr(j, d) before observing the samples. Choose the nearest point E0 and an orthogonal O
+    such that
+
+                                               OE = E0 and ∥O − I∥op ≤ COζ.
+    Put
+
+                                                    S0 = OSOT = H0 + ρD0.
+    Then H0 is supported on E0, D0 on E0⊥, and the canonical rotation obeys the following sharper
+    PSD estimate. If S = j λjvjvjT with λj ≥ 0, then
+
+                                Tr(SOSOT ) = λjλk(vjT Ovk)2 ≥ cos2(θmax) λ2j ,
+
+                                                     j,k                                  j
+
+    because the symmetric part of the canonical principal-plane rotation is at least cos(θmax)I. Conse-
+    quently,
+
+                           ∥OSOT − S∥F2 = 2 Tr(S2) − 2 Tr(SOSOT ) ≤ 2 sin2(θmax)∥S∥F2 .
+
+    Since ∥S∥F = 1 and sin θmax ≤ ζ, this gives
+
+                                       ∥S0 − S∥F ≤ COζ and ∥S0 − S∥F ≤ CO ζ .
+                                                                        ρ            δ
+
+    For  fixed  E0,  write  xi  =  gi  +  wi  along  E0   ⊕  E⊥    and  define
+
+                                                                0
+
+                                                     GE0 = σ(g1, . . . , gn).
+
+    Conditional on GE0, the wi are independent N (0, Ip) vectors with p = d − j. For A ∈ Sym(E0) and
+    D ∈ Sym(E0⊥), define
+
+                                          gT  Agi    −  Tr   A                  wT   Dwi  −  Tr  D
+                            Qg(A)i =          √                 and Qw(D)i =         √              .
+                                           i                                      i
+
+                                                     2                                    2
+
+    Then
+
+                                          Qd(H0 + ρD0) = Qg(H0) + ρQw(D0).
+
+                                                                   60
+               STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI  Define
+
+                           L(E0, g) = span{1n} + {Qg(A) : A ∈ Sym(E0)}.
+
+    After conditioning, this is a deterministic subspace independent of the tail samples, and
+
+                                                                j(j + 1)
+                                      dim L(E0, g) ≤ 1 + 2 .
+
+    The tail dimension is p = d − j = d − OK(1) and the nuisance dimension is OK(1). For all sufficiently
+    large d,
+
+               n − dim L(E0, g) ≥ α−d2 − 1 − K(K + 1) ≥ 1 + ϵ0 p2,
+                                                          2               4
+
+    and, because p ≥ d/2,
+
+                                      n ≤ α+d2 ≤ 4α+p2 = C1p2.
+
+    Put
+                                       a¯ = 1 1nT Qd(S0) and v = −Qg(H0/ρ) + a¯1n.
+                                             ρn
+
+    The block identity and the definition of Πn give
+
+                                                 Qw(D0) − v = ρ−1ΠnQd(S0).
+
+    On the global continuity event, ∥Πnz∥1 ≤ 2∥z∥1 and the rotation estimate give
+
+                                1                         ζ1
+                                n ∥Qw(D0) − v∥1 ≤ Crot δ + δn ∥ΠnQd(S)∥1.
+
+    Conditional on GE0, define                                                     
+
+                                    1 
+                           Estr = D⪰0, ∥D∥F =1, ∥D∥op≤τ inf n ∥Qw(D) − v∥1 ≥ cstr .
+                                      v∈L(E0,g), ∥v∥1≤Bn
+
+    Then Theorem 15.1 and the tail-continuity estimate from Section 13 give, for a constant ccond > 0
+    depending only on the fixed parameters,
+
+                                         P ((Estr ∩ {Λw ≤ A∗})c | GE0 ) ≤ 3e−ccondp2 ,
+
+    where
+
+                                                        1
+                                      ∥D∥F =1 Λw = sup n ∥Qw(D)∥1.
+
+    The bound is uniform in the realized nuisance subspace.
+        Suppose that n−1∥ΠnQd(S)∥1 < ccone. On the preceding good events,
+
+                                   1 ∥Qw(D0) − v∥1 ≤ Crot ζ + ccone ≤ cstr .
+                                   n                      δδ              2
+
+    Moreover,
+
+               1                   1  1
+               n ∥v∥1 ≤ n ∥Qw(D0)∥1 + n ∥Qw(D0) − v∥1 ≤ A∗ + 1 < B.
+
+    Thus D0 and v lie in the classes prohibited by Theorem 15.1, a contradiction. Uniformity over both
+    classes permits D0 and v to be selected after observing the tail rows.
+
+                                         61
+                STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+AI     The deterministic Grassmann nets constructed above satisfy
+
+                K                                     K           √  dj
+                                                                4j
+                               N (Gr(j, d), ζ) ≤ 1 +       1+           ≤ (K + 1)eCK,ζd.
+
+                j=0                                   j=1         ζ
+
+       Consequently, for all sufficiently large d,
+                                              (K + 1)eCK,ζ d3e−ccond(d−K)2 ≤ e−cprobd2
+
+       for a fixed cprob > 0. Adding the global-continuity and fixed-rank exceptional events proves the
+       theorem with margin c = ccone and a positive failure exponent depending only on α− and α+.
+
+           If T ∈ Fd, then T̸ = 0. The normalization S = T /∥T ∥F satisfies S ⪰ 0, ∥S∥F = 1, and
+       ΠnQd(S) = 0, contradicting the margin. If lim inf n/d2 > 1/4 but the aspect ratio is unbounded,
+
+       choose a fixed α0 with
+
+                               1                           1         n
+                                  < α0 < min , lim inf 2 .
+                               4                           2 dd
+
+       For all sufficiently large d, ⌊α0d2⌋ ≤ n(d). After discarding finitely many initial dimensions, which
+       does not affect limits, retain deterministically the first ⌊α0d2⌋ observations. By antitone monotonicity
+       (Section 2), n1 ≤ n2 ⇒ Fn2 ⊆ Fn1, so Fn(d) ⊆ F⌊α0d2⌋; hence infeasibility with ⌊α0d2⌋ observations
+
+       implies infeasibility with n(d) observations.
+
+       This proves Theorem 1.1(ii) for unbounded aspect from Theorem 16.4.
+
+Human                                                 17. Conclusion
+
+           Part I constructs an exact positive definite fit whenever the aspect ratio stays a fixed distance
+       below 1/4. Part II proves that the centered kernel contains no nonzero positive semidefinite matrix
+       whenever the aspect ratio stays a fixed distance above 1/4. These are precisely the two assertions of
+       Theorem 1.1. The proof contains no statement about the critical sequence n/d2 → 1/4.
+
+                                                    Acknowledgments
+
+           The authors would like to thank Ricky Simanjuntak for discussions at various stages of the
+       project and for his feedback on the final draft.
+
+       [AHH12]                                    References
+       [ASS03]
+       [BM25]   Andris Ambainis, Aram W. Harrow, and Matthew B. Hastings. Random tensor
+                theory: Extending random matrix theory to mixtures of random product states.
+                Communications in Mathematical Physics, 310(1):25–74, 2012.
+
+                Michael Aizenman, Robert Sims, and Shannon L. Starr. An extended variational prin-
+                ciple for the Sherrington–Kirkpatrick spin-glass model. Physical Review B, 68:214403,
+                2003.
+
+                Afonso S. Bandeira and Antoine Maillard. Exact threshold for approximate ellipsoid
+                fitting of random points. Electronic Journal of Probability, 30:1–46, 2025.
+
+                                                           62
+         STRICT THRESHOLD FOR GAUSSIAN ELLIPSOID FITTING
+
+[dlCPTX26] Sofia de la Cerda, Aaron Potechin, Madhur Tulsiani, and Jeff Xu. Sharp phase
+                 transition for ellipsoid fitting. arXiv preprint arXiv:2608.12415, 2026.
+
+[DS01]   Kenneth R. Davidson and Stanislaw J. Szarek. Local operator theory, random matrices
+         and Banach spaces. In Handbook of the Geometry of Banach Spaces, volume 1, pages
+         317–366. Elsevier, 2001. See Theorem II.13 for the Gaussian singular-value estimate.
+
+[Fer74]  Xavier Fernique. Minorations des fonctions al´eatoires gaussiennes. Annales de l’Institut
+         Fourier, 24(2):61–66, 1974. See Section 2.1 for Sudakov minoration.
+
+[Gor88]  Yehoram Gordon. On Milman’s inequality and random subspaces which escape through
+         a mesh in Rn. In Geometric Aspects of Functional Analysis, volume 1317 of Lecture
+         Notes in Mathematics, pages 84–106. Springer, 1988.
+
+[KS26]   Frederic Koehler and Youngtak Sohn. Universality and sharp thresholds for ellipsoid
+         fitting. arXiv preprint arXiv:2608.27372, 2026.
+
+[McD89]  Colin McDiarmid. On the method of bounded differences. In Surveys in Combinatorics,
+         1989, volume 141 of London Mathematical Society Lecture Note Series, pages 148–188.
+         Cambridge University Press, 1989.
+
+[MK24]   Antoine Maillard and Dmitriy Kunisky. Fitting an ellipsoid to random points: predic-
+         tions using the replica method. IEEE Transactions on Information Theory, 70(10):7273–
+         7296, 2024.
+
+[MW26]   Theodor Misiakiewicz and Garrett G. Wen. The sharp sat/unsat phase transition in
+         random ellipsoid fitting. arXiv preprint arXiv:2608.10184, 2026.
+
+[RV13]   Mark Rudelson and Roman Vershynin. Hanson–Wright inequality and Sub-Gaussian
+         concentration. Electronic Communications in Probability, 18(82):1–9, 2013.
+
+[Sch25]  Johannes Schmitt. Extremal descendant integrals on moduli spaces of curves: An
+         inequality discovered and proved in collaboration with ai. arXiv preprint
+         arXiv:2512.14575, 2025.
+
+[SPW13]  James Saunderson, Pablo A. Parrilo, and Alan S. Willsky. Diagonal and low-rank
+         decompositions and fitting ellipsoids to random points. In Proceedings of the 52nd
+         IEEE Conference on Decision and Control, pages 6031–6036, 2013.
+
+[Tal11]  Michel Talagrand. Mean Field Models for Spin Glasses, Volume I: Basic Examples,
+         volume 54 of Ergebnisse der Mathematik und ihrer Grenzgebiete. Springer, 2011.
+
+[vdV98] A. W. van der Vaart. Asymptotic Statistics. Cambridge University Press, 1998.
+
+[Ver18]  Roman Vershynin. High-dimensional probability: An introduction with applications in
+         data science. Cambridge University Press, 2018.
+
+         63
+
