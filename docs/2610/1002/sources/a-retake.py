@@ -1,0 +1,2 @@
+import runpy,subprocess
+m=runpy.run_path('docs/2610/1002/sources/a-capture.py');c=m['call'];u='https://www.cell.com/joule/fulltext/S2542-4351(26)00362-4';c('open',u);c('state');c('wait','selector','body');c('wait','text','Summary','--timeout','20000');subprocess.run(['bun','docs/2610/1002/sources/b-dpr.mjs','evidence1002a',str(m['I']/'07-suncatcher-joule.png'),'650','970']);m['log'](u,'OpenCLI CDP screenshot','DPR2 retake to preserve Summary heading','07-suncatcher-joule.png')

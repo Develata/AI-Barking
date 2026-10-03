@@ -1,0 +1,8 @@
+import runpy,json,requests,datetime
+m=runpy.run_path('docs/2610/1002/sources/a-capture.py');c=m['call'];P=m['P']
+def now():return datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).isoformat()
+for n,u in [('d-c-clef-reddit','https://www.reddit.com/r/LocalLLaMA/comments/1wv4zzi/clef_open_weights_decision_model_by_cloudflare/'),('d-c-jev-reddit','https://www.reddit.com/r/LocalLLaMA/comments/1wleg4w/what_is_jev_and_what_is_it_used_for/')]:
+ try:
+  c('open',u);c('state');c('wait','selector','shreddit-post','--timeout','20000');d=c('eval','JSON.stringify({url:location.href,title:document.title,posts:[...document.querySelectorAll("shreddit-post")].map(e=>({title:e.getAttribute("post-title"),score:e.getAttribute("score"),comments:e.getAttribute("comment-count"),created:e.getAttribute("created-timestamp"),permalink:e.getAttribute("permalink"),text:e.querySelector("[slot=text-body]")?.innerText})),comments:[...document.querySelectorAll("shreddit-comment")].slice(0,20).map(e=>({id:e.id,score:e.getAttribute("score"),author:e.getAttribute("author"),permalink:e.getAttribute("permalink"),text:e.querySelector("[slot=comment]")?.innerText}))})');d['captured_bjt']=now();(P/(n+'.json')).write_text(json.dumps(d,ensure_ascii=False,indent=2),encoding='utf8');print(n,d['posts'],flush=True)
+ except Exception as e:(P/(n+'-error.txt')).write_text(str(e),encoding='utf8');print(e,flush=True)
+r=requests.get('https://hn.algolia.com/api/v1/search',params={'query':'Jev','tags':'story','hitsPerPage':80},timeout=40);(P/'d-c-jev-hn.json').write_text(r.text,encoding='utf8');print('hn',now(),flush=True)

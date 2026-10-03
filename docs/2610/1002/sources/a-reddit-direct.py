@@ -1,0 +1,3 @@
+import runpy,json
+m=runpy.run_path('docs/2610/1002/sources/a-capture.py');c=m['call'];u='https://www.reddit.com/r/singularity/comments/1wvf2vf/googles_project_suncatcher_prototype_satellite_is/'
+c('open',u);c('state');d=c('eval','JSON.stringify({url:location.href,title:document.title,posts:[...document.querySelectorAll("shreddit-post")].map(e=>({title:e.getAttribute("post-title"),score:e.getAttribute("score"),comments:e.getAttribute("comment-count"),created:e.getAttribute("created-timestamp"),permalink:e.getAttribute("permalink")}))})');(m['P']/'d-a-reddit-post-browser.json').write_text(json.dumps(d,ensure_ascii=False,indent=2),encoding='utf8');m['log'](u,'opencli browser DOM post metadata','scoped public post only','d-a-reddit-post-browser.json');print(d)

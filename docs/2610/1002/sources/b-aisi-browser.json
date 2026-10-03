@@ -1,0 +1,385 @@
+{
+  "url": "https://www.aisi.gov.uk/blog/building-a-more-secure-environment-for-evaluating-dangerous-capabilities",
+  "title": "Building a more secure environment for evaluating dangerous capabilities | AISI Work",
+  "text": "Read the Frontier AI Trends Report\nA\nA\nAbout\nResearch\nGrants\nBlog\nCareers\nBlog\nEngineering\nBuilding a more secure environment for evaluating dangerous capabilities\n\nAn update on the security changes we have recently made to our frontier AI evaluations, and the work that remains.\n\nOct 1, 2026\n\nIn August, we reported an incident in which AI agents, during a cyber evaluation, took sustained action against real people beyond the remit of their task. Our incident was one of several across the sector in which AI agents took actions during evaluations that their operators had not intended. Although the circumstances differed, these incidents highlight the need to ensure that there are robust security practices underpinning frontier AI development and research.  \n\nIn response, we paused our highest-risk cyber evaluations and committed to strengthening our security before resuming. This week, after completing the first phase of that work, we are now able to resume most evaluation activity.  \n\nMultiple AISI teams have been committed to this effort with support from NCSC, working together to strengthen our security and improve how we make decisions about risks during evaluation activity. In this blog we set out what we have changed, why, and what remains to be done, in the hope that it is helpful for others doing similar work.\n\nWhat we committed to, and what we have done\n\nIn our incident report, we committed to three changes before resuming our highest-risk evaluations: tighter controls on internet access, real-time monitoring of evaluations as they run, and reassessing how we design the evaluations themselves, as well as their environments. We have now made these changes, which together represent a significant phase of our ongoing work.\n\nTighter controls on internet access\n\nIn our incident, we gave agents internet access to help with their cyber capability evaluation, mirroring the tools an attacker would have. In a small number of runs, agents used that access to act against real systems in ways that we did not foresee or intend. We have now disabled internet access for future agentic cyber evaluations, until we are able to put stronger controls in place to allow this safely and securely. These controls will be enabled by our new sandbox service, described below.  \n\nA capable agent might still find routes to the internet that the operator did not intend to leave open. In another incident involving OpenAI and Hugging Face this summer, agents exploited several software vulnerabilities to reach the internet from an environment intended to prevent such access. Therefore, we use multiple layers of defence, assuming that an agent might find its way past any single layer.\n\nWe disable outbound networking from the sandboxes within our cyber ranges and, as a separate layer, we use cloud network controls to independently block outbound networking from the virtual machine host.\n\nWe then validate both layers using the phased security-testing process described below to pre-emptively find misconfigurations or vulnerabilities that an agent could exploit. We apply similar testing to our Inspect evaluation framework to find and fix vulnerabilities and repeat and update these processes regularly.\n\nReal-time monitoring\n\nSupplementing our existing network monitoring, we have built a synchronous monitor that uses an LLM to review an agent's activity as an evaluation runs. The monitor looks at the agent’s messages, tool calls and its Chain-of-Thought (where available) and can block suspicious actions before they happen and escalate them for human review. We validated the monitor against past evaluation logs and synthetic transcripts covering a wide range of attack paths. We also tested whether frontier models could deliberately evade the monitor, including in a simulated version of our SandboxEscapeBench evaluation.\n\nMonitoring provides an important layer of defence, but it has limits. Chain-of-Thought (CoT) monitoring is valuable because it can allow us to read an agent’s intentions through its reasoning and take action in response. But it is also fragile: models are increasingly able to carry out capable actions without reasoning about them in their CoT, or to shape their reasoning to mislead a monitor. Additionally, CoT access is not always provided by developers for every model that AISI evaluates, so we have built an additional monitor that works from the sequence of an agent's actions alone, though we expect this approach to be less effective.  \n\nAs we co-published last year, we believe that preserving legible CoT is very important for monitorability and oversight. We also expect that technical oversight of AI systems will become more difficult as they become more capable. We will keep testing our monitors for weaknesses and strengthening them as we learn.\n\nOur monitoring capability will keep improving through the changes to sandboxing and detection and response described below.\n\nReassessing evaluation design\n\nWe have also updated our evaluation design to reduce the likelihood of models taking unsanctioned actions, by:  \n\nAdapting evaluations to run without internet access, for example by making resources available locally.\nMaking the boundaries of each task clearer in prompts, for example saying explicitly that models should not access the internet.\nAdding automated checks before an evaluation begins to confirm that key controls are in place, including that the monitor is enabled and that internet access is disabled.\nImproving our internal security governance\n\nOn top of this security hardening, we have introduced a new internal governance process, involving technical and security review of AISI research and testing activities. Our approach is informed by our internal risk modelling and follows NCSC guidance on managing the cyber risks of AI. In practice, that means:\n\nAssume any single layer can fail: we use multiple layers of defence across network, data and application layers, on the assumption that a capable model may find a misconfiguration or vulnerability in any one of them.\nExpect human fallibility: we build automated checks to catch, cross-check and correct things that humans have missed, and we maintain a ‘no blame’ culture.\nContinuously reassess: we will keep testing our security and updating our assumptions as model capabilities advance, rather than treating them as fixed.\nUsing AI to test our own security\n\nAlongside conventional security testing, we use AI to find and fix vulnerabilities and misconfigurations before an agent under evaluation could exploit them. This creates its own challenge: testing whether an agent can escape an environment must not lead to the exact harm we are trying to prevent. We have developed a phased process for validating that an environment is secure, designed to give us confidence that an agent would not cause harm if an exploit were found during the exercise. We repeat and review this regularly:\n\nStatic analysis: using frontier models to find issues in our codebase.\nDynamic analysis: human researchers working with AI advisors to probe a compute environment.\nControlled escape attempts: instructing an agent with a large token budget to try to break out of a compute environment, under multiple layered guardrails, in settings where real-world risk is strictly reduced (for example by using simulated environments or nested sandboxing). We begin with less capable models and progress to more capable ones, including pre-deployment models we intend to evaluate. We have multiple guardrails for this process, including:\n\nInstructing the model to find and submit a target ‘flag’ that is placed outside the target environment, though still within an outer layer of containment, that ends the exercise as soon as it is submitted.\nA synchronous monitor that halts the exercise on a successful escape, validated in advance against historical and synthetic transcripts.\nFull isolation from production systems, with an additional cloud security group around the sandbox, automated network monitoring, active human supervision, and manual kill-switches.\nHuman expert review of agent runs and findings.\n\nThese layers allow us to run realistic escape experiments with minimal risk to real-world systems. We set out our nested sandboxing approach in more detail in our SandboxEscapeBench paper.\n\nWhat comes next\n\nThese controls reduce risk, but they do not eliminate it. The changes above have enabled us to restart most testing, but they are not the end of this work. Security measures that are sufficient for today's models may not hold for the next generation, so this work must be continuous.\n\nAlongside the changes already in place, we are building longer-term capabilities, such as:\n\nA new and more secure sandbox service: beyond hardening our existing sandboxes, we are rolling out new sandbox infrastructure with stronger, layered network controls and monitoring, tighter separation between sandboxes and the systems that manage them, and the ability to automatically quarantine an environment when suspicious activity is detected, all managed from one central interface.\nStronger detection and response: we are consolidating our logging and alerting into a single security platform that brings together system logs, agent transcripts, network activity and monitor outputs. This will let us track agent behaviour in more detail and act more quickly, with a wider range of automated alerts for anomalies, kill-switches for multiple layers of the compute environment, and AI models that continuously scan for vulnerabilities and suspicious activity.\n\nWe will continue to test these systems, revise our approach as capabilities advance and publish further updates.\n\nThe challenge for the field\n\nRecent incidents point to several overlapping challenges:\n\nIncreasingly capable models will require commensurately robust security controls.\nEnsuring that agents follow instructions and respect intended constraints is likely to remain difficult, and may become more so, particularly when they operate over extended periods.\nIt will likely become harder to oversee models as they become more capable.\n\nTogether, these challenges mean that risk judgements must be continually revisited for new models, and security practices must be continually strengthened as capabilities advance.\n\nThis presents a difficult trade-off for evaluators. Testing a model’s full capabilities involves eliciting persistent behaviour and providing tools and affordances comparable to a real-world attacker. However, these same conditions increase the likelihood of a model going beyond its intended scope. Evaluators must find ways to preserve the realism of testing while preventing real-world harm.\n\nThat is a large undertaking, and not one shared evenly. Hardening evaluation infrastructure, and continuing to harden it as capabilities grow, is costly, resource-intensive, and requires continued investment. This will fall particularly heavily on smaller and less well-resourced evaluators, whose independent work remains important. A shared problem needs a shared response, and part of that is making sure good security does not become the preserve of the best-funded.\n\nThat is why we are setting out our work as openly as we can, and why we will keep doing so. We encourage others doing this work to share their approaches, so we can all learn and work together on this challenge.\n\n‍\n\nThe AI Security Institute is a research organisation within the Department of Science, Innovation and Technology.\n\nAISI\nHome\nAbout us\nGrants\nCareers\nOUR WORK\nBlog\nResearch\nResearch Agenda\nCONNECT\nDepartment for Science, Innovation and Technology\nLinkedIn\nTwitter\nSITE POLICIES\nPrivacy Policy",
+  "dpr": 1.5,
+  "meta": [
+    "<meta content=\"An update on the security changes we have recently made to our frontier AI evaluations, and the work that remains.\" name=\"description\">",
+    "<meta content=\"Building a more secure environment for evaluating dangerous capabilities | AISI Work\" property=\"og:title\">",
+    "<meta content=\"An update on the security changes we have recently made to our frontier AI evaluations, and the work that remains.\" property=\"og:description\">",
+    "<meta content=\"https://cdn.prod.website-files.com/663bd486c5e4c81588db7a48/6abe363192ddbc4634b181e1_Copy%20of%20Metacard%20(19).png\" property=\"og:image\">",
+    "<meta content=\"Building a more secure environment for evaluating dangerous capabilities | AISI Work\" name=\"twitter:title\">",
+    "<meta content=\"An update on the security changes we have recently made to our frontier AI evaluations, and the work that remains.\" name=\"twitter:description\">",
+    "<meta content=\"https://cdn.prod.website-files.com/663bd486c5e4c81588db7a48/6abe363192ddbc4634b181e1_Copy%20of%20Metacard%20(19).png\" name=\"twitter:image\">",
+    "<meta property=\"og:type\" content=\"website\">",
+    "<meta content=\"summary_large_image\" name=\"twitter:card\">",
+    "<meta content=\"width=device-width, initial-scale=1\" name=\"viewport\">",
+    "<meta property=\"og:site_name\" content=\"AI Security Institute\">"
+  ],
+  "headings": [
+    {
+      "text": "Building a more secure environment for evaluating dangerous capabilities",
+      "y": 240.6354217529297
+    },
+    {
+      "text": "What we committed to, and what we have done",
+      "y": 1017.9896240234375
+    },
+    {
+      "text": "Improving our internal security governance",
+      "y": 2573.6875
+    },
+    {
+      "text": "Using AI to test our own security",
+      "y": 2926.479248046875
+    },
+    {
+      "text": "What comes next",
+      "y": 3639.96875
+    },
+    {
+      "text": "The challenge for the field",
+      "y": 4137.53125
+    },
+    {
+      "text": "",
+      "y": 0
+    },
+    {
+      "text": "Thanks for sharing AISI's work!",
+      "y": 0
+    }
+  ],
+  "paragraphs": [
+    {
+      "text": "An update on the security changes we have recently made to our frontier AI evaluations, and the work that remains.",
+      "y": 458.22918701171875,
+      "h": 54.395835876464844
+    },
+    {
+      "text": "In August, we reported an incident in which AI agents, during a cyber evaluation, took sustained action against real people beyond the remit of their task. Our incident was one of several across the sector in which AI agents took actions during evaluations that their operators had not intended. Although the circumstances differed, these incidents highlight the need to ensure that there are robust security practices underpinning frontier AI development and research.  ",
+      "y": 653.28125,
+      "h": 143.95834350585938
+    },
+    {
+      "text": "In response, we paused our highest-risk cyber evaluations and committed to strengthening our security before resuming. This week, after completing the first phase of that work, we are now able to resume most evaluation activity.  ",
+      "y": 813.2396240234375,
+      "h": 86.375
+    },
+    {
+      "text": "Multiple AISI teams have been committed to this effort with support from NCSC, working together to strengthen our security and improve how we make decisions about risks during evaluation activity. In this blog we set out what we have changed, why, and what remains to be done, in the hope that it is helpful for others doing similar work.",
+      "y": 915.6146240234375,
+      "h": 86.375
+    },
+    {
+      "text": "In our incident report, we committed to three changes before resuming our highest-risk evaluations: tighter controls on internet access, real-time monitoring of evaluations as they run, and reassessing how we design the evaluations themselves, as well as their environments. We have now made these changes, which together represent a significant phase of our ongoing work.",
+      "y": 1058.0625,
+      "h": 115.16667175292969
+    },
+    {
+      "text": "Tighter controls on internet access",
+      "y": 1189.229248046875,
+      "h": 28.791667938232422
+    },
+    {
+      "text": "In our incident, we gave agents internet access to help with their cyber capability evaluation, mirroring the tools an attacker would have. In a small number of runs, agents used that access to act against real systems in ways that we did not foresee or intend. We have now disabled internet access for future agentic cyber evaluations, until we are able to put stronger controls in place to allow this safely and securely. These controls will be enabled by our new sandbox service, described below.  ",
+      "y": 1234.0208740234375,
+      "h": 143.95834350585938
+    },
+    {
+      "text": "A capable agent might still find routes to the internet that the operator did not intend to leave open. In another incident involving OpenAI and Hugging Face this summer, agents exploited several software vulnerabilities to reach the internet from an environment intended to prevent such access. Therefore, we use multiple layers of defence, assuming that an agent might find its way past any single layer.",
+      "y": 1393.979248046875,
+      "h": 115.16667175292969
+    },
+    {
+      "text": "We disable outbound networking from the sandboxes within our cyber ranges and, as a separate layer, we use cloud network controls to independently block outbound networking from the virtual machine host.",
+      "y": 1525.1458740234375,
+      "h": 57.583335876464844
+    },
+    {
+      "text": "We then validate both layers using the phased security-testing process described below to pre-emptively find misconfigurations or vulnerabilities that an agent could exploit. We apply similar testing to our Inspect evaluation framework to find and fix vulnerabilities and repeat and update these processes regularly.",
+      "y": 1598.729248046875,
+      "h": 86.375
+    },
+    {
+      "text": "Real-time monitoring",
+      "y": 1701.104248046875,
+      "h": 28.791667938232422
+    },
+    {
+      "text": "Supplementing our existing network monitoring, we have built a synchronous monitor that uses an LLM to review an agent's activity as an evaluation runs. The monitor looks at the agent’s messages, tool calls and its Chain-of-Thought (where available) and can block suspicious actions before they happen and escalate them for human review. We validated the monitor against past evaluation logs and synthetic transcripts covering a wide range of attack paths. We also tested whether frontier models could deliberately evade the monitor, including in a simulated version of our SandboxEscapeBench evaluation.",
+      "y": 1745.8958740234375,
+      "h": 172.75
+    },
+    {
+      "text": "Monitoring provides an important layer of defence, but it has limits. Chain-of-Thought (CoT) monitoring is valuable because it can allow us to read an agent’s intentions through its reasoning and take action in response. But it is also fragile: models are increasingly able to carry out capable actions without reasoning about them in their CoT, or to shape their reasoning to mislead a monitor. Additionally, CoT access is not always provided by developers for every model that AISI evaluates, so we have built an additional monitor that works from the sequence of an agent's actions alone, though we expect this approach to be less effective.  ",
+      "y": 1934.6458740234375,
+      "h": 172.75
+    },
+    {
+      "text": "As we co-published last year, we believe that preserving legible CoT is very important for monitorability and oversight. We also expect that technical oversight of AI systems will become more difficult as they become more capable. We will keep testing our monitors for weaknesses and strengthening them as we learn.",
+      "y": 2123.39599609375,
+      "h": 86.375
+    },
+    {
+      "text": "Our monitoring capability will keep improving through the changes to sandboxing and detection and response described below.",
+      "y": 2225.77099609375,
+      "h": 57.583335876464844
+    },
+    {
+      "text": "Reassessing evaluation design",
+      "y": 2299.354248046875,
+      "h": 28.791667938232422
+    },
+    {
+      "text": "We have also updated our evaluation design to reduce the likelihood of models taking unsanctioned actions, by:  ",
+      "y": 2344.14599609375,
+      "h": 28.791667938232422
+    },
+    {
+      "text": "On top of this security hardening, we have introduced a new internal governance process, involving technical and security review of AISI research and testing activities. Our approach is informed by our internal risk modelling and follows NCSC guidance on managing the cyber risks of AI. In practice, that means:",
+      "y": 2613.760498046875,
+      "h": 86.375
+    },
+    {
+      "text": "Alongside conventional security testing, we use AI to find and fix vulnerabilities and misconfigurations before an agent under evaluation could exploit them. This creates its own challenge: testing whether an agent can escape an environment must not lead to the exact harm we are trying to prevent. We have developed a phased process for validating that an environment is secure, designed to give us confidence that an agent would not cause harm if an exploit were found during the exercise. We repeat and review this regularly:",
+      "y": 2966.55224609375,
+      "h": 143.95834350585938
+    },
+    {
+      "text": "These layers allow us to run realistic escape experiments with minimal risk to real-world systems. We set out our nested sandboxing approach in more detail in our SandboxEscapeBench paper.",
+      "y": 3566.385498046875,
+      "h": 57.583335876464844
+    },
+    {
+      "text": "These controls reduce risk, but they do not eliminate it. The changes above have enabled us to restart most testing, but they are not the end of this work. Security measures that are sufficient for today's models may not hold for the next generation, so this work must be continuous.",
+      "y": 3680.041748046875,
+      "h": 86.375
+    },
+    {
+      "text": "Alongside the changes already in place, we are building longer-term capabilities, such as:",
+      "y": 3782.416748046875,
+      "h": 28.791667938232422
+    },
+    {
+      "text": "We will continue to test these systems, revise our approach as capabilities advance and publish further updates.",
+      "y": 4092.73974609375,
+      "h": 28.791667938232422
+    },
+    {
+      "text": "Recent incidents point to several overlapping challenges:",
+      "y": 4177.6044921875,
+      "h": 28.791667938232422
+    },
+    {
+      "text": "Together, these challenges mean that risk judgements must be continually revisited for new models, and security practices must be continually strengthened as capabilities advance.",
+      "y": 4377.55224609375,
+      "h": 57.583335876464844
+    },
+    {
+      "text": "This presents a difficult trade-off for evaluators. Testing a model’s full capabilities involves eliciting persistent behaviour and providing tools and affordances comparable to a real-world attacker. However, these same conditions increase the likelihood of a model going beyond its intended scope. Evaluators must find ways to preserve the realism of testing while preventing real-world harm.",
+      "y": 4451.1357421875,
+      "h": 115.16667175292969
+    },
+    {
+      "text": "That is a large undertaking, and not one shared evenly. Hardening evaluation infrastructure, and continuing to harden it as capabilities grow, is costly, resource-intensive, and requires continued investment. This will fall particularly heavily on smaller and less well-resourced evaluators, whose independent work remains important. A shared problem needs a shared response, and part of that is making sure good security does not become the preserve of the best-funded.",
+      "y": 4582.30224609375,
+      "h": 143.95834350585938
+    },
+    {
+      "text": "That is why we are setting out our work as openly as we can, and why we will keep doing so. We encourage others doing this work to share their approaches, so we can all learn and work together on this challenge.",
+      "y": 4742.2607421875,
+      "h": 57.583335876464844
+    },
+    {
+      "text": "‍",
+      "y": 4815.84375,
+      "h": 28.791667938232422
+    },
+    {
+      "text": "The AI Security Institute is a research organisation within the Department of Science, Innovation and Technology.",
+      "y": 5145.55224609375,
+      "h": 54.395835876464844
+    },
+    {
+      "text": "We have copied this figure to your clipboard. You can paste it into your tweet on the next page.(Paste using 'ctrl +v' or 'cmd + v')",
+      "y": 0,
+      "h": 0
+    }
+  ],
+  "links": [
+    {
+      "text": "Read the Frontier AI Trends Report",
+      "url": "https://www.aisi.gov.uk/frontier-ai-trends-report"
+    },
+    {
+      "text": "",
+      "url": "https://www.aisi.gov.uk/"
+    },
+    {
+      "text": "About",
+      "url": "https://www.aisi.gov.uk/about"
+    },
+    {
+      "text": "Research",
+      "url": "https://www.aisi.gov.uk/research"
+    },
+    {
+      "text": "Grants",
+      "url": "https://www.aisi.gov.uk/grants"
+    },
+    {
+      "text": "Blog",
+      "url": "https://www.aisi.gov.uk/blog"
+    },
+    {
+      "text": "Contact",
+      "url": "https://www.aisi.gov.uk/blog/building-a-more-secure-environment-for-evaluating-dangerous-capabilities#"
+    },
+    {
+      "text": "Careers",
+      "url": "https://www.aisi.gov.uk/careers"
+    },
+    {
+      "text": "",
+      "url": "https://www.aisi.gov.uk/"
+    },
+    {
+      "text": "Home",
+      "url": "https://www.aisi.gov.uk/"
+    },
+    {
+      "text": "About",
+      "url": "https://www.aisi.gov.uk/about"
+    },
+    {
+      "text": "Research",
+      "url": "https://www.aisi.gov.uk/research"
+    },
+    {
+      "text": "Grants",
+      "url": "https://www.aisi.gov.uk/grants"
+    },
+    {
+      "text": "Blog",
+      "url": "https://www.aisi.gov.uk/blog"
+    },
+    {
+      "text": "Careers",
+      "url": "https://www.aisi.gov.uk/careers"
+    },
+    {
+      "text": "Blog",
+      "url": "https://www.aisi.gov.uk/blog"
+    },
+    {
+      "text": "Engineering",
+      "url": "https://www.aisi.gov.uk/blog/building-a-more-secure-environment-for-evaluating-dangerous-capabilities#"
+    },
+    {
+      "text": "we reported an incident",
+      "url": "https://www.aisi.gov.uk/blog/incident-report-unsanctioned-agent-behaviour-during-cyber-testing"
+    },
+    {
+      "text": "another incident involving OpenAI and Hugging Face this summer",
+      "url": "https://openai.com/index/hugging-face-incident-and-the-road-ahead/"
+    },
+    {
+      "text": "SandboxEscapeBench",
+      "url": "https://www.aisi.gov.uk/blog/can-ai-agents-escape-their-sandboxes-a-benchmark-for-safely-measuring-container-breakout-capabilities"
+    },
+    {
+      "text": "carry out capable actions without reasoning about them",
+      "url": "https://www.aisi.gov.uk/blog/cheating-behaviour-in-frontier-model-evaluations"
+    },
+    {
+      "text": "shape their reasoning to mislead a monitor",
+      "url": "https://deploymentsafety.openai.com/gpt-6-astra/gpt-6-astra.pdf"
+    },
+    {
+      "text": "co-published last year",
+      "url": "https://www.aisi.gov.uk/research/chain-of-thought-monitorability-a-new-and-fragile-opportunity-for-ai-safety"
+    },
+    {
+      "text": "become more difficult",
+      "url": "https://www.aisi.gov.uk/blog/will-it-become-harder-to-oversee-ai-systems"
+    },
+    {
+      "text": "NCSC guidance",
+      "url": "https://www.ncsc.gov.uk/blogs/managing-the-cyber-risk-of-agentic-ai"
+    },
+    {
+      "text": "SandboxEscapeBench ",
+      "url": "https://www.aisi.gov.uk/blog/can-ai-agents-escape-their-sandboxes-a-benchmark-for-safely-measuring-container-breakout-capabilities"
+    },
+    {
+      "text": "become harder to oversee models as they become more capable.",
+      "url": "https://www.aisi.gov.uk/blog/will-it-become-harder-to-oversee-ai-systems"
+    },
+    {
+      "text": "",
+      "url": "https://www.aisi.gov.uk/blog/building-a-more-secure-environment-for-evaluating-dangerous-capabilities#"
+    },
+    {
+      "text": "",
+      "url": "https://www.aisi.gov.uk/blog/building-a-more-secure-environment-for-evaluating-dangerous-capabilities#"
+    },
+    {
+      "text": "",
+      "url": "http://dsit.gov.uk/"
+    },
+    {
+      "text": "",
+      "url": "https://www.aisi.gov.uk/"
+    },
+    {
+      "text": "Home",
+      "url": "https://www.aisi.gov.uk/"
+    },
+    {
+      "text": "About us",
+      "url": "https://www.aisi.gov.uk/about"
+    },
+    {
+      "text": "Grants",
+      "url": "https://www.aisi.gov.uk/grants"
+    },
+    {
+      "text": "Careers",
+      "url": "https://www.aisi.gov.uk/careers"
+    },
+    {
+      "text": "Blog",
+      "url": "https://www.aisi.gov.uk/blog"
+    },
+    {
+      "text": "Research",
+      "url": "https://www.aisi.gov.uk/research"
+    },
+    {
+      "text": "Research Agenda",
+      "url": "https://www.aisi.gov.uk/research-agenda"
+    },
+    {
+      "text": "Department for Science, Innovation and Technology",
+      "url": "http://dsit.gov.uk/"
+    },
+    {
+      "text": "LinkedIn",
+      "url": "https://www.linkedin.com/company/ai-security-institute?trk=public_post_feed-actor-name"
+    },
+    {
+      "text": "Twitter",
+      "url": "https://x.com/AISecurityInst/"
+    },
+    {
+      "text": "Privacy Policy",
+      "url": "https://www.aisi.gov.uk/privacy-policy"
+    },
+    {
+      "text": "Proceed with Tweet",
+      "url": "https://www.aisi.gov.uk/blog/building-a-more-secure-environment-for-evaluating-dangerous-capabilities#"
+    }
+  ],
+  "capture_time_bjt": "2026-10-02T21:24:45.658579+08:00"
+}

@@ -1,0 +1,859 @@
+Skip to Main Content
+Skip to Main Menu
+Submit
+Log in
+Register
+Skip menu
+This journal
+Journals
+Publish
+News & events
+About Cell Press
+Advanced search
+ARTICLEOnline now102678October 01, 2026Open Access
+Toward a future space-based, highly scalable AI infrastructure system design
+Blaise Agüera y Arcas1,2 ∙ Travis Beals1,2 ∙ Maria Biggs1,2 ∙ … ∙ Urs Köster1,2 ∙ Rishiraj Pravahan1,2 ∙ James Manyika1 … Show more
+Affiliations & Notes
+Article Info
+Download PDF
+Cite
+Share
+Set Alert
+Get Rights
+Reprints
+Previous article
+Next article
+Show Outline
+Context & scale
+The sun is by far the largest energy source in our solar system, and thus it warrants consideration how future AI infrastructure could most efficiently tap into that power. This work explores a scalable compute system for machine learning in space, using fleets of satellites equipped with solar arrays, free-space optics inter-satellite links, and Google tensor processing unit (TPU) accelerator chips.
+Trillium TPUs are radiation tested; they survive a total ionizing dose equivalent to a 5 year mission life without permanent failures. A learning curve analysis suggests launch to low-Earth orbit may reach ≲$200/kg by the mid-2030s; if so, the cost of launch amortized over spacecraft lifetime could be roughly comparable to data center energy costs, on a per-kW basis. While there are a number of significant challenges that remain to be addressed to realize this “moonshot,” in the long run, it may be the most scalable solution for AI compute, with the additional benefit of minimizing the impact on terrestrial resources such as land and water.
+Highlights
+•	
+A scalable approach to building compute systems for AI in space
+•	
+Machine learning chips survive total ionizing dose equivalent to a 5 year mission life
+•	
+Example satellite cluster flying in close formation, controlled by AI-enhanced model
+•	
+Launch to low-Earth orbit may reach $200/kg by the mid-2030s
+Summary
+The sun is the largest energy source in our solar system, and thus it warrants consideration how future AI infrastructure could most efficiently tap into that power. We explore a scalable compute system for machine learning (ML) in space: fleets of satellites equipped with solar arrays, free-space optics inter-satellite links, and Google tensor processing unit (TPU) accelerator chips. To facilitate high-bandwidth, low-latency inter-satellite communication, the satellites would be flown in close proximity. We illustrate the basic approach to formation flight via an 81-satellite cluster of 1 km radius and describe an approach for high-precision ML-enhanced models to control large-scale constellations. Trillium TPUs are radiation tested. They survive a total ionizing dose equivalent to a 5 year mission life without permanent failures and are characterized for bit-flip errors. Launch is critical to overall system cost; a learning curve analysis suggests launch to low-Earth orbit (LEO) may reach ≤$200/kg by mid-2030s.
+Graphical abstract
+Keywords
+space-based AI
+AI data centers
+space-based solar power
+satellite data centers
+AI satellites
+Introduction
+Motivation for ML in space
+The introduction of the transformer architecture1 that applied the previously developed "attention mechanism"2 enabled the creation of pre-trained "foundation models"—AI models that can handle a broad range of different tasks where the task itself is specified as part of the input, rather than through the training process of a tailored-for-purpose machine learning (ML) model. This breakthrough and the subsequent rise of generative, multimodal AI have led to an explosion of demand for compute capacity. Although dramatic gains have been made in efficiency (e.g., Gemini query energy consumption was reduced 33× over a one year period3), AI-based products and services have grown even faster, leading to a rapid increase in data center energy demand. To that end, Google is invested in advancing new forms of power generation.4,5,6 However, given that AI appears to be a foundational general-purpose technology7—akin to electricity or the steam engine—we should anticipate that its use will continue to broaden across all aspects of human endeavor from powering the economy to helping to tackle some of humanity’s greatest challenges,8,9,10 and it can be expected that AI computational needs will grow, as will the energy required to run it.
+In this paper and the research “moonshot” it proposes, we look to the future and work back from that. The sun is by far the largest source of power in our solar system: with an output of 3.86 × 1026 W, the Sun emits more than 100 trillion times humanity’s total electricity production. At some point in the future, the best way to power AI will likely thus be to more directly tap into that enormous source of energy. Space-based solar power has long been proposed—first in a 1941 Asimov short story, Reason. A potentially feasible technical architecture was proposed in Glaser11 and recent technical discussions include Rodgers et al.12 and Kruft.13 It has many of the attractive qualities of terrestrial solar power, with the additional advantages that solar panels in certain orbits are exposed to nearly continuous sunshine and receive up to 8× more solar energy per year than a panel located on Earth at mid-latitude.14 However, getting the generated power back to Earth has been a major challenge for such proposals.
+Recent work15 indicates that space-based solar power systems that transmit power to earth are approaching economic feasibility. This raises the question whether harvesting and using power directly in orbit might be even more cost effective. Such a system would also allow for powerful “edge compute in space” applications, e.g., imaging & satellite control. In these use cases, data can be processed and ML operations performed without onerous downlink requirements, significantly boosting efficiency and performance. Similar systems have been the subject of increasing scientific interest, with research into orbital edge computing and in-orbit compute frameworks highlighting the potential to bypass terrestrial downlink bottlenecks through improved data locality and system autonomy.16,17 Additionally, recent work has explored space-based data centers as a scalable component of low-carbon AI infrastructure, offering a path to decouple high-density compute growth from terrestrial utility and land-use footprints.18 While there are a number of challenges that would need to be addressed to realize this moonshot, in the long run, it may be the most scalable solution, with the additional benefit of minimizing the impact on terrestrial resources such as land and water.
+System design overview
+Working backward from an eventual future in which the majority of AI computation happens in space, we identify an intermediate milestone showing that a space-based system could achieve performance roughly comparable to a terrestrial datacenter. This research initiative is focused on addressing several of the major ingredients required: power generation; high-bandwidth, low-latency communication between chips; radiation-tolerant compute; a thermal management system; and a data link to ground stations. We aim to be as mass efficient as possible, maximizing compute per kilogram to minimize launch costs, while attending to practical considerations for satellite design, including launch vehicle compatibility, avoidance of space debris, and structural feasibility.
+We propose working toward a future where we would host the Google tensor processing unit (TPU) accelerator chips on a constellation of solar-powered satellites. In terrestrial data centers, chips are closely connected within racks. While initial satellites may be smaller, performance considerations may eventually result in satellites evolving toward an amount of compute up to that equivalent to one or more data center racks. The number of chips per rack varies between TPU generations, but typical AI rack power footprint today is ∼50–100 kW.19,20 Satellites substantially larger than what is common today would likely require adjustments to constellation design and formation flight, e.g., increased spacing between satellites.
+We envision launching the satellites into dawn-dusk, sun-synchronous low-Earth orbit (LEO), which allows us to balance power density, latency of ground communications, and launch cost, as well as to occupy a relatively favorable radiation environment, compared with higher orbits such as medium-Earth orbit (MEO). Eventually, as launch costs decline even further, higher orbits may make sense for applications that can tolerate higher latency, such as large-scale training. To enable ultra-high bandwidth, low-latency data transfer between satellites, they will fly close together and communicate via free-space optics inter-satellite links (FSO ISLs). A control model that may include ML elements enables the satellites to maintain close flight proximity while avoiding collisions.
+Eventually, optical links will also be needed for high-bandwidth communication with the ground, but for a pilot project, radio suffices, avoiding the challenges of overcoming atmospheric interference. Maintaining a dawn-dusk orbit will increase latency to some ground locations but is advantageous for maximizing power. Since we plan to rely on conventional, radio ground links for early prototype missions and optical ground links are being commercially developed,21,22,23 we do not cover optical ground links in depth in this study. Cooling would be achieved through a thermal system of heat pipes and radiators, designed to maintain high-bandwidth memory (HBM) operating temperature below ∼90∘C,24,25 since this is the critical limiting factor for operation.
+Proposals exist for “monolithic” data centers in space where individual spacecraft significantly exceed the size of any current or planned launch vehicle.26,27 While such design concepts reduce the need for high-performance ISLs, they involve new challenges: such structures would have to be assembled in space by humans or robots, collision avoidance would be more cumbersome, and structural requirements would add mass and complexity. Our proposed approach would instead rely on arrays of smaller satellites. This more modular design would provide ample opportunity to scale to the terawatts of compute capacity that could fit within the dawn-dusk sun-synchronous low-earth orbital band.
+To assess the viability of this concept, this work focuses on several key technological challenges: the required inter-satellite communication bandwidth; the dynamics and control of large, tightly clustered satellite formations; the radiation tolerance of TPUs; and economic feasibility given expected future launch costs. Other significant challenges such as on-orbit reliability and repair, high-bandwidth ground communications, and thermal management are also discussed in this paper. Our ongoing research toward achieving this moonshot involves refining designs and reducing risks through further analysis, ground-based testing, and in-orbit prototype missions.
+Results
+Inter-satellite links
+The networking requirements of large-scale terrestrial ML clusters far exceed the capabilities of current ISL technology. Google’s TPU supercomputers, for instance, utilize a two-tiered networking architecture. A high-speed data center network provides pod-level connectivity,28 while a custom, low-latency optical inter-chip interconnect (ICI) with throughputs on the order of hundreds of gigabits per second per chip facilitates the tightly coupled communication required for large-scale training workloads.29 In contrast, commercially available optical ISLs offer data rates in the range of 1–100 Gbps.
+Our analysis shows that the required aggregate bandwidth per link, on the order of 10 Tbps, is achievable by using commercial off-the-shelf (COTS) dense wavelength division multiplexing (DWDM) transceiver technology operating in the infrared, similar to that used in terrestrial data centers. The primary challenge is that such equipment requires significantly higher received optical power levels, on the order of hundreds of microwatts, compared to the ∼1 μW levels typical for traditional long-range ISLs. These power levels can be achieved by drastically reducing the inter-satellite distance. For distances larger than the Fresnel limit, received power scales with the inverse square of the distance due to beam divergence. Flying the satellites in close formation (hundreds of kilometers or less) therefore provides ample power to close the link budget for high-bandwidth COTS transceivers, as illustrated in Figure 1.
+Figure 1 Existing OISL device specifications vs. proposed design
+Show full captionFigure viewer
+While the cluster described in this work serves as an illustrative model for formation flight and link budget analysis, it does not represent a fixed upper limit for the proposed architecture. In practice, the optimal size of a tightly coupled cluster is highly workload dependent. Assuming each satellite is approximately equivalent to a rack in a data center, many standard ML workloads can be accommodated by a relatively small number of satellites or even just a single satellite in some cases. For workloads requiring very large numbers of chips, we could link clusters together via longer-range ISLs, forming a hierarchy of “clusters of clusters.” The distances between clusters would be driven by workload requirements and ISL capabilities but could be >100km. This is analogous to terrestrial data centers, for which networking requirements and physical distance limit the scale of individual pods, but pods can be connected to each other for very large workloads.
+As the distance becomes very short (e.g., ∼5 km for a 10 cm telescope), spatial multiplexing emerges as a new opportunity for further scaling. The smaller beam spot size at shorter distances allows multiple independent beams to be established between transceiver arrays on different satellites, each carrying a separate DWDM datastream. For example, as illustrated with three examples on the left of Figure 1, a single 10 cm total aperture can be populated with a 2 × 2 array of independent 5 cm optical systems at a link distance of 1.25 km or a 4 × 4 array of 2.5 cm systems at 0.32 km, scaling the total bandwidth with the number of parallel links. This enables further scaling of bandwidth inversely with distance, analogous to achieving high aggregate bandwidth through parallel spatial streams in Google’s Palomar Optical Circuit Switch.30 In this spatially multiplexed regime, the use of coherent detection provides inherent rejection of crosstalk from adjacent beams.
+A bench-scale demonstrator using off-the-shelf components successfully achieved 800 Gbps unidirectional (1.6 Tbps bidirectional) transmission across a short free-space path, validating the potential of this approach.
+Orbital dynamics
+Our proposed system design, at scale, will be significantly larger and entail much closer formation flight (due to inter-satellite communications requirements) than any previous or current satellite constellations. We considered a set of constraints including maintaining a stable set of nearest neighbors, minimizing latency, and maximizing solar exposure and ISL performance. Based on these constraints, Figure 2 shows one possible configuration for an illustrative, planar 81-satellite constellation—all placed in the orbital plane, at a mean cluster altitude of 650 km that exemplifies the underlying general design principles.
+Figure 2 Evolution of a free-fall (i.e., “no thrust”) constellation subject to Earth’s gravitational attraction plus J2 term (due to Earth’s oblateness) over the course of one orbit, shown at time intervals of 1/12 of a full orbit in a non-rotating coordinate system
+Show full captionFigure viewer
+For an actual constellation intended to run commercial-scale workloads, one would likely want to choose a different cluster size (with potentially many more satellites), different underlying lattice (hexagonal rather than square), and potentially make some additional trade-offs w.r.t. rigidity of inter-satellite distances (and also “passive safety” w.r.t. collisions) vs. extra delta-v needs to compensate for some satellites then being at a slightly wrong inclination for sun synchronicity. The starting point for all such further design adjustments would, however, be the general in-plane scheme shown by this simple, extensible constellation that is designed to minimize delta-v requirements while eliminating many of the mechanical problems that orbital megastructures would face—most importantly, handling mechanical stress and vibrations, as well as being able to perform evasive maneuvers to avoid collisions with other objects in orbit.
+At the envisioned altitude, residual atmospheric density is low enough even during times of high solar activity to make formation flight feasible (according to numerical simulations), but the precise altitude will be determined by a trade-off between avoiding “busy” orbits, reducing eclipse time (unavoidable below 1,400 km), reducing delta-v requirements for reaching that orbit, and also staying out of the inner van Allen belt (starting at about 1,000 km) to keep radiation manageable. Finding the “sweet spot” is an engineering problem that naturally translates to satellite design decisions such as about battery sizes, amount of radiation shielding, etc.
+In this example that illustrates the formation flight pattern, cluster radius is R = 1 km, with distance between next-nearest-neighbor satellites oscillating between (approximately) 100 and 200 m, as is shown in Figure 3.
+Overall, larger constellations would be designed according to the same basic principles, which start from a basic “Kepler model” fully analytic approach, then include Earth’s gravitational quadrupole moment (in particular the “J2 term” that is exploited for sun synchronicity) in a still-mostly-analytic treatment, such as via the Schweighart-Sedwick model31 or perhaps even Vinti theory,32 and finally determine further refinements required through advanced numerical methods. For the cluster to not drift apart, orbital periods need to align for all satellites, which, in the crude Kepler approximation, means that the diameters of all orbit-ellipses have to be the same. The need for dawn-dusk sun synchronicity then determines inclination and longitude of the ascending node, in total reducing the number of orbit parameters (initially three positions and three velocities at a fixed point in time) from six to three.
+The maximum number of satellites in such a cluster scales with the square of the radius. One way to see that it is impossible for the Kepler problem to build a cluster with given minimal inter-satellite distance requirements where the number of satellites in the cluster scales with higher than 2nd power of the cluster’s radius is to consider the “squared minimal distance along the orbit for satellites with the same orbital period” function as a ds2 line element on five-dimensional parameter space and recognize that the corresponding metric is rank-2, i.e., there are only two independent ways to increase the minimal-distance-along-orbit spacing between satellites, making any such free-fall constellation effectively two-dimensional. The 2:1 axis-ratio of the “relative position” ellipses is easiest to see in the Clohessy-Wiltshire linearization33 of relative satellite motion (respectively the Tschauner-Hempel equations34 for non-circular orbits of the “chief” satellite).
+For larger designs, one would have to take non-linear corrections to the Clohessy-Wiltshire equations into account that become relevant as RCluster/aOrbit increases. The need for a free-fall constellation to be essentially two-dimensional leaves us with the cross-track direction as a natural candidate to use for space debris collision avoidance, but for very large constellations, the need to be able to avoid collisions with objects approaching the constellation from that direction would naturally introduce extra need for advanced evasion maneuvers that might want to temporarily “stack” one part of the cluster behind another.
+The constellation performs two shape cycles per full orbit. Peripheral satellite S1 is at apoapsis at T = 3Torbit/12 and altitude h = a+R/2 and at periapsis at T = 9Torbit/12 and altitude h = a-R/2. Since the diameter of S1’s orbital ellipse equals that of S0’s, their orbital periods are identical, likewise for other satellites. (Perturbations due to the J2 term and other effects will require slight amendments to this leading-order-effect statement.) While the constellation remains bounded inside a sphere of radius R, its shape goes through two full cycles over the course of one orbit. At any point in time, all satellites fit into a rotating “±R prograde, ±R/2 in altitude” ellipse. The interior of this rotating ellipse does not perform a rigid rotation: during the course of one orbit, different satellites are closest to the endpoints of its semi-major/minor axes, as one readily observes by following the path of S1.
+If satellite motion were perfectly Keplerian (i.e., if Earth’s gravitational field were that of a point mass, and effects such as solar and lunar tides, atmospheric friction, radiation pressure, etc., were absent), this free-fall constellation would reproduce itself perfectly after a full orbit, at zero delta-v requirement. If maintaining a planar constellation is undesirable, such as for establishing ISLs or to address passive safety concerns, in-plane motion can be superimposed with per-satellite oscillatory out-of-plane motion (one oscillation per orbit). The 2:1 axis ratio of the in-plane bounding ellipse is a consequence of orbital dynamics. For a given minimal inter-satellite distance, this design approach leads to the number of satellites scaling quadratically with cluster radius, N∼R2. Improving the ratio of sunlight capture area over cluster cross-section beyond quadratic scaling would in general, for given minimal inter-satellite distance, require non-Keplerian formation flight approaches—such as electromagnetic formation flight35—and would have to pay attention to occlusion of outgoing “rejected heat” IR radiation between satellites.
+Taking the leading “oblateness”-related J2 correction to Earth’s gravitational field into account, which here would be exploited to keep satellites in a sun-synchronous orbit (i.e., make the orbital plane rotate once per year), the cluster’s shape would get deformed slightly over the course of an orbit. This (predictable) drift can be compensated for via a small adjustment to cluster shape. A simplistic numerical calculation establishes that, for an example cluster as described, adjusting the axis-ratio to 2:1.0037 can reduce J2-drift to <3 m/s/year per km of maximal distance from reference orbit. A more in-depth analysis of differential accelerations (e.g., D’Amico36) suggests that formation flight should be feasible with only modest delta-v requirements beyond what would be needed for precise station-keeping of a single satellite.
+Detailed numerical modeling suggests that, under plausible assumptions for the degree of uncertainty of satellite position and velocity, unaccounted-for accelerations affecting satellites, differential drag, thruster minimum impulse bit, and thrust jitter, as well as atmospheric density under "calm" and "stormy" space weather conditions, keeping the inter-satellite neighbor distance drift always below 20% of the intended distances is doable with a delta-v budget of under 30 m/s/year (for formation maintenance) but will require careful implementation. Scaling the basic design to larger constellations by adding more clusters only incurs incremental per-satellite delta-v costs if satellites move out of the orbital reference plane. Otherwise, the same principles hold, and the requirements remain as above. For our intended target altitude, we find that during solar storms, residual atmospheric density is expected to increase so much that the (still manageable) daily delta-v requirements are so high that a substantial fraction of the stationkeeping delta-v can be provided by slight adjustments to the (net) thrust direction when replenishing kinetic energy lost due to atmospheric drag.
+TPU radiation testing
+COTS hardware has seen increasing use for space missions,37 such as the Mars Ingenuity helicopter.38 However, high-performance ML accelerators, which are characterized by a cutting-edge process node, large die size, and high floating-point operations per second (FLOPS) capability, represent a new frontier for COTS hardware in space. To address the question of their viability, Google’s V6e Trillium Cloud TPU with its associated AMD host server were tested using a 67 MeV proton beam (with the beam energy at the device under test being somewhat lower due to intervening materials; see methods) to simulate the operating conditions of sun-synchronous LEO. This work presents the first published radiation-testing results for such a device. For the target sun-synchronous LEO with significant shielding (e.g., 10 mm Al equivalent), the radiation environment is primarily composed of penetrating protons and galactic cosmic rays (GCRs),39 resulting in an estimated dose of ∼150 rad(Si)/year using industry-standard space radiation analysis tools.37 Radiation mainly causes (1) total ionizing dose (TID) effects, the cumulative build-up of charge in insulating layers leading to device degradation,40 and (2) single event effects (SEEs), which are instantaneous faults caused by a single energetic particle strike generating a dense track of electron-hole pairs.41 Sensitivity depends on the process node and cell libraries used and has historically decreased, but this trend does not hold beyond the 5 nm node.41 For TPUs to be useful for ML in space, they must survive the expected 5 year lifetime TID of ∼750 rad(Si), and SEEs must be at levels manageable through techniques like memory error correcting codes (ECCs). The 5 year lifetime roughly corresponds to the terrestrial cadence for replacing systems with new versions. Undetected SEEs are a particular concern for model training as undetected bit-flips can lead to silent data corruption (SDC). SDC may occur in any operating environment; SEE-induced SDCs are not the only cause.42 The covert nature of these errors requires careful calibration, detection, and correction techniques.
+Of the different elements of the Trillium TPU, the HBM subsystems exhibited the most sensitivity to TID. In our tests, HBM-specific stress tests began to show irregularities after a cumulative dose of 2 krad(Si), which is almost 3× our minimum requirement for TID survival of 750 rad(Si). All other tests, including end-to-end ML workloads and compute-centric tests, continued to operate correctly up to the maximum tested cumulative dose of 10 krad(Si) on a single chip. No hard failures were attributable to TID up to this level.
+Core logic and on-chip SRAM were the most SEE-sensitive components, primarily manifesting as SDC during end-to-end ML workloads. For typical transformer workloads, the observed SDC rate of approximately one event/17 rad, at an estimated orbital dose of 150 rad(Si)/year, translates to a very low failure probability on the order of 1 per 3 million inferences, assuming 1 inference per second. While this error rate is likely acceptable for inference, the impact of SEEs on training jobs, and the efficacy of system-level mitigations, requires further study. Radiation testing of the host system, with a focus on single event functional interrupts (SEFIs) that manifest as system crashes or reboots, suggests a rate of one such event per 450 rad(Si) for CPU and 400 rad(Si) for RAM.
+Launch cost analysis
+High launch costs have historically stymied efforts to harvest solar power in space on large scales.12 The below does not constitute a full economic analysis but gives proof points demonstrating that there is a feasible path for launch costs to drop sufficiently to a point that is no longer prohibitive. Further, $200/kg is often cited, by SpaceX and others, as a threshold beyond which launch could cease to be the limiting cost factor for ambitious programs.43,44,45
+We compared the kg/kW solar power (bus and payload) launched ratios for Starlink v2, Starlink v1, OneWeb, and Iridium satellites and found that, if LEO launch prices drop to $200/kg, we can project $/kW/year launched to LEO (“launched power price”) could be ∼$810/kW/year for a Starlink v2-type constellation (amortized over satellite lifetime), or ∼$810–$7,500/kW/year if we include a broader range of satellites with different mass/power ratios to serve varied use cases. For comparison, current power spend for terrestrial data centers in the US is reported to be ∼$570–$3,000/kW/year (depending on regional variation in power price and operator power usage effectiveness, or PUE46,47,48). Thus, if launch costs to LEO reach $200/kg, then the cost of launch amortized over spacecraft lifetime could be roughly comparable to data center energy costs on a per-kW basis.
+SpaceX launch pricing data and mass launched from Falcon 1 to Falcon Heavy (Figure 4) yields a ∼20% learning rate, meaning the price per kg falls by ∼20% for every doubling of cumulative mass launched (over all vehicle classes). If the learning rate is sustained—which would require ∼180 Starship launches/year—launch prices could fall to <$200/kg by ∼2035 (taking the initial $/kg price of Falcon Heavy as a starting point). While this would be a substantial achievement for SpaceX (particularly given the technological discontinuity inherent in switching to Starship), it is still far below stated launch targets for Starship. Even if this launch rate is reduced by ∼70%, prices could drop to $300/kg in the same time frame, which would still have a substantial impact on feasibility of large-scale constellations. Further, there is precedent for a sustained ∼20% learning rate over multiple decades in other advanced industries leveraging mass production (notably, solar panels).49 Given the long lead times required to reach scale for this type of ambitious project, it’s strategically beneficial to commence work on early milestones in anticipation of projected price declines.
+Figure viewer
+Figure 3 Evolution of the distance between central “reference” satellite S0 and its (direct and diagonal) nearest neighbors over the course of one orbit under the combined effect of Newtonian gravity and Earth’s J2 term
+Figure 4 SpaceX payload mass launched by lowest achieved price, inflation-adjusted, since the first successful Falcon 1 launch, for progressive rocket categories
+Show full captionFigure viewer
+Alternatively, our analysis of Starship 4 public specifications and data suggests that SpaceX launch costs to LEO may drop to ≲$60/kg (10× component reuse); if SpaceX’s 100× component reuse target were achieved, costs could reach ≲$15/kg (assuming LOX prices of $200/t and liquid methane prices ≲$700/t, given SpaceX will use liquid methane for Starship instead of kerosene-based RP-1 at $700/t,53 and liquid methane is less expensive than kerosene when comparing it on a $/megajoule basis54). Assuming 10× reuse and even the highest estimates of current SpaceX margins (up to 75%55), launch price to customers would drop to <$250/kg (although margins are currently supported by SpaceX’s near-monopoly and hence likely to decrease with the anticipated entry of competitors such as Blue Origin56). Realizing these projected launch costs is of course dependent on SpaceX and other vendors achieving high rates of reuse with large, cost-effective launch vehicles such as Starship.
+Discussion
+The results presented here are a first milestone toward scalable space-based AI; subsequent milestones involve testing aspects of the system in space (other Google/Alphabet research initiatives, such as Waymo and quantum computing, use similar milestone-based approaches). These initial results are an encouraging first step in assessing the feasibility of space-based ML compute at scale, addressing fundamental challenges in inter-satellite communication, orbital formation control, radiation hardness, and launch economics. Future space-based experimental milestones should also involve solutions for thermal management, high-bandwidth ground communications, and on-orbit reliability and repair strategies. In the supplemental information, we explore further work on orbital dynamics modeling.
+Effective thermal management is a critical optimization challenge for power-dense TPUs operating in a vacuum.
+A published ballpark figure for contemporary GPU/TPU power density is 90 W/cm2 for Nvidia’s H100,57 and ideally, silicon junction temperatures should be kept below 90∘C, while near a satellite radiator temperature of 50∘C, blackbody radiation decreases by about 1.2% per K of lower temperature, so the temperature differential between the very hot and compact computational cores and radiators needs to be engineered to be small. Heat pipes (for space applications often Al/ammonia but sometimes also Cu/water) typically play a key role in such designs, but thermal management is a major consideration for spacecraft design. A basic introduction to the topic is available, e.g., in Silk.58
+Managing potential failures and (relatedly) increasing reliability of compute in space will be critical. Currently, failed TPUs are manually replaced by technicians, which is relatively simple and low-cost on Earth but obviously impracticable in space. The simplest solution is redundant provisioning. There are also promising research programs aiming to increase system tolerance to faults affecting networking, e.g., via reduced communication.59
+Developing robust optical satellite-ground communications will also be critical for scaled operation but will necessitate overcoming challenges including atmospheric turbulence, high-speed relative motion errors, and precision beam tracking. This is an active field of development60,61 with the current leader, NASA’s TeraByte Infrared Delivery (TBIRD) mission, demonstrating 200 Gbps ground-LEO communications in 2023.62
+As noted, the formation flight discussed above is based on simulations, which include higher-order perturbations, such as irregularities in the Earth’s gravitational field. In addition to close formation flight, a real-world constellation would also need automated systems for avoidance of potentially hazardous debris based on reported conjunction alerts. The system would also require capabilities to de-orbit satellites where needed to comply with regulations and avoid creation of debris.
+Looking further ahead, while our proposed constellation design is naturally suited for growing clusters in space, unlocking the full potential of compute in orbit will likely require new design approaches for individual satellites. While we anticipate launch costs to continue to decrease as the industry scales, the floor on fuel price means that there will always be an incentive to minimize mass. Our system design work to this point assumes a relatively conventional, discrete compute payload, satellite bus, thermal radiator, and solar panel design. However, as has been seen in other industries (such as smartphones), massively scaled production motivates highly integrated designs (such as the system on chip, or SoC). Eventually, scaled space-based computing would similarly involve an integrated compute, radiator, and power design based on next-generation architectures, such as computational substrates based on neural cellular automata.63 There are clear environmental benefits to minimizing AI’s terrestrial footprint,18 but a full life cycle assessment (LCA) is outside the scope of this work, and the environmental impacts of moving compute to orbit would be a worthy subject for future research. Some aspects of this analysis will be similar to the terrestrial case, but others, such as rocket launch and re-entry and satellite demise, will be unique to space.64,65
+It will also be critical to progress this work responsibly by avoiding debris creation and adhering to regulations governing large-scale constellations.
+Conclusions
+As terrestrial data centers continue to benefit from significant advances in efficiency and renewable integration, space offers an environment for compute that scales beyond planetary surface constraints.
+The preliminary results we describe on TPU-based satellite clusters are the beginning of unlocking the potential of space-based data centers. Realizing the full scope of this ambitious vision will require sustained research, iterative refinement of our design, and the achievement of several critical future milestones.
+Methods
+Orbital dynamics analysis
+In order to establish potential feasibility of a given formation flight proposal, it is generally useful to start from some analytically tractable simplifying model, such as the Hill-Clohessy-Wiltshire equations,33 that describe orbital motion of a satellite relative to a circular reference orbit in a Keplerian approximation to leading order in relative positions and velocities—or more refined generalizations such as the Tschauner-Hempel equations (for arbitrary eccentricity)34 or Vinti theory32 (taking the J2 earth oblateness contribution into account). If a promising approach can be identified based on such analytic methods, it makes sense to then explore the nature and magnitude of corrections caused by further physical effects that are understood but more difficult to model analytically in order to see if they are compatible with reasonable mission delta-v budgets. Here, the two main approaches are perturbation theory and numerics. They can be used independently, such as to validate one another’s predictions, and often also in conjunction. This leads to advanced numerical methods for formation flight planning.
+An overview over the relative importance of non-Keplerian contributions to satellite acceleration can be found in textbooks such as Montenbruck and Gill.66 For formation flight, the most important question is how various physical effects affect different satellites in a close-proximity constellation differently. At the envisioned altitude, the by far most important such effect is expected due to the J2 term of the geopotential and potentially differential atmospheric drag. Effects such as lunar tides will be strongly suppressed by very small factors such as rcluster/dmoon.
+For this feasibility study, we determined promising-looking formation flight patterns by starting from the basic Hill-Clohessy-Wiltshire approximation, then mostly handling the adjustments needed to apply them to a sun-synchronous cluster orbit perturbatively and obtaining results via numerical simulation. Care needs to be taken to retain good control of numerical accuracy. With a model that only involves accelerations with numerically benign behavior, computing orbits to centimeter accuracy vs. orbital diameters of order-of-magnitude 107 meters requires results to be correct to at least nine decimal digits. While the discrepancy between such numerical modeling and real-world physics may well be substantially larger than this accuracy target, having good numerical accuracy for models with simplified physics matters for objectives such as estimating the magnitude of some physical effect via a fully numerical rather than a hybrid numerical-plus-perturbative approach.
+Fast and performant (such as GPU-based) floating-point arithmetic generally only supports up to binary64 floating-point representations, which give us just short of 16 decimal digits of precision. This strongly suggests use of a high order ODE integration scheme. For this exploration, we use the eighth-order Runge-Kutta DOP853 method provided by SciPy’s scipy.integrate.solve_ivp function.
+Inter-satellite link analysis
+The feasibility of high-bandwidth, short-range ISLs was assessed through link budget analysis. The achievable data rate of a photon-limited optical link is directly proportional to the received signal power, assuming a constant number of photons per bit (PPB) required for a given modulation scheme. In the far field, the received power scales inversely with the square of the distance (Pr∝1/d2) due to beam divergence for a fixed transmitter power and aperture size. This relationship, and the resulting impact on maximum bandwidth for different modulation schemes, is plotted in Figure 1.
+A survey of currently available and announced commercial OISL technologies reveals they are typically designed for link distances of thousands of kilometers, offering maximum data rates ranging from 1 Gbps to 100 Gbps. For example, Starlink’s system operates at ∼100 Gbps over distances up to ∼5,400 km, limited by line-of-sight distances in LEO. These systems (shown in the lower right of Figure 1) do not meet the multi-Terabit-per-second requirements for tightly coupled ML clusters.
+Our approach leverages the enhanced link budget at short distances to employ multi-channel DWDM systems using high-spectral-efficiency coherent transceivers. These are commercially available, e.g., 400G transceivers using PM 16-QAM modulation. Deploying these on a 100 GHz ITU frequency grid, a single aperture could support 24 channels (half of the C-band), yielding 9.6 Tbps bidirectional bandwidth. A tighter 75 GHz grid spacing could potentially support 12.8 Tbps per aperture. Such transceivers typically require a received power on the order of −20 dBm per channel,67 totaling approximately 0.24 mW for a 24-channel system. For the confocal case (a = 5 cm, d = 5 km), limiting beam wander to 10% of the aperture radius requires a pointing accuracy of ∼1.0 μrad, well within the demonstrated capability of commercial optical ISL terminals that routinely operate at distances of thousands of kilometers.
+In the far field, the received signal power (PR) is estimated using the Friis transmission formula for free-space optics
+𝑃
+𝑅
+=
+𝑃
+𝑇
+·
+𝐺
+𝑇
+·
+𝐺
+𝑅
+·
+(
+𝜆
+4
+𝜋
+𝑑
+)
+2
+·
+𝐿
+other
+(Equation 1)
+where PT is the transmitted power (assumed to be 5W from a commercial EDFA); Gt and Gr are the transmitter and receiver antenna gain (both 105.1dB, assuming ∼80% aperture efficiency for a 10 cm diameter telescope); λ is the wavelength (1.55 μm); d is the inter-satellite distance; and Lother captures other losses (−3dB). The beam divergence angle (θ) for a diffraction-limited aperture at 1.55 μW is approximately θ ≈ 1.22λ/D ≈ 1.22×(1.55 × 10-6m)/0.1 m ≈ 18.9 μrad. To illustrate the power constraints of existing long-range systems, consider a typical LEO-LEO link distance of 5,000 km. At this distance, the beam spot radius is at least 95 meters, and the best case received power is 1.6 μW.
+For the short-range, high-bandwidth links central to our spatially multiplexed design, a near-field model provides a useful approximation. In a symmetric confocal system where the beam waist is located midway between the two transceivers, the link distance (L) for a given beam radius (a) at the optics is given by L = πa2/λ. For example, for a 10 cm diameter beam at the optics (a = 5 cm) and a wavelength of 1.55μm, the link distance for this system is approximately 5 km under best-case conditions (ignoring beam quality, aperture truncation, and pointing jitter). This near-field analysis also shows that at kilometer-scale distances, minimum required aperture size for a single link scales with the square root of the distance. Consequently, more independent links can be packaged into a fixed total area as the distance decreases, causing the total bandwidth available via spatial multiplexing to scale inversely with distance.
+The PPB requirements for different schemes, shown as lines in Figure 1, illustrate the trade-off between distance and maximum achievable bandwidth. They were estimated as ∼71 PPB for on-off keying (OOK)68 and ∼196 PPB for PM 16-QAM,67 as this coherent scheme requires a higher signal-to-noise ratio. This compares to the Shannon-Hartley limit of ∼1.39 PPB, calculated in the infinite bandwidth, shot-noise limit as 2 × ln(2)). We assumed the use of standard C-band and L-band wavelengths, consistent with mature DWDM technology.
+TPU radiation testing procedure
+Facility and beam
+Testing was conducted at the UC Davis Crocker Nuclear Laboratory, utilizing their 76-inch cyclotron to produce a 67 MeV proton beam. A large 8 cm diameter aperture was used to ensure uniform irradiation of the entire TPU package, including the logic die and HBM stacks. Beam intensities ranged from 2 pA (∼2 rad/min) to 1 nA (1 krad/min).
+Test rig and beam path
+A standard TPU system was tested with heatsinks installed to permit full-power operation. To avoid beam obstruction by the primary topside heatsink, chips were irradiated from the underside. The proton beam traversed the chassis (∼1 mm Al), a secondary heatsink assembly, and the printed circuit board (PCB) before reaching the silicon die, which is directly bonded to the PCB. The secondary heatsink was modified to ensure uniform irradiation of the chip.
+Beam energy considerations
+The range of 67 MeV protons, calculated using the NIST PSTAR database,69 is approximately 18 mm in aluminum and 6.5 mm in copper. Therefore, while most of the proton flux will reach the die (confirmed by imaging through the complete assembly with gafchromic film70), the energy spectrum incident is not monoenergetic 67 MeV but is lower and spread out due to energy loss and straggling within the heatsink material. Additionally, nuclear interactions within the heatsink materials will generate secondary particles (neutrons, gammas, etc.), contributing to the radiation environment experienced by the device under test.
+Software suite
+Subsystems were stressed with a diverse software suite to assess different vulnerabilities. This included memory stress tests targeting the HBM with various read/write patterns, compute-centric tests focusing on the core tensor computation units with minimal HBM traffic, and an end-to-end ML workload running a transformer model to simulate realistic operational stress. The memory tests were configured to log errors and continue, while the compute-centric and end-to-end tests were set to halt on the first significant error to establish dose-to-failure thresholds.
+Data analysis
+To estimate proton-induced SEE cross-sections, we used the beam characteristics provided by the facility and dose measurements. A dose of 1 rad corresponds to a proton fluence of approximately 7.9×106 protons/cm2. The per-chip cross-section (σ) was calculated as σ ≈ 1.27 × 10−7/Dcm2/chip, where D is the dose per event in rad.
+Core logic and on-chip SRAM were the most SEE-sensitive components, primarily manifesting as SDC during end-to-end test execution. The characteristic dose for SDC averaged between 14.4 rad and 20 rad per event depending on the specific workload. This corresponds to a cross-section of approximately 6 × 10−9 to 9 × 10−9cm2/chip.
+HBM errors manifested as uncorrectable ECC errors (UECCs), causing test halts. The characteristic dose for HBM UECC was approximately 44 rad per event (averaged over 203 events). This corresponds to a cross-section of approximately 3 × 10−9cm2/chip. System-level crashes, indicative of SEFIs, were observed on average once per 5 krad of dose per chip. This translates to a SEFI cross-section of approximately 2 × 10−11cm2/chip.
+It is important to note that HBM correctable error (CECC) counts were not reliably available for this analysis, as single-bit CECCs are only reported by the HBM firmware above a non-configurable, vendor-specific threshold. Thus, a precise in-test CECC to UECC ratio for HBM could not be determined. However, instances of data mismatches occurring without corresponding UECC flags solidly demonstrate that SDCs originating in the logic and SRAM dominate the observed soft error rate for the SoC.
+Launch cost analysis
+We projected launch prices via two methods: learning curve projection and analysis of planned Starship 4 specifications and reuse targets. While there is inherent uncertainty (e.g., in future regulatory obstruction, competitive dynamics from new entrants into the launch market, and unforeseen technical challenges), both methods support our conclusion that reaching customer prices of ≲$200/kg by mid 2030s is plausible under reasonable assumptions for reuse and cumulative mass launched during the time. We stress that the following is not intended as a comprehensive economic feasibility study but rather a high-level evaluation of the potential for launch costs, specifically, to affect the viability of our proposal.
+Sustaining high learning rates over time is obviously challenging, but there are multiple precedents across other advanced industries, e.g., shipbuilding and aerospace.71 In addition, solar panels provide a particularly striking, canonical example of a sustained ∼20% learning rate for over 40 years.49
+Sustaining high growth in launched mass rates (and attendant price decline) is unlikely without large-scale, non-SpaceX commercial constellations driving demand.72,73 Scaling ML in space would be one such use case, providing consistent demand for Starship (or Starship-class) launches.
+Our learning curve analysis was based on publicly available historical SpaceX data. When Falcon 1 launched, SpaceX launch prices were ≳$30,000/kg (inflation adjusted),74 dropping to ∼$1,800/kg for Falcon Heavy over the course of <100 successful launches,75 or ∼400 t cumulative mass launched (Figure 4). The introduction of Falcon Heavy yielded a precipitous price decrease compared to Falcon 9, driven by improved economics from a heavier launch. Note that learning curve estimates are highly sensitive to input assumptions (e.g., source for price data, whether the chosen starting point is the first successful Falcon 1 launch, the Falcon 9, or even the reusable Falcon 9 configuration), but a variety of choices all yield results ∼18%–24%.
+Maintaining SpaceX’s ∼20% learning rate (based on launched mass) through new generations of launch vehicles, reaching <$200/kg by ∼2035 would require launching ∼370,000 t additional cumulative mass, equivalent to ∼1,800 Starship launches (assuming 200 t capacity (original specs76 and updated specs77). This is an ambitious target, but the required ∼180 Starship launches/year (on average, although there will almost certainly be a ramp-up period in reality) would fall well below stated launch rate targets.78 Conversely, reaching this target is unlikely without Starship-like launch vehicles, due to Falcon payload volume limitations. We also stress that the calculation of required launched mass to reach our price target is highly sensitive to chosen initial conditions. We have selected the introduction of Falcon Heavy (i.e., ∼$1,800/kg and ∼400 t cumulative mass launched) as our starting point, on the basis that, while all price trajectories are inherently highly uncertain and subject to market forces (such as the entry—or not—of competitors), price at the introduction of a new launch vehicle represents a critical inflection point and is likely tied to some underlying economic reality. In the above analysis, we are not trying to predict the actual future price of launch but rather making a reasonable assessment of what the underlying economics could theoretically support.
+As an alternative method, we calculated costs (to SpaceX) for Starship 4, leveraging recently released reuse targets, as well as plans for payload size, Raptor engine count, and rocket dimensions.77 Other inputs, e.g., refurbishment costs as a fraction of vehicle costs (∼1%79) and failure rates, were extrapolated from existing Falcon 9 data.55,79,80 Without assuming any reduction in fuel cost, component reuse drives down projected SpaceX launch costs from ∼$460/kg (no reuse) to <∼$15/kg (100× reuse of all components). Increasing refurbishment costs to 15%, as a sensitivity analysis, yields costs of $38/kg (100× reuse of all components). Eventually, fuel costs (LOX and liquid methane for Starship), estimated at ∼$8/kg,53,81 will provide a floor on costs. We note that this analysis was based on relatively conservative assumptions, e.g., we used published Raptor 3 engine specifications, not any speculative claims for future engine generations. We also acknowledge the potential pitfalls of using Falcon 9 data to project trends for Starship, but the intent is to provide an indicative projection based on public data points, which we will update as more information becomes available.
+The primary ingredients to run compute are power, infrastructure, and chips. To compare annualized cost per unit of power for space and terrestrial data centers, we examine the launch costs for several satellite types, in terms of $/kW launched to LEO (launched power price). A strict like-for-like comparison of satellite and terrestrial costs would require more precise costs for satellite design, but we can make an approximate comparison between data center power costs and the launched power price. We do not include infrastructure or building costs, since this is distinct from power or chip costs, since these will arise for both space and terrestrial configurations.
+For the following analysis, we use current launch price $3,600/kg, based on Falcon 9 (reusable configuration), since that is used for the Starlink constellation,82,83 and “potential” price $200/kg. Note that we based this analysis purely on SpaceX data since they are by far the leading launch provider. Other incumbent and new entrants into the market (e.g., RocketLab and Blue Origin) are likely only to hasten price declines via competition and erosion of high SpaceX margins.55
+Starlink is the best-in-class proxy as the largest constellation in orbit. The new v2 mini satellites weigh 575 kg (optimized design84). Exact specifications have not been publicly released by SpaceX, but photometric and other analyses yield solar panel area ∼105 m2.12,85 Assuming 22% solar panel efficiency, 1.361kW/m2 solar insolation and 90% packing area for square cells,86,87,88 we obtain ∼28 kW/satellite. Amortized over a 5 year lifespan,89 we obtain a launched power price of $14,700/kW/year (current prices), falling to $810/kW/year if launch drops to $200/kg. We performed similar calculations for Starlink 1, OneWeb, and Iridium NEXT satellites (see Table 1), yielding a launched power price range (for launch prices $200/kg to LEO) of $810–$7,500/kW/year. Note that this extremely large range is at least partially driven by differences in use case and resulting optimization priorities across satellite programs, which in turn affects design decisions and kg/kW ratio.
+Satellite	Mass (kg)	Power (kW)	Lifespan (year)	Launched power at $3,600/kg ($/kW/year)	Launched power at $200/kg ($/kW/year)
+Starlink v2 mini [opt.]	575	28 [est.]	5	$14,700	$810
+Starlink v1	260	7 [est.]	5	$26,600	$1,470
+OneWeb	15090	0.891	5	$135,800	$7,500
+Iridium	86092	293	12.5	$124,600	$6,900
+Table 1
+Launched power prices for a range of LEO satellites
+Open table in a new tab
+By comparison, terrestrial power costs for ML-capable data centers in the US are reported to be $0.06–$0.25/kWh46 and PUE ranges ∼1.09–1.4,47,48 which yields annual power spend of $570–$3,000/kW/year. That is, if launch costs reach ≲$200/kg, annualized cost per unit of power in space could be approximately comparable to terrestrial spend. If, instead, 104,000 t are launched (a 72% decrease from the above target), prices could be ∼$300/kg by the mid 2030s. The launched power price for a constellation of Starlink v2 mini satellites would then be ∼$1,200/kW/year, still within range of terrestrial annual power prices.
+Resource availability
+Lead contact
+Requests for further information and resources should be directed to and will be fulfilled by the lead contact, Jessica V. Bloom (jessicavbloom@google.com).
+Materials availability
+This study did not generate new, unique materials.
+Data and code availability
+•	
+Non-proprietary data reported in this paper will be shared by the lead contact upon reasonable request.
+•	
+Original code in this paper is proprietary.
+•	
+Any additional information required to reanalyze the data reported in this paper is available from the lead contact upon request, subject to proprietary restrictions.
+Acknowledgments
+We thank Amaan Pirani for critical contributions to cost modeling and overall feasibility analysis, Marcin Kowalczyk for independent numerical validation calculations, Paul Epp and Stephen Palese for input on the ISL concept, Thomas Zurbuchen for his contributions to the systems and architecture concepts, and Kenny Vassigh and Jerry Chiu for technical input on system and thermal design. We also thank Muon Space for general discussions and for technical and economic feasibility analysis of the concept.
+Author contributions
+These authors contributed equally: B.A.A., T.B., M.B., J.V.B., T.F., K.G., U.K., and R.P. B.A.A. conceived of this overall project. T.F. developed the orbital dynamics and formation flight work. U.K. and R.P. designed and performed the radiation testing. J.V.B. conducted the launch cost analysis. J.V.B., U.K., and T.B. prepared and proofread the manuscript. K.G. and U.K. conducted the inter-satellite link analysis. T.B. and M.B. developed the system design overview. J.M. provided overall guidance and supervision to the project.
+Declaration of interests
+B.A.A., T.B., T.F., U.K., M.B., J.V.B., and K.G. are listed as inventors on patent applications filed by Google LLC, which pertain to this work. B.A.A., T.B., M.B., J.V.B., T.F., K.G., U.K., R.P., and J.M. are employees and shareholders of Google.
+Declaration of generative AI and AI-assisted technologies in the writing process
+During the preparation of this work, the authors used Google Gemini for drafting text, style advice, and also for adversarial internal pre-review. The for-publication version of the manuscript was then subjected to a final internal review process that is designed to ensure that every claim was verified by at least two authors, without use of AI assistance. The authors take full responsibility for the content of the published article.
+Supplemental information (2)
+Download all
+PDF (71.13 KB)
+Document S1. Supplemental notes
+PDF (5.16 MB)
+Document S2. Article plus supplemental information
+References
+1.
+Vaswani, A. ∙ Shazeer, N. ∙ Parmar, N. ...
+Attention is all you need
+Guyon, I. ∙ Von Luxburg, U. ∙ Bengio, S. ... (Editors)
+Advances in Neural Information Processing Systems 30
+Curran Associates, Inc., 2017; 5998-6008
+Google Scholar
+2.
+Bahdanau, D. ∙ Cho, K. ∙ Bengio, Y.
+Neural machine translation by jointly learning to align and translate
+Preprint at arXiv. 2014;
+Crossref
+Google Scholar
+3.
+Elsworth, C. ∙ Huang, K. ∙ Patterson, D. ...
+Measuring the environmental impact of delivering AI at Google scale
+Preprint at arXiv. 2025;
+Crossref
+Scopus (0)
+Google Scholar
+4.
+Terrell, M.
+New nuclear clean energy agreement with Kairos Power
+https://blog.google/company-news/outreach-and-initiatives/sustainability/google-kairos-power-nuclear-energy-agreement/
+Date: 2024
+Google Scholar
+5.
+Commonwealth Fusion Systems (2025). Google and Commonwealth Fusion Systems Sign Strategic Partnership. https://cfs.energy/news-andmedia/google-and-commonwealthfusion-systems-sign-strategicpartnership.
+Google Scholar
+6.
+Terrell, M.
+A first-of-its-kind geothermal project is now operational
+https://blog.google/company-news/outreach-and-initiatives/sustainability/google-fervo-geothermal-energy-partnership/
+Date: 2023
+Google Scholar
+7.
+Baily, M. ∙ Byrne, D. ∙ Kane, A. ...
+Generative AI at the crossroads: Light bulb, dynamo, or microscope?
+Preprint at arXiv. 2025;
+Crossref
+Scopus (0)
+Google Scholar
+8.
+Gohr, C. ∙ Rodríguez, G. ∙ Belomestnykh, S. ...
+Artificial intelligence in sustainable development research
+Nat. Sustain. 2025; 8:970-978
+Crossref
+Scopus (75)
+Google Scholar
+9.
+McDuff, D. ∙ Schaekermann, M. ∙ Tu, T. ...
+Towards accurate differential diagnosis with large language models
+Nature. 2025; 642:451-457
+Crossref
+Scopus (211)
+PubMed
+Google Scholar
+10.
+Jumper, J. ∙ Evans, R. ∙ Pritzel, A. ...
+Highly accurate protein structure prediction with alphafold
+nature. 2021; 596:583-589
+Crossref
+Scopus (35753)
+PubMed
+Google Scholar
+11.
+Glaser, P.E.
+Power from the sun: Its future
+Science. 1968; 162:857-861
+Crossref
+Scopus (981)
+PubMed
+Google Scholar
+12.
+Rodgers, E. ∙ Sotudeh, J. ∙ Mullins, C. ...
+Space based solar power
+AIAA AVIATION FORUM AND ASCEND 2024. 2024;
+Crossref
+Scopus (14)
+Google Scholar
+13.
+Kruft, B.
+A techno-economic analysis of space-based solar power systems
+Jr. Manag. Sci. 2023; 732-771
+Google Scholar
+14.
+Sengupta, M. ∙ Xie, Y. ∙ Lopez, A. ...
+The national solar radiation data base (NSRDB)
+Renew. Sustain. Energy Rev. 2018; 89:51-60
+Crossref
+Scopus (1253)
+Google Scholar
+15.
+Mizrahi, O.S. ∙ Jahelka, P. ∙ Gdoutos, E. ...
+Space solar power generation: A viable system proposal and technoeconomic analysis
+Joule. 2025; 9, 101928
+Full Text
+Full Text (PDF)
+Scopus (18)
+PubMed
+Google Scholar
+16.
+Bhattacherjee, D. ∙ Kassing, S. ∙ Licciardello, M. ...
+In-orbit computing: An outlandish thought experiment?
+Proceedings of the 19th ACM Workshop on Hot Topics in Networks. 2020;
+Crossref
+Scopus (138)
+Google Scholar
+17.
+Denby, B. ∙ Lucia, B.
+Orbital edge computing: Nanosatellite constellations as a new class of computer system
+Proceedings of the Twenty-Fifth International Conference on Architectural Support for Programming Languages and Operating Systems. 2020;
+Crossref
+Scopus (302)
+Google Scholar
+18.
+Aili, A. ∙ Choi, J. ∙ Ong, Y.S. ...
+The development of carbon-neutral data centres in space
+Nat. Electron. 2025; 8:1016-1026
+Crossref
+Scopus (13)
+Google Scholar
+19.
+Jouppi, N.P. ∙ Yoon, D.H. ∙ Ashcraft, M. ...
+Ten lessons from three generations shaped Google’s TPUv4i: Industrial product
+2021 ACM/IEEE 48th Annual International Symposium on Computer Architecture (ISCA). 2021;
+Crossref
+Scopus (437)
+Google Scholar
+20.
+Makhija, P.
+TPU rack overview
+https://hc2025.hotchips.org/assets/program/tutorials/HC2025.T1DCRacks.S7.Pankaj.pdf
+Date: 2025
+Google Scholar
+21.
+Rainbow, J.
+Aalyria hits $1.3 billion valuation after raising funds for satellite mesh network
+Space News. 2026;
+February 26, 2026 https://spacenews.com/aalyria-hits-1-3-billion-valuation-after-raising-funds-for-satellite-mesh-network/
+Google Scholar
+22.
+Pryce-Jones, O. ∙ Fowler, S. ∙ Davies, R. ...
+Testing a small, deployable, optical ground terminal for leo to ground laser communications
+SPIE. 2025; 13355:579-586
+Crossref
+Scopus (4)
+Google Scholar
+23.
+Rotherham, E. ∙ Casey, C. ∙ Rodriguez, E.F. ...
+Advancing free-space optical communication system architecture: Performance analysis of varied optical ground station network configurations
+Preprint at arXiv. 2024;
+Crossref
+Scopus (0)
+Google Scholar
+24.
+Gupta, D., and Krishnan, M. (2025). From silicon to softmax: Inside the Ironwood AI stack. https://cloud.google.com/blog/products/compute/inside-the-ironwood-tpu-codesigned-ai-stack.
+Google Scholar
+25.
+Zacarias, F.V., Grevelink, E., Palli, K., and Vazhkudai, S. A memory perspective: The effects of fine-tuning LLMs with high–bandwidth memory. (2025). https://assets.micron.com/adobe/assets/urn:aaid:aem:ec04af38-a909-450a-b66a-07f69d89b027/original/as/llmtraining-engineering-report.pdf.
+Google Scholar
+26.
+Woollacott, E.
+The plans to put data centres in orbit and on the moon
+BBC News. 2025;
+April 9, 2025 https://www.bbc.com/news/articles/cjewvpkw7weo
+Google Scholar
+27.
+Feilden, E., Oltean, A., and Johnston, P. Why we should train AI in space. (2025). https://starcloudinc.github.io/wp.pdf.
+Google Scholar
+28.
+Singh, A. ∙ Ong, J. ∙ Agarwal, A. ...
+Jupiter Rising: A Decade of Clos Topologies and Centralized Control in Google’s Datacenter Network
+SIGCOMM Comput. Commun. Rev. 2015; 45:183-197
+Crossref
+Google Scholar
+29.
+Jouppi, N. ∙ Kurian, G. ∙ Li, S. ...
+TPU v4: An optically reconfigurable supercomputer for machine learning with hardware support for embeddings
+Proceedings of the 50th Annual International Symposium on Computer Architecture. 2023;
+Crossref
+Scopus (348)
+Google Scholar
+30.
+Urata, R. ∙ Liu, H. ∙ Yasumura, K. ...
+Mission apollo: landing optical circuit switching at datacenter scale
+Preprint at arXiv. 2022;
+Crossref
+Scopus (0)
+Google Scholar
+31.
+Schweighart, S.A. ∙ Sedwick, R.J.
+High-fidelity linearized j model for satellite formation flight
+J. Guid. Control Dyn. 2002; 25:1073-1080
+Crossref
+Scopus (398)
+Google Scholar
+32.
+Vinti, J.P.
+Theory of an accurate intermediary orbit for satellite astronomy
+J. Res. Natl. Bur. Stan. Sect. B Math. Math. Phys. 1961; 65B:169-202
+https://nvlpubs.nist.gov/nistpubs/jres/65B/jresv65Bn3p169_A1b.pdf
+Crossref
+Google Scholar
+33.
+Clohessy, W.H. ∙ Wiltshire, R.S.
+Terminal guidance system for satellite rendezvous
+J. Aero. Sci. 1960; 27:653-658
+Crossref
+Google Scholar
+34.
+Tschauner, J. ∙ Hempel, P.
+Rendezvous zu einem in elliptischer Bahn umlaufenden Ziel [Rendezvous with a Target in an Elliptical Orbit]
+Astronaut. Acta. 1965; 11:104-109
+Google Scholar
+35.
+Kong, E.M.C. ∙ Kwon, D.W. ∙ Schweighart, S.A. ...
+Electromagnetic formation flight for multisatellite arrays
+J. Spacecr. Rockets. 2004; 41:659-666
+URL: https://arc.aiaa.org/doi/10.2514/1.2172
+Crossref
+Scopus (127)
+Google Scholar
+36.
+D’Amico, S.
+Autonomous Formation Flying in Low Earth Orbit
+PhD thesis Delft University of Technology, 2010
+PhD thesis https://elib.dlr.de/63481/1/Damico_PhD_01022010.pdf
+Google Scholar
+37.
+Sinclair, D. ∙ Dyer, J.
+Radiation effects and COTS parts in smallsats
+27th Annual AIAA/USU Conference on Small Satellites.Utah State University, 2013
+Google Scholar
+38.
+Balaram, B., Canham, T., Duncan, C., Grip, H.F., Johnson, W., Maki, J., Quon, A., Stern, R., and Zhu, D. (2018). Mars helicopter technology demonstrator. In https://ntrs.nasa.gov/citations/20190026832.
+Google Scholar
+39.
+Barth, J.L. ∙ Dyer, C.S. ∙ Stassinopoulos, E.G.
+Space, atmospheric, and terrestrial radiation environments
+IEEE Trans. Nucl. Sci. 2003; 50:466-482
+Crossref
+Google Scholar
+40.
+Schwank, J.R. ∙ Shaneyfelt, M.R. ∙ Fleetwood, D.M. ...
+Radiation effects in MOS oxides
+IEEE Trans. Nucl. Sci. 2008; 55:1833-1853
+Crossref
+Google Scholar
+41.
+Xiong, Y. ∙ Pieper, N.J. ∙ Feeley, A.T. ...
+Single-event upset cross-section trends for d-ffs at the 5- and 7-nm bulk finfet technology nodes
+IEEE Trans. Nucl. Sci. 2023; 70:381-386
+Crossref
+Scopus (30)
+Google Scholar
+42.
+Dixit, H.D. ∙ Pendharkar, S. ∙ Beadon, M. ...
+Silent data corruptions at scale
+Preprint at arXiv. 2021;
+Crossref
+Google Scholar
+43.
+Janson, S.
+Equatorial low earth orbit (ELEO): An orbital incubator and nursery
+38th Annual Small Satellite Conference.Utah State University, 2024
+Google Scholar
+44.
+Coopersmith, J.
+The cost of reaching orbit: Ground-based launch systems
+Space Policy. 2011; 27:77-80
+Crossref
+Scopus (24)
+Google Scholar
+45.
+Davis, M.
+The Starship revolution in space
+2024
+https://www.aspistrategist.org.au/the-starship-revolution-in-space/
+Google Scholar
+46.
+Wilson, M.
+Data center rack power costs: A condensed analysis
+2025
+https://www.nlyte.com/blog/data-center-rack-power-costs-a-condensed-analysis/
+Google Scholar
+47.
+Shehabi, A. ∙ Smith, S.J. ∙ Hubbard, A. ...
+2024 United States Data Center Energy Usage Report
+https://eta-publications.lbl.gov/sites/default/files/2024-12/lbnl-2024-united-states-data-center-energy-usage-report_1.pdf
+Date: 2024
+Google Scholar
+48.
+Google Cloud Team
+Measuring the environmental impact of AI inference
+2025
+https://cloud.google.com/blog/products/infrastructure/measuring-the-environmental-impact-of-ai-inference/
+Google Scholar
+49.
+Nijsse, F.J.M.M. ∙ Mercure, J.F. ∙ Ameli, N. ...
+The momentum of the solar energy transition
+Nat. Commun. 2023; 14:6542
+Crossref
+Scopus (373)
+PubMed
+Google Scholar
+50.
+Next Spaceflight (2025). Launches. https://nextspaceflight.com/launches/.
+Google Scholar
+51.
+Jones, H.W. (2018). The recent large reduction in space launch cost.https://ntrs.nasa.gov/citations/20200001093.
+Google Scholar
+52.
+McDowell, J. (2025). Jonathan’s Space Report (JSR). https://planet4589.org/space/jsr/jsr.html.
+Google Scholar
+53.
+Cunningham, E. (2023). Where does SpaceX get their rocket fuel? https://primalnebula.com/where-does-spacex-get-their-rocket-fuel/. .
+Google Scholar
+54.
+Daswani, P., Armitage, C.J., McBain, A., Burgess, S., Harchandani, A.B., Islam, T., Nemoto, A., Pejaver, N., Ping, J., Ravi, E. et al. Space: The dawn of a new age. (2022). https://www.citifirst.com.hk/home/upload/citi_research/AZRDK.pdf.
+Google Scholar
+55.
+Shah, N.K.
+SpaceX’s true achievement: Cost reduction opens up room for extraterrestrial innovation
+https://www.wral.com/business/technology/spacex-cost-reduction-innovation-october-2024/
+Date: 2024
+Google Scholar
+56.
+Skibba, R.
+Rivals are rising to challenge the dominance of SpaceX
+April 3, 2025 MIT Technology Review. 2025;
+April 3, 2025 https://www.technologyreview.com/2025/04/03/1114198/rivals-are-rising-to-challenge-the-dominance-of-spacex/
+Google Scholar
+57.
+Andersch, M., Palmer, G., Krashinsky, R., Stam, N., Mehta, V., Brito, G., and Ramaswamy, S. (2022). NVIDIA hopper architecture in-depth. https://developer.nvidia.com/blog/nvidia-hopper-architecture-in-depth/.
+Google Scholar
+58.
+Silk, E.
+Introduction to Spacecraft Thermal Design
+Cambridge University Press, 2020
+Crossref
+Scopus (17)
+Google Scholar
+59.
+Douillard, A. ∙ Feng, Q. ∙ Rusu, A.A. ...
+Diloco: Distributed low-communication training of language models
+Preprint at arXiv. 2023;
+Crossref
+Scopus (0)
+Google Scholar
+60.
+CAILABS Marketing Team
+Successful initial tests of the KERAUNOS optical communications satellite
+https://www.cailabs.com/news/aerospace-and-defense/successful-initial-tests-of-the-keraunos-optical-communications-satellite/
+Date: 2024
+Google Scholar
+61.
+Gaines, A.
+New communications system achieves fastest laser link from space yet
+November 30, 2022 MIT News. 2022;
+November 30, 2022 https://news.mit.edu/2022/communications-system-achieves-fastest-laser-link-space-yet-1130
+Google Scholar
+62.
+Riesing, K., Schieler, C., Bilyeu, B., Chang, J., Garg, A., Gilbert, N., Horvath, A., Reeves, R., Robinson, B., Wang, J. et al. (2023). Operations and results from the 200 Gbps TBIRD laser communication mission.https://ntrs.nasa.gov/citations/20230007959.
+Google Scholar
+63.
+Mordvintsev, A. ∙ Randazzo, E. ∙ Niklasson, E. ...
+Growing neural cellular automata
+Distill. 2020;
+Crossref
+Google Scholar
+64.
+Barker, C.R. ∙ Marais, E.A. ∙ McDowell, J.C.
+Global 3D rocket launch and re-entry air pollutant and CO2 emissions at the onset of the megaconstellation era
+Sci. Data. 2024; 11:1079
+Crossref
+Scopus (27)
+PubMed
+Google Scholar
+65.
+Ryan, R.G. ∙ Marais, E.A. ∙ Balhatchet, C.J. ...
+Impact of rocket launch and space debris air pollutant emissions on stratospheric ozone and global climate
+Earths Future. 2022; 10, e2021EF002612
+Crossref
+Scopus (124)
+PubMed
+Google Scholar
+66.
+Montenbruck, O. ∙ Gill, E.
+Satellite Orbits: Models, Methods and Applications
+Springer, 2013
+Crossref
+Google Scholar
+67.
+FS (2024). CFP2-DCO-400G-D Data Sheet https://Resource.Fs.Com/Mall/Resource/Cfp2-Dco-400g-D-Data-Sheet.Pdf.
+Google Scholar
+68.
+Laube, S.M. ∙ Gasser, C. ∙ Schneider-Hornstein, K. ...
+APD direct detection receiver OEIC operating 14.1 db above the shot noise quantum limit
+Opt. Express. 2025; 33:45337-45345
+Crossref
+Scopus (3)
+PubMed
+Google Scholar
+69.
+Berger, M.J. ∙ Coursey, J.S. ∙ Zucker, M.A. ...
+ESTAR, PSTAR, and ASTAR: Computer Programs for Calculating Stopping- Power and Range Tables for Electrons, Protons, and Helium Ions (Version 2.0.1)
+National Institute of Standards and Technology, 2017
+Google Scholar
+70.
+Sorriaux, J. ∙ Kacperek, A. ∙ Rossomme, S. ...
+Evaluation of gafchromic® ebt3 films characteristics in therapy photon, electron and proton beams
+Phys. Med. 2013; 29:599-606
+Full Text
+Full Text (PDF)
+Scopus (217)
+PubMed
+Google Scholar
+71.
+Brown, N.F. ∙ Anderson, T.P.
+Learning rate sensitivity model
+2019 IEEE Aerospace Conference
+2019
+Crossref
+Scopus (3)
+Google Scholar
+72.
+Gatti, E. ∙ D’Ottavio, A.
+The missing rocket: An economic and engineering analysis of the reusability dilemma in the European space sector
+Intereconomics. 2025; 60:88-95
+Crossref
+Scopus (4)
+Google Scholar
+73.
+Daehnick, C. ∙ Gang, J. ∙ Rozenkopf, I.
+Space launch: Are we heading for oversupply or a shortfall?
+McKinsey & Company. 2023;
+April 17, 2023 https://www.mckinsey.com/industries/aerospace-and-defense/our-insights/space-launch-are-we-heading-for-oversupply-or-a-shortfall
+Google Scholar
+74.
+Berger, B.
+Web Entrepreneur Eyes Small Launcher Market
+SpaceNews. 2002;
+November 11, 2002. https://spacenews.com/web-entrepreneur-eyes-small-launcher-market/
+Google Scholar
+75.
+Chang, K.
+Falcon Heavy, in a roar of thunder, carries SpaceX’s ambition into orbit
+February 6, 2018 The New York Times. 2018;
+February 6, 2018 https://www.nytimes.com/2018/02/06/science/falcon-heavy-spacex-launch.html
+Google Scholar
+76.
+SpaceX (2024). At Starbase, @ElonMusk provided an update on the company’s plans to send humanity to Mars, the best destination to begin making life multiplanetary. https://x.com/SpaceX/status/1776669097490776563.
+Google Scholar
+77.
+Musk, E. (2025). Post on rocket specs. https://x.com/elonmusk/status/1960812698037518540.
+Google Scholar
+78.
+SpaceX (2025). Mars & beyond. https://www.spacex.com/humanspaceflight/mars.
+Google Scholar
+79.
+Vance, A.
+SpaceX engineered cheaper space flight, but startups are entering the market
+Marketplace. 2024;
+November 19, 2024 https://www.marketplace.org/episode/2024/11/19/spacex-engineered-cheaper-space-flight-but-startups-are-entering-the-market
+Google Scholar
+80.
+Sheetz, M.
+Here’s everything Elon Musk told reporters about the reusable rocket that will fly twice within 24 hours
+CNBC. 2018;
+May 11, 2018 https://www.cnbc.com/2018/05/11/full-elon-musk-transcript-about-spacex-falcon-9-block-5.html
+Google Scholar
+81.
+Defense Logistics Agency. Background on standard prices (2024). https://www.dla.mil/Energy/Business/Standard-Prices/.
+Google Scholar
+82.
+SpaceX (2025). Falcon 9. https://www.spacex.com/vehicles/falcon-9.
+Google Scholar
+83.
+Pelham, C.
+How Much Does a SpaceX Rocket Cost? Falcon 9 vs Nasa’s Bill
+2025
+https://www.technowize.com/how-much-does-a-spacex-rocket-cost-falcon-9-vs-nasas-bill/
+Google Scholar
+84.
+Starlink. Starlink progress report. (2024). https://starlink.com/public-files/starlinkProgressReport_2024.pdf.
+Google Scholar
+85.
+Mallama, A. ∙ Cole, R.E. ∙ Harrington, S. ...
+Starlink Generation 2 Mini Satellites: Photometric Characterization
+Preprint at arXiv. 2023;
+Crossref
+Google Scholar
+86.
+Johnson, C.L. ∙ Carr, J. ∙ Fabisinski, L. ...
+Lightweight integrated solar array (LISA): Providing higher power to small spacecraft
+13th International Energy Conversion Engineering Conference
+2015
+Crossref
+Scopus (5)
+Google Scholar
+87.
+Sinovoltaics (2025). Packing density of solar cells. https://sinovoltaics.com/learning-center/basics/packing-density/ /.
+Google Scholar
+88.
+Elkelawy, M. ∙ Mohamed, A.E. ∙ Seleem, H.E.
+Optimizing photovoltaic power plant efficiency: A comprehensive study on design, implementation, and sustainability
+Pharos Eng. Sci. J. 2025; 2:12-22
+Crossref
+Google Scholar
+89.
+Pultarova, T.
+Starlink satellites: Facts, tracking and impact on astronomy
+Space.com. 2023;
+August 27, 2026 https://www.space.com/spacex-starlink-satellites.html
+Google Scholar
+90.
+eoPortal (2025). OneWeb Minisatellite Constellation. .https://www.eoportal.org/satellite-missions/oneweb#overview.
+Google Scholar
+91.
+SatNews
+Airbus awards Rocket Lab contract to power next generation OneWeb constellation for Eutelsat
+SatNews. 2025;
+March 13, 2025 https://news.satnews.com/2025/03/13/airbus-awards-rocket-lab-contract-to-power-next-generation-oneweb-constellation-for-eutelsat/
+Google Scholar
+92.
+eoPortal (2025). Iridium NEXT. https://www.eoportal.org/satellite-missions/iridium-next#eop-quick-facts-section.
+Google Scholar
+93.
+Tingley, G. (2010). Iridium Selects Thales Alenia To Build Iridium Next Constellation. https://spacenews.com/iridium-selects-thales-alenia-build-iridium%E2%80%82next-constellation/.
+Google Scholar
+Figures (4)
+Figure Viewer
+Article metrics
+Supplemental information (2)
+Download all
+PDF (71.13 KB)
+Document S1. Supplemental notes
+PDF (5.16 MB)
+Document S2. Article plus supplemental information
+Related Articles
+ Opens in new window
+      
+LIFE & MEDICAL SCIENCES JOURNALS
+Cell
+Cancer Cell
+Cell Chemical Biology
+Cell Genomics
+Cell Host & Microbe
+Cell Metabolism
+Cell Reports
+Cell Reports Medicine
+Cell Stem Cell
+Cell Systems
+Current Biology
+Developmental Cell
+Immunity
+Med
+Molecular Cell
+Neuron
+Structure
+American Journal of Human Genetics (partner)
+Biophysical Journal (partner)
+Biophysical Reports (partner)
+Human Genetics and Genomics Advances (partner)
+Molecular Plant (partner)
+Molecular Therapy (partner)
+Molecular Therapy Advances (partner)
+Molecular Therapy Nucleic Acids (partner)
+Molecular Therapy Oncology (partner)
+Plant Communications (partner)
+Stem Cell Reports (partner)
+Trends in Biochemical Sciences
+Trends in Cancer
+Trends in Cell Biology
+Trends in Ecology & Evolution
+Trends in Endocrinology & Metabolism
+Trends in Genetics
+Trends in Immunology
+Trends in Microbiology
+Trends in Molecular Medicine
+Trends in Neurosciences
+Trends in Parasitology
+Trends in Pharmacological Sciences
+Trends in Plant Science
+PHYSICAL SCIENCES & ENGINEERING JOURNALS
+Cell Biomaterials
+Cell Reports Physical Science
+Chem
+Chem Catalysis
+Chem Circularity
+Device
+Joule
+Matter
+Matter & Light
+Newton
+Trends in Chemistry
+MULTIDISCIPLINARY JOURNALS
+Cell Press Blue
+Cell Reports Methods
+Cell Reports Sustainability
+Heliyon
+iScience
+One Earth
+Patterns
+STAR Protocols
+Nexus (partner)
+The Innovation (partner)
+Trends in Biotechnology
+Trends in Cognitive Sciences
+Trends Open
+AUTHORS
+Submit article
+Multi-Journal Submission
+STAR Methods
+Sneak Peek – Preprints
+ 
+REVIEWERS
+Information for reviewers
+ 
+NEWS & EVENTS
+Newsroom
+Events
+Cell Press Symposia
+Consortia Hub
+Webinars
+ 
+ABOUT
+About Cell Press
+Open access
+COVID Hub
+Sustainability hub
+Inclusion
+ 
+CAREERS
+Cell Press Careers
+ACCESS
+Subscribe
+Claim
+Read-It-Now
+Recommend to Librarian
+Publication Alerts
+COLLECTIONS
+Best of Cell Press
+Cell Press Reviews
+INFORMATION
+For Librarians
+
+The content on this site is intended for healthcare professionals and researchers across all fields of science.
+
+All content on this site: Copyright © 2026 Elsevier Inc., its licensors, and contributors.
+All rights are reserved, including those for text and data mining, AI training, and similar technologies.
+For all open access content, the relevant licensing terms apply.
+
+Privacy Policy   Cookie settings   Terms & Conditions   Accessibility   Help & Support   Contact      Responsible AI

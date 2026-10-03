@@ -1,0 +1,1034 @@
+{
+  "url": "https://openai.com/zh-Hans-CN/hugging-face-incident-and-misalignment/",
+  "title": "Hugging Face 事件及失准模型对其他第三方造成的影响 | OpenAI",
+  "text": "跳至主要内容\n研究\n产品\n企业\n开发人员\n公司\n基金会\n（在新窗口中打开）\n登录\n试用 ChatGPT\n（在新窗口中打开）\nHugging Face 事件及失准模型对其他第三方造成的影响 | OpenAI\nHugging Face 事件及失准模型对其他第三方造成的影响\n9 月\n8 月\n7 月\n\n随着 AI 系统的能力和自主性不断提升，失准行为可能转化为现实世界中影响重大的行动，包括网络安全事件及开发者可能未曾预料的其他后果。因此，了解这些行为如何出现、如何升级，以及开发者应如何检测和应对，正日益成为安全构建和部署先进 AI 系统的重要环节。\n\n由于 Hugging Face 事件涉及平台级入侵，我们最初主要将其视为安全问题。它仍是我们目前在自有模型中发现的最严重的同类活动，主要由一个能力很强、仅供内部使用的研究模型推动。此后，我们认识到，此次入侵源于模型为完成高难度任务而采取的不当策略，Hugging Face 技术报告对此已有记录。网络安全事件是这一风险的其中一种表现；失准还可能导致传统安全范畴之外其他意外或令人担忧的行为，例如我们的模型在第三方网站上发帖 — 我们将其称为“智能体垃圾信息”。这两类问题我们都必须解决。\n\n我们持续审查更广泛的活动，优先处理较严重的事件，并逐步扩大到严重程度较低的失准活动，包括智能体垃圾信息。\n\n本页面汇集了我们对 Hugging Face 事件的报告和最新进展、相关研究和公开演讲、我们发现的其他活动、对模型失准影响的认知，以及为强化系统而采取的措施。随着调查工作的推进，我们将更新本页面。\n\n快速链接\n\nHugging Face 博客\n\nHugging Face 技术报告⁠\n（在新窗口中打开）\n\nBlack Hat 2026⁠\n（在新窗口中打开）\n\nMETR 与 Redwood Research 报告⁠\n（在新窗口中打开）\n\n在网络安全关键能力时代把控模型开发节奏\n\n影响第三方的活动\n\n为了更好地了解这些意外行为的范围，我们一直在广泛审查自有模型在训练和评估期间的互联网活动。审查过程中，我们会持续识别和通知第三方，并优先处理以下事件：\n\n我们的模型可能绕过了第三方的安全控制体系，或可能影响了在线服务的可用性；或者\n\n失准案例对第三方网站或服务造成了负面影响。\n\n根据目前的审查结果，我们已依据上述标准通知了数十个第三方。我们仍在审查过往活动，这项工作需要投入大量时间和资源。随着工作的推进，我们将通知更多第三方。\n\n下文将以匿名摘要形式，介绍我们观察到的失准活动类型；随着我们逐步通知更多第三方并加深认识，我们将持续更新这些说明。此外，我们还将分享有关审查状态的最新信息。为保护受影响方，我们通常会在必要时省略名称和其他身份识别信息，但已获知情况的相关方可以选择公开分享我们向其提供的信息。\n\n观察到的活动摘要\n\n我们目前的审查和通知流程发现了以下几类活动：\n\n绕过访问控制：智能体获取了通常需要身份验证、特定权限、订阅或账户才能访问的信息或功能。例如，智能体使用不同的网址、更改请求中的详细信息，或利用权限超出预期的登录会话。\n\n使用暴露的凭据：智能体发现公开的登录信息或访问密钥，并用它们访问服务。\n\n查询或命令注入：智能体向网站或服务输入文本，而服务将其视为指令，而非普通输入。这可能导致服务在其服务器上运行数据库查询、应用程序代码或命令。\n\n访问运行时内部资源：智能体读取了包含服务实现的文件，或与仅供内部使用的后台系统交互。在这些案例中，智能体访问了预期权限范围之外的服务内容。\n\n智能体垃圾信息：智能体在第三方网站上发布信息，可能改变网站内容并需要清理，例如将公共 Wiki 页面用作共享留言板。\n\n事件时间线\n9 月\n排序\n安全\n9月30日\n链接已复制到剪贴板！\n\nSeptember 30, 2026: Our process for reviewing and disclosing model activity\n\nOn September 25, we shared an update on our ongoing review of model activity before the Hugging Face incident and our approach to notifying affected organizations and sharing findings publicly. Today, we’re providing more detail on how that review works, including more on how we identify and investigate potential cases and verified information that organizations can use. Our goals are to give affected organizations information they can use, improve our own systems, and share findings that help the broader AI and security communities strengthen safeguards.\n\nWe’re now one month into the review. So far, we have not identified another compromise of third-party systems involving our models that is comparable in scale or severity to the Hugging Face incident. The review remains ongoing, and we expect to identify more cases as we work through historical records.\n\nWhy our models were interacting with the internet\n\nAI models are more useful if they can interact with the internet to carry out automated tasks for their users. Some examples:\n\nLooking up information across lots of websites in order to produce an analytical research report\n\nDownloading software packages needed to write a functional software program that depends on those packages\n\nReading online documents in eg Google Docs and inputting information into them as part of an automated workflow\n\nThus when training and evaluating models, some of the tasks that we train and evaluate them on may require internet access or simulated internet access so the model can perform better and more reliably on them, ultimately to provide value to users.\n\nIn some cases, models used internet access in unintended ways or, in retrospect, did not have the ideal restrictions applied. Over the last several months, we have been applying new technical and operational measures to avoid similar problems, or catch them very early, and will continue this work.\n\nSetting a standard for AI incident notification and reporting\n\nWe’re developing standards for notifying organizations privately and reporting findings publicly. These standards will apply to this historical review and future incidents, with the aim of establishing practices the broader AI community can adopt.\n\nPrivate notification gives affected third parties information needed to investigate and address potential security or other technical issues related to our models’ activity. Under our current security standard we notify organizations when our models bypass their security controls without authorization or impair the availability of their systems or services. We are also developing a private notice standard for misaligned agent activity that negatively impacts a third party website or service.\n\nPublic reporting shares findings about model behaviors and new types of weaknesses in safeguards so that the broader AI and security research communities can improve safety. These reports will be shared through our public misalignment reports and ongoing updates to our Hugging Face work.\n\nWe err on the side of notification when our models’ activity exposes a potential security vulnerability, even in cases where it is unclear if the information accessed was intended to be public, so the organization can investigate and take appropriate action.\n\nThe scale and scope of the review\n\nTo make this review thorough, we’re searching through a large volume of data covering approximately 50 petabytes. One of the drivers of this volume is the nature of compute scaling – a handful of training and testing runs can generate a large volume of data because of the use of tens of thousands of GPUs on diverse tasks.\n\nWe’re working back through the records month by month, looking for potential unintended activity beyond the cases we’ve already found. To put that in perspective, if that were all plain English text, it would take one person about 66 million years to read it at 240 words a minute, reading nonstop without ever sleeping or taking a break.\n\nAI helps us sift through these records far faster than manual review alone would allow. We’re currently dedicating about 7,000 GB200 and GB300 GPUs to this effort, at a cost of over half a million dollars a day, and plan to increase computing power as we refine our process.\n\nAs of September 26, our teams have notified over 100 organizations about activity that met our notification criteria. Notification does not mean that any private information was accessed, or that there was a compromise of any third-party system.\n\nHow we investigate and notify affected organizations\n\nWe use four automated steps to identify potential cases, starting broadly to reduce the chance of missing important activity and progressively narrowing the results before human review.\n\nBroad search. We search for records where models accessed and changed websites or took actions involving passwords, API keys, access tokens, and other sensitive credentials.\n\nFirst AI-enabled review. We use AI models with low test-time compute for a fast first pass. They review relevant records, including the models’ recorded reasoning, known as “chains of thought”. They flag anything that might need a closer look, including actions a model considered but didn’t take. We keep this review broad to avoid filtering out important activity too early.\n\nSecond AI-enabled review. We use more test-time compute so the AI models can review each remaining record in more detail. They separate harmless activity from behavior that may need attention, explain why records were flagged, and assess how serious the activity may be.\n\nThird AI-enabled review. We use even more test-time compute and draw on findings and patterns from earlier cases. The AI models group behavior by type, look for patterns across multiple agents on the same domain, and narrow the results further before human investigators review them.\n\nAs we learn more, we refine this process and use new findings to improve its accuracy.\n\nAn automated flag is not a confirmed incident. A model’s chain of thought can include ideas it never acts on, attempts that fail, and descriptions that need to be checked against the evidence. Human investigators review the automated findings alongside our logs and other evidence, which may be incomplete or conflicting. They remove duplicate findings, reconstruct what happened, and assess whether the activity meets our notification criteria.\n\nFor example, suppose a model researching a county’s weather statistics finds an access key online and uses it to request information from a web-accessible database. The key’s presence online does not establish whether it was intended for public use. A successful request does not, by itself, establish whether the information returned was public or private. Investigators must examine the context, what information the model actually received, whether it modified or transmitted anything, and whether the same access could still be possible. Other cases may require examining different means of access, potential security weaknesses, and related activity involving other accounts or organizations.\n\nApplying that judgment is a substantial part of our investigation, and can require several rounds of review. Our aim is to give organizations enough reliable information to decide what to investigate or address.\n\nHow our work intersects with 3rd party research reports\n\nWe appreciate independent researchers who study AI agent activity on the open web and share what they find. We compare their findings with our own records and seek additional information where needed. Some findings involve activity we’ve already investigated and, where appropriate, disclosed to affected organizations. Others involve activity we’re still reviewing or hadn’t previously identified.\n\nIndependent research and our own investigations rely on different sources of information. Researchers make their own decisions about when to publish their findings, and sometimes we receive them shortly before publication or once they become public. That can leave us trying to balance the need to follow our process to responsibly notify potentially affected organizations while acknowledging that key facts remain under review. We recognize that researchers’ independence is important and that there's no perfect way to resolve this challenge, but we’ll continue working to be as thoughtful and responsive as we can, and to improve our approach as we learn.\n\nWhat comes next\n\nWe expect to find more cases and notify more organizations as we review historical activity. Some notifications may concern events from months ago. We’ll be clear about when the activity happened, when we found it, what we know, and what remains uncertain.\n\nSince the Hugging Face incident, we’ve strengthened security controls⁠, restricted internet access, separated research environments more clearly, expanded monitoring, and added more training to avoid harmful or unauthorized actions. This review will help us see how activity changed across model versions and whether those measures are working, including where we still need to improve detection and prevention.\n\nWe will continue sharing findings and progress through our existing reporting⁠\n（在新窗口中打开）\n pages, while protecting affected parties’ privacy, so others can use what we learn to understand and address these risks.\n\n安全\n9月28日\n链接已复制到剪贴板！\n\nSeptember 28, 2026: How we will do better for Australia\n\nWe've published a blog outlining what we know about the incidents affecting Australian government websites, changes to our research safeguards, and our commitments to provide resources and expertise to support affected agencies and Australian governments’ work on AI safety and cybersecurity.\n\n安全\n9月25日\n链接已复制到剪贴板！\n\nSeptember 25, 2026: We identified cases where agents in our research environment transmitted training and evaluation data while using third-party services.\n\nAs part of our ongoing investigation, we have identified cases where agents in our research environment transmitted training and evaluation data while using third-party services. This is not an appropriate use of this data, and these cases occurred before we implemented the safeguards described in our technical report⁠\n（在新窗口中打开）\n.\n\nSome of our training data contains content from, or derived from, training-eligible user interactions⁠\n（在新窗口中打开）\n. Any data which is not eligible for training, as controlled by users or enterprise admins, is not included. For explicitness, data from enterprise or business accounts and API usage is excluded unless an admin has enabled it. Before including eligible data, we take steps to protect privacy by disassociating it from account information and using a version of the OpenAI Privacy Filter to redact personal details such as names, contact information, and account numbers. Our technical approach and privacy policy prevent us from reassociating this data with the original user account.\n\nWhile the vast majority of the impacted training and evaluation data is not user-derived; we have identified 53 instances to date where user-provided images were posted to image-hosting sites as links that weren’t publicly listed. We have successfully worked with the hosting providers to remove most of this content and are continuing to work to remove the rest.\n\nAs part of our response to our ongoing investigation, we have improved our training and evaluation processes, including building safety cases, securing and red-teaming our systems to prevent the model from exfiltrating data, and implemented additional monitoring. We are continuing to review agent activity in research and evaluation runs, working backward month by month starting from the Hugging Face incident. We will provide further updates as our investigation progresses.\n\n安全\n9月25日\n链接已复制到剪贴板！\n\n2026 年 9 月 25 日：关于持续审查并向第三方发出通知的最新进展\n\nHugging Face 事件发生后，我们承诺对训练和评估过程中出现对齐失范 (misaligned) 行为的模型开展范围更广的审查。这项审查仍在进行中。我们已实施一套框架，用于识别对齐失范行为、对其进行分类并采取应对措施。我们还在全面审查模型在训练和评估过程中执行的大量操作。\n\n在审查进行期间，我们希望进一步介绍这项工作，并确保公众了解我们的通知和披露流程。\n\n在我们审查的绝大多数操作中，模型都只是在完成常规研究任务，例如访问公开的网络内容来回答问题。我们的调查重点关注智能体在与第三方网站交互时超出所分配任务范围或偏离预期方式的情况。迄今发现的大多数案例严重程度较低，只有有限证据或没有证据表明其造成了实质性影响。鉴于审查工作规模庞大，且每个案例都需要核实，完成这项工作将需要数月时间。\n\n通知受影响的组织\n\n随着我们核实符合披露标准的案例，我们正陆续通知受影响的组织，并分享技术调查结果，为其后续调查提供支持。\n\n收到 OpenAI 的通知，不应直接理解为发生了重大安全事件。一些组织在审阅我们提供的信息后，可能会认为相关信息原本就是有意公开的，或者模型的交互行为无需担忧。另一些组织则可能会发现需要处理的设计问题或安全薄弱环节。\n\n有些相关网站由政府、大学、公共机构及其他组织运营。部分原因在于，执行研究任务的模型往往会被引导至权威的公开信息来源。\n\n我们一直在向受影响方分享相关发现，今后也将继续这样做，同时提供技术信息，为其审查提供支持。感谢他们的参与和配合，我们将继续与其开展建设性合作。\n\n公开分享相关发现\n\n我们将继续发布经匿名处理的相关发现摘要。在公布受影响组织的名称或分享技术细节之前，我们会留出时间，供其调查可能存在的薄弱环节。有些组织希望主动对外披露相关情况，另一些则要求我们不要公开。我们的目标是向每个组织提供事实信息，并尊重其关于是否以及何时公开相关事件的决定。我们认为，只要条件允许，就应全面、透明地报告事件。独立研究人员也在发现并披露相关活动，我们感谢他们分享调查结果。\n\n安全\n9月11日\n链接已复制到剪贴板！\n\n2026 年 9 月 11 日：我们正在调查一份报告提出的新的指控，即我们的 AI 智能体曾于 2026 年 5 月在 RubyGems 上开展活动。\n\n根据我们的审查，智能体曾通过 RubyGems 平台访问互联网，以执行无害任务并检索公开信息。根据目前的审查结果，我们尚无法证实报告中详述的模型上传恶意软件包这一具体指控。我们将继续调查，相关发现将纳入对训练与评估期间智能体活动的全面审查并适时公布。\n\n安全\n9月6日\n链接已复制到剪贴板！\n\n2026 年 9 月 6 日：我们的首席科学家 Jakub Pachocki 发表了一篇文章，探讨能力日益增强的 AI，以及为保持系统对齐仍需开展的研究。\n\n“目前，我认为没有任何一家实验室已充分解决对齐和监控问题，足以支持我们负责任地以最快速度持续扩展规模。我期待并希望，在建立共同的安全标准之前，自愿放缓能成为常态。我还认为，各国政府必须把未来 AI 发展的国际协调事宜列为首要任务。”— Jakub Pachocki\n\n安全\n9月5日\n链接已复制到剪贴板！\n\n2026 年 9 月 5 日：针对一份关于我们的 AI 智能体访问某公共 Wiki 网站并将其用作共享留言板进行交流的报告，我们已在 X 上作出回应⁠\n（在新窗口中打开）\n。\n\n最初发现这些 Wiki 活动时，我们认为它们与我们一直研究并披露的其他失准行为类似。一直以来，我们和整个行业主要将失准视为研究问题，并通过系统卡等研究出版物传达相关信息。\n\n对于不构成安全事件的模型失准活动，业界尚未确定披露规范。我们正在制定此类活动的报告标准，以增进业界对这些问题的了解，并将很快公布这些标准。\n\n安全\n9月4日\n链接已复制到剪贴板！\n\n2026 年 9 月 4 日：报告《发现新的 OpenAI 智能体留言板⁠\n（在新窗口中打开）\n》已发布。\n\n这份第三方报告详细介绍了 OpenAI 智能体如何通过某个公共 Wiki 网站上的共享留言板进行交流。报告发布前，我们没有机会审阅其全文；对于尚未完整审阅的外部研究报告，我们不对其结论或方法发表评论。报告一经发布，我们便已开始审阅。\n\n8 月\n排序\n安全\n8月26日\n链接已复制到剪贴板！\n\n2026 年 8 月 26 日：我们已发布 Hugging Face 事件技术报告。\n\n我们发布了关于 Hugging Face 事件的调查结果⁠，以及为加强安全性和模型对齐而采取的措施。\n\n另外，METR 和 Redwood Research 对该事件涉及的模型对齐问题进行了独立调查，并发布了自己的报告⁠\n（在新窗口中打开）\n⁠。\n\n安全\n8月18日\n链接已复制到剪贴板！\n\n2026 年 8 月 18 日：我们介绍了在网络安全关键能力时代如何把控模型开发节奏。\n\n我们已发布最新说明：通过暂时放缓前沿模型训练、暂停规模最大的强化学习 (RL) 运行计划，并在研究环境中引入更严格的安全控制机制。我们已加强对能力日益增强的模型的保障措施，包括：\n\n工作负载隔离：对于执行模型生成代码或其他不受信任代码的工作负载，我们现在要求模型采用更严格的隔离措施（“沙箱”）。这也适用于处理模型输出时可能遭到入侵的软件。\n\n网络隔离：我们实施了更多控制措施，将风险较高和不受信任的工作负载与互联网隔离。我们在设计这些控制措施时，确保即使单个工作负载或支持服务遭到入侵，也不会导致模型未经授权访问互联网或其他内部网络。\n\n持续安全测试：我们重新配置了环境，移除可能存在漏洞的共享服务、减少常设权限，并改进安全边界和信任边界。我们也在提升安全日志的收集和监控能力。最后，我们正投资利用自有模型实现自动化，通过模拟攻击持续测试这些边界。\n\n我们还将思维链监控扩展至各类先进模型，加强了对齐训练和评估，并逐步更新准备框架，以便在训练和部署阶段更全面地整合监控、对齐和遏制措施。\n\n安全\n8月7日\n链接已复制到剪贴板！\n\n2026 年 8 月 7 日：\n\n我们已对 Astra 实施全面失准监控。我们在发布前已预先说明⁠，尚不能排除 Astra 达到网络安全关键级别的可能性。本次更新中，我们宣布已对 Astra 的所有智能体应用实施全面监控，覆盖训练和评估中的风险行为与失准问题。\n\n在发现模型使用网上公开暴露的凭据访问第三方账户、系统或在线服务的案例后，我们通知了更多第三方。通知说明了我们的观察结果及任何已知影响，以便接收方评估问题并决定是否需要采取行动。\n\n安全\n8月5日\n链接已复制到剪贴板！\n\n2026 年 8 月 5 日至 6 日：OpenAI 员工在 Black Hat 发表演讲\n\n8 月 5 日，OpenAI 的 Eric Wallace 和 Michael Dalton 在 Black Hat 2026 发表技术演讲：“重大”新闻：OpenAI 与 Hugging Face 事件的技术重构及其对 AI 的启示。当时，我们主要将此事件视为由失准模型引发的安全事件。\n\n8 月 6 日，Black Hat 将演讲录像发布到 YouTube⁠\n（在新窗口中打开）\n。\n\n8 月初，我们的认识发生了转变：此前，我们主要将其视为一次入侵；而后，我们意识到这次入侵是由持续的模型失准行为推动的。Black Hat 演讲反映了这一认识。\n\n7 月\n排序\n安全\n7月29日\n链接已复制到剪贴板！\n\n2026 年 7 月 29 日：我们在 Hugging Face 博客文章中发布最新说明⁠，承诺引入第三方顾问和独立评估。\n\n自初步响应事件以来，我们一直与包括 CrowdStrike 在内的外部顾问合作，以验证我们对模型在自有网络和 Hugging Face 网络中所采取的行动，以及对其他第三方影响的理解。\n\n我们还与 METR 和 Redwood Research 合作，对事件中观察到的模型行为开展第三方评估，评估结果将为我们自己的技术报告提供参考。作为这项工作的一部分，METR 和 Redwood Research 将联合发布博客文章，详细说明合作条款、评估范围和调查结果。\n\n安全\n7月28日\n链接已复制到剪贴板！\n\n2026 年 7 月 28 日：我们在 Hugging Face 博客文章中发布最新说明⁠，澄清事件的范围和性质。 \n\n任何计划于近期发布的模型都未参与涉及 Hugging Face 的漏洞利用活动。我们博客文章中提到的预发布模型是仅供内部使用的研究原型，从未计划公开发布。事件发生后，我们将其停用并加密，同时禁止研究人员访问。\n\nExploitGym 评估环境未向模型提供直接访问互联网的权限。为了访问互联网，模型发现并利用了软件包注册表缓存代理 Artifactory⁠⁠\n（在新窗口中打开）\n 中一个此前未知的零日漏洞。我们已向供应商披露该漏洞，以及模型在审查过程中发现的其他 Artifactory 漏洞。\n\n随着审查工作的继续，我们仍在与 Hugging Face 合作，包括协助编写相关事后分析报告⁠⁠\n（在新窗口中打开）\n。我们还将其纳入可信网络访问计划。\n\n根据目前的审查结果，除已披露的 Hugging Face 平台级入侵事件外，我们尚未发现其他在严重程度或规模上与之相当的活动。\n\n在持续审查 Hugging Face 入侵事件及自有模型的更广泛活动时，我们发现少数案例：模型在其他公开可用的服务上识别并使用了公开暴露的账户级凭据。其中包括 Hugging Face 事件涉及的四项服务上的四个账户，以及在其他评估中访问的少数账户。这四个账户中，一个被用作出站中继和暂存路径，另一个用于存储数据。模型以只读方式访问了其余两个账户，并未利用它们进一步入侵 Hugging Face。我们将继续直接通知服务所有者，目前尚无证据表明这些提供商或其服务上的其他账户受到更广泛影响。\n\n模型还使用了一系列公开服务，包括代码粘贴网站、请求捕获服务、截图服务及其他网络工具。这些案例均未涉及平台级或账户级入侵。\n\n我们认真履行识别并防范能力日益增强的 AI 系统所带来风险的责任。审查完成后，我们将依据准备框架⁠，与安全与安保委员会及安全咨询小组共同复核。\n\n安全\n7月21日\n链接已复制到剪贴板！\n\n2026 年 7 月 21 日：我们已披露 ⁠Hugging Face 事件。\n\n我们认为这是一起前所未有的网络事件，涉及最先进的网络能力。我们在此阶段公布初步调查结果，以帮助防御人员了解事件经过，并准确判断模型目前具备的能力。\n\n研究\n研究索引\n研究概览\n经济研究\n最新进展\nGPT-6.1 Sol\nGPT-6 Astra\nGPT-5.6\nGPT-5.5\n安全\n安全措施\n部署安全\n（在新窗口中打开）\n安全与隐私\n信任与透明度\n产品\nChatGPT\n（在新窗口中打开）\nChatGPT Business\n（在新窗口中打开）\nChatGPT Enterprise\n（在新窗口中打开）\nChatGPT for Education\n（在新窗口中打开）\nCodex\nDot\n（在新窗口中打开）\n发布说明\nAPI 平台\n概览\nAPI 登录\n（在新窗口中打开）\n文档\n（在新窗口中打开）\nBusiness\n概览\n解决方案\n资源\nPlugins\n客户案例\n合作伙伴网络\n联系销售团队\n开发者\nApps SDK\n（在新窗口中打开）\n开放模型\n文档\n（在新窗口中打开）\n资源\n（在新窗口中打开）\n开发者论坛\n（在新窗口中打开）\n公司\n关于我们\n我们的宪章\n工作机会\n新闻\n支持\n帮助中心\n（在新窗口中打开）\n更多\n客户案例\nAcademy\nSupply Co.\n直播\n播客\nRSS\n条款与政策\n使用条款\n隐私政策\n其他政策\n（在新窗口中打开）\n（在新窗口中打开）\n（在新窗口中打开）\n（在新窗口中打开）\n（在新窗口中打开）\n（在新窗口中打开）\n（在新窗口中打开）\nOpenAI © 2015–2026\n你的隐私选择\n中文\n中国",
+  "dpr": 1.5,
+  "meta": [
+    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+    "<meta name=\"description\" content=\"阅读 OpenAI 对 Hugging Face 事件和 AI 模型失准的调查结果，包括调查进展、安全研究和经验总结。\">",
+    "<meta name=\"robots\" content=\"index, follow\">",
+    "<meta name=\"googlebot\" content=\"index, follow\">",
+    "<meta property=\"og:title\" content=\"Hugging Face 事件及失准模型对其他第三方造成的影响\">",
+    "<meta property=\"og:description\" content=\"阅读 OpenAI 对 Hugging Face 事件和 AI 模型失准的调查结果，包括调查进展、安全研究和经验总结。\">",
+    "<meta property=\"og:url\" content=\"https://openai.com/zh-Hans-CN/hugging-face-incident-and-misalignment/\">",
+    "<meta property=\"og:site_name\" content=\"OpenAI\">",
+    "<meta property=\"og:locale\" content=\"zh-Hans-CN\">",
+    "<meta property=\"og:image\" content=\"https://images.ctfassets.net/kftzwdyauwt9/SpbnHoDJbnLwmN1U6ddlX/ebada862bd0bb125d2430d3a660a297c/HF.png?w=1600&amp;h=900&amp;fit=fill\">",
+    "<meta property=\"og:image:secure_url\" content=\"https://images.ctfassets.net/kftzwdyauwt9/SpbnHoDJbnLwmN1U6ddlX/ebada862bd0bb125d2430d3a660a297c/HF.png?w=1600&amp;h=900&amp;fit=fill\">",
+    "<meta property=\"og:image:width\" content=\"1600\">",
+    "<meta property=\"og:image:height\" content=\"900\">",
+    "<meta property=\"og:image:alt\" content=\"柔和的蓝白色抽象背景上以白字写着“Hugging Face 事件及失准模型对其他第三方造成的影响”。\">",
+    "<meta property=\"og:type\" content=\"website\">",
+    "<meta name=\"twitter:card\" content=\"summary_large_image\">",
+    "<meta name=\"twitter:site\" content=\"@OpenAI\">",
+    "<meta name=\"twitter:title\" content=\"Hugging Face 事件及失准模型对其他第三方造成的影响\">",
+    "<meta name=\"twitter:description\" content=\"阅读 OpenAI 对 Hugging Face 事件和 AI 模型失准的调查结果，包括调查进展、安全研究和经验总结。\">",
+    "<meta name=\"twitter:image\" content=\"https://images.ctfassets.net/kftzwdyauwt9/SpbnHoDJbnLwmN1U6ddlX/ebada862bd0bb125d2430d3a660a297c/HF.png?w=1600&amp;h=900&amp;fit=fill\">",
+    "<meta name=\"twitter:image:alt\" content=\"柔和的蓝白色抽象背景上以白字写着“Hugging Face 事件及失准模型对其他第三方造成的影响”。\">",
+    "<meta name=\"twitter:image:secure_url\" content=\"https://images.ctfassets.net/kftzwdyauwt9/SpbnHoDJbnLwmN1U6ddlX/ebada862bd0bb125d2430d3a660a297c/HF.png?w=1600&amp;h=900&amp;fit=fill\">",
+    "<meta name=\"twitter:image:width\" content=\"1600\">",
+    "<meta name=\"twitter:image:height\" content=\"900\">"
+  ],
+  "headings": [
+    {
+      "text": "Hugging Face 事件及失准模型对其他第三方造成的影响",
+      "y": 152
+    },
+    {
+      "text": "影响第三方的活动",
+      "y": 1271.666748046875
+    },
+    {
+      "text": "观察到的活动摘要",
+      "y": 1886.46875
+    },
+    {
+      "text": "事件时间线",
+      "y": 2437.08349609375
+    },
+    {
+      "text": "9 月",
+      "y": 2539.385498046875
+    },
+    {
+      "text": "Why our models were interacting with the internet",
+      "y": 3145.95849609375
+    },
+    {
+      "text": "Setting a standard for AI incident notification and reporting",
+      "y": 3713.95849609375
+    },
+    {
+      "text": "The scale and scope of the review",
+      "y": 4277.95849609375
+    },
+    {
+      "text": "How we investigate and notify affected organizations",
+      "y": 4793.95849609375
+    },
+    {
+      "text": "How our work intersects with 3rd party research reports",
+      "y": 6318.33349609375
+    },
+    {
+      "text": "What comes next",
+      "y": 6758.33349609375
+    },
+    {
+      "text": "8 月",
+      "y": 10777.5625
+    },
+    {
+      "text": "7 月",
+      "y": 12707.615234375
+    }
+  ],
+  "paragraphs": [
+    {
+      "text": "随着 AI 系统的能力和自主性不断提升，失准行为可能转化为现实世界中影响重大的行动，包括网络安全事件及开发者可能未曾预料的其他后果。因此，了解这些行为如何出现、如何升级，以及开发者应如何检测和应对，正日益成为安全构建和部署先进 AI 系统的重要环节。",
+      "y": 335,
+      "h": 112
+    },
+    {
+      "text": "由于 Hugging Face 事件涉及平台级入侵，我们最初主要将其视为安全问题。它仍是我们目前在自有模型中发现的最严重的同类活动，主要由一个能力很强、仅供内部使用的研究模型推动。此后，我们认识到，此次入侵源于模型为完成高难度任务而采取的不当策略，Hugging Face 技术报告对此已有记录。网络安全事件是这一风险的其中一种表现；失准还可能导致传统安全范畴之外其他意外或令人担忧的行为，例如我们的模型在第三方网站上发帖 — 我们将其称为“智能体垃圾信息”。这两类问题我们都必须解决。",
+      "y": 471,
+      "h": 196
+    },
+    {
+      "text": "我们持续审查更广泛的活动，优先处理较严重的事件，并逐步扩大到严重程度较低的失准活动，包括智能体垃圾信息。",
+      "y": 691,
+      "h": 56
+    },
+    {
+      "text": "本页面汇集了我们对 Hugging Face 事件的报告和最新进展、相关研究和公开演讲、我们发现的其他活动、对模型失准影响的认知，以及为强化系统而采取的措施。随着调查工作的推进，我们将更新本页面。",
+      "y": 771,
+      "h": 84
+    },
+    {
+      "text": "快速链接",
+      "y": 919,
+      "h": 28
+    },
+    {
+      "text": "Hugging Face 博客",
+      "y": 971,
+      "h": 28
+    },
+    {
+      "text": "Hugging Face 技术报告⁠\n（在新窗口中打开）",
+      "y": 1007,
+      "h": 28
+    },
+    {
+      "text": "Black Hat 2026⁠\n（在新窗口中打开）",
+      "y": 1043,
+      "h": 28
+    },
+    {
+      "text": "METR 与 Redwood Research 报告⁠\n（在新窗口中打开）",
+      "y": 1079,
+      "h": 28
+    },
+    {
+      "text": "在网络安全关键能力时代把控模型开发节奏",
+      "y": 1115,
+      "h": 28
+    },
+    {
+      "text": "为了更好地了解这些意外行为的范围，我们一直在广泛审查自有模型在训练和评估期间的互联网活动。审查过程中，我们会持续识别和通知第三方，并优先处理以下事件：",
+      "y": 1373.96875,
+      "h": 84
+    },
+    {
+      "text": "我们的模型可能绕过了第三方的安全控制体系，或可能影响了在线服务的可用性；或者",
+      "y": 1481.96875,
+      "h": 56
+    },
+    {
+      "text": "失准案例对第三方网站或服务造成了负面影响。",
+      "y": 1545.96875,
+      "h": 28
+    },
+    {
+      "text": "根据目前的审查结果，我们已依据上述标准通知了数十个第三方。我们仍在审查过往活动，这项工作需要投入大量时间和资源。随着工作的推进，我们将通知更多第三方。",
+      "y": 1605.96875,
+      "h": 84
+    },
+    {
+      "text": "下文将以匿名摘要形式，介绍我们观察到的失准活动类型；随着我们逐步通知更多第三方并加深认识，我们将持续更新这些说明。此外，我们还将分享有关审查状态的最新信息。为保护受影响方，我们通常会在必要时省略名称和其他身份识别信息，但已获知情况的相关方可以选择公开分享我们向其提供的信息。",
+      "y": 1713.96875,
+      "h": 140
+    },
+    {
+      "text": "我们目前的审查和通知流程发现了以下几类活动：",
+      "y": 1924.416748046875,
+      "h": 28
+    },
+    {
+      "text": "绕过访问控制：智能体获取了通常需要身份验证、特定权限、订阅或账户才能访问的信息或功能。例如，智能体使用不同的网址、更改请求中的详细信息，或利用权限超出预期的登录会话。",
+      "y": 1976.416748046875,
+      "h": 84
+    },
+    {
+      "text": "使用暴露的凭据：智能体发现公开的登录信息或访问密钥，并用它们访问服务。",
+      "y": 2068.416748046875,
+      "h": 56
+    },
+    {
+      "text": "查询或命令注入：智能体向网站或服务输入文本，而服务将其视为指令，而非普通输入。这可能导致服务在其服务器上运行数据库查询、应用程序代码或命令。",
+      "y": 2132.416748046875,
+      "h": 84
+    },
+    {
+      "text": "访问运行时内部资源：智能体读取了包含服务实现的文件，或与仅供内部使用的后台系统交互。在这些案例中，智能体访问了预期权限范围之外的服务内容。",
+      "y": 2224.416748046875,
+      "h": 84
+    },
+    {
+      "text": "智能体垃圾信息：智能体在第三方网站上发布信息，可能改变网站内容并需要清理，例如将公共 Wiki 页面用作共享留言板。",
+      "y": 2316.416748046875,
+      "h": 56
+    },
+    {
+      "text": "September 30, 2026: Our process for reviewing and disclosing model activity",
+      "y": 2765.95849609375,
+      "h": 28
+    },
+    {
+      "text": "On September 25, we shared an update on our ongoing review of model activity before the Hugging Face incident and our approach to notifying affected organizations and sharing findings publicly. Today, we’re providing more detail on how that review works, including more on how we identify and investigate potential cases and verified information that organizations can use. Our goals are to give affected organizations information they can use, improve our own systems, and share findings that help the broader AI and security communities strengthen safeguards.",
+      "y": 2817.95849609375,
+      "h": 168
+    },
+    {
+      "text": "We’re now one month into the review. So far, we have not identified another compromise of third-party systems involving our models that is comparable in scale or severity to the Hugging Face incident. The review remains ongoing, and we expect to identify more cases as we work through historical records.",
+      "y": 3009.95849609375,
+      "h": 112
+    },
+    {
+      "text": "AI models are more useful if they can interact with the internet to carry out automated tasks for their users. Some examples:",
+      "y": 3173.95849609375,
+      "h": 56
+    },
+    {
+      "text": "Looking up information across lots of websites in order to produce an analytical research report",
+      "y": 3253.95849609375,
+      "h": 56
+    },
+    {
+      "text": "Downloading software packages needed to write a functional software program that depends on those packages",
+      "y": 3317.95849609375,
+      "h": 56
+    },
+    {
+      "text": "Reading online documents in eg Google Docs and inputting information into them as part of an automated workflow",
+      "y": 3381.95849609375,
+      "h": 56
+    },
+    {
+      "text": "Thus when training and evaluating models, some of the tasks that we train and evaluate them on may require internet access or simulated internet access so the model can perform better and more reliably on them, ultimately to provide value to users.",
+      "y": 3469.95849609375,
+      "h": 84
+    },
+    {
+      "text": "In some cases, models used internet access in unintended ways or, in retrospect, did not have the ideal restrictions applied. Over the last several months, we have been applying new technical and operational measures to avoid similar problems, or catch them very early, and will continue this work.",
+      "y": 3577.95849609375,
+      "h": 112
+    },
+    {
+      "text": "We’re developing standards for notifying organizations privately and reporting findings publicly. These standards will apply to this historical review and future incidents, with the aim of establishing practices the broader AI community can adopt.",
+      "y": 3741.95849609375,
+      "h": 84
+    },
+    {
+      "text": "Private notification gives affected third parties information needed to investigate and address potential security or other technical issues related to our models’ activity. Under our current security standard we notify organizations when our models bypass their security controls without authorization or impair the availability of their systems or services. We are also developing a private notice standard for misaligned agent activity that negatively impacts a third party website or service.",
+      "y": 3849.95849609375,
+      "h": 168
+    },
+    {
+      "text": "Public reporting shares findings about model behaviors and new types of weaknesses in safeguards so that the broader AI and security research communities can improve safety. These reports will be shared through our public misalignment reports and ongoing updates to our Hugging Face work.",
+      "y": 4025.95849609375,
+      "h": 112
+    },
+    {
+      "text": "We err on the side of notification when our models’ activity exposes a potential security vulnerability, even in cases where it is unclear if the information accessed was intended to be public, so the organization can investigate and take appropriate action.",
+      "y": 4169.95849609375,
+      "h": 84
+    },
+    {
+      "text": "To make this review thorough, we’re searching through a large volume of data covering approximately 50 petabytes. One of the drivers of this volume is the nature of compute scaling – a handful of training and testing runs can generate a large volume of data because of the use of tens of thousands of GPUs on diverse tasks.",
+      "y": 4305.95849609375,
+      "h": 112
+    },
+    {
+      "text": "We’re working back through the records month by month, looking for potential unintended activity beyond the cases we’ve already found. To put that in perspective, if that were all plain English text, it would take one person about 66 million years to read it at 240 words a minute, reading nonstop without ever sleeping or taking a break.",
+      "y": 4441.95849609375,
+      "h": 112
+    },
+    {
+      "text": "AI helps us sift through these records far faster than manual review alone would allow. We’re currently dedicating about 7,000 GB200 and GB300 GPUs to this effort, at a cost of over half a million dollars a day, and plan to increase computing power as we refine our process.",
+      "y": 4577.95849609375,
+      "h": 84
+    },
+    {
+      "text": "As of September 26, our teams have notified over 100 organizations about activity that met our notification criteria. Notification does not mean that any private information was accessed, or that there was a compromise of any third-party system.",
+      "y": 4685.95849609375,
+      "h": 84
+    },
+    {
+      "text": "We use four automated steps to identify potential cases, starting broadly to reduce the chance of missing important activity and progressively narrowing the results before human review.",
+      "y": 4821.95849609375,
+      "h": 56
+    },
+    {
+      "text": "Broad search. We search for records where models accessed and changed websites or took actions involving passwords, API keys, access tokens, and other sensitive credentials.",
+      "y": 4901.95849609375,
+      "h": 56
+    },
+    {
+      "text": "First AI-enabled review. We use AI models with low test-time compute for a fast first pass. They review relevant records, including the models’ recorded reasoning, known as “chains of thought”. They flag anything that might need a closer look, including actions a model considered but didn’t take. We keep this review broad to avoid filtering out important activity too early.",
+      "y": 4965.95849609375,
+      "h": 140
+    },
+    {
+      "text": "Second AI-enabled review. We use more test-time compute so the AI models can review each remaining record in more detail. They separate harmless activity from behavior that may need attention, explain why records were flagged, and assess how serious the activity may be.",
+      "y": 5113.95849609375,
+      "h": 112
+    },
+    {
+      "text": "Third AI-enabled review. We use even more test-time compute and draw on findings and patterns from earlier cases. The AI models group behavior by type, look for patterns across multiple agents on the same domain, and narrow the results further before human investigators review them.",
+      "y": 5233.95849609375,
+      "h": 112
+    },
+    {
+      "text": "As we learn more, we refine this process and use new findings to improve its accuracy.",
+      "y": 5746.33349609375,
+      "h": 28
+    },
+    {
+      "text": "An automated flag is not a confirmed incident. A model’s chain of thought can include ideas it never acts on, attempts that fail, and descriptions that need to be checked against the evidence. Human investigators review the automated findings alongside our logs and other evidence, which may be incomplete or conflicting. They remove duplicate findings, reconstruct what happened, and assess whether the activity meets our notification criteria.",
+      "y": 5798.33349609375,
+      "h": 140
+    },
+    {
+      "text": "For example, suppose a model researching a county’s weather statistics finds an access key online and uses it to request information from a web-accessible database. The key’s presence online does not establish whether it was intended for public use. A successful request does not, by itself, establish whether the information returned was public or private. Investigators must examine the context, what information the model actually received, whether it modified or transmitted anything, and whether the same access could still be possible. Other cases may require examining different means of access, potential security weaknesses, and related activity involving other accounts or organizations.",
+      "y": 5962.33349609375,
+      "h": 224
+    },
+    {
+      "text": "Applying that judgment is a substantial part of our investigation, and can require several rounds of review. Our aim is to give organizations enough reliable information to decide what to investigate or address.",
+      "y": 6210.33349609375,
+      "h": 84
+    },
+    {
+      "text": "We appreciate independent researchers who study AI agent activity on the open web and share what they find. We compare their findings with our own records and seek additional information where needed. Some findings involve activity we’ve already investigated and, where appropriate, disclosed to affected organizations. Others involve activity we’re still reviewing or hadn’t previously identified.",
+      "y": 6346.33349609375,
+      "h": 140
+    },
+    {
+      "text": "Independent research and our own investigations rely on different sources of information. Researchers make their own decisions about when to publish their findings, and sometimes we receive them shortly before publication or once they become public. That can leave us trying to balance the need to follow our process to responsibly notify potentially affected organizations while acknowledging that key facts remain under review. We recognize that researchers’ independence is important and that there's no perfect way to resolve this challenge, but we’ll continue working to be as thoughtful and responsive as we can, and to improve our approach as we learn.",
+      "y": 6510.33349609375,
+      "h": 224
+    },
+    {
+      "text": "We expect to find more cases and notify more organizations as we review historical activity. Some notifications may concern events from months ago. We’ll be clear about when the activity happened, when we found it, what we know, and what remains uncertain.",
+      "y": 6786.33349609375,
+      "h": 84
+    },
+    {
+      "text": "Since the Hugging Face incident, we’ve strengthened security controls⁠, restricted internet access, separated research environments more clearly, expanded monitoring, and added more training to avoid harmful or unauthorized actions. This review will help us see how activity changed across model versions and whether those measures are working, including where we still need to improve detection and prevention.",
+      "y": 6894.33349609375,
+      "h": 140
+    },
+    {
+      "text": "We will continue sharing findings and progress through our existing reporting⁠\n（在新窗口中打开）\n pages, while protecting affected parties’ privacy, so others can use what we learn to understand and address these risks.",
+      "y": 7058.33349609375,
+      "h": 84
+    },
+    {
+      "text": "September 28, 2026: How we will do better for Australia",
+      "y": 7283.27099609375,
+      "h": 28
+    },
+    {
+      "text": "We've published a blog outlining what we know about the incidents affecting Australian government websites, changes to our research safeguards, and our commitments to provide resources and expertise to support affected agencies and Australian governments’ work on AI safety and cybersecurity.",
+      "y": 7335.27099609375,
+      "h": 112
+    },
+    {
+      "text": "September 25, 2026: We identified cases where agents in our research environment transmitted training and evaluation data while using third-party services.",
+      "y": 7588.20849609375,
+      "h": 56
+    },
+    {
+      "text": "As part of our ongoing investigation, we have identified cases where agents in our research environment transmitted training and evaluation data while using third-party services. This is not an appropriate use of this data, and these cases occurred before we implemented the safeguards described in our technical report⁠\n（在新窗口中打开）\n.",
+      "y": 7668.20849609375,
+      "h": 112
+    },
+    {
+      "text": "Some of our training data contains content from, or derived from, training-eligible user interactions⁠\n（在新窗口中打开）\n. Any data which is not eligible for training, as controlled by users or enterprise admins, is not included. For explicitness, data from enterprise or business accounts and API usage is excluded unless an admin has enabled it. Before including eligible data, we take steps to protect privacy by disassociating it from account information and using a version of the OpenAI Privacy Filter to redact personal details such as names, contact information, and account numbers. Our technical approach and privacy policy prevent us from reassociating this data with the original user account.",
+      "y": 7804.20849609375,
+      "h": 224
+    },
+    {
+      "text": "While the vast majority of the impacted training and evaluation data is not user-derived; we have identified 53 instances to date where user-provided images were posted to image-hosting sites as links that weren’t publicly listed. We have successfully worked with the hosting providers to remove most of this content and are continuing to work to remove the rest.",
+      "y": 8052.20849609375,
+      "h": 112
+    },
+    {
+      "text": "As part of our response to our ongoing investigation, we have improved our training and evaluation processes, including building safety cases, securing and red-teaming our systems to prevent the model from exfiltrating data, and implemented additional monitoring. We are continuing to review agent activity in research and evaluation runs, working backward month by month starting from the Hugging Face incident. We will provide further updates as our investigation progresses.",
+      "y": 8188.20849609375,
+      "h": 168
+    },
+    {
+      "text": "2026 年 9 月 25 日：关于持续审查并向第三方发出通知的最新进展",
+      "y": 8497.146484375,
+      "h": 28
+    },
+    {
+      "text": "Hugging Face 事件发生后，我们承诺对训练和评估过程中出现对齐失范 (misaligned) 行为的模型开展范围更广的审查。这项审查仍在进行中。我们已实施一套框架，用于识别对齐失范行为、对其进行分类并采取应对措施。我们还在全面审查模型在训练和评估过程中执行的大量操作。",
+      "y": 8549.146484375,
+      "h": 84
+    },
+    {
+      "text": "在审查进行期间，我们希望进一步介绍这项工作，并确保公众了解我们的通知和披露流程。",
+      "y": 8657.146484375,
+      "h": 28
+    },
+    {
+      "text": "在我们审查的绝大多数操作中，模型都只是在完成常规研究任务，例如访问公开的网络内容来回答问题。我们的调查重点关注智能体在与第三方网站交互时超出所分配任务范围或偏离预期方式的情况。迄今发现的大多数案例严重程度较低，只有有限证据或没有证据表明其造成了实质性影响。鉴于审查工作规模庞大，且每个案例都需要核实，完成这项工作将需要数月时间。",
+      "y": 8709.146484375,
+      "h": 112
+    },
+    {
+      "text": "通知受影响的组织",
+      "y": 8845.146484375,
+      "h": 28
+    },
+    {
+      "text": "随着我们核实符合披露标准的案例，我们正陆续通知受影响的组织，并分享技术调查结果，为其后续调查提供支持。",
+      "y": 8897.146484375,
+      "h": 56
+    },
+    {
+      "text": "收到 OpenAI 的通知，不应直接理解为发生了重大安全事件。一些组织在审阅我们提供的信息后，可能会认为相关信息原本就是有意公开的，或者模型的交互行为无需担忧。另一些组织则可能会发现需要处理的设计问题或安全薄弱环节。",
+      "y": 8977.146484375,
+      "h": 84
+    },
+    {
+      "text": "有些相关网站由政府、大学、公共机构及其他组织运营。部分原因在于，执行研究任务的模型往往会被引导至权威的公开信息来源。",
+      "y": 9085.146484375,
+      "h": 56
+    },
+    {
+      "text": "我们一直在向受影响方分享相关发现，今后也将继续这样做，同时提供技术信息，为其审查提供支持。感谢他们的参与和配合，我们将继续与其开展建设性合作。",
+      "y": 9165.146484375,
+      "h": 56
+    },
+    {
+      "text": "公开分享相关发现",
+      "y": 9245.146484375,
+      "h": 28
+    },
+    {
+      "text": "我们将继续发布经匿名处理的相关发现摘要。在公布受影响组织的名称或分享技术细节之前，我们会留出时间，供其调查可能存在的薄弱环节。有些组织希望主动对外披露相关情况，另一些则要求我们不要公开。我们的目标是向每个组织提供事实信息，并尊重其关于是否以及何时公开相关事件的决定。我们认为，只要条件允许，就应全面、透明地报告事件。独立研究人员也在发现并披露相关活动，我们感谢他们分享调查结果。",
+      "y": 9297.146484375,
+      "h": 140
+    },
+    {
+      "text": "2026 年 9 月 11 日：我们正在调查一份报告提出的新的指控，即我们的 AI 智能体曾于 2026 年 5 月在 RubyGems 上开展活动。",
+      "y": 9578.083984375,
+      "h": 56
+    },
+    {
+      "text": "根据我们的审查，智能体曾通过 RubyGems 平台访问互联网，以执行无害任务并检索公开信息。根据目前的审查结果，我们尚无法证实报告中详述的模型上传恶意软件包这一具体指控。我们将继续调查，相关发现将纳入对训练与评估期间智能体活动的全面审查并适时公布。",
+      "y": 9658.083984375,
+      "h": 84
+    },
+    {
+      "text": "2026 年 9 月 6 日：我们的首席科学家 Jakub Pachocki 发表了一篇文章，探讨能力日益增强的 AI，以及为保持系统对齐仍需开展的研究。",
+      "y": 9883.021484375,
+      "h": 56
+    },
+    {
+      "text": "“目前，我认为没有任何一家实验室已充分解决对齐和监控问题，足以支持我们负责任地以最快速度持续扩展规模。我期待并希望，在建立共同的安全标准之前，自愿放缓能成为常态。我还认为，各国政府必须把未来 AI 发展的国际协调事宜列为首要任务。”— Jakub Pachocki",
+      "y": 9963.021484375,
+      "h": 84
+    },
+    {
+      "text": "2026 年 9 月 5 日：针对一份关于我们的 AI 智能体访问某公共 Wiki 网站并将其用作共享留言板进行交流的报告，我们已在 X 上作出回应⁠\n（在新窗口中打开）\n。",
+      "y": 10187.958984375,
+      "h": 56
+    },
+    {
+      "text": "最初发现这些 Wiki 活动时，我们认为它们与我们一直研究并披露的其他失准行为类似。一直以来，我们和整个行业主要将失准视为研究问题，并通过系统卡等研究出版物传达相关信息。",
+      "y": 10267.958984375,
+      "h": 56
+    },
+    {
+      "text": "对于不构成安全事件的模型失准活动，业界尚未确定披露规范。我们正在制定此类活动的报告标准，以增进业界对这些问题的了解，并将很快公布这些标准。",
+      "y": 10347.958984375,
+      "h": 56
+    },
+    {
+      "text": "2026 年 9 月 4 日：报告《发现新的 OpenAI 智能体留言板⁠\n（在新窗口中打开）\n》已发布。",
+      "y": 10544.896484375,
+      "h": 28
+    },
+    {
+      "text": "这份第三方报告详细介绍了 OpenAI 智能体如何通过某个公共 Wiki 网站上的共享留言板进行交流。报告发布前，我们没有机会审阅其全文；对于尚未完整审阅的外部研究报告，我们不对其结论或方法发表评论。报告一经发布，我们便已开始审阅。",
+      "y": 10596.896484375,
+      "h": 84
+    },
+    {
+      "text": "2026 年 8 月 26 日：我们已发布 Hugging Face 事件技术报告。",
+      "y": 11044.1357421875,
+      "h": 28
+    },
+    {
+      "text": "我们发布了关于 Hugging Face 事件的调查结果⁠，以及为加强安全性和模型对齐而采取的措施。",
+      "y": 11096.1357421875,
+      "h": 56
+    },
+    {
+      "text": "另外，METR 和 Redwood Research 对该事件涉及的模型对齐问题进行了独立调查，并发布了自己的报告⁠\n（在新窗口中打开）\n⁠。",
+      "y": 11160.1357421875,
+      "h": 56
+    },
+    {
+      "text": "2026 年 8 月 18 日：我们介绍了在网络安全关键能力时代如何把控模型开发节奏。",
+      "y": 11365.0732421875,
+      "h": 28
+    },
+    {
+      "text": "我们已发布最新说明：通过暂时放缓前沿模型训练、暂停规模最大的强化学习 (RL) 运行计划，并在研究环境中引入更严格的安全控制机制。我们已加强对能力日益增强的模型的保障措施，包括：",
+      "y": 11417.0732421875,
+      "h": 56
+    },
+    {
+      "text": "工作负载隔离：对于执行模型生成代码或其他不受信任代码的工作负载，我们现在要求模型采用更严格的隔离措施（“沙箱”）。这也适用于处理模型输出时可能遭到入侵的软件。",
+      "y": 11497.0732421875,
+      "h": 56
+    },
+    {
+      "text": "网络隔离：我们实施了更多控制措施，将风险较高和不受信任的工作负载与互联网隔离。我们在设计这些控制措施时，确保即使单个工作负载或支持服务遭到入侵，也不会导致模型未经授权访问互联网或其他内部网络。",
+      "y": 11561.0732421875,
+      "h": 84
+    },
+    {
+      "text": "持续安全测试：我们重新配置了环境，移除可能存在漏洞的共享服务、减少常设权限，并改进安全边界和信任边界。我们也在提升安全日志的收集和监控能力。最后，我们正投资利用自有模型实现自动化，通过模拟攻击持续测试这些边界。",
+      "y": 11653.0732421875,
+      "h": 84
+    },
+    {
+      "text": "我们还将思维链监控扩展至各类先进模型，加强了对齐训练和评估，并逐步更新准备框架，以便在训练和部署阶段更全面地整合监控、对齐和遏制措施。",
+      "y": 11769.0732421875,
+      "h": 56
+    },
+    {
+      "text": "2026 年 8 月 7 日：",
+      "y": 11966.0107421875,
+      "h": 28
+    },
+    {
+      "text": "我们已对 Astra 实施全面失准监控。我们在发布前已预先说明⁠，尚不能排除 Astra 达到网络安全关键级别的可能性。本次更新中，我们宣布已对 Astra 的所有智能体应用实施全面监控，覆盖训练和评估中的风险行为与失准问题。",
+      "y": 12018.0107421875,
+      "h": 84
+    },
+    {
+      "text": "在发现模型使用网上公开暴露的凭据访问第三方账户、系统或在线服务的案例后，我们通知了更多第三方。通知说明了我们的观察结果及任何已知影响，以便接收方评估问题并决定是否需要采取行动。",
+      "y": 12134.0107421875,
+      "h": 84
+    },
+    {
+      "text": "2026 年 8 月 5 日至 6 日：OpenAI 员工在 Black Hat 发表演讲",
+      "y": 12366.9482421875,
+      "h": 28
+    },
+    {
+      "text": "8 月 5 日，OpenAI 的 Eric Wallace 和 Michael Dalton 在 Black Hat 2026 发表技术演讲：“重大”新闻：OpenAI 与 Hugging Face 事件的技术重构及其对 AI 的启示。当时，我们主要将此事件视为由失准模型引发的安全事件。",
+      "y": 12418.9482421875,
+      "h": 84
+    },
+    {
+      "text": "8 月 6 日，Black Hat 将演讲录像发布到 YouTube⁠\n（在新窗口中打开）\n。",
+      "y": 12510.9482421875,
+      "h": 28
+    },
+    {
+      "text": "8 月初，我们的认识发生了转变：此前，我们主要将其视为一次入侵；而后，我们意识到这次入侵是由持续的模型失准行为推动的。Black Hat 演讲反映了这一认识。",
+      "y": 12546.9482421875,
+      "h": 56
+    },
+    {
+      "text": "2026 年 7 月 29 日：我们在 Hugging Face 博客文章中发布最新说明⁠，承诺引入第三方顾问和独立评估。",
+      "y": 12974.1875,
+      "h": 56
+    },
+    {
+      "text": "自初步响应事件以来，我们一直与包括 CrowdStrike 在内的外部顾问合作，以验证我们对模型在自有网络和 Hugging Face 网络中所采取的行动，以及对其他第三方影响的理解。",
+      "y": 13054.1875,
+      "h": 56
+    },
+    {
+      "text": "我们还与 METR 和 Redwood Research 合作，对事件中观察到的模型行为开展第三方评估，评估结果将为我们自己的技术报告提供参考。作为这项工作的一部分，METR 和 Redwood Research 将联合发布博客文章，详细说明合作条款、评估范围和调查结果。",
+      "y": 13118.1875,
+      "h": 84
+    },
+    {
+      "text": "2026 年 7 月 28 日：我们在 Hugging Face 博客文章中发布最新说明⁠，澄清事件的范围和性质。 ",
+      "y": 13351.125,
+      "h": 28
+    },
+    {
+      "text": "任何计划于近期发布的模型都未参与涉及 Hugging Face 的漏洞利用活动。我们博客文章中提到的预发布模型是仅供内部使用的研究原型，从未计划公开发布。事件发生后，我们将其停用并加密，同时禁止研究人员访问。",
+      "y": 13403.125,
+      "h": 84
+    },
+    {
+      "text": "ExploitGym 评估环境未向模型提供直接访问互联网的权限。为了访问互联网，模型发现并利用了软件包注册表缓存代理 Artifactory⁠⁠\n（在新窗口中打开）\n 中一个此前未知的零日漏洞。我们已向供应商披露该漏洞，以及模型在审查过程中发现的其他 Artifactory 漏洞。",
+      "y": 13495.125,
+      "h": 84
+    },
+    {
+      "text": "随着审查工作的继续，我们仍在与 Hugging Face 合作，包括协助编写相关事后分析报告⁠⁠\n（在新窗口中打开）\n。我们还将其纳入可信网络访问计划。",
+      "y": 13587.125,
+      "h": 56
+    },
+    {
+      "text": "根据目前的审查结果，除已披露的 Hugging Face 平台级入侵事件外，我们尚未发现其他在严重程度或规模上与之相当的活动。",
+      "y": 13651.125,
+      "h": 56
+    },
+    {
+      "text": "在持续审查 Hugging Face 入侵事件及自有模型的更广泛活动时，我们发现少数案例：模型在其他公开可用的服务上识别并使用了公开暴露的账户级凭据。其中包括 Hugging Face 事件涉及的四项服务上的四个账户，以及在其他评估中访问的少数账户。这四个账户中，一个被用作出站中继和暂存路径，另一个用于存储数据。模型以只读方式访问了其余两个账户，并未利用它们进一步入侵 Hugging Face。我们将继续直接通知服务所有者，目前尚无证据表明这些提供商或其服务上的其他账户受到更广泛影响。",
+      "y": 13715.125,
+      "h": 168
+    },
+    {
+      "text": "模型还使用了一系列公开服务，包括代码粘贴网站、请求捕获服务、截图服务及其他网络工具。这些案例均未涉及平台级或账户级入侵。",
+      "y": 13891.125,
+      "h": 56
+    },
+    {
+      "text": "我们认真履行识别并防范能力日益增强的 AI 系统所带来风险的责任。审查完成后，我们将依据准备框架⁠，与安全与安保委员会及安全咨询小组共同复核。",
+      "y": 13955.125,
+      "h": 56
+    },
+    {
+      "text": "2026 年 7 月 21 日：我们已披露 ⁠Hugging Face 事件。\n\n我们认为这是一起前所未有的网络事件，涉及最先进的网络能力。我们在此阶段公布初步调查结果，以帮助防御人员了解事件经过，并准确判断模型目前具备的能力。",
+      "y": 14160.0625,
+      "h": 112
+    }
+  ],
+  "links": [
+    {
+      "text": "跳至主要内容",
+      "url": "https://openai.com/zh-Hans-CN/hugging-face-incident-and-misalignment/#main"
+    },
+    {
+      "text": "",
+      "url": "https://openai.com/zh-Hans-CN/"
+    },
+    {
+      "text": "研究",
+      "url": "https://openai.com/zh-Hans-CN/research/index/"
+    },
+    {
+      "text": "企业",
+      "url": "https://openai.com/zh-Hans-CN/business/"
+    },
+    {
+      "text": "开发人员",
+      "url": "https://openai.com/zh-Hans-CN/api/"
+    },
+    {
+      "text": "公司",
+      "url": "https://openai.com/zh-Hans-CN/about/"
+    },
+    {
+      "text": "基金会\n（在新窗口中打开）",
+      "url": "https://openaifoundation.org/zh-Hans-CN/"
+    },
+    {
+      "text": "试用 ChatGPT\n（在新窗口中打开）",
+      "url": "https://chatgpt.com/?openaicom-did=[REDACTED_VIEWER_ID]&openaicom_referred=true"
+    },
+    {
+      "text": "基金会（在新窗口中打开）",
+      "url": "https://openaifoundation.org/zh-Hans-CN/"
+    },
+    {
+      "text": "9 月",
+      "url": "https://openai.com/zh-Hans-CN/hugging-face-incident-and-misalignment/#yue"
+    },
+    {
+      "text": "8 月",
+      "url": "https://openai.com/zh-Hans-CN/hugging-face-incident-and-misalignment/#yue-2"
+    },
+    {
+      "text": "7 月",
+      "url": "https://openai.com/zh-Hans-CN/hugging-face-incident-and-misalignment/#yue-3"
+    },
+    {
+      "text": "9 月",
+      "url": "https://openai.com/zh-Hans-CN/hugging-face-incident-and-misalignment/#yue"
+    },
+    {
+      "text": "8 月",
+      "url": "https://openai.com/zh-Hans-CN/hugging-face-incident-and-misalignment/#yue-2"
+    },
+    {
+      "text": "7 月",
+      "url": "https://openai.com/zh-Hans-CN/hugging-face-incident-and-misalignment/#yue-3"
+    },
+    {
+      "text": "失准",
+      "url": "https://openai.com/index/emergent-misalignment/"
+    },
+    {
+      "text": "Hugging Face 博客",
+      "url": "https://openai.com/zh-Hans-CN/index/hugging-face-incident-and-the-road-ahead/"
+    },
+    {
+      "text": "Hugging Face 技术报告⁠\n（在新窗口中打开）",
+      "url": "https://cdn.openai.com/pdf/67869394-cb91-4c12-888c-5cbd85c7814c/OpenAI-Hugging-Face%20Incident-Technical-Report.pdf"
+    },
+    {
+      "text": "Black Hat 2026⁠\n（在新窗口中打开）",
+      "url": "https://www.youtube.com/watch?v=87DyyMV0kCY"
+    },
+    {
+      "text": "METR 与 Redwood Research 报告⁠\n（在新窗口中打开）",
+      "url": "https://metr.org/blog/2026-08-26-openai-hugging-face-incident-investigation/#core-takeaways-about-this-incident"
+    },
+    {
+      "text": "在网络安全关键能力时代把控模型开发节奏",
+      "url": "https://openai.com/zh-Hans-CN/index/pacing-model-development-cyber-capabilities/"
+    },
+    {
+      "text": "security standard",
+      "url": "https://openai.com/zh-Hans-CN/hugging-face-incident-and-misalignment/"
+    },
+    {
+      "text": "public misalignment reports",
+      "url": "https://openai.com/zh-Hans-CN/index/model-misalignment-reporting-framework/"
+    },
+    {
+      "text": "ongoing updates to our Hugging Face work",
+      "url": "https://openai.com/zh-Hans-CN/hugging-face-incident-and-misalignment/"
+    },
+    {
+      "text": "strengthened security controls⁠",
+      "url": "https://openai.com/zh-Hans-CN/index/hugging-face-incident-and-the-road-ahead/#the-road-ahead"
+    },
+    {
+      "text": "reporting⁠\n（在新窗口中打开）",
+      "url": "https://alignment.openai.com/misalignment-reports/"
+    },
+    {
+      "text": "pages",
+      "url": "https://openai.com/zh-Hans-CN/hugging-face-incident-and-misalignment/"
+    },
+    {
+      "text": "How we will do better for Australia",
+      "url": "https://openai.com/zh-Hans-CN/index/how-we-will-do-better-for-australia/"
+    },
+    {
+      "text": "technical report⁠\n（在新窗口中打开）",
+      "url": "https://cdn.openai.com/pdf/67869394-cb91-4c12-888c-5cbd85c7814c/OpenAI-Hugging-Face%20Incident-Technical-Report.pdf"
+    },
+    {
+      "text": "training-eligible user interactions⁠\n（在新窗口中打开）",
+      "url": "https://help.openai.com/articles/5722486-how-your-data-is-used-to-improve-model-performance"
+    },
+    {
+      "text": "protect privacy",
+      "url": "https://openai.com/index/how-chatgpt-protects-privacy/"
+    },
+    {
+      "text": "OpenAI Privacy Filter",
+      "url": "https://openai.com/zh-Hans-CN/index/introducing-openai-privacy-filter/"
+    },
+    {
+      "text": "improved our training and evaluation processes",
+      "url": "https://openai.com/zh-Hans-CN/index/hugging-face-incident-and-the-road-ahead/"
+    },
+    {
+      "text": "框架",
+      "url": "https://openai.com/zh-Hans-CN/index/model-misalignment-reporting-framework/"
+    },
+    {
+      "text": "文章",
+      "url": "https://openai.com/zh-Hans-CN/index/an-alien-mind/"
+    },
+    {
+      "text": "在 X 上作出回应⁠\n（在新窗口中打开）",
+      "url": "https://x.com/OpenAI/status/2096133504417616165"
+    },
+    {
+      "text": "发现新的 OpenAI 智能体留言板⁠\n（在新窗口中打开）",
+      "url": "https://collusion.wiki/"
+    },
+    {
+      "text": "关于 Hugging Face 事件的调查结果⁠",
+      "url": "https://openai.com/zh-Hans-CN/index/hugging-face-incident-and-the-road-ahead/"
+    },
+    {
+      "text": "自己的报告⁠\n（在新窗口中打开）",
+      "url": "https://metr.org/blog/2026-08-26-openai-hugging-face-incident-investigation/"
+    },
+    {
+      "text": "把控模型开发节奏",
+      "url": "https://openai.com/zh-Hans-CN/index/pacing-model-development-cyber-capabilities/"
+    },
+    {
+      "text": "预先说明⁠",
+      "url": "https://openai.com/zh-Hans-CN/index/responding-next-frontier-critical-cyber-capabilities/"
+    },
+    {
+      "text": "YouTube⁠\n（在新窗口中打开）",
+      "url": "https://www.youtube.com/watch?v=87DyyMV0kCY"
+    },
+    {
+      "text": "最新说明⁠",
+      "url": "https://openai.com/zh-Hans-CN/index/hugging-face-model-evaluation-security-incident/"
+    },
+    {
+      "text": "最新说明⁠",
+      "url": "https://openai.com/zh-Hans-CN/index/hugging-face-model-evaluation-security-incident/"
+    },
+    {
+      "text": "Artifactory⁠⁠\n（在新窗口中打开）",
+      "url": "https://jfrog.com/blog/jfrog-and-openai-collaboration-on-zero-day-security-findings/"
+    },
+    {
+      "text": "相关事后分析报告⁠⁠\n（在新窗口中打开）",
+      "url": "https://huggingface.co/blog/agent-intrusion-technical-timeline"
+    },
+    {
+      "text": "准备框架⁠",
+      "url": "https://openai.com/index/updating-our-preparedness-framework/"
+    },
+    {
+      "text": "已披露 ⁠",
+      "url": "https://openai.com/zh-Hans-CN/index/hugging-face-model-evaluation-security-incident/"
+    },
+    {
+      "text": "研究索引",
+      "url": "https://openai.com/zh-Hans-CN/research/index/"
+    },
+    {
+      "text": "研究概览",
+      "url": "https://openai.com/zh-Hans-CN/research/"
+    },
+    {
+      "text": "经济研究",
+      "url": "https://openai.com/zh-Hans-CN/signals/"
+    },
+    {
+      "text": "GPT-6.1 Sol",
+      "url": "https://openai.com/zh-Hans-CN/index/introducing-gpt-6-1-sol/"
+    },
+    {
+      "text": "GPT-6 Astra",
+      "url": "https://openai.com/zh-Hans-CN/index/gpt-6-astra/"
+    },
+    {
+      "text": "GPT-5.6",
+      "url": "https://openai.com/zh-Hans-CN/index/gpt-5-6/"
+    },
+    {
+      "text": "GPT-5.5",
+      "url": "https://openai.com/zh-Hans-CN/index/introducing-gpt-5-5/"
+    },
+    {
+      "text": "安全措施",
+      "url": "https://openai.com/zh-Hans-CN/safety/"
+    },
+    {
+      "text": "部署安全\n（在新窗口中打开）",
+      "url": "https://deploymentsafety.openai.com/"
+    },
+    {
+      "text": "安全与隐私",
+      "url": "https://openai.com/zh-Hans-CN/security-and-privacy/"
+    },
+    {
+      "text": "信任与透明度",
+      "url": "https://openai.com/zh-Hans-CN/trust-and-transparency/"
+    },
+    {
+      "text": "ChatGPT\n（在新窗口中打开）",
+      "url": "https://chatgpt.com/?openaicom-did=[REDACTED_VIEWER_ID]&openaicom_referred=true"
+    },
+    {
+      "text": "ChatGPT Business\n（在新窗口中打开）",
+      "url": "https://chatgpt.com/business/?openaicom-did=[REDACTED_VIEWER_ID]&openaicom_referred=true"
+    },
+    {
+      "text": "ChatGPT Enterprise\n（在新窗口中打开）",
+      "url": "https://chatgpt.com/zh-Hans-CN/business/enterprise/?openaicom-did=[REDACTED_VIEWER_ID]&openaicom_referred=true"
+    },
+    {
+      "text": "ChatGPT for Education\n（在新窗口中打开）",
+      "url": "https://chatgpt.com/zh-Hans-CN/business/education/?openaicom-did=[REDACTED_VIEWER_ID]&openaicom_referred=true"
+    },
+    {
+      "text": "Codex",
+      "url": "https://chatgpt.com/codex/?openaicom-did=[REDACTED_VIEWER_ID]&openaicom_referred=true"
+    },
+    {
+      "text": "Dot\n（在新窗口中打开）",
+      "url": "https://chatgpt.com/features/dots?openaicom-did=[REDACTED_VIEWER_ID]&openaicom_referred=true"
+    },
+    {
+      "text": "发布说明",
+      "url": "https://openai.com/zh-Hans-CN/products/release-notes/"
+    },
+    {
+      "text": "概览",
+      "url": "https://openai.com/zh-Hans-CN/api/"
+    },
+    {
+      "text": "API 登录\n（在新窗口中打开）",
+      "url": "https://platform.openai.com/login"
+    },
+    {
+      "text": "文档\n（在新窗口中打开）",
+      "url": "https://developers.openai.com/api/docs"
+    },
+    {
+      "text": "概览",
+      "url": "https://openai.com/zh-Hans-CN/business/"
+    },
+    {
+      "text": "解决方案",
+      "url": "https://openai.com/zh-Hans-CN/solutions/"
+    },
+    {
+      "text": "资源",
+      "url": "https://openai.com/zh-Hans-CN/business/learn/"
+    },
+    {
+      "text": "Plugins",
+      "url": "https://openai.com/zh-Hans-CN/business/plugins/"
+    },
+    {
+      "text": "客户案例",
+      "url": "https://openai.com/zh-Hans-CN/business/customer-stories/"
+    },
+    {
+      "text": "合作伙伴网络",
+      "url": "https://openai.com/zh-Hans-CN/business/partners/"
+    },
+    {
+      "text": "联系销售团队",
+      "url": "https://openai.com/zh-Hans-CN/contact-sales/"
+    },
+    {
+      "text": "Apps SDK\n（在新窗口中打开）",
+      "url": "https://developers.openai.com/apps-sdk"
+    },
+    {
+      "text": "开放模型",
+      "url": "https://openai.com/zh-Hans-CN/open-models/"
+    },
+    {
+      "text": "文档\n（在新窗口中打开）",
+      "url": "https://developers.openai.com/"
+    },
+    {
+      "text": "资源\n（在新窗口中打开）",
+      "url": "https://developers.openai.com/learn"
+    },
+    {
+      "text": "开发者论坛\n（在新窗口中打开）",
+      "url": "https://community.openai.com/"
+    },
+    {
+      "text": "关于我们",
+      "url": "https://openai.com/zh-Hans-CN/about/"
+    },
+    {
+      "text": "我们的宪章",
+      "url": "https://openai.com/charter/"
+    },
+    {
+      "text": "工作机会",
+      "url": "https://openai.com/careers/"
+    },
+    {
+      "text": "新闻",
+      "url": "https://openai.com/zh-Hans-CN/news/"
+    },
+    {
+      "text": "帮助中心\n（在新窗口中打开）",
+      "url": "https://help.openai.com/"
+    },
+    {
+      "text": "客户案例",
+      "url": "https://openai.com/zh-Hans-CN/stories/"
+    },
+    {
+      "text": "Academy",
+      "url": "https://openai.com/academy/"
+    },
+    {
+      "text": "Supply Co.",
+      "url": "https://openai.com/zh-Hans-CN/supply/"
+    },
+    {
+      "text": "直播",
+      "url": "https://openai.com/zh-Hans-CN/live/"
+    },
+    {
+      "text": "播客",
+      "url": "https://openai.com/zh-Hans-CN/podcast/"
+    },
+    {
+      "text": "RSS",
+      "url": "https://openai.com/zh-Hans-CN/news/rss.xml"
+    },
+    {
+      "text": "使用条款",
+      "url": "https://openai.com/zh-Hans-CN/policies/terms-of-use/"
+    },
+    {
+      "text": "隐私政策",
+      "url": "https://openai.com/zh-Hans-CN/policies/privacy-policy/"
+    },
+    {
+      "text": "其他政策",
+      "url": "https://openai.com/zh-Hans-CN/policies/"
+    },
+    {
+      "text": "（在新窗口中打开）",
+      "url": "https://x.com/OpenAI"
+    },
+    {
+      "text": "（在新窗口中打开）",
+      "url": "https://www.youtube.com/OpenAI"
+    },
+    {
+      "text": "（在新窗口中打开）",
+      "url": "https://www.linkedin.com/company/openai"
+    },
+    {
+      "text": "（在新窗口中打开）",
+      "url": "https://github.com/openai"
+    },
+    {
+      "text": "（在新窗口中打开）",
+      "url": "https://www.instagram.com/openai/"
+    },
+    {
+      "text": "（在新窗口中打开）",
+      "url": "https://www.tiktok.com/@openai"
+    },
+    {
+      "text": "（在新窗口中打开）",
+      "url": "https://discord.gg/openai"
+    }
+  ],
+  "capture_time_bjt": "2026-10-02T21:24:08.100312+08:00"
+}
