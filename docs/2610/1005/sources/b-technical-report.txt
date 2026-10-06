@@ -1,0 +1,1128 @@
+ textGrain: Entropy-Calibrated Watermarking
+             for Language Model Text
+
+Technical report accompanying OpenAI’s October 5th blog post
+
+         Xiang Li           Garrett Wen      Xiaohong Chen              Qi Long
+
+University of Pennsylvania  Yale University   Yale University  University of Pennsylvania
+
+Arzav Jain  Florent Joly    Mike Lam         Qingquan Song     Weijie Su∗
+
+   OpenAI       OpenAI        OpenAI               OpenAI        OpenAI
+
+                            October 5, 2026
+
+                                                                Abstract
+
+             This technical report provides the mathematical details of the textGrain watermark de-
+        scribed in OpenAI’s October 5th blog post. It speciﬁes the generation and detection procedures,
+        explains how to set a budget for the sampling entropy lost in exchange for a watermark sig-
+        nal, and states the assumptions underlying the theoretical guarantees. The method couples
+        token generation to keyed randomness through an optimal transport problem with costs based
+        on Gumbel random variables and Kullback–Leibler (KL) regularization. The KL divergence
+        from independence equals the reduction in conditional entropy, giving the watermark strength
+        parameter a direct information-theoretic interpretation. To speed up computation, we apply
+        transport to vocabulary blocks, reducing the optimization dimension while preserving relative
+        token probabilities within each block. We analyze how to calibrate the watermark to a chosen
+        entropy-loss budget. The detector requires only the generated text and the secret key and does
+        not need to know the budget used during generation.
+
+1 Introduction
+
+This report is intended for readers of the accompanying blog post who want a precise account of
+how textGrain works. It explains how generation creates dependence on keyed randomness, what
+the entropy budget controls, and how the detector obtains statistical evidence from the text.
+
+     A language model generates text one token at a time, sampling each token (a word or part
+of a word) from a next token prediction (NTP) distribution determined by the preceding text.
+Watermarking embeds a statistical signal by modifying this sampling using pseudorandom values
+derived from a secret key and the preceding context (Kirchenbauer et al., 2023; Aaronson, 2023;
+Dathathri et al., 2024). With the watermark conﬁguration speciﬁed, a detector uses the text and
+key to reconstruct these values and tests for dependence between them and the observed tokens
+(Li et al., 2025a).
+
+     Preserving the NTP distribution provides one way to limit the eﬀect of watermarking on gen-
+eration. A watermark is unbiased if, at any ﬁxed context, averaging its token distribution over
+
+    ∗Correspondence to suw@openai.com.
+
+                                                                1
+a randomly drawn key recovers the original NTP distribution (Hu et al., 2024; Li et al., 2025a;
+Dathathri et al., 2024). In practice, a key is often reused across responses. Unbiasedness alone does
+not ensure that sampling remains random under that key. For example, Gumbel-max watermarking
+selects the token with the largest sum of its log probability and a keyed Gumbel value; at a ﬁxed
+context and key, it always selects the same token (Aaronson, 2023). Repeated generation from the
+same prompt can therefore produce identical responses (Kuditipudi et al., 2024; He et al., 2025b).
+This matters when an application needs several distinct answers or solutions to the same prompt.
+
+    If tokens are independent of the keyed randomness, there is no watermark signal to detect. If
+that randomness determines every token, no further sampling randomness remains. Entropy re-
+duction measures the average sampling randomness removed between these extremes: it compares
+the NTP entropy with the entropy that remains after conditioning on the keyed randomness. An
+unbiased watermark deﬁnes a coupling, a joint distribution of the generated token and keyed ran-
+domness with prescribed marginals (Li et al., 2025a; Xie et al., 2025; Long et al., 2025; Tsur et al.,
+2025; He et al., 2025a; Gloaguen et al., 2026). The average entropy reduction is the mutual infor-
+mation between these variables. Optimal transport (OT) provides a way to choose the coupling:
+its cost favors selected forms of dependence, while KL regularization penalizes departure from in-
+dependence. The KL penalty equals the average entropy reduction, so an entropy budget directly
+limits the average sampling randomness that may be removed.
+
+    textGrain applies OT to keyed blocks of vocabulary tokens. The coupling determines how the
+selected block depends on the keyed randomness; within that block, tokens retain their original
+relative probabilities. This reduces the optimization dimension and preserves unbiasedness when
+the coupling has the required marginals. Section 2 develops the coupling and entropy formulation,
+and Section 3 speciﬁes block generation and detection. The appendices give the numerical solver
+and proofs (Appendix A), compatibility with speculative sampling (Appendix B), and connections
+to related work (Appendix C).
+
+2 Framework: watermarking as OT
+
+Sampling and coupling. Given a token sequence w1:n over a vocabulary V, let Pt denote the
+NTP distribution determined by the preﬁx w1:t−1. At position t, the watermark uses a pseudoran-
+dom value Ξt derived from the secret key and a window of up to Lctx preceding tokens. For a single
+position, we suppress t and write P , Ξ, and W for the NTP distribution, keyed randomness, and
+sampled token. At a ﬁxed preﬁx, a randomly drawn key induces a distribution µ over Ξ. Averaging
+over keys means averaging over Ξ ∼ µ; ﬁxing the keyed randomness means conditioning on Ξ.
+
+    A watermark is unbiased if averaging its conditional token distribution over Ξ ∼ µ recovers
+P . Thus the joint distribution of (W, Ξ) has marginals P and µ. We call this joint distribution a
+coupling π and write Π(P , µ) for the set of all such couplings. Once Ξ = ξ is ﬁxed, the sampling
+distribution is Q(· | ξ) = π(· | Ξ = ξ). Unwatermarked sampling corresponds to the independent
+coupling P ⊗ µ, for which Q(· | ξ) = P for every ξ (Li et al., 2025a). A watermark makes Q(· | ξ)
+depend on ξ while preserving its average over µ.
+
+Regularized OT. OT selects a coupling by minimizing its expected cost subject to ﬁxed
+marginals (Peyré and Cuturi, 2019). We assign each token and randomness pair a cost c(w, ξ),
+with smaller values for pairs favored by the watermark. To limit dependence, we penalize departure
+
+                                                                2
+from the independent coupling using the KL divergence (Kullback and Leibler, 1951; Cover and
+
+Thomas, 2006),
+
+                DKL(π∥P ⊗ µ) =  log    dπ        dπ.
+
+                                       d(P ⊗ µ)
+
+All logarithms are natural. With regularization strength λ > 0, we choose
+
+                πλ ∈ arg min {Eπc(W, Ξ) + λDKL(π∥P ⊗ µ)} .                 (1)
+
+                π∈Π(P ,µ)
+
+The cost favors the selected dependence, while the KL penalty limits it. The marginal constraints
+preserve the NTP distribution after averaging over keys.
+
+Information and entropy. The coupling determines how much sampling randomness remains
+when the keyed randomness is ﬁxed. The NTP entropy is H(P ) = − w∈V Pw log Pw, with 0 log 0 =
+0. Given Ξ = ξ, the remaining sampling entropy is H{Q(· | ξ)}. Averaging this quantity over Ξ
+gives the conditional entropy Hπ(W | Ξ). For any coupling with marginals P and µ (Cover and
+Thomas, 2006),
+
+                             DKL(π∥P ⊗ µ) = Iπ(W ; Ξ) = H(P ) − EΞH{Q(· | Ξ)}.
+
+The KL penalty is therefore exactly the average entropy removed by watermarking. This identity
+concerns an average over the keyed randomness; it does not impose the same entropy loss for every
+ﬁxed key.
+
+3 textGrain: watermarking with block OT
+
+3.1 Watermark embedding
+
+We apply OT to blocks of tokens to reduce the optimization dimension while retaining relative token
+probabilities within each block. An entropy budget limits the average loss of sampling entropy to
+a fraction β ∈ [0, 1] of the NTP entropy. Figure 1 illustrates the construction: partition the
+vocabulary, construct a coupling under the budget, then sample a block and a token. Algorithm 1
+summarizes one generation step.
+
+Vocabulary blocks. Let P be the NTP distribution after any temperature scaling or top-p
+truncation (Holtzman et al., 2020), and let A = {w : Pw > 0} be its support. For a chosen number
+of blocks B, write [B] = {1, . . . , B}. A keyed partition g : V → [B] assigns each token to a block.
+The partition depends only on the key and context window, so the detector can reconstruct it
+without access to P . The block probabilities are
+
+                Pbblk =                Pw, b ∈ [B].                        (2)
+
+                           w∈A:g(w)=b
+
+Coupling under an entropy budget. We couple the block distribution P blk to m equally likely
+columns. A coupling π assigns probability π(b, j) to the pair (b, j), with row sums P blk b and column
+sums 1/m. Selecting a column uniformly and then sampling a block conditional on that column
+therefore recovers P blk on average.
+
+    For each pair (b, j), the key and context window generate a standard Gumbel variab√le Zbj with
+distribution function FG(z) = exp{− exp(−z)}. We standardize it as Gbj = (Zbj−γ)/(π/ 6), where
+
+                                                                3
+a Vocabulary blocks                             b Entropy-constrained OT                        c Token sampling
+
+          Prefix                        Context window +       Key
+The morning was ___
+
+Token distribution        Keyed blocks
+                         warm 0.40
+warm      0.30           calm                      Cost table                  Selected column
+                         cold 0.35
+cold      0.25           sunny                                   Sinkhorn +                     Block probabilities   Within a block  Next token
+                         mild 0.25                             budget update                                    0.04        cold          cold
+mild      0.15           bright                                                                                 0.69
+                                                                                                                0.27       sunny
+calm      0.10
+
+sunny     0.10
+
+bright    0.10
+
+Figure 1: Embedding a watermark with block OT. a, The key and context window divide
+the vocabulary into blocks; each block receives the sum of its tokens’ NTP probabilities. Colors
+distinguish the three blocks in this example. b, OT couples these probabilities to four equally likely
+columns, favoring pairs with smaller costs subject to the entropy budget. The cost table assigns
+a pseudorandom cost to each pair of a block and a column; darker cells indicate smaller costs.
+Circle areas show the coupling probabilities. c, The key and context window select a column. Its
+normalized entries determine the block probabilities; a token is then sampled within the selected
+block using the original relative probabilities. The blue tokens illustrate a context window of two
+tokens, whereas the model uses the full preﬁx. Displayed probabilities are rounded.
+
+Algorithm 1 Embedding a watermark with block OT and an entropy budget
+Require: NTP distribution P , secret key, context window, block count B, column count m, and
+
+     target entropy loss fraction β
+ 1: Construct the keyed partition g
+ 2: Aggregate the block probabilities using (2)
+ 3: Generate the cost table c(b, j) = −Gbj from standardized Gumbel variables
+ 4: Compute a coupling with the prescribed marginals, targeting loss βH(P ) using Algorithm A.1;
+
+     retain its achieved loss and convergence status
+ 5: Select the keyed column J, then sample a block and token using (5)
+
+γ is the Euler–Mascheroni constant and π here is the mathematical constant. Set c(b, j) = −Gbj, so
+minimizing cost favors larger Gumbel values. In the idealized construction, the Zbj are independent
+and identically distributed, and the random draws used for the partition, cost table, and selected
+
+column are independent at a ﬁxed context. Distinct contexts use independent draws. These
+
+assumptions model the keyed pseudorandom functions; repeated contexts reuse the same values.
+
+    Let um = (1/m, . . . , 1/m). Because relative probabilities within each block are unchanged, the
+KL divergence from P blk ⊗ um equals the average loss of NTP entropy across columns. The ideal
+budgeted problem is
+
+                            Bm
+
+                    min                 π(b, j)c(b, j) subject to DKL π P blk ⊗ um ≤ βH(P ).                                          (3)
+          π∈Π(P b=1 blk,um) j=1
+
+Introducing a nonnegative multiplier for the constraint gives the regularized objective. For λ > 0,
+
+we write                                                                                                             
+
+                                                B m                                                                  
+                                                               π(b, j)c(b, j) + λDKL π P blk ⊗ um .
+                     πλ ∈ arg min                                                                                                   (4)
+
+                         π  ∈Π(P  blk   ,um  )     b=1  j  =1
+
+                                                               4
+Here β bounds the allowed entropy loss, while λ penalizes dependence in the objective. Increasing
+β permits more entropy loss; increasing λ cannot increase the loss at an exact optimum (Proposi-
+tion A.1). A zero budget gives the independent coupling. Positive budgets need not be attained
+exactly, because the largest attainable loss depends on the block and column marginals.
+
+    The numerical solver alternates coupling updates with adjustments to λ. It restores the pre-
+scribed marginals before sampling and reports the achieved entropy loss. A ﬁnite iteration limit or
+numerical tolerance can leave that loss above or below the target, so the requested budget alone is
+not a guarantee for the numerical output. Appendix A.1 describes the procedure, and Theorem A.3
+gives a conditional convergence bound.
+
+Token sampling. The key selects a column J that is uniform conditional on the partition and
+cost table in the idealized construction. For any coupling π with the prescribed marginals, the
+conditional block probability is r(b | j) = mπ(b, j). Sampling within the chosen block according to
+the original relative probabilities gives
+
+   Pw
+Q(w | j) = mπ{g(w), j} blk , w ∈ A,  (5)
+   Pg(w)
+
+with Q(w | j) = 0 outside A. The denominator is positive for w ∈ A. This formula applies to both
+exact OT solutions and numerically computed couplings after marginal correction.
+
+    For a ﬁxed partition and cost table, averaging over J recovers the NTP distribution:
+m−1 j Q(w | j) = Pw. Moreover,
+
+                                1 H{Q(· | j)} = H(P ) − DKL π P blk m ⊗ um .
+                               m j=1
+
+A coupling satisfying (3) thus retains at least a fraction 1 − β of NTP entropy on average across
+columns. This is not a lower bound for every column. Preservation of the entire sequence distribu-
+tion additionally requires conditional uniformity at each generation step, as stated in Theorem A.4.
+
+Compatibility with speculative sampling. textGrain can be combined with speculative sam-
+pling while the draft and target models share a secret key (Leviathan et al., 2023; Chen et al.,
+2023). The draft proposes tokens, and the target evaluates the proposals in parallel. Veriﬁcation
+uses the two watermarked conditional distributions to preserve the target’s watermarked output
+law. Appendix B gives the algorithm and its assumptions. The resulting speed depends on proposal
+acceptance and the cost of watermarking both models; distributional equivalence alone does not
+establish a speedup.
+
+3.2 Watermark detection
+
+Reconstructing the scores. The coupling favors pairs of blocks and columns with smaller costs,
+so detection tests whether observed tokens tend to occupy such pairs (Figure 2). The textGrain
+detector uses the same tokenizer, block and column counts, context-window rule, and keyed pseudo-
+random construction as generation. At each scored position, the key and observed context window
+reconstruct the partition, cost table, and selected column. The token identiﬁes its block and hence
+the relevant cost. Reconstruction requires neither the coupling nor the generating model or entropy
+budget.
+
+5
+a Identify token block                 b Recover token score     c Test for watermark
+
+                                       Context window +  Key
+
+     Context window      Keyed blocks  Cost table          Selected column
+
+The morning was         warm                                                   Each scored position  Test statistic  Null distribution
+cold and bright.        calm                                          Transformed                                              Observed value
+                                                                                                        Σ Yt
+                        cold                                               score
+                        sunny
+                                                         Transform
+                        mild
+                        bright                                      Y4
+
+                                                                 Y1, Y2, …, Yn
+
+                                       Selected entry
+
+Figure 2: Detecting the watermark from the observed text. a, The detector identiﬁes the
+block containing the observed token. As in Figure 1, blue text marks a context window of two
+tokens. b, The context window and key reconstruct the cost table and selected column (black
+outline). The cost for the observed block (jade outline) is transformed into the score Y4 for the
+fourth illustrated token, cold. c, Repeating this procedure at the scored positions yields Y1, . . . , Yn.
+Their sum is compared with its distribution under unwatermarked text to test for a watermark.
+
+Detection statistic and calibration. Let ct be the reconstructed√cost at scored position t.
+Undoing standardization gives the original Gumbel value Zt = γ − (π/ 6)ct. We deﬁne
+
+                                       Yt = − log{1 − FG(Zt)},              n
+
+                                                                 Sn = Yt,
+
+                                                                           t=1
+
+where n is the number of scored positions. Smaller costs yield larger scores and therefore larger
+values of Sn.
+
+    For the idealized null calculation, assume the unwatermarked text is independent of the secret
+key and that the independence conditions for the partition, cost table, and column hold. Conditional
+on the text, each reconstructed Zt is then a standard Gumbel variable, so Yt has the unit exponential
+distribution. To avoid reusing the same table, score only the ﬁrst occurrence of each distinct
+context window. Under the assumed independence across distinct contexts, the resulting scores are
+independent and Sn ∼ Gamma(n, 1), with shape n and scale 1. For n ≥ 1, we declare a watermark
+when Sn exceeds this distribution’s (1 − α) quantile. The conditional false positive rate is α under
+these assumptions; with no scored positions, the test makes no detection.
+
+    Ignoring repeated contexts during detection does not enforce the conditional uniformity needed
+for sequence preservation in Theorem A.4. One way to obtain that property is to sample directly
+from the NTP distribution at contexts already used during generation. A ﬁxed deployed key and
+ﬁnite precision arithmetic require empirical calibration checks; the idealized null calculation does
+not by itself guarantee the same error rate for every key or application.
+
+References
+
+Scott Aaronson. Watermarking of large language models. https://simons.berkeley.edu/talks/
+   scott-aaronson-ut-austin-openai-2023-08-17, August 2023.
+
+Jason Altschuler, Jonathan Niles-Weed, and Philippe Rigollet. Near-linear time approximation
+   algorithms for optimal transport via sinkhorn iteration. In Advances in Neural Information
+  Processing Systems, volume 30, 2017.
+
+                                                              6
+Mikhail J Atallah, Victor Raskin, Michael Crogan, Christian Hempelmann, Florian Kerschbaum,
+   Dina Mohamed, and Sanket Naik. Natural language watermarking: Design, analysis, and a
+   proof-of-concept implementation. In Information Hiding, pages 185–200, 2001.
+
+Jose H. Blanchet, T. Tony Cai, Xiang Li, Hao Liu, Qi Long, and Weijie J. Su. Optimal watermark
+   localization in mixed-source large language model texts. arXiv preprint arXiv:2608.14906, 2026.
+
+T Tony Cai, Xiang Li, Qi Long, Weijie J Su, and Garrett G Wen. Optimal detection for language
+  watermarks with pseudorandom collision. arXiv preprint arXiv:2510.22007, 2025.
+
+Zhongze Cai, Shang Liu, Hanzhao Wang, Huaiyang Zhong, and Xiaocheng Li. Towards better
+   statistical understanding of watermarking LLMs. Journal of the American Statistical Association,
+  121(553):247–258, 2026. doi: 10.1080/01621459.2026.2618290.
+
+Charlie Chen, Sebastian Borgeaud, Geoﬀrey Irving, Jean-Baptiste Lespiau, Laurent Sifre, and John
+  Jumper. Accelerating large language model decoding with speculative sampling. arXiv preprint
+  arXiv:2302.01318, 2023. doi: 10.48550/arXiv.2302.01318.
+
+Ruibo Chen, Yihan Wu, Junfeng Guo, and Heng Huang. Improved unbiased watermark for large
+   language models. In Proceedings of the 63rd Annual Meeting of the Association for Com-
+   putational Linguistics (Volume 1: Long Papers), pages 20587–20601, Vienna, Austria, July
+  2025. Association for Computational Linguistics. doi: 10.18653/v1/2025.acl-long.1005. URL
+   https://aclanthology.org/2025.acl-long.1005/.
+
+Xuyang Chen, Xiang Li, Yangxinyu Xie, and Qi Long. Selective disclosure watermarking for large
+   language models. In Forty-third International Conference on Machine Learning, 2026.
+
+Miranda Christ and Sam Gunn. Pseudorandom error-correcting codes. In Annual International
+  Cryptology Conference, pages 325–347. Springer, 2024.
+
+Miranda Christ, Sam Gunn, and Or Zamir. Undetectable watermarks for language models. In
+  Conference on Learning Theory, pages 1125–1139. PMLR, 2024.
+
+Thomas M. Cover and Joy A. Thomas. Elements of Information Theory. Wiley, Hoboken, NJ, 2nd
+   edition, 2006.
+
+Marco Cuturi. Sinkhorn distances: Lightspeed computation of optimal transport. In Advances in
+  Neural Information Processing Systems, volume 26. Curran Associates, Inc., 2013.
+
+Amirhossein Dabiriaghdam and Lele Wang. SimMark: A robust sentence-level similarity-based
+  watermarking algorithm for large language models. In Proceedings of the 2025 Conference on
+  Empirical Methods in Natural Language Processing, pages 30785–30806, Suzhou, China, 2025.
+  Association for Computational Linguistics. doi: 10.18653/v1/2025.emnlp-main.1567. URL
+   https://aclanthology.org/2025.emnlp-main.1567/.
+
+Sumanth Dathathri, Abigail See, Sumedh Ghaisas, Po-Sen Huang, Rob McAdam, Johannes Welbl,
+  Vandana Bachani, Alex Kaskasoli, Robert Stanforth, Tatiana Matejovicova, et al. Scalable wa-
+   termarking for identifying large language model outputs. Nature, 634(8035):818–823, 2024. doi:
+  10.1038/s41586-024-08025-4.
+
+Pierre Fernandez, Antoine Chaﬃn, Karim Tit, Vivien Chappelier, and Teddy Furon. Three bricks
+   to consolidate watermarks for large language models. In 2023 IEEE International Workshop on
+  Information Forensics and Security (WIFS), pages 91–99. IEEE, 2023.
+
+                                                                7
+Jiayi Fu, Xuandong Zhao, Ruihan Yang, Yuansen Zhang, Jiangjie Chen, and Yanghua Xiao. Gum-
+   belSoft: Diversiﬁed language model watermarking via the GumbelMax-trick. In Proceedings of the
+  62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers),
+   pages 5791–5808, Bangkok, Thailand, August 2024. Association for Computational Linguistics.
+   doi: 10.18653/v1/2024.acl-long.315.
+
+Thibaud Gloaguen, Robin Staab, Nikola Jovanović, and Martin Vechev. A uniﬁed framework for
+   LLM watermarks. arXiv preprint arXiv:2602.06754, 2026. URL https://arxiv.org/abs/2602.
+   06754.
+
+Noah Golowich and Ankur Moitra. Edit distance robust watermarks via indexing pseudorandom
+   codes. In Advances in Neural Information Processing Systems, volume 37, 2024. doi: 10.52202/
+   079017-0652.
+
+Haiyun He, Yepeng Liu, Ziqiao Wang, Yongyi Mao, and Yuheng Bu. Theoretically grounded frame-
+  work for LLM watermarking: A distribution-adaptive approach. Advances in Neural Information
+  Processing Systems, 38:114528–114564, 2025a.
+
+Weiqing He, Xiang Li, Tianqi Shang, Li Shen, Weijie J. Su, and Qi Long. On the empirical power
+   of goodness-of-ﬁt tests in watermark detection. In Advances in Neural Information Processing
+  Systems, volume 38, 2025b.
+
+Ari Holtzman, Jan Buys, Li Du, Maxwell Forbes, and Yejin Choi. The curious case of neural text
+   degeneration. In International Conference on Learning Representations, 2020.
+
+Abe Hou, Jingyu Zhang, Tianxing He, Yichen Wang, Yung-Sung Chuang, Hongwei Wang, Lingfeng
+   Shen, Benjamin Van Durme, Daniel Khashabi, and Yulia Tsvetkov. SemStamp: A semantic
+  watermark with paraphrastic robustness for text generation. In North American Chapter of
+  the Association for Computational Linguistics: Human Language Technologies, volume 1, pages
+  4067–4082, 2024.
+
+Zhengmian Hu, Lichang Chen, Xidong Wu, Yihan Wu, Hongyang Zhang, and Heng Huang. Unbi-
+   ased watermark for large language models. In International Conference on Learning Represen-
+  tations, 2024.
+
+Baihe Huang, Banghua Zhu, Hanlin Zhu, Jason Lee, Jiantao Jiao, and Michael Jordan. Towards
+   optimal statistical watermarking. In Socially Responsible Language Modelling Research, 2023.
+   URL https://openreview.net/forum?id=Fc2FaS9mYJ.
+
+Baihe Huang, Eric Xu, Kannan Ramchandran, Jiantao Jiao, and Michael I Jordan. Towards
+   anytime-valid statistical watermarking. arXiv preprint arXiv:2602.17608, 2026.
+
+Mingjia Huo, Sai Ashish Somayajula, Youwei Liang, Ruisi Zhang, Farinaz Koushanfar, and Pengtao
+  Xie. Token-speciﬁc watermarking with enhanced detectability and semantic coherence for large
+   language models. In International Conference on Machine Learning, 2024.
+
+John Kirchenbauer, Jonas Geiping, Yuxin Wen, Jonathan Katz, Ian Miers, and Tom Goldstein. A
+  watermark for large language models. In International Conference on Machine Learning, volume
+  202, pages 17061–17084, 2023.
+
+                                                                8
+John Kirchenbauer, Jonas Geiping, Yuxin Wen, Manli Shu, Khalid Saifullah, Kezhi Kong, Kasun
+   Fernando, Aniruddha Saha, Micah Goldblum, and Tom Goldstein. On the reliability of wa-
+   termarks for large language models. In International Conference on Learning Representations,
+  2024.
+
+Kalpesh Krishna, Yixiao Song, Marzena Karpinska, John Wieting, and Mohit Iyyer. Paraphrasing
+   evades detectors of AI-generated text, but retrieval is an eﬀective defense. In Advances in Neural
+  Information Processing Systems, volume 36, 2023.
+
+Rohith Kuditipudi, John Thickstun, Tatsunori Hashimoto, and Percy Liang. Robust distortion-
+   free watermarks for language models. Transactions on Machine Learning Research, 2024. ISSN
+  2835-8856. URL https://openreview.net/forum?id=FpaCL1MO2C.
+
+S. Kullback and R. A. Leibler. On information and suﬃciency. The Annals of Mathematical
+  Statistics, 22(1):79–86, 1951. doi: 10.1214/aoms/1177729694.
+
+Yaniv Leviathan, Matan Kalman, and Yossi Matias. Fast inference from transformers via specu-
+   lative decoding. In Proceedings of the 40th International Conference on Machine Learning, vol-
+   ume 202 of Proceedings of Machine Learning Research, pages 19274–19286. PMLR, 2023. URL
+   https://proceedings.mlr.press/v202/leviathan23a.html.
+
+Xiang Li, Feng Ruan, Huiyuan Wang, Qi Long, and Weijie J Su. A statistical framework of
+  watermarks for large language models: Pivot, detection eﬃciency and optimal rules. The Annals
+  of Statistics, 53(1):322–351, 2025a. doi: 10.1214/24-AOS2468.
+
+Xiang Li, Garrett Wen, Weiqing He, Jiayuan Wu, Qi Long, and Weijie J. Su. Optimal estimation
+   of watermark proportions in hybrid AI-human texts. arXiv preprint arXiv:2506.22343, 2025b.
+
+Xiang Li, Feng Ruan, Huiyuan Wang, Qi Long, and Weijie J. Su. Robust detection of watermarks
+   for large language models under human edits. Journal of the Royal Statistical Society Series B:
+  Statistical Methodology, 88(2):491–515, 2026. doi: 10.1093/jrsssb/qkaf056.
+
+Xingchi Li, Guanxun Li, and Xianyang Zhang. Segmenting watermarked texts from language
+   models. In Neural Information Processing Systems, 2024.
+
+Aiwei Liu, Leyi Pan, Xuming Hu, Shiao Meng, and Lijie Wen. A semantic invariant robust wa-
+   termark for large language models. In International Conference on Learning Representations,
+  2024.
+
+Yepeng Liu and Yuheng Bu. Adaptive text watermark for large language models. In International
+  Conference on Machine Learning, 2024.
+
+Carol Xuan Long, Dor Tsur, Claudio Mayrink Verdun, Hsiang Hsu, Haim Permuter, and
+   Flavio P Calmon. Optimized couplings for watermarking large language models. In 2025
+  IEEE International Symposium on Information Theory (ISIT), pages 1–6. IEEE, 2025. doi:
+  10.1109/ISIT63088.2025.11195457.
+
+Alexander Nemecek, Yuzhou Jiang, and Erman Ayday. Topic-based watermarks for large lan-
+   guage models. In Findings of the Association for Computational Linguistics: ACL 2026, pages
+  24372–24402, San Diego, California, United States, 2026. Association for Computational Lin-
+   guistics. doi: 10.18653/v1/2026.ﬁndings-acl.1220. URL https://aclanthology.org/2026.
+   findings-acl.1220/.
+
+                                                                9
+Leyi Pan, Aiwei Liu, Yijian Lu, Zitian Gao, Yichen Di, Lijie Wen, Irwin King, and Philip S.
+  Yu. WaterSeeker: Pioneering eﬃcient detection of watermarked segments in large documents.
+   In Findings of the Association for Computational Linguistics: NAACL 2025, pages 2866–2882,
+  Albuquerque, New Mexico, April 2025. Association for Computational Linguistics. doi: 10.18653/
+  v1/2025.ﬁndings-naacl.156. URL https://aclanthology.org/2025.findings-naacl.156/.
+
+Gabriel Peyré and Marco Cuturi. Computational optimal transport: With applications to data
+   science. Foundations and Trends® in Machine Learning, 11(5-6):355–607, 2019. doi: 10.1561/
+  2200000073.
+
+Tom Sander, Hongyan Chang, Sylvestre-Alvise Rebuﬃ, Tomáš Souček, Tuan Tran, Valeriu Laca-
+   tusu, Alexandre Mourachko, Surya Parimi, Christophe Ropers, Rashel Moritz, Vanessa Stark,
+   Hady Elsahar, and Pierre Fernandez. TextSeal: A localized LLM watermark for provenance
+   & distillation protection. arXiv preprint arXiv:2605.12456v2, 2026. URL https://arxiv.org/
+   abs/2605.12456v2.
+
+Bernhard Schmitzer. Stabilized sparse scaling algorithms for entropy regularized transport problems.
+  SIAM Journal on Scientiﬁc Computing, 41(3):A1443–A1481, 2019. doi: 10.1137/16M1106018.
+
+Ziteng Sun, Uri Mendlovic, Yaniv Leviathan, Asaf Aharoni, Jae Hun Ro, Ahmad Beirami, and
+  Ananda Theertha Suresh. Block veriﬁcation accelerates speculative decoding. In International
+  Conference on Learning Representations, 2025.
+
+Umut Topkara, Mercan Topkara, and Mikhail J Atallah. The hiding virtues of ambiguity: Quan-
+   tiﬁably resilient watermarking of natural language text through synonym substitutions. In Pro-
+  ceedings of the 8th workshop on Multimedia and security, pages 164–174, 2006.
+
+Dor Tsur, Carol Long, Claudio Mayrink Verdun, Sajani Vithana, Hsiang Hsu, Richard Chen, Haim
+   Permuter, and Flavio Calmon. HeavyWater and SimplexWater: Distortion-free LLM watermarks
+   for low-entropy distributions. In Advances in Neural Information Processing Systems, volume 38,
+   pages 118653–118705. Curran Associates, Inc., 2025. doi: 10.52202/085713-3575.
+
+Yihan Wu, Zhengmian Hu, Junfeng Guo, Hongyang Zhang, and Heng Huang. A resilient and
+   accessible distribution-preserving watermark for large language models. In Proceedings of the 41st
+  International Conference on Machine Learning, volume 235 of Proceedings of Machine Learning
+  Research, pages 53443–53470, 2024.
+
+Yangxinyu Xie, Xiang Li, Tanwi Mallick, Weijie Su, and Ruixun Zhang. Debiasing watermarks for
+   large language models via maximal coupling. Journal of the American Statistical Association,
+  120(551):1424–1436, 2025. doi: 10.1080/01621459.2025.2520455.
+
+Jiahao Xu, Rui Hu, Olivera Kotevska, and Zikai Zhang. XMark: Reliable multi-bit watermarking
+   for LLM-generated texts. In Proceedings of the 64th Annual Meeting of the Association for
+  Computational Linguistics (Volume 1: Long Papers), pages 14747–14763, San Diego, California,
+   United States, 2026. Association for Computational Linguistics. doi: 10.18653/v1/2026.acl-long.
+   672. URL https://aclanthology.org/2026.acl-long.672/.
+
+KiYoon Yoo, Wonhyuk Ahn, Jiho Jang, and Nojun Kwak. Robust multi-bit natural language water-
+   marking through invariant features. In Annual Meeting Of The Association For Computational
+  Linguistics, 2023.
+
+                                                               10
+Hanlin Zhang, Benjamin L Edelman, Danilo Francati, Daniele Venturi, Giuseppe Ateniese, and
+   Boaz Barak. Watermarks in the sand: Impossibility of strong watermarking for language mod-
+   els. In Proceedings of the 41st International Conference on Machine Learning, volume 235 of
+  Proceedings of Machine Learning Research, pages 58851–58880. PMLR, 2024.
+
+Xuandong Zhao, Prabhanjan Vijendra Ananth, Lei Li, and Yu-Xiang Wang. Provable robust
+  watermarking for AI-generated text. In International Conference on Learning Representations,
+  2024.
+
+Xuandong Zhao, Chenwen Liao, Yu-Xiang Wang, and Lei Li. Eﬃciently identifying watermarked
+   segments in mixed-source texts. In Proceedings of the 63rd Annual Meeting of the Association
+   for Computational Linguistics (Volume 1: Long Papers), pages 6304–6316, Vienna, Austria, July
+  2025. Association for Computational Linguistics. doi: 10.18653/v1/2025.acl-long.316.
+
+A Block OT with entropy calibration: solver and guarantees
+
+A.1 Solving the OT problem under an entropy constraint
+
+We solve the OT problem with KL regularization in (4) while adjusting λ towards the target
+entropy loss. The method alternates between updating the coupling and adjusting λ according to
+the achieved loss. Throughout this appendix, ρ = P blk denotes the block distribution, um the
+uniform column distribution, and c(b, j) = −Gbj. For λ > 0 and a ﬁnite cost table, the equivalent
+maximization problem is
+
+πλ ∈ arg max {⟨π, G⟩ − λDKL(π∥ρ ⊗ um)} .                    (A.1)
+
+         π∈Π(ρ,um)
+
+Algorithm A.1 gives the procedure for one token position.
+
+Initialization and Sinkhorn updates. Line 1 excludes blocks with zero mass before the it-
+erations. A zero target or zero block entropy gives the independent coupling. In particular, the
+algorithm returns before dividing by H(P ) when this entropy is zero. Otherwise, line 5 caps the
+requested loss at min{H(ρ), log m} and, relative to block entropy, at 1 − 10−8. These caps follow
+from the information bound in Theorem A.4. They can reduce the requested target, but do not
+guarantee that the remaining target is attainable for the given marginals, cost table and interval
+of λ.
+
+    For ﬁxed λ > 0, the matrix Kλ(b, j) = exp{−c(b, j)/λ} gives the solution the form πλ =
+diag(u)Kλ diag(v). The row and column scaling vectors u, v enforce the prescribed marginals
+through alternating Sinkhorn updates (Cuturi, 2013). Lines 11–14 perform these updates and nor-
+malize each column to mass 1/m. Evaluating them in the log domain using log-sum-exp avoids
+forming very large or small kernel entries explicitly. Any probability ﬂoor used when taking log-
+arithms is a numerical modiﬁcation of the update. Line 12 subtracts the mean of log v. The
+subsequent row update cancels this rescaling, leaving the coupling unchanged in exact arithmetic.
+
+Marginal correction. After these updates, a ﬁnite iterate may still have incorrect row sums.
+Line 15 restores both prescribed marginals by scaling down rows and columns with excess mass,
+then redistributing the missing mass to ﬁll both sets of deﬁcits. We denote this operation by R
+and its input table by X.
+
+11
+Algorithm A.1 Alternating updates of the block coupling and regularization
+
+Require: Block probabilities P blk, cost table c, NTP entropy H(P ) and target β ∈ [0, 1]
+
+1: Remove blocks with zero mass and the corresponding rows of c
+2: if β = 0 or H(P blk) = 0 then
+3: return P blk ⊗ um, zero entropy loss and status “independent coupling”
+
+4: end if
+5: β ← min β, (1 − 10−8)H(P blk)/H(P ), log m/H(P )
+
+6: If β = 0, return the independent coupling with zero entropy loss
+
+7: Set λ = 1, v = um, a = 1/2, λmin = 10−2, λmax = 102
+8: Set δ = 10−12H(P blk)/H(P ), tolerance εI and iteration limit Nit ≥ 1
+
+9: for s = 0, . . . , Nit − 1 do
+
+10: Form log Kλ = [−c(b, j)/λ]bj                        ▷ Evaluate updates in the log domain
+11: u ← P blk/(Kλv); v ← um/(Kλ⊤u)                         ▷ Update row, then column factors
+12: log v ← log v − m−1(1⊤ log v)1                                  ▷ Center the column factors
+                                                                             ▷ Refresh row factors
+13: u ← P blk/(Kλv)
+
+14: Rescale each column of diag(u)Kλ independently to sum to 1/m, giving πs
+
+15: πs ← R(πs) using (A.2)                                              ▷ Restore both marginals
+
+16: Compute the fraction of entropy removed, βs, using (A.3)
+
+17: if |βs − β| ≤ εI or s = Nit − 1 then
+
+18:  return πs, βs and whether |βs − β| ≤ εI
+
+19: end if a                                                               ▷ Adjust entropy loss
+20: λnew ← clip[λmin,λmax] λ max(βs, δ)/β
+
+21: Rescale v ← exp{(λ/λnew) log v}; then set λ ← λnew
+
+22: end for
+
+    Let X ≥ 0 have total mass one, with prescribed row and column marginals a = ρ and b = um.
+The vectors x and y below contain the row and column scaling factors. Each factor is at most one,
+so these steps only remove excess mass:
+
+             X′ = diag(x)X,                    xi = min ai , 1 ,
+             X′′ = X′ diag(y),                               (X 1)i
+
+                                               yj = min                 bj
+                                                                        ′ ⊤ ,1 .
+                                                         ((X ) 1)j
+
+If a denominator is zero, set the corresponding scale to one. The remaining marginal deﬁcits
+ea = a−X′′1 and eb = b−(X′′)⊤1 are nonnegative and have the same total mass ∆ = 1⊤ea = 1⊤eb.
+Distributing this missing mass according to the two deﬁcit vectors gives the corrected coupling
+
+                                                X′′ + eae⊤b /∆, ∆ > 0,                     (A.2)
+                                  R(X) = ′′
+                                  X,                    ∆ = 0.
+
+It is nonnegative and satisﬁes R(X)1 = a and R(X)⊤1 = b. Moreover,
+                                 ∥R(X) − X∥1 ≤ 2 ∥X1 − a∥1 + ∥X⊤1 − b∥1 ,
+
+because scaling down the rows and columns removes at most their excess mass, and the rank-one
+update ﬁlls the remaining deﬁcit (Altschuler et al., 2017, Algorithm 2 and Lemma 7). Thus vanish-
+ing marginal residuals imply a vanishing correction. Convergence to the OT optimum additionally
+
+                                           12
+requires convergence of the underlying iterates. At iteration s, applying this correction to the cur-
+rent transport table gives the coupling πs used in Algorithm A.1. Entropy loss is evaluated on this
+corrected table. Both marginal residuals should also be checked in ﬂoating point arithmetic.
+
+Entropy loss and regularization updates. Line 16 measures the fraction of entropy removed
+
+by the corrected coupling,
+
+                            βs =  DKL πs P blk ⊗ um               (A.3)
+                                                    .
+                                  H(P )
+
+The same calculation can be performed by dividing the KL divergence by block entropy H(ρ) and
+rescaling the target and tolerance by H(P )/H(ρ). Rescaling all three quantities together preserves
+both the stopping test and the ratio of achieved loss to target loss used to update λ. The reported
+fraction uses the NTP entropy normalization above.
+
+    Line 20 increases λ when the loss exceeds the target and decreases it when the loss is too small.
+The exponent a = 1/2 moderates the adjustment, while the ﬂoor δ and clipping bounds keep it well
+deﬁned. When normalizing by block entropy, the ﬂoor is 10−12, equivalent to δ = 10−12H(ρ)/H(P )
+in the algorithm. Line 21 multiplies log v by λold/λnew, preserving λ log v so that the next Sinkhorn
+step reuses the current factors. The algorithm applies marginal correction before sampling and
+returns the corrected coupling, achieved loss and convergence status. Active numerical ﬂoors and
+bounds can aﬀect its output.
+
+    Marginal correction enforces the prescribed marginals, but does not enforce the entropy budget.
+Even when the stopping test succeeds, the achieved fraction can be as large as β + εI ; after Nit
+iterations, it can diﬀer by more. The entropy identity therefore applies with the achieved fraction
+βs. A strict budget claim requires checking βs ≤ β separately. Both the original request and any
+capped target should be reported with the achieved loss and convergence status.
+
+Batching and computational cost. Once several NTP distributions are available, their OT
+problems can be solved in parallel by stacking the cost tables and scaling vectors. Each prob-
+lem keeps its own λ, target entropy loss and stopping criterion. Problems that reach tolerance
+stop updating while the others continue. Tables with diﬀerent numbers of blocks are padded, and
+padded rows are excluded from the updates. This combines independent solves into shared matrix
+operations without changing their results, apart from ﬂoating point error. It does not remove the
+sequential dependence needed to obtain NTP distributions during ordinary autoregressive genera-
+tion.
+
+    Each Sinkhorn update and marginal correction requires O(Bm) operations. Aggregating the
+active vocabulary and performing Nit updates therefore costs O(|A| + NitBm), where A is the
+active support.
+
+A.2 Calibrating entropy loss
+
+We adjust λ to bring the achieved entropy loss towards its target. The KL divergence of the
+exact coupling from independence equals the mutual information between block and column. It
+also equals the average token entropy lost across columns. For H(P ) > 0, write θ = log λ and let
+βeﬀ (θ) = DKL(πeθ ∥ρ ⊗ um) /H(P ) be the fraction of entropy removed by the exact OT solution. A
+ﬁnite number of Sinkhorn steps and marginal correction give the approximation βs. For a positive
+target, the update in line 20 is then
+
+                            θs+1 = projΘ θs + a log βs ,          (A.4)
+                                                               β
+
+                                  13
+where a is the step size and Θ = [log λmin, log λmax] is the permitted interval for log λ. This ex-
+pression applies when the numerical ﬂoor is inactive, with β denoting the target after any cap.
+Normalizing by block or token entropy gives the same ratio in the update. The solver uses matrix
+scaling (Cuturi, 2013), stabilization in the log domain (Schmitzer, 2019) and marginal correction
+(Altschuler et al., 2017), together with the update in (A.4). Rescaling the stored factors lets succes-
+sive updates reuse the current solution. The direction of the update follows from a simple property:
+increasing λ cannot increase the KL divergence of the optimal coupling from independence.
+
+Proposition A.1 (Monotonicity of the KL divergence). For a ﬁxed ﬁnite cost table and marginals
+restricted to their positive support, (A.1) has a unique optimizer for each λ > 0. Its KL divergence
+DKL(πλ∥ρ ⊗ um) is nonincreasing in λ. It is strictly decreasing between any two values of λ whose
+optimal couplings diﬀer. Hence a target KL divergence determines at most one λ on every strictly
+decreasing portion of the path.
+
+Proof of Proposition A.1. The feasible set is compact, and the objective is continuous and strictly
+concave for λ > 0, giving existence and uniqueness. For 0 < λ1 < λ2, write πi = πλi, Si = ⟨πi, G⟩,
+and Di = DKL(πi∥ρ ⊗ um). Optimality gives S1 − λ1D1 ≥ S2 − λ1D2 and S2 − λ2D2 ≥ S1 − λ2D1.
+Adding yields (λ2 − λ1)(D1 − D2) ≥ 0, hence D1 ≥ D2. If D1 = D2, the two inequalities force
+S1 = S2, so π2 is also optimal at λ1. Uniqueness then gives π1 = π2. Hence D1 > D2 whenever
+the optimal couplings diﬀer.
+
+     The update increases λ when entropy loss exceeds the target and decreases it when the loss is
+too small. Its convergence rate depends on how strongly the loss responds to changes in λ. We
+measure this response by ν(θ) := − d log βeﬀ(θ)/ dθ. For example, ν ≈ 2 means that a small 1%
+increase in λ reduces the fraction of entropy removed by about 2%. The following condition rules
+out a response that is too ﬂat or too steep for the chosen step size.
+
+Assumption A.2 (Regularity of the response to regularization). The exact fraction βeﬀ(θ) is
+positive and continuously diﬀerentiable on a closed interval Θ containing the initial iterate θ0 and
+a solution θ⋆ of βeﬀ (θ⋆) = β. Its relative sensitivity ν(θ) and the step size a > 0 satisfy
+
+                  0 < ν ≤ ν(θ) ≤ ν < ∞ (θ ∈ Θ), q := max{|1 − aν|, |1 − aν|} < 1.
+
+The estimate after marginal correction is positive and satisﬁes log βs = log βeﬀ (θs) + es, where es
+is the error caused by the approximate OT solution, measured on the logarithmic scale.
+
+     This assumption requires an attainable target and quantitative bounds on the response through-
+out the chosen interval. Monotonicity alone does not imply these bounds. We use a = 1/2 to damp
+the update; the following convergence guarantee applies only when the stated sensitivity and ap-
+proximation conditions hold.
+
+Theorem A.3 (Convergence of the regularization update). Under Assumption A.2, the iterates
+in (A.4) satisfy
+
+                                                                                                    s−1
+
+                                       |θs − θ⋆| ≤ qs|θ0 − θ⋆| + a qs−1−j|ej|.
+
+                                                                                                    j=0
+
+Thus exact OT solutions (es = 0) give geometric convergence with contraction factor q. Uniformly
+bounded approximation errors limit the guaranteed accuracy, while errors |ej| = O(rj), 0 < r < 1,
+contribute O(max{q, r}s) when r̸ = q and O(sqs−1) when r = q.
+
+                                                               14
+Proof of Theorem A.3. Put ϕ(θ) = log βeﬀ (θ) − log β. Then ϕ(θ⋆) = 0 and ϕ′(θ) = −ν(θ). Before
+projection, the mean value theorem gives θs + aϕ(θs) − θ⋆ = {1 − aν(ξs)}(θs − θ⋆) for some ξs
+between θs and θ⋆. Projection onto an interval containing θ⋆ is nonexpansive, so Assumption A.2
+gives a contraction at each step with the additional perturbation aes. Iterating this bound proves
+the result.
+
+    This bound separates two sources of error: the initial choice of λ and the inaccuracy of each
+OT solution. The ﬁrst decays geometrically. The second accumulates with decreasing weights, so
+accurate calibration also requires suﬃciently accurate Sinkhorn iterates. The theorem does not
+establish convergence of a ﬁxed number of alternating updates without control of the errors es.
+
+    Near the largest attainable entropy loss, changing λ may have little eﬀect on the coupling. Then
+ν can approach zero and convergence can slow. The achieved loss should therefore be reported
+alongside the requested target. At a ﬁxed λ, a large cost range relative to λ makes the entries
+of Kλ = exp(G/λ) more uneven and can slow Sinkhorn convergence (Peyré and Cuturi, 2019).
+Reusing the previous scaling factors provides a nearby starting point when successive values of λ
+are close and the solution varies smoothly.
+
+A.3 Marginal preservation and entropy loss
+
+Sampling within each block according to the original token probabilities preserves the token
+marginal of the corrected coupling. It also leaves the block choice as the only source of dependence
+between the token and the selected column. The following result makes these statements precise
+and identiﬁes the resulting loss of conditional entropy.
+
+Theorem A.4 (Marginal preservation and the entropy identity). Fix           an NTP    distribution P
+                                                                            laws r(·  | j) satisfying
+with support A, a      partition g with block law ρ, and conditional block  | j)/m,   and sample W
+                       = ρb. Let J be uniform on [m], set π(b, j) = r(b
+m−1   m    r(b  |  j)
+      j=1
+
+from
+
+                       Q(w | j) = r{g(w) | j} Pw ,         w ∈ A,
+                                                    ρg(w)
+
+with Q(w | j) = 0 outside A. The denominator is positive on A. Writing C = g(W ), we have
+
+                            1m
+                                    Q(w | j) = Pw,
+
+                            m j=1
+                       I(W ; J) = I(C; J) = DKL(π∥ρ ⊗ um)
+
+                                                = H(P ) − EJ H{Q(· | J)}
+                                                ≤ min{H(ρ), log m}.
+
+Consequently, for H(P ) > 0, an entropy loss of I(W ; J) = βeﬀ H(P ) retains the fraction 1 − βeﬀ of
+NTP entropy on average over columns. This is not a bound for each individual column or key. If,
+at every unmasked position, the column index is uniform conditionally on the preceding generation
+history and on the current partition and transport table, and if masked positions sample directly
+from the NTP distribution, then the generated sequence, averaged over keys, has the same law as
+unwatermarked generation.
+
+Proof of Theorem A.4. For w ∈ A and b = g(w), substituting the lift and using the block marginal
+gives m−1 j Q(w | j) = Pw; both sides vanish outside A. The joint law factors as Pr(J) Pr(C |
+J)P (W | C), so W ⊥ J | C. Since C is a function of W , I(W ; J) = I(C; J). The law of (C, J) is π
+
+                       15
+with marginals ρ and um, giving the KL identity. The entropy identity follows from the preserved
+marginal W ∼ P , and the bound follows from I(C; J) ≤ min{H(C), H(J)} = min{H(ρ), log m}.
+Conditioning ﬁrst on the generation history, partition and table permits the same averaging over
+columns at each unmasked position. Masked positions follow the NTP distribution by assumption.
+Iterating these conditional identities proves the sequence statement.
+
+    The sequence statement requires conditional uniformity after observing the generated history.
+Reusing the pseudorandom values for a repeated context can violate this condition, even though
+the identity at a ﬁxed preﬁx remains valid. Fresh independent values at each position, or masking
+repeated contexts under an ideal model with independent randomness for distinct contexts, pro-
+vide suﬃcient conditions. A practical pseudorandom function approximates this ideal model; the
+theorem does not assert exact independence for a ﬁxed key.
+
+B Speculative sampling with a shared key
+
+B.1 Generation and block veriﬁcation
+
+We combine the block watermark with speculative sampling by watermarking both the draft and
+
+target distributions with the same secret key k. Both models apply marginal correction before
+
+sampling or evaluating token probabilities. Their NTP distributions and target entropy losses may
+
+diﬀer.
+
+     Let  Pd   and   Pt          be  the       draft  and    target   NTP          distributions         at    the  initial  preﬁx   followed   by
+
+            i          i                                                                                                             Qd         Qti .
+
+the  ﬁrst  i−1   proposals.               Denote      their  watermarked           distributions         conditional      on  k  by     i  and
+
+Both models use the same key and construction of pseudorandom values. Their diﬀerent NTP
+
+distributions can nevertheless yield diﬀerent conditional token distributions. Veriﬁcation uses the
+
+watermarked probabilities that govern sampling, as required by Proposition B.1.
+
+Algorithm B.1 Speculative sampling with a shared watermark key
+
+Require: Draft and target models, shared key k, draft length K ≥ 1, and both watermark conﬁg-
+
+     urations
+
+1: for i = 1, . . . , K do
+
+2:        Compute    Pd          and      its  corrected     watermarked           distribution          Qd    using  k.
+
+                       i                                                                                    i
+                           Qd
+3:        Draw  xi  ∼               with      fresh  sampling    randomness.
+                              i
+
+4: end for
+
+5:   Compute    Pt   ,  .  .  .  ,  P tK  +1   in  parallel  in  one  target       forward        pass.
+
+                  1                                                       t                    t
+                                                                          1                    K
+6:   Apply  the  watermark                with     key  k  to  obtain  Q     ,  .  .  .  ,  Q     +1  .
+
+7: Compute ri, hi by (B.1)–(B.2).
+
+8: Draw independent Ui ∼ Uniform(0, 1) and set Lkeep = max({0} ∪ {i : Ui ≤ hi}).
+
+9: if Lkeep < K then
+
+10: Draw W ∼ RLkeep from (B.3).                                                                                                  ▷ Bonus token
+11: else
+12: Draw W ∼ QtK+1.
+13: end if
+
+14: Emit (x1, . . . , xLkeep, W ) and discard the remaining proposals.
+
+Drafting and target evaluation. The draft proposes K tokens sequentially from its water-
+marked distributions. The target then evaluates all draft positions and the possible bonus position
+
+                                                               16
+in one forward pass. Once these NTP distributions are available, their OT problems can also be
+solved in a batch. Proposal draws, veriﬁcation uniforms and the ﬁnal draw use fresh independent
+sampling randomness. The models must use compatible token identiﬁers and input formatting, and
+probabilities must reﬂect the temperature, truncation and watermarking used for generation.
+
+Joint veriﬁcation. Block veriﬁcation tests candidate preﬁx lengths jointly and can retain a
+longer preﬁx even if a shorter one fails its test (Sun et al., 2025). Starting from r0 = 1, deﬁne
+
+                                           Qti (xi )               i = 1, . . . , K.                (B.1)
+                        ri = min ri−1 d , 1 ,
+
+                                           Qi (xi)
+
+The denominator is positive for every proposal that can be sampled. The quantity ri can decrease
+
+for a token less likely under the target and recover when later proposals favor it. For 1 ≤ i < K,
+
+t d set zi
+             zi = [riQi+1(w) − Qi+1(w)]+,                hi = zi + 1 − ri ,           hK = rK ,     (B.2)
+
+                     w∈V
+
+where [a]+ = max(a, 0) and hi = 1 if its numerator and denominator both vanish. Independent
+tests Ui ≤ hi determine the longest retained preﬁx Lkeep. A failed test at one length does not
+rule out retaining a longer preﬁx. These tests and the following residual must be used together to
+preserve the target law.
+
+Correction and bonus tokens.               If Lkeep < K, the remaining proposals are discarded and the
+next token is drawn from
+                                           [rLkeep QtLkeep+1(w) − QdLkeep+1(w)]+                    (B.3)
+                             RLkeep (w) =  v∈V [rLkeep QLkeep+1 t (v) − QLkeep+1 d (v)]+ .
+
+This residual supplies the target mass missing from the draft. Its denominator is positive whenever
+
+this branch has positive probability. No additional watermark transformation is applied to the
+
+residual, because it is already derived from the watermarked distributions. If all K proposals are
+retained, a bonus token is drawn directly from QtK+1 without another target forward pass. When
+caching is enabled, the model caches are restored to the retained preﬁx before continuing, and
+
+stopping rules are applied to emitted tokens in order.
+
+B.2 Distribution preservation and detection
+
+Proposition B.1 (Preservation of the watermarked target law). Fix a key k. Suppose each proposal
+
+is  sampled  from  the  conditional  distribution  Qd    used  in  veriﬁcation,  each       target  distribution  Qt
+
+                                                      i                                                              i
+
+is the one used by direct watermarked target generation at the same preﬁx, and all draws use
+
+fresh independent sampling randomness. With exact probability calculations, repeated application
+
+of Algorithm B.1 generates the same law for the output sequence as direct sampling from the target’s
+
+watermarked distributions conditional on k.
+
+Proof of Proposition B.1. Fix k and suppress it from the notation. Let X1, . . . , XK denote the
+draft proposals. We ﬁrst verify the retention identity from Sun et al. (2025, Lemma 3),
+
+                                     Pr(Lkeep ≥ i | X1:i = x1:i) = ri,
+
+                                                   17
+where later proposals and veriﬁcation uniforms are averaged out. The identity holds for i = K
+because hK = rK. For the induction step, the recursion in (B.1) gives
+
+                                Qdi+1(w)ri+1(x1:i, w) = min{Qdi+1(w), riQti+1(w)}.
+
+Assuming the identity at i + 1, summing over w gives
+
+Pr(Lkeep > i | X1:i = x1:i) = ri − zi.
+
+The uniform Ui is independent of all later proposals and tests. The probability of retaining at least
+i proposals is therefore
+
+                                            (ri − zi) + (1 − ri + zi)hi = ri,
+
+including the case ri = 1, zi = 0. Backward induction proves the identity. Hence the probability of
+correction at length i, conditional on the proposed preﬁx, is zi. For i = 0, deﬁne z0 by the same
+positive-part sum as in (B.2), with r0 = 1; the same conclusion follows from the identity at i = 1.
+
+    The residual ﬁlls the missing mass because, for 0 ≤ i < K,
+
+Qdi+1(w)ri+1(x1:i, w) + ziRi(w) = riQti+1(w).
+
+retained proposal  correction
+
+For tokens with Qdi+1(w) = 0, the retained proposal contributes zero and the residual supplies
+the required target mass. When zi = 0, correction at that preﬁx has probability zero and its
+contribution is deﬁned as zero. Starting from r0 = 1, this balance gives the target conditional
+distribution for the next output token. After a correction, the procedure restarts at the emitted
+preﬁx; after K retained proposals, the bonus token follows the target law. Induction over emitted
+tokens establishes the sequence law (Sun et al., 2025, Theorem 1). The argument holds conditional
+on the shared key and does not require separate draft and target keys.
+
+    Thus diﬀerent draft settings aﬀect acceptance and computational cost while preserving the ideal
+target output law. The OT solves themselves need not reach the exact optimum: the proposition
+applies to the corrected distributions actually used, provided that sampling and veriﬁcation use
+the same probabilities and that the target distribution matches direct target generation at each
+preﬁx. Numerical errors in evaluating acceptance probabilities or normalizing residuals can aﬀect
+the identity. Averaging over keys recovers the same distribution as direct watermarked target gen-
+eration. Equality with unwatermarked generation additionally requires the conditional uniformity
+assumptions in Theorem A.4.
+
+    Detection uses the shared key and the target watermark conﬁguration, following Section 3.2.
+It does not require draft tokens to be identiﬁed or iteration boundaries to be recorded. Under
+the proposition’s conditions, the same detector calibration and deﬁnitions of diversity apply as for
+direct watermarked target generation. Retained entropy is determined by the target’s achieved
+entropy loss. Acceptance rate and elapsed time require empirical measurement.
+
+C Related work
+
+C.1 Language model watermarks
+
+Early text watermarks modiﬁed completed passages through syntactic transformations or synonym
+substitution (Atallah et al., 2001; Topkara et al., 2006). Modern generative watermarks intervene
+during decoding. At each step, a pseudorandom function of the secret key and context generates
+
+                   18
+reproducible values that guide token sampling. The detector reconstructs these values from the
+text and key and tests for dependence between them and the observed tokens (Li et al., 2025a).
+
+     Diﬀerent methods address diﬀerent objectives. Green list methods bias generation toward a
+keyed subset of tokens to improve detectability while maintaining text quality (Kirchenbauer et al.,
+2023, 2024). Adaptive methods and variants that assign diﬀerent strengths to individual tokens
+adjust this bias across contexts (Liu and Bu, 2024; Huo et al., 2024). Watermarks that carry several
+bits can encode identiﬁers or metadata for attribution, rather than only indicating the presence
+of a watermark (Fernandez et al., 2023; Yoo et al., 2023; Xu et al., 2026; Chen et al., 2026).
+Cryptographic approaches study watermarks that are computationally undetectable without the
+key, resistance to adversarial changes, and limits on secure watermarking (Christ et al., 2024; Christ
+and Gunn, 2024; Zhang et al., 2024). Semantic methods use features or sentence representations
+that can be less sensitive to changes in individual tokens, with the aim of retaining a signal after
+edits such as paraphrasing (Liu et al., 2024; Hou et al., 2024; Dabiriaghdam and Wang, 2025;
+Nemecek et al., 2026).
+
+     We study how watermarking changes the sampling diversity available under a ﬁxed key. Our
+construction embeds a binary provenance signal during generation and preserves the NTP distri-
+bution after averaging over keys. Its entropy budget measures the average sampling randomness
+removed to create dependence on the key.
+
+C.2 Unbiasedness and diversity under a ﬁxed key
+
+Green list methods generally change the NTP distribution even after averaging over their keyed
+token subsets (Kirchenbauer et al., 2023, 2024). We focus on methods that preserve this distribution
+after averaging over keyed randomness. At a ﬁxed preﬁx, the randomly drawn key induces Ξ ∼ µ, as
+in Section 2. Such methods are variously called unbiased, distribution preserving, or distortion free;
+we use unbiased, following the statistical literature (Hu et al., 2024; Li et al., 2025a). An unbiased
+watermark deﬁnes a coupling of Ξ and the generated token W whose token marginal is the original
+NTP distribution. Examples include Gumbel-max sampling (Aaronson, 2023; Sander et al., 2026),
+reweighting schemes (Hu et al., 2024; Wu et al., 2024; Chen et al., 2025), inverse transform sampling
+(Kuditipudi et al., 2024), optimized couplings (Xie et al., 2025; Tsur et al., 2025), and tournament
+sampling (Dathathri et al., 2024). MCmark reweights token probabilities by favoring a vocabulary
+segment selected using the key, with the adjustments designed to preserve the NTP distribution on
+average (Chen et al., 2025). Our method also groups tokens, but determines the conditional block
+probabilities through an OT problem whose marginal constraints preserve the NTP distribution
+and whose entropy-loss budget controls the sampling randomness retained under a ﬁxed key.
+
+     Unbiasedness at each ﬁxed preﬁx does not by itself establish preservation of the entire sequence
+distribution. Repeated contexts can reuse the same keyed values, so their conditional distribution
+depends on the preceding generation history (Cai et al., 2025). Dathathri et al. (2024, Supplemen-
+tary Appendices G.2 and G.3) distinguish these guarantees and mask repeated context windows
+to preserve the sequence distribution. Both guarantees average over keyed randomness. Neither
+directly controls the entropy H{Q(· | ξ)} that remains after the preﬁx and keyed values are ﬁxed.
+We quantify its reduction from H(P ) on average over Ξ.
+
+     Fu et al. (2024) address the lack of diversity in Gumbel-max generation under a ﬁxed key.
+GumbelSoft samples from a softmax distribution over perturbed logits instead of taking the hard
+maximum. This restores sampling randomness but does not generally preserve the original NTP
+distribution, which separates its objective from unbiased entropy control.
+
+     Recent work also optimizes the coupling directly. He et al. (2025a) jointly optimize the water-
+marking scheme and detector under a distortion constraint, obtaining an unbiased construction as
+
+                                                               19
+the zero distortion case. Long et al. (2025) optimize the worst case detection power over a class
+of NTP distributions. Huang et al. (2026) jointly optimize a coupling and an e-value for detection
+that remains valid under optional stopping. Tsur et al. (2025) use OT with costs based on coding
+theory or distributions with heavy tails. Gloaguen et al. (2026) consider a broader constrained opti-
+mization framework that allows both unbiased and biased watermarks. Their proposed PPL-based
+methods do not generally preserve the original NTP distribution, because controlling expected log-
+likelihood does not ensure unbiasedness. We require this distribution to be preserved and use OT
+to control the sampling entropy retained under a ﬁxed key.
+
+    Our construction uses the coupling’s KL divergence from independence to control the average
+entropy loss. Applying this constraint to blocks of tokens reduces the optimization dimension while
+preserving relative probabilities within each block.
+
+C.3 Statistical inference for language model watermarks
+
+Watermark detection tests for dependence between text and keyed randomness, often through a
+statistic whose null distribution does not depend on the unknown NTP distributions (Huang et al.,
+2023; Li et al., 2025a; Cai et al., 2026; He et al., 2025b). Related tasks estimate the proportion of
+watermarked text in a mixture or locate watermarked segments (Li et al., 2025b; Zhao et al., 2025;
+Li et al., 2024; Pan et al., 2025; Sander et al., 2026; Blanchet et al., 2026). Editing can weaken the
+evidence, motivating goodness-of-ﬁt tests and analyses of robustness (Li et al., 2026; Krishna et al.,
+2023; Zhao et al., 2024; Golowich and Moitra, 2024).
+
+    We test for a watermark across the scored positions of a passage. The detector reconstructs
+Gumbel values, but their distribution under watermarked generation diﬀers from that of Gumbel-
+max. Results about the power or optimality of a detector for Gumbel-max therefore do not transfer
+automatically. Section 3.2 gives our score and its null calibration under explicit independence
+assumptions.
+
+                                                               20
+

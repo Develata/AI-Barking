@@ -1,0 +1,164 @@
+{
+  "url": "https://wikitech.wikimedia.org/wiki/Incidents/2026-05-13_wdqs",
+  "title": "Incidents/2026-05-13 wdqs - Wikitech",
+  "text": "Jump to content\nMain menu\nSearch\nEnglish\nDonate\nCreate account\nLog in\nContents hide\nBeginning\nSummary\nTimeline\nDetection\nConclusions\nToggle Conclusions subsection\nWhat went well?\nWhat went poorly?\nWhere did we get lucky?\nLinks to relevant documentation\nActionables\nIncidents/2026-05-13 wdqs\nPage\nDiscussion\nRead\nView source\nView history\nTools\nAppearance hide\n< Incidents\n\ndocument status: final\n\nSummary\nIncident metadata (see Incident Scorecard)\nIncident ID\t2026-05-13 wdqs\tStart\t2026-05-07 15:10:00\nTask\tT425758\tEnd\t2026-05-11 13:50:00\nPeople paged\t0\tResponder count\tBrian King, Ryan Kemper, Guillaume Lederrey, Gabriele Modena, Ben Tullis\nCoordinators\tGabriele Modena\tAffected metrics/SLOs\tBoth Uptime (availability) percentage as well as Excessive lag percentage\nImpact\tWe serve stale data for >20 hours from 6 nodes, and at peak 50% of WDQS external endpoint requests were timing out for users.\n\n…\n\nAggressive scrapers started hitting WDQS on 2026-05-07 causing a decreased service availability that impacted SLO/WDQS (both Uptime (availability) percentage  as well as Excessive lag percentage).\n\nOver the whole period we identified two issues at play:\n\nBlazegraph was under load and started to timeout for a large population of users (>50% at peak).\nThe streaming-updater-consumer service (responsible for real-time index updates) was throttled by the overloaded Blazegraph, resulting in index UPDATES being rejected (429) and lag increased. This, in return, triggered max lag protection in Wikibase, resulting in wikidata.org requests (edits) getting throttled.\n\n\nThe incident began in the afternoon (UTC) of 2026-05-07. It was temporarily mitigated, but alerts started firing again overnight.\n\nUpon reviewing the alerts on Friday (2026-05-08), we diagnosed that the entirety of eqiad was lagging and proceeded to depool the deployment to allow Wikidata changes (WDQS index updates) to propagate. As lag started increasing again, we applied rate limits to actors that were aggressively querying the service and causing timeouts.\n\nDespite the aggressive global edge rate limiting applied on Friday, the outage persisted throughout the weekend. The initial rate-limiting rules were extrapolated from a Turnilo data cube based on a 1-in-128 sample of all incoming web requests across Wikimedia projects. Deeper analysis of WDQS logs (both offline on HDFS and in real time on the nodes themselves) on Monday (2026-05-11) identified a scraper that had not previously been captured by the webrequest sample (Turnilo). Once a requestctl rule was applied to the scraper signatures, query timeout rates returned to baseline.\n\nTimeline\n\nAll times in UTC.\n\n2026-05-07 15:10 OUTAGE BEGINS\n2026-05-07 15:19 Gabriele Modena starts a thread on  #talk-to-wikidata-platform (internal comms)\n2026-05-07 15:38 Brian King responds and based on traffic analysis manually applies rate limits on aggressive actors. The situation seemed contained, but overnight alerts started firing again.\n2026-05-08 08:34 Gabriele Modena starts a thread on #talk-to-wikidata-platform (internal comms) and #data-platfrom-sre coordination (https://wikimedia.slack.com/archives/C055QGPTC69/p1778229258561559). Ben Tullis responds.\n2026-05-08 09:04 We diagnose that the whole of eiad is lagged and following https://wikitech.wikimedia.org/wiki/Wikidata_Query_Service/Runbooks/ElevatedMaxLagWDQS.\n2026-05-08 09:40 Ben Tullis depooled the whole DC. Streaming-updater-consumer starts to backfill and catch up on depooled nodes. https://sal.toolforge.org/log/kA_1Bp4BffdvpiTruey1\nwdqs depooled from eqiad. kafka consumer lag decreasing\n2026-05-08 09:52 While cross referring WDQS bespoke throttling logic and logs, we identify that the streaming-updater-consumer service running on localhost is being throttled\n2026-05-08 10:17 Consumer lag is climbing on codfw nodes\ncodfw wdqs kafka consumer lag increasing\n2026-05-08 10:50 wdqs is repooled in  eqiad https://sal.toolforge.org/log/rKQ2B54B1kByGTxAC5bL\n2026-05-08 18:32 Ryan Kemper applies rate limits on actor signatures (based on turnilo) mitigates the issue, but it will persist throughout the weekend.\n2026-05-11 09:11 webrequest_sampled (turnilo) does not report traffic accurately enough. Gabriele Modena manually inspects service logs (on nodes) and escalates to #mediawiki_security\n2026-05-11 11:00 Gabriele Modena manually depooled wdqs1011,wdqs1012, wdqs1014, wdqs1015, wdqs1016. The nodes had lag > 20h\n2026-05-11 11:42 rate limits are applied.\n2026-05-11 13:50  OUTAGE ENDS\n2026-05-11 15:30 post-outage cleanup finished. all consumers have caught up\n2026-05-11 16:40 Ryan Kemper lifts rate limit rules that have accidentally impacted legitimate traffic.\nDetection\n\nThe issue was detected via alerts firing.\n\nRdfStreamingUpdaterHighConsumerUpdateLag.\nElevatedMaxLagWDQS\nBlazegraphFailedServerRatioIncrease\n\nThe alerting was accurate. The alerts indicated the related runbooks in their message body.\n\nConclusions\n\nWe have learned that we cannot rely only on Turnilo (webrequest sample) to extrapolate actors that need rate limits. We have also learnt that streaming-updater-consumer should not be throttled by Blazegraph filter logic.\n\nCommunication with the community went well generally, but could use a better balance of speed and accuracy. We've aligned across teams on coordinating event and resolution status information in an incidents Slack channel to ensure we engage the community quickly and with clarity.\n\nWhat went well?\nAlters fired appropriately\nIncident response was prompt and responders have been highly engaged.\nWhat went poorly?\nWe learn that some runbooks need update (ElevatedMaxLag)\nWhere did we get lucky?\n…\nLinks to relevant documentation\nSLO/WDQS\nhttps://wikitech.wikimedia.org/wiki/Wikidata_Query_Service/Runbook/High_replication_lag_and_query_timeout\nhttps://wikitech.wikimedia.org/wiki/Wikidata_Query_Service/Runbooks/ElevatedMaxLagWDQS\nActionables\nhttps://phabricator.wikimedia.org/T426067: We updated the runbooks with additional information on troubleshooting traffic directly from logs (in real-time).\nhttps://phabricator.wikimedia.org/T425770: As a follow up cleanup task, we developed a workaround  for WDQS to not throttle streaming-updater-consumer requests. This will be deployed and tested in Wikidata Platform’s current sprint.\nhttps://phabricator.wikimedia.org/T425989: Investigate and document options to improve real-time traffic analysis for the WDQS telemetry.  \nRyan Kemper cleaned up previously defined requestctl rules that could have impacted legitimate traffic.\nCategory: Incident documentation\nThis page was last edited on 15 May 2026, at 11:08. Page was rendered with Parsoid.\nText is available under the Creative Commons Attribution-ShareAlike License; additional terms may apply. See Terms of Use for details.\nPrivacy policy\nAbout Wikitech\nDisclaimers\nCode of Conduct\nDevelopers\nStatistics\nCookie statement\nMobile view",
+  "meta": [
+    "<meta name=\"ResourceLoaderDynamicStyles\" content=\"\">",
+    "<meta name=\"generator\" content=\"MediaWiki 1.47.0-wmf.22\">",
+    "<meta name=\"referrer\" content=\"origin\">",
+    "<meta name=\"referrer\" content=\"origin-when-cross-origin\">",
+    "<meta name=\"robots\" content=\"max-image-preview:standard\">",
+    "<meta name=\"format-detection\" content=\"telephone=no\">",
+    "<meta name=\"viewport\" content=\"width=1120\">",
+    "<meta property=\"og:title\" content=\"Incidents/2026-05-13 wdqs - Wikitech\">",
+    "<meta property=\"og:type\" content=\"website\">",
+    "<meta property=\"mw:PageProp/toc\">"
+  ],
+  "links": [
+    {
+      "text": "Page",
+      "url": "https://wikitech.wikimedia.org/wiki/Incidents/2026-05-13_wdqs"
+    },
+    {
+      "text": "Discussion",
+      "url": "https://wikitech.wikimedia.org/w/index.php?title=Talk:Incidents/2026-05-13_wdqs&action=edit&redlink=1"
+    },
+    {
+      "text": "Read",
+      "url": "https://wikitech.wikimedia.org/wiki/Incidents/2026-05-13_wdqs"
+    },
+    {
+      "text": "View source",
+      "url": "https://wikitech.wikimedia.org/w/index.php?title=Incidents/2026-05-13_wdqs&action=edit"
+    },
+    {
+      "text": "View history",
+      "url": "https://wikitech.wikimedia.org/w/index.php?title=Incidents/2026-05-13_wdqs&action=history"
+    },
+    {
+      "text": "\n\nRead",
+      "url": "https://wikitech.wikimedia.org/wiki/Incidents/2026-05-13_wdqs"
+    },
+    {
+      "text": "\n\nView source",
+      "url": "https://wikitech.wikimedia.org/w/index.php?title=Incidents/2026-05-13_wdqs&action=edit"
+    },
+    {
+      "text": "\n\nView history",
+      "url": "https://wikitech.wikimedia.org/w/index.php?title=Incidents/2026-05-13_wdqs&action=history"
+    },
+    {
+      "text": "",
+      "url": "https://wikitech.wikimedia.org/wiki/Special:WhatLinksHere/Incidents/2026-05-13_wdqs"
+    },
+    {
+      "text": "",
+      "url": "https://wikitech.wikimedia.org/wiki/Special:RecentChangesLinked/Incidents/2026-05-13_wdqs"
+    },
+    {
+      "text": "",
+      "url": "https://wikitech.wikimedia.org/w/index.php?title=Incidents/2026-05-13_wdqs&oldid=2414239"
+    },
+    {
+      "text": "",
+      "url": "https://wikitech.wikimedia.org/w/index.php?title=Incidents/2026-05-13_wdqs&action=info"
+    },
+    {
+      "text": "",
+      "url": "https://wikitech.wikimedia.org/w/index.php?title=Special:CiteThisPage&page=Incidents%2F2026-05-13_wdqs&id=2414239&wpFormIdentifier=titleform"
+    },
+    {
+      "text": "",
+      "url": "https://wikitech.wikimedia.org/w/index.php?title=Special:UrlShortener&url=https%3A%2F%2Fwikitech.wikimedia.org%2Fwiki%2FIncidents%2F2026-05-13_wdqs"
+    },
+    {
+      "text": "",
+      "url": "https://wikitech.wikimedia.org/w/index.php?title=Incidents/2026-05-13_wdqs&useparsoid=0"
+    },
+    {
+      "text": "",
+      "url": "https://wikitech.wikimedia.org/w/index.php?title=Special:Book&bookcmd=book_creator&referer=Incidents%2F2026-05-13+wdqs"
+    },
+    {
+      "text": "",
+      "url": "https://wikitech.wikimedia.org/w/index.php?title=Special:DownloadAsPdf&page=Incidents%2F2026-05-13_wdqs&action=show-download-screen"
+    },
+    {
+      "text": "",
+      "url": "https://wikitech.wikimedia.org/w/index.php?title=Incidents/2026-05-13_wdqs&printable=yes"
+    },
+    {
+      "text": "Incidents",
+      "url": "https://wikitech.wikimedia.org/wiki/Incidents"
+    },
+    {
+      "text": "Incident Scorecard",
+      "url": "https://wikitech.wikimedia.org/wiki/Incident_Scorecard"
+    },
+    {
+      "text": "T425758",
+      "url": "https://phabricator.wikimedia.org/T425758"
+    },
+    {
+      "text": "SLO/WDQS",
+      "url": "https://wikitech.wikimedia.org/wiki/SLO/WDQS"
+    },
+    {
+      "text": "",
+      "url": "https://wikitech.wikimedia.org/wiki/File:Screenshot_From_2026-05-13_21-49-55.png"
+    },
+    {
+      "text": "",
+      "url": "https://wikitech.wikimedia.org/wiki/File:2026-05-11_Wdqs_5xx_rate_drops.png"
+    },
+    {
+      "text": "https://wikitech.wikimedia.org/wiki/Wikidata_Query_Service/Runbooks/ElevatedMaxLagWDQS",
+      "url": "https://wikitech.wikimedia.org/wiki/Wikidata_Query_Service/Runbooks/ElevatedMaxLagWDQS"
+    },
+    {
+      "text": "",
+      "url": "https://wikitech.wikimedia.org/wiki/File:2026-05-08_wdqs_eqiad_depooled.png"
+    },
+    {
+      "text": "",
+      "url": "https://wikitech.wikimedia.org/wiki/File:2026-05-08_wdqs_codfw_lag_rising.png"
+    },
+    {
+      "text": "SLO/WDQS",
+      "url": "https://wikitech.wikimedia.org/wiki/SLO/WDQS"
+    },
+    {
+      "text": "https://wikitech.wikimedia.org/wiki/Wikidata_Query_Service/Runbook/High_replication_lag_and_query_timeout",
+      "url": "https://wikitech.wikimedia.org/wiki/Wikidata_Query_Service/Runbook/High_replication_lag_and_query_timeout"
+    },
+    {
+      "text": "https://wikitech.wikimedia.org/wiki/Wikidata_Query_Service/Runbooks/ElevatedMaxLagWDQS",
+      "url": "https://wikitech.wikimedia.org/wiki/Wikidata_Query_Service/Runbooks/ElevatedMaxLagWDQS"
+    },
+    {
+      "text": "https://phabricator.wikimedia.org/T426067",
+      "url": "https://phabricator.wikimedia.org/T426067"
+    },
+    {
+      "text": "https://phabricator.wikimedia.org/T425770",
+      "url": "https://phabricator.wikimedia.org/T425770"
+    },
+    {
+      "text": "https://phabricator.wikimedia.org/T425989",
+      "url": "https://phabricator.wikimedia.org/T425989"
+    },
+    {
+      "text": "https://wikitech.wikimedia.org/w/index.php?title=Incidents/2026-05-13_wdqs&oldid=2414239",
+      "url": "https://wikitech.wikimedia.org/w/index.php?title=Incidents/2026-05-13_wdqs&oldid=2414239"
+    },
+    {
+      "text": "Category",
+      "url": "https://wikitech.wikimedia.org/wiki/Special:Categories"
+    },
+    {
+      "text": "Incident documentation",
+      "url": "https://wikitech.wikimedia.org/wiki/Category:Incident_documentation"
+    }
+  ],
+  "captured_bj": "2026-10-06T09:14:11.585+08:00"
+}

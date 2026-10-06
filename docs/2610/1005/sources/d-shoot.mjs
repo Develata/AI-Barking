@@ -1,0 +1,35 @@
+import fs from 'node:fs';
+import {homedir} from 'node:os';
+import {pathToFileURL} from 'node:url';
+import {join} from 'node:path';
+import {execFileSync} from 'node:child_process';
+const {sendCommand}=await import(pathToFileURL(join(homedir(),'scoop/persist/bun/install/cache/@jackwener/opencli@1.8.7@@@1/dist/src/browser/daemon-client.js')).href);
+const session='1005-d';
+const cli=a=>execFileSync('opencli.exe',['browser',session,...a],{encoding:'utf8',timeout:170000,maxBuffer:8000000,env:{...process.env,OPENCLI_BROWSER_COMMAND_TIMEOUT:'150'}}).split('\n  Update available:')[0].trim();
+const cdp=(m,p)=>sendCommand('cdp',{session,surface:'browser',cdpMethod:m,cdpParams:p});
+const ev=s=>JSON.parse(cli(['eval','JSON.stringify('+s+')']));
+const [name,url,anchor,end,zoom='1']=process.argv.slice(2);
+if(!/^d-(2[5-9]|3[0-4])-[a-z0-9-]+\.png$/.test(name))throw Error('D image range');
+const record={time_bj:new Date(Date.now()+28800000).toISOString().replace('Z','+08:00'),url,file:name,tool:'OpenCLI 1005-d CDP; DPR=2'};
+try{
+ cli(['open',url]);await new Promise(r=>setTimeout(r,1200));
+ ev(`(()=>{document.documentElement.style.zoom=${JSON.stringify(zoom)};return true})()`);record.zoom=Number(zoom);
+ record.extension_ui_hidden=ev("(()=>{const e=document.getElementById('immersive-translate-popup');if(e)e.style.visibility='hidden';return !!e})()");
+ await cdp('Emulation.setDeviceMetricsOverride',{width:700,height:1100,deviceScaleFactor:2,mobile:false});
+ await new Promise(r=>setTimeout(r,1000));
+ let clip=ev(`(()=>{const a=${JSON.stringify(anchor)},b=${JSON.stringify(end||'')},pad=${/^d-3/.test(name)?0:12};const es=[...document.querySelectorAll('p,h1,h2,h3,h4,article,table,div')];const pick=s=>es.filter(e=>(e.innerText||'').includes(s)&&e.getBoundingClientRect().height>0).sort((a,b)=>(/^H[1-4]$/.test(a.tagName)&&a.innerText===s?-100000: a.innerText.length)-(/^H[1-4]$/.test(b.tagName)&&b.innerText===s?-100000:b.innerText.length))[0];const e=pick(a);if(!e)throw Error('anchor missing');const r=e.getBoundingClientRect();const f=b?pick(b):null;const y=Math.max(0,Math.floor(r.top+scrollY-pad));return {x:0,y,width:700,height:Math.ceil(f?f.getBoundingClientRect().bottom+scrollY-y+pad:r.height+2*pad)}})()`);
+ record.clip=clip;
+ if(clip.height<=0||clip.height>8000)throw Error('Invalid clip '+JSON.stringify(clip));
+ await cdp('Emulation.setDeviceMetricsOverride',{width:700,height:Math.max(1800,Math.ceil(clip.height+150)),deviceScaleFactor:2,mobile:false});
+ ev(`(()=>{window.scrollTo(0,${Math.max(0,clip.y-70)});return {scrollY}})()`);
+ await new Promise(r=>setTimeout(r,600));
+ const visible=ev('({scrollY,innerHeight,innerWidth,devicePixelRatio})');record.viewport=visible;
+ const shot=await Promise.race([cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:false}),new Promise((_,reject)=>setTimeout(()=>reject(Error('screenshot timed out after 30s')),30000).unref())]);
+ const top=Math.round((clip.y-visible.scrollY)*2);
+ if(top<0||top+clip.height*2>visible.innerHeight*2)throw Error('Clip outside viewport');
+ const cropped=execFileSync('python',['-c','import sys,io;from PIL import Image;im=Image.open(io.BytesIO(sys.stdin.buffer.read()));assert im.width==1400;im.crop((0,int(sys.argv[1]),1400,int(sys.argv[2]))).save(sys.stdout.buffer,format="PNG")',String(top),String(top+clip.height*2)],{input:Buffer.from(shot.data,'base64'),maxBuffer:16000000});
+ fs.writeFileSync('docs/2610/1005/images/'+name,cropped,{flag:'wx'});
+ record.clip=clip;record.result='captured; visual QA pending';
+}catch(e){record.result='FAILED: '+e.message.slice(0,400)}
+fs.appendFileSync('docs/2610/1005/sources/d-screenshot-records.jsonl',JSON.stringify(record)+'\n');console.log(JSON.stringify(record));
+process.exit(record.result.startsWith('FAILED')?1:0);

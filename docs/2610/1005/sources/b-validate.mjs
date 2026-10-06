@@ -1,0 +1,21 @@
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+const dir='docs/2610/1005/';
+const evidence=fs.readFileSync(dir+'sources/evidence-b.md','utf8');
+const files=[];for(const sub of ['sources','images'])for(const n of fs.readdirSync(dir+sub))if(/^b-|^(evidence|capture-log)-b\.md$|^1[0-4]-b-/.test(n))files.push(dir+sub+'/'+n);
+const refs=[...new Set(evidence.match(/1[0-4]-b-[a-z-]+\.png/g))];
+const shots=refs.map(n=>{const b=fs.readFileSync(dir+'images/'+n);return {file:n,width:b.readUInt32BE(16),height:b.readUInt32BE(20),exists:true};});
+const rows=evidence.split('\n').filter(x=>/^\| B[1-8]/.test(x));
+const bad=rows.filter(x=>!/(已找到|部分支持|与说法不符|未找到一手来源) \|$/.test(x));
+const textFiles=files.filter(n=>!n.endsWith('.png'));
+const secretPatterns=/auth_token|sessionid|access_token|refresh_token|ct0=|twid=|__Secure-|"cookie"\s*:|"authorization"\s*:/i;
+const hits=textFiles.filter(n=>!n.endsWith('b-validation.json')&&secretPatterns.test(fs.readFileSync(n,'utf8')));
+// Source code of this check naturally contains the scan patterns, and is not a capture.
+const captureHits=hits.filter(n=>!n.endsWith('b-validate.mjs'));
+const over=textFiles.filter(n=>fs.statSync(n).size>1000000);
+const result={checked_bj:new Date(Date.now()+28800000).toISOString().replace('Z','+08:00'),b_files:files.length,claim_rows:rows.length,groups_present:[1,2,3,4,5,6,7,8].map(n=>({group:'B'+n,present:rows.some(r=>r.startsWith('| B'+n))})),bad_status_rows:bad,shots,width_limit_ok:shots.every(s=>s.width<=1400),capture_secret_pattern_files:captureHits,text_files_over_1MB:over,visual_review:'10–13 opened and inspected; requested core text and both full graphs/table present; 10 retains a small translation-extension bubble at right edge of context paragraph, no user identity; adjacent next-section text is included in 11–13.',delivery_gaps:['B2 PDF download rejected by approval policy; no local PDF/pdftotext/pdftoppm or image14','EU Code PDF inaccessible','synonym experiment FPR unverified','HN comment scores unavailable','large-scale social discussion unproven'],workspace:'Other groups added A/C/D concurrently; our write paths are only B files under 1005; tracked diff still only preexisting EDITORIAL.md and daily-scan.md.'};
+fs.writeFileSync(dir+'sources/b-validation.json',JSON.stringify(result,null,2));
+const listed=files.filter(n=>!n.endsWith('b-files.tsv')&&!n.endsWith('b-validation.json')).map(n=>{const b=fs.readFileSync(n);return [n,b.length,crypto.createHash('sha256').update(b).digest('hex')];});
+fs.writeFileSync(dir+'sources/b-files.tsv','path\tbytes\tsha256\n'+listed.map(x=>x.join('\t')).join('\n')+'\n');
+console.log(JSON.stringify(result,null,2));
+if(bad.length||captureHits.length||over.length)process.exitCode=1;

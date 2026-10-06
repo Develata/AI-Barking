@@ -1,0 +1,267 @@
+Skip to content
+spicylemonade
+compensated-magnet-ledger
+Repository navigation
+Code
+Issues
+Pull requests
+Agents
+Actions
+Projects
+Security and quality
+Insights
+Watch
+0
+ (0)
+Fork2
+ (2)
+Star10
+ (10)
+
+Computational ledger for two room-temperature Luttinger-compensated magnet candidates, YBaMnFeO5 and KV[Cr(CN)6]: raw QE inputs/outputs, checker, re-runs
+
+Other
+10 stars
+2 forks
+0 watching
+1 branch
+0 tags
+Activity
+Public repository
+main
+Go to file
+Add file
+Code
+Latest commit
+spicylemonade
+and
+claude
+Converge the dihydrate HSE06 run (new folder F2, claims K19b/K20b)
+45551de
+ · 
+History
+Folders and files
+Name	Last commit message	Last commit date
+
+docs
+	
+Converge the dihydrate HSE06 run (new folder F2, claims K19b/K20b)
+	
+
+
+ledger
+	
+Converge the dihydrate HSE06 run (new folder F2, claims K19b/K20b)
+	
+
+
+materials
+	
+Converge the dihydrate HSE06 run (new folder F2, claims K19b/K20b)
+	
+
+
+reproduce
+	
+Address an outside review; add the ordering and hull raw outputs; cor…
+	
+
+
+tools
+	
+Converge the dihydrate HSE06 run (new folder F2, claims K19b/K20b)
+	
+
+
+.gitignore
+	
+Computational ledger for YBaMnFeO5 and KV[Cr(CN)6]
+	
+
+
+BLOG.md
+	
+Converge the dihydrate HSE06 run (new folder F2, claims K19b/K20b)
+	
+
+
+CITATION.cff
+	
+Computational ledger for YBaMnFeO5 and KV[Cr(CN)6]
+	
+
+
+LEDGER.md
+	
+Converge the dihydrate HSE06 run (new folder F2, claims K19b/K20b)
+	
+
+
+LICENSE
+	
+Computational ledger for YBaMnFeO5 and KV[Cr(CN)6]
+	
+
+
+View all files
+Repository files navigation
+README
+License
+Two magnets that add up to zero: a computational ledger
+
+This repository holds the data behind a blog post about two candidate room-temperature "Luttinger-compensated" magnetic semiconductors. In these magnets two inequivalent kinds of magnetic atom carry opposite spins of equal size, so in an ideal crystal the net spin moment is zero, yet the electrons are still sorted by spin as they would be in a ferromagnet. (The two kinds of atom are often different elements, as in both materials here, but the same element on two different kinds of site also works.)
+
+YBaMnFeO₅: a new design. On paper it is nearly ideal. However, our own calculations suggest the atomic ordering it needs may be hard to reach with standard synthesis.
+KV[Cr(CN)₆]: a Prussian-blue-type magnet first made in 1999; its only reported sample, a hydrated powder, orders at 376 K. Our calculations say it already has this electronic structure. Its zero net moment was designed in (1999), and its spin-sorted band edges are already visible in a 2008 hybrid-functional calculation that did not comment on them. We point them out, put numbers on them and test how robust they are (LEDGER caveat 11).
+
+Everything here was computed by a team of Claude Opus 5.5 agents (Anthropic), which ran density functional theory (DFT) calculations on cloud computers. This repository makes the numbers checkable: the inputs and raw outputs, the scripts, and a claim-by-claim checker. Of the 61 claims in the ledger, 52 are recomputed directly from raw outputs, 3 by re-running included scripts, 3 are read from recorded analysis files, and 3 are experimental or literature values.
+
+Read the blog post: BLOG.md. A designed web version with the same text and diagrams is in docs/index.html; turn on GitHub Pages for the /docs folder to serve it.
+
+Status of the main claims
+	YBaMnFeO₅ (designed)	KV[Cr(CN)₆] (made in 1999)
+Zero net spin moment (ideal collinear crystal at 0 K, DFT without spin–orbit coupling)	yes	yes
+Electrons spin-sorted at both band edges, same spin	yes: windows of 1.0 / 1.4 eV (HSE06)	yes: windows of 2.6 / 1.6 eV (HSE06)
+Band gap (HSE06)	2.35 eV	2.09 eV
+Orders above room temperature	predicted: about 420 K raw, about 490 K calibrated	measured: 376 K on the hydrated powder, 365 K after heating (Holmes & Girolami, 1999)
+Can it be made?	May be hard with standard methods. The required Mn/Fe checkerboard is predicted to scramble at about 950 K, below the temperatures where the atoms move quickly during synthesis, and scrambling destroys the effect	Already made, but only once, as a hydrated powder with small imbalances (0.125 μB/f.u.)
+Survives real-world imperfections?	No: one swapped Mn/Fe pair closes the spin-selective gap	Water and vacancies: HSE06 says yes, PBE+U says the hole window shrinks a lot. Unresolved
+Measured spin polarisation, conductivity or band gap	none (not made)	none yet
+Grade from the agents' own adversarial review	design study, not a realizable discovery	solid "identification plus numbers", not a breakthrough
+
+Each number above is traced in LEDGER.md to the exact input and raw output files and to a script that recomputes it.
+
+Corrections found while building this ledger
+
+Re-reading every raw output, and an outside reader's literature check, turned up five things the agents' own records got wrong or left out. They are fixed or flagged here, and none changes the main conclusions above.
+
+YBaMnFeO₅ hull distance: +13.7 meV/atom, not +2.6. The agents computed the hull before every competing phase had finished. With all 33 completed competitors, read from their raw outputs, BaFe₂O₄ and Ba₆Y₂Fe₄O₁₅ lower the hull (claims Y24 and Y24b; LEDGER caveat 17). That is still typical of compounds that have been made, but it is no longer "at the edge of stability".
+HSE06 for the water-containing KV[Cr(CN)₆]: the agents' run stopped before its exact-exchange loop converged, and the old run index marked it converged. Carried to convergence, it gives a hole window of 2.31 eV instead of 2.43, and an electron window of 1.40 eV instead of 1.42. Both edges stay spin-sorted (claims K19b, K20b; LEDGER caveat 7).
+Partly relaxed geometries: the water-filled-vacancy cell and two of the cation arrangements were computed on geometries whose relaxation had stopped early (LEDGER caveats 8 and 14).
+One truncated output: one of the 96 cation-ordering outputs was saved without its last lines, so its recorded energy cannot be re-derived; the other 95 match exactly.
+Missed prior work: the agents' literature search missed Middlemiss, Lawton & Wilson (2008), a hybrid-functional study of KV[Cr(CN)₆] whose spin-resolved plot already shows the same-spin band edges. The novelty claim is narrowed accordingly (LEDGER caveat 11).
+Check our work in three levels
+
+Level 1: check the arithmetic (seconds, laptop). Recompute the DFT numbers from the raw Quantum ESPRESSO outputs in this repository, and check the rest against the recorded analysis files:
+
+pip install numpy
+python tools/verify.py            # 58 pass, 0 fail, 3 not computable (experiment/literature) as of 2026-10-04
+python tools/crosscheck_raw.py    # the cation-ordering and hull energies against their raw outputs
+
+Level 2: re-run the models (minutes, laptop). Re-derive the exchange constants and Néel temperature of YBaMnFeO₅ from the raw energies, and redo the cation-order simulation that rules it out:
+
+pip install numpy pymatgen numba
+python materials/YBaMnFeO5/exchange_fit_and_Neel_T/rerun_fit_and_mc.py              # recorded 417 K; re-run gives 414 ± 4 K
+bash   materials/YBaMnFeO5/cation_order_cluster_expansion/rerun_torder.sh 3         # recorded and re-run: 915 / 965 / 915 K
+
+Level 3: re-run the quantum-mechanical calculations (CPU hours, cluster or cloud). Download the same pseudopotentials (md5-checked) and run the original input files with Quantum ESPRESSO 7.5:
+
+conda install -c conda-forge qe=7.5 openmpi
+bash reproduce/get_pseudos.sh pseudo
+NP=16 NK=8 PSEUDO=$PWD/pseudo bash reproduce/run_qe.sh \
+  materials/KV_Cr_CN6/runs/A_pbeu_relax_scf_nscf_Ugrid/KVCr_LCM.in \
+  materials/KV_Cr_CN6/runs/A_pbeu_relax_scf_nscf_Ugrid/KVCr_LCM_nscf.in
+
+We did exactly this in a fresh cloud container for four sets of runs, and all 16 checked values match the originals; see reproduce/RESULTS.md. A fifth run took the agents' unconverged HSE06 water calculation, reproduced its first 12 cycles digit for digit, and carried it to convergence (materials/KV_Cr_CN6/runs/F2_hse06_dihydrate_LCM_converged/). There is also a one-command cloud version, reproduce/modal_repro.py.
+
+What is in here
+BLOG.md                         the blog post (plain language)
+LEDGER.md                       every claim -> files -> script -> status, plus all known caveats
+ledger/claims.csv               the same claims, machine-readable
+ledger/runs.csv                 index of all 876 included inputs (868 pw.x runs + 8 post-processing), with convergence flags
+ledger/harvest_manifest.json    provenance: original storage path and md5 of every raw file
+tools/verify.py                 Level-1 checker (numpy only)
+tools/crosscheck_raw.py         ordering and hull energies vs their raw outputs; recomputes the hull distance
+tools/build_runs_index.py       rebuilds ledger/runs.csv
+tools/qe_parse.py               small pw.x output parser (eigenvalues, moments, energies, cells)
+tools/magtools.py               Heisenberg fit + classical Monte Carlo (from the campaign)
+reproduce/                      Level-3: pseudopotential checksums, run scripts, independent re-run results
+materials/KV_Cr_CN6/
+    runs/                       raw inputs/outputs: PBE+U, HSE06, hydrate, vacancies, defects, bands, control
+    structures/                 relaxed cells (CIF, POSCAR) and magnetic CIFs
+    analysis_data/              collector outputs (defects, phonons, tautomers, T_C model), spin-group check
+    original_scripts/           the agents' job scripts and collectors, as run
+    working_notes/              the agents' working READMEs and second referee report
+    AGENT_DOSSIER_2026-10-03.md the agents' own dossier, including corrections and retractions
+materials/YBaMnFeO5/
+    runs/                       raw inputs/outputs: relaxation, HSE06, U scans, spin flips, antisites, exchange fit,
+                                cation-ordering study (J), competing phases for the hull (K)
+    exchange_fit_and_Neel_T/    fit + Monte Carlo (Level-2 script)
+    cation_order_cluster_expansion/   the decisive negative result (Level-2 script)
+    Neel_T_calibration/         YFeO3 / MnFe2O4 / YBaMn2O5 calibration runs and analysis
+    structures/ analysis_data/ figures/ original_job_inputs/
+    AGENT_DOSSIER_2026-10-02.md the agents' own dossier, including the downgrade verdict
+
+
+About 130 MB in total; large text outputs are gzipped (the tools read them directly).
+
+How this was produced
+
+When: 1–4 October 2026.
+
+Who: several Claude agents working in parallel, each on its own "lane" of a broader search for unusual magnetic materials. This repository covers only the Luttinger-compensated-magnet lane. The other lanes did not find anything above their bars, and their results are not included.
+
+How the agents worked:
+
+pre-registered pass/fail rules before running decisive calculations;
+adversarial "referee" agents that tried to kill each claim;
+literature searches for prior art (the agents' literature notes are not included; the key references are cited in LEDGER.md and the dossiers).
+
+Several claims were retracted or corrected along the way. The dossiers in materials/*/AGENT_DOSSIER_*.md keep that record.
+
+Compute: Quantum ESPRESSO 7.5 on Modal cloud CPUs. The Track-L lane submitted about 750 jobs, most of them not part of this repository.
+
+Human role: setting goals, directing the search, and deciding what to publish.
+
+Caveats in one paragraph
+
+These are DFT predictions for ideal crystals at zero temperature.
+
+"Zero net moment" is a spin-only, collinear result. Spin–orbit coupling and orbital moments, which could leave a small residue, were not computed reliably, and at finite temperature two inequivalent sublattices need not stay exactly compensated.
+Density functional theory with a Hubbard U, and even HSE06, can misplace energy levels by tenths of an eV.
+The two methods used here disagree about how much water harms KV[Cr(CN)₆].
+Nobody has measured the spin polarisation, band gap or conductivity of either material.
+YBaMnFeO₅'s key ordering is predicted to be hard to reach with standard synthesis.
+KV[Cr(CN)₆]'s only sample is one hydrated powder from 1999.
+
+The full list is in LEDGER.md → Known caveats.
+
+Experiments that would settle it
+Re-make KV[Cr(CN)₆] and measure its composition and saturation magnetisation (the cheapest test).
+Element-specific X-ray magnetic circular dichroism (V and Cr L-edges) and magneto-optics at near-zero magnetisation, across a series of compositions.
+Spin-resolved photoemission of the top valence band of anhydrous KV[Cr(CN)₆]: the prediction is about 100 % one spin over about 2 eV, reversing with the magnetic order.
+License and citation
+Code (tools/, reproduce/, and scripts under materials/): MIT.
+Data and text: CC BY 4.0.
+
+See LICENSE and CITATION.cff.
+
+The experimental compound KV[Cr(CN)₆]·2H₂O is from S. M. Holmes and G. S. Girolami, J. Am. Chem. Soc. 121, 5593 (1999). Pseudopotentials are from PseudoDojo (van Setten et al., Comput. Phys. Commun. 226, 39 (2018)), and calculations used Quantum ESPRESSO (Giannozzi et al., J. Phys.: Condens. Matter 29, 465901 (2017)).
+
+Releases
+No releases published
+Packages
+No packages published
+Contributors
+2
+ (2)
+spicylemonadeGeby Jaff
+claudeClaude
+Languages
+Python
+98.7%
+Shell
+1.3%
+Footer
+© 2026 GitHub, Inc.
+Footer navigation
+Terms
+Privacy
+Security
+Status
+Community
+Docs
+Contact
+Manage cookies
+Do not share my personal information
+ 

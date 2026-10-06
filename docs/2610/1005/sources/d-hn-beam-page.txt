@@ -1,0 +1,947 @@
+	Hacker Newsnew | past | comments | ask | show | jobs | submit	login
+
+
+
+	
+	Beam: Reflection's 501B open-weight model (reflection.ai)
+	300 points by Philpax 6 hours ago | hide | past | favorite | 77 comments
+	
+
+
+	
+ help
+
+
+
+
+	
+	
+Ariarule 5 hours ago | next [–]
+
+
+Always glad to see more open-weight models, but this caption on the 2nd demo image had me do a double-take: "Land or Water Generalization Experiment: We recreated the viral X puzzle by asking Beam to create a fixed 180×90 grid for longitudes -179° to 179° and latitudes -89° to 89°, with 16,200 points. This puzzle is a few days old, so could not appear in the training data, thus testing the model’s generalization. Beam gets 95.5% coverage right, putting us between Opus 5 (92.5%) and Fable 5 (97.8%), which shows how well it generalizes to novel new tasks."
+
+Oof, no, this "puzzle is a few days old" is incorrect even if it's a social media trend just recently. Asking a model to generate a world map in this way is _at least_ from August 2025 as it appeared on LessWrong at that time: https://www.lesswrong.com/posts/xwdRzJxyqFqgXTWbH/how-does-a...
+
+reply
+
+
+
+	
+	
+extr 5 hours ago | parent | next [–]
+
+
+Yeah I remember when the original post about this came out. Def not recent. Though I think their point survives in that they didn't exactly RL on this.
+
+reply
+
+
+
+	
+	
+jiggawatts 3 hours ago | parent | prev | next [–]
+
+
+I'd love to see these tests repeated for the current frontier models...
+
+reply
+
+
+
+	
+	
+charlieyu1 4 hours ago | parent | prev | next [–]
+
+
+I don't think age of the puzzle even matters, all models have search capacities these days
+
+reply
+
+
+
+	
+	
+criemen 4 hours ago | root | parent | next [–]
+
+
+> all models have search capacities these days
+
+one would hope that they disable websearch and internet access (maybe all tools?) when doing generalization testing?
+
+reply
+
+
+
+	
+	
+zakisaad 2 hours ago | root | parent | prev | next [–]
+
+
+Model weights (what is being tested here) don't inherently "access the web" when inference is running. If the model has access to a web search tool, that's a different story.
+
+reply
+
+
+
+	
+	
+dexwiz 4 hours ago | root | parent | prev | next [–]
+
+
+Is search part of the model or the harness?
+
+reply
+
+
+
+	
+	
+Cycl0ps 3 hours ago | root | parent | next [–]
+
+
+Maybe that's a rhetorical question but just in case - the search would always be part of the harness. A model is only handling next-token prediction for a given input. That token may be something like [[web search]] to invoke a tool call but the actual call would be handled by the harness.
+
+reply
+
+
+
+	
+	
+htrp 6 hours ago | prev | next [–]
+
+
+> Beam is a sparse Mixture-of-Experts model with 501 billion total parameters, 23 billion active, built for coding, reasoning, and agentic workloads.
+
+> Beam’s capabilities come from major investments in both pretraining and reinforcement learning (RL). We pretrained the model on 23.8 trillion diverse, curated, high-quality tokens from the web and proprietary licensed datasets, matching or outperforming available similar-sized open base models. In parallel, we developed the algorithms, training environments, and infrastructure needed to sustain high-compute RL at exceptional scale. Our high-compute RL run generated over 100 million rollouts on 10.5K NVIDIA GB300 GPUs over 4 weeks of training.
+
+Early access, no weights no tech details, just a sign up here for info
+
+reply
+
+
+
+	
+	
+wronglebowski 5 hours ago | parent | next [–]
+
+
+I'm all for more open models, but talk is cheap and this is a rather pointless announcement without anything backing it up. Publish your weights and HF repo or shut up IMO.
+
+reply
+
+
+
+	
+	
+antoniojtorres 1 hour ago | root | parent | next [–]
+
+
+Is that all that a company about to give away the product of 10,000 GPUs running for a month gets to be now? give it away without a single promotional post or shut up? I support open source as much as the person but this is pretty caustic.
+
+reply
+
+
+
+	
+	
+zelphirkalt 5 hours ago | parent | prev | next [–]
+
+
+And also a "proprietary data set" hahaha... Probably just means they don't want to show it, and it is data, that either they shouldn't have, or that there is nothing special about their training data and it is just meant to sound like there is some secret ingredient, while there is none.
+
+reply
+
+
+
+	
+	
+janalsncm 4 hours ago | root | parent | next [–]
+
+
+Not sharing the data is pretty standard because 1) it tends to get the lawyers involved and 2) good data is critical for getting good results.
+
+Imo you can get better results with great data and generic modeling techniques than with incredible modeling techniques and crappy data. Because if you have crappy data, you won’t even know if your model is good because your evals will also be bad.
+
+This is why Anthropic is throwing a fit about the Chinese distillation “attacks”. Clean reasoning traces are gold.
+
+reply
+
+
+
+	
+	
+mlmonkey 3 hours ago | root | parent | prev | next [–]
+
+
+Data has copyright issues, so one can't share it generally without getting permissions from all of the copyright holders. The data is not theirs to share, anyways. The derived (learned) weights are a different matter.
+
+reply
+
+
+
+	
+	
+vanuatu 4 hours ago | root | parent | prev | next [–]
+
+
+this is very normal for frontier lab companies. you need good data either synthetic or labelled (all the chinese open source models have their own armies of data labelers)
+
+reply
+
+
+
+	
+	
+Loquebantur 4 hours ago | parent | prev | next [–]
+
+
+> Beam is undergoing final red-teaming and evaluations. You can sign up here for early access to the model.
+
+> We will release the weights, technical report, model card, and developer artifacts later this month.
+
+reply
+
+
+
+	
+	
+wren6991 2 hours ago | prev | next [–]
+
+
+I thought it would be interesting to look at some key figures vs another contemporary model in the same weight class (DeepSeek V4.1 Flash)
+
+                                DS V4.1F            Beam
+    LM total params             552B                501B
+    LM active params (prefill)  8B                  23B
+    LM active params (decode)   16B                 23B
+    N-gram/PLE params           196B                0
+    Pretrain tokens             45T                 28T
+    Disk KV bytes/token (FP4)   890                 No information
+    Vision                      Yes (pretrain)      No
+    Weights available           Yes (launch day)    "This month"
+    Weights licence             MIT                 Apache 2.0
+
+At first blush the benchmarks are impressive, but to paraphrase Linus: "Talk is cheap, show me the weights." :-)
+
+reply
+
+
+
+	
+	
+laybak 2 hours ago | parent | next [–]
+
+
+yeah agreed, let's normalize "show me the weights" in this era
+
+reply
+
+
+
+	
+	
+NorwegianDude 5 hours ago | prev | next [–]
+
+
+Bigger and still worse than existing free Chinese models that are smaller? Open weight models are nice, but at this point it seems western models are very far behind Chinese ones, despite Chinese companies publishing a lot of their findings. I hope we get more open models and more providers, as being stuck with a model from China or US with no competition is risky.
+
+Google does do a great job with Gemma models. It's one of the few language models actually good at language. OpenAI's top closed models can't even write norwegian correctly.
+
+reply
+
+
+
+	
+	
+mirekrusin 4 hours ago | parent | next [–]
+
+
+It takes time / few iterations to get it right (and it's moving target), but yes, expensive trial, my personal feeling is that they went a bit too high, at the same time who knows, maybe good move – as they're saying RL didn't plateau. It feels like they had something like $100M budget for it?
+
+reply
+
+
+
+	
+	
+onlyrealcuzzo 5 hours ago | prev | next [–]
+
+
+This appears to be larger than DeepSeek v4.1 Flash, more expensive to run, and worse on every measured metric.
+
+Am I missing something?
+
+reply
+
+
+
+	
+	
+swiftcoder 4 hours ago | parent | next [–]
+
+
+> Am I missing something?
+
+It's pretty clear from their framing ("Beam advances the Western open-weight frontier") that one of their main selling points is not being a Chinese lab.
+
+I can't imagine that mattering to many individuals, but I guess someone out there has a government contract that forbids the use of foreign models
+
+reply
+
+
+
+	
+	
+htrp 4 hours ago | root | parent | next [–]
+
+
+Reflection raised on the idea of creating the "American Deepseek Project"
+
+reply
+
+
+
+	
+	
+mirekrusin 4 hours ago | root | parent | next [–]
+
+
+Who's funding this?
+
+reply
+
+
+
+	
+	
+atlasunshrugged 4 hours ago | root | parent | next [–]
+
+
+Looks like Nvidia, Eric Schmidt, Sequoia, and a host of others https://techcrunch.com/2025/10/09/reflection-raises-2b-to-be...
+
+reply
+
+
+
+	
+	
+ipsum2 4 hours ago | root | parent | prev | next [–]
+
+
+I still don't get why, after over a decade on HN, people refuse to Google very simple questions.
+
+reply
+
+
+
+	
+	
+hadlock 15 minutes ago | root | parent | next [–]
+
+
+I still don't get why, after 25 years of slashdot, still ask why people DRTFA and complain about it as meta commentary.
+
+InB4: kids these days :shakes-fist-at-cloud:
+
+reply
+
+
+
+	
+	
+jauntywundrkind 3 hours ago | root | parent | prev | next [–]
+
+
+Reciprocally, people probably do go find out. The great filter is also how many of them come back to post the useful interesting information.
+
+reply
+
+
+
+	
+	
+dominotw 3 hours ago | root | parent | prev | next [–]
+
+
+quesiton is more like "lets analyze the motivations behind funding this"
+
+reply
+
+
+
+	
+	
+kelnos 1 hour ago | root | parent | next [–]
+
+
+And a much better post would be "Just checked, and X, Y, and Z are funding this. My bet is that Y is funding it because $REASON..."
+
+Asking an easily-searchable question is just lazy.
+
+reply
+
+
+
+	
+	
+NamlchakKhandro 1 hour ago | root | parent | prev | next [–]
+
+
+because my templeos goes straight from ring0 after bios straight into a ui for hackernews that only lets me scroll, click into comments and type comments.
+
+reply
+
+
+
+	
+	
+nozzlegear 1 hour ago | root | parent | prev | next [–]
+
+
+I don't get why anyone posts anything on HN when they can just have an LLM generate an entirely self-contained conversation now.
+
+/s
+
+The conversation is why.
+
+reply
+
+
+
+	
+	
+mirekrusin 4 hours ago | root | parent | prev | next [–]
+
+
+Multiple independent approaches are cool and all but fully open source model training (datasets, pipeline, checkpoints) should be taking advantage of being open and share runs/budget between different entities.
+
+reply
+
+
+
+	
+	
+dotancohen 5 hours ago | parent | prev | next [–]
+
+
+We're still at the stage where every new entrant is welcome in my opinion. Doesn't need to be record-breaking upon initial release.
+
+reply
+
+
+
+	
+	
+halJordan 4 hours ago | root | parent | next [–]
+
+
+I disagree. Sure let them play and see if they can improve. But this model has more compute and more training data than the predecessors it fails to surpass. That only means their training regime is inferior if their predecessors did so much more with so much less. That inferiority should not be encouraged.
+
+reply
+
+
+
+	
+	
+kelnos 1 hour ago | root | parent | next [–]
+
+
+You don't just magically do better than everyone else on every metric on your first go at something. Doing worse than others and refining is how pretty much everything works.
+
+reply
+
+
+
+	
+	
+janalsncm 4 hours ago | root | parent | prev | next [–]
+
+
+The reality is they trained a model and it looks worse on benchmarks than Qwen or GLM. I don’t see how sharing the weights hurts anyone? Even when Llama 4 came out and it was a dumpster fire, it didn’t affect me personally.
+
+> That only means their training regime is inferior if their predecessors did so much more with so much less
+
+Hard to imagine how that wouldn’t be the case. They probably missed the boat on distilling Claude (or their lawyers said no), they probably didn’t hire an army of math PhDs to write reasoning traces, they don’t have millions of DAUs in a coding agent to train from, and they probably have less money, less experience, fewer top tier researchers, and fewer resources for experiments. They are an underdog without a doubt.
+
+None of that means they shouldn’t release their model.
+
+reply
+
+
+
+	
+	
+thinkcontext 2 hours ago | root | parent | prev | next [–]
+
+
+I wonder if that's an indication that they are not distilling which limits how good they can get.
+
+reply
+
+
+
+	
+	
+flockonus 4 hours ago | root | parent | prev | next [–]
+
+
+It depends! If a startup is entering with a large model to face other larger models, it must be better at least in 1 meaningful dimension.
+
+500B params performing worse than other OSS of the same size is pretty meaningless if no one will use it.
+
+reply
+
+
+
+	
+	
+vanuatu 4 hours ago | parent | prev | next [–]
+
+
+Reflection is explicitly marketed as the 'US' DeepSeek
+
+seems like they are aiming to provide both inference and RLaaS for american companies and western govts. even if they never fully beat deepseek if they get close enough the fact that they're American will help them close deals
+
+reply
+
+
+
+	
+	
+jstummbillig 5 hours ago | parent | prev | next [–]
+
+
+Apparently there is more to making good models than copying everything on the internet.
+
+reply
+
+
+
+	
+	
+aizk 4 hours ago | parent | prev | next [–]
+
+
+Yes it's (hopefully) not distilled from every single major American provider.
+
+reply
+
+
+
+	
+	
+Centigonal 4 hours ago | parent | prev | next [–]
+
+
+new entrant in this weight class, US lab.
+
+reply
+
+
+
+	
+	
+martini333 5 hours ago | parent | prev | next [–]
+
+
+Beam goes brrrr
+
+reply
+
+
+
+	
+	
+drubs 5 hours ago | prev | next [–]
+
+
+I remember being in the room with pretraining day 1 to help monitor the training job launch. Watching this model train from day 1 has been an amazing experience!
+
+reply
+
+
+
+	
+	
+jeremyjh 4 hours ago | parent | next [–]
+
+
+What sort of outputs or telemetry is monitored on a large pre-training run?
+
+reply
+
+
+
+	
+	
+drubs 4 hours ago | root | parent | next [–]
+
+
+Outside of ML metrics, you're monitoring the health of every piece of hardware in the system. You need to make sure that you have every GPU, every CPU, the PCIe buses, the networking fabric are all working without any errors. You need to ensure that you can respond as fast as possible to any possible error. One bad component can bottleneck the entire job.
+
+reply
+
+
+
+	
+	
+costco 1 hour ago | root | parent | next [–]
+
+
+https://github.com/facebookresearch/metaseq/blob/main/projec...
+
+I really enjoyed reading the log book from the training of OPT-175B at Meta… I guess it’s all classified info but it’d be fun to read a blog post about the crazy day to day issues you run into when doing things at this scale :)
+
+reply
+
+
+
+	
+	
+michaelkdev 4 hours ago | prev | next [–]
+
+
+Is it worse than the top open-weight Chinese models? Yes, it is, but at least the West has joined the party, and hopefully they will iterate on this and keep up the pace. The Chinese labs will certainly release new and powerful versions soon, so it's all about relative pace right now.
+
+reply
+
+
+
+	
+	
+astrostl 1 hour ago | prev | next [–]
+
+
+Beggar choosing: my kingdom for more 90B-133B MoE local models. Especially with disk offload, that is a function/performance sweet spot for Mac workstations with 64GB-128GB of RAM.
+
+reply
+
+
+
+	
+	
+aeetes 5 hours ago | prev | next [–]
+
+
+the performance chart puts the better open source models behind the fold making it seem like it outperforms them... but it doesn't! all for open source models but this announcement is misleading
+
+reply
+
+
+
+	
+	
+brumbelow 5 hours ago | parent | next [–]
+
+
+Yes. All the link made me realize is that I should checkout Deepseek 4.1 flash
+
+reply
+
+
+
+	
+	
+eaf7e281 4 hours ago | prev | next [–]
+
+
+> Where frontier open models like Kimi K3 remain ahead on raw capability, Beam's advantage is efficiency at inference time.
+
+It's great to see a company that acknowledges it still needs improvement instead of making false claims.
+
+reply
+
+
+
+	
+	
+hidelooktropic 2 hours ago | prev | next [–]
+
+
+Nitpicking but I really wish this benchmarks table were easier to read. Should show which columns win in each row and should not require horizontal scrolling to see across.
+
+reply
+
+
+
+	
+	
+minimaxa 2 hours ago | prev | next [–]
+
+
+That was exciting... Will come back later when the weights are out and gguf'd.
+
+Access is currently limited. We'll contact you if early access becomes available.
+
+reply
+
+
+
+	
+	
+hypfer 4 hours ago | prev | next [–]
+
+
+Someone should name their next model "Workhorse" just for SEO reasons.
+
+It's interesting how the industry converged to this very term, given that very less work is being done by horses since quite a while.
+
+reply
+
+
+
+	
+	
+hnedeotes 4 hours ago | parent | next [–]
+
+
+Thankfully there wasn't mistagging, we could have ended with workjackass.
+
+reply
+
+
+
+	
+	
+zopper 5 hours ago | prev | next [–]
+
+
+Open model that is not yet open or widely accessible via API. Primarily comparing to non-SOTA models like Inkling and GLM 5.2. Included comparison to GLM 5.3 and DeepSeek V4.1 Flash in the table, but not in the charts (I assume they would make them look bad). Also no results from AA Index or Arena.
+
+reply
+
+
+
+	
+	
+keeganpoppen 5 hours ago | prev | next [–]
+
+
+very curious to see more about what kinds of hardware you can run this on and the perf. characteristics… on the face of it, it seems like optimizing for inference speed might(?) be good for running on smaller hardware, but i suppose it could be the other way around and it is actually much resource-hungrier for the number of parameters, etc. …
+
+reply
+
+
+
+	
+	
+segmondy 3 hours ago | prev | next [–]
+
+
+Any time a new lab shows up, folks complain about how their models are worse. Really? It would be nice if a new comer comes from no where and beats everyone, but that's rarely the case. The good thing is that other labs/people are figuring out how to build this, and if they keep at it then this is as bad as it gets for them and it would hopefully get better. A new entrant to the market is good for everyone.
+
+reply
+
+
+
+	
+	
+NamlchakKhandro 1 hour ago | parent | next [–]
+
+
+honest question: how honest do you think people are about their improvements and performance compared to objective results when all you do is praise them?
+
+participation awards are not helpful.
+
+reply
+
+
+
+	
+	
+sharktheone 5 hours ago | prev | next [–]
+
+
+Am I the only one who thought of the BEAM VM after the first word of thee title?
+
+reply
+
+
+
+	
+	
+pstuart 5 hours ago | parent | next [–]
+
+
+nopes
+
+reply
+
+
+
+	
+	
+vcryan 3 hours ago | prev | next [–]
+
+
+This is like an ad for how great Deepseek V4.1 Flash is.
+
+reply
+
+
+
+	
+	
+wg0 5 hours ago | prev | next [–]
+
+
+Suppose I inherited a data center spanning several hundred acres full of GPUs and free electricity.
+
+Where do I get the data?
+
+I mean, this many models. They have to start somewhere.
+
+reply
+
+
+
+	
+	
+petu 5 hours ago | parent | next [–]
+
+
+I guess public datasets on HuggingFace and some shadow libraries content is enough to start.
+
+e.g. fineweb dataset is 50TB https://huggingface.co/datasets/HuggingFaceFW/fineweb
+
+reply
+
+
+
+	
+	
+wren6991 2 hours ago | parent | prev | next [–]
+
+
+I heard you should ask Claude about this. Preferably with thousands of accounts, routed through residential proxies
+
+reply
+
+
+
+	
+	
+lucrbvi 5 hours ago | parent | prev | next [–]
+
+
+There are a lot of open-research on pre-training, post-training and RL data mixtures and sourcing.
+
+I recommend checking papers from Datalogy, Nvidia Nemotron, Ai2 (Ollmo, Tulu, ...) and the recent model from Aleph Alpha if you want to learn more.
+
+reply
+
+
+
+	
+	
+altcognito 5 hours ago | parent | prev | next [–]
+
+
+If you ask a model, they will generally tell you where to get data. Modern frontier models have the large advantage of having tens if not hundreds of millions of users providing use cases to train against to improve their responses.
+
+reply
+
+
+
+	
+	
+blourvim 1 hour ago | parent | prev | next [–]
+
+
+You can also hire teams to create data for you for higher quality.
+
+reply
+
+
+
+	
+	
+ttul 5 hours ago | parent | prev | next [–]
+
+
+https://scale.com/data-engine - you just buy it.
+
+reply
+
+
+
+	
+	
+alchemist1e9 55 minutes ago | root | parent | next [–]
+
+
+any prices anywhere for anything specific?
+
+reply
+
+
+
+	
+	
+Hamuko 5 hours ago | parent | prev | next [–]
+
+
+Get data from Claude. That's what the Chinese (allegedly) do.
+
+reply
+
+
+
+	
+	
+kbwal7 5 hours ago | root | parent | next [–]
+
+
+Note that this sort of distillation is NOT for pre-training data (which is tens of trillions of tokens). I think the allegations against Chinese companies by Anthropic is more so that they distill SFT data (which is good for post-training, but you still need a strong base model)
+
+reply
+
+
+
+	
+	
+konfusinomicon 5 hours ago | parent | prev | next [–]
+
+
+forget the data....sell it and go live your life!
+
+reply
+
+
+
+	
+	
+TheArcane 3 hours ago | prev [–]
+
+
+If you don't buy into "America good, China bad" narrative, this new entrant & release by Inclusion Ai is a lot more exciting by every measurable metric.
+
+https://github.com/inclusionAI/Ling
+
+reply
+
+
+
+	
+	
+jonathaneunice 2 hours ago | parent [–]
+
+
+That seems to be from ~1y ago. What am I missing?
+
+reply
+
+
+
+
+
+
+
+Consider applying for YC's Winter 2027 batch! Applications are open till November 2.
+
+
+Guidelines | FAQ | Lists | API | Security | Legal | Apply to YC | Contact
+
+
+Search: 

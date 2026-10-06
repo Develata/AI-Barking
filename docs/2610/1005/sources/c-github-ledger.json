@@ -1,0 +1,235 @@
+{
+  "url": "https://github.com/spicylemonade/compensated-magnet-ledger/blob/main/LEDGER.md",
+  "title": "compensated-magnet-ledger/LEDGER.md at main · spicylemonade/compensated-magnet-ledger",
+  "text": "Skip to content\nspicylemonade\ncompensated-magnet-ledger\nRepository navigation\nCode\nIssues\nPull requests\nAgents\nActions\nProjects\nSecurity and quality\nInsights\nFiles\nmain\nBreadcrumbs\ncompensated-magnet-ledger\n/LEDGER.md\nLatest commit\nspicylemonade\nand\nclaude\nConverge the dihydrate HSE06 run (new folder F2, claims K19b/K20b)\n45551de\n · \nHistory\n248 lines (207 loc) · 31.3 KB\nFile metadata and controls\nPreview\nCode\nBlame\nRaw\nComputational ledger\n\nEvery number in the blog post and the README is listed below with:\n\nthe calculation it came from,\nthe exact input and raw output files in this repository,\na script that recomputes it.\n\nRun one command to check all of them:\n\npip install numpy\npython tools/verify.py\n\nIt re-reads the raw Quantum ESPRESSO outputs and recomputes each value: net magnetisation, band gap, spin windows and energy differences. It then compares each against the value the agents recorded. It needs only numpy and takes a few seconds. On 2026-10-04 it reported 58 pass, 0 fail; three entries are experimental or literature values and cannot be computed. A second script, python tools/crosscheck_raw.py, checks every energy behind the cluster expansion and the hull against its raw output.\n\nTiers\nTier\tMeaning\tHow to check\nA\tRecomputed from raw pw.x output files in materials/*/runs/\tpython tools/verify.py\nL2\tRecomputed end to end by an included script from the raw energies (exchange fit and Monte Carlo; cluster-expansion Monte Carlo)\tmaterials/YBaMnFeO5/exchange_fit_and_Neel_T/rerun_fit_and_mc.py, materials/YBaMnFeO5/cation_order_cluster_expansion/rerun_torder.sh\nB\tRead from a recorded analysis file in this repository; the script that produced it is included, but not every intermediate input is\topen the cited JSON\nE\tExperimental or literature value; cannot be computed\tsee the citation\nR\tRe-run from scratch in a fresh cloud container from the inputs in this repository, with the pseudopotentials downloaded from the public source\treproduce/, then python tools/verify.py --repro\nDefinitions used throughout\nCompensated (LCM) state: the collinear magnetic order in which the two inequivalent magnetic sublattices point opposite ways. In these collinear calculations without spin–orbit coupling, the total spin moment of the cell is then zero. Both materials are insulating in this state, so the spin moment per cell must be a whole number of Bohr magnetons (Luttinger counting); that is why it comes out exactly zero rather than approximately zero. Orbital moments, spin–orbit coupling and finite temperature are outside this statement (caveats 1 and 5).\nSpin window: scanning the whole Brillouin zone, the energy range at a band edge that holds only one spin.\nHole window: win_VB = VBM(edge spin) − VBM(other spin).\nElectron window: win_CB = CBM(other spin) − CBM(edge spin).\nA state is occupied if its occupation is above 0.5.\nThese are the same definitions as the original analysis code; see tools/qe_parse.py.\nUnipolar: both band edges are in the same spin channel. Bipolar: they are in opposite channels.\nEnergies per magnetic ion: (E_state − E_ground) / (number of magnetic ions in the cell).\nMoments: QE's sphere-integrated \"magn=\" values. They are smaller than the nominal 3 μB (V²⁺, Cr³⁺) or 5 μB (Mn²⁺, Fe³⁺) because the spheres are small.\nSoftware and settings (common to all runs)\nSetting\tValue\nCode\tQuantum ESPRESSO pw.x 7.5 (conda-forge build), MPI on cloud CPUs (Modal)\nPseudopotentials\tPseudoDojo v0.4, PBE, scalar-relativistic, \"standard\", norm-conserving. md5 sums are in reproduce/pseudo_md5.txt; the public download matches them exactly (checked 2026-10-04)\nDFT+U\tDudarev, ortho-atomic projectors. KV[Cr(CN)₆]: U(V 3d) = U(Cr 3d) = 3 eV, with a U grid {2, 3, 4}. YBaMnFeO₅: U(Mn 3d) = U(Fe 3d) = 4 eV, with scans over 0–6 eV\nHybrid functional\tHSE06 without U, ecutfock = 2 × ecutwfc, Gygi–Baldereschi divergence treatment with x_gamma_extrapolation\nSmearing\tGaussian, 0.005 Ry\nSpin\tCollinear (nspin = 2), no spin–orbit coupling unless stated\n\nEvery input file states its own cutoff, k-mesh and q-mesh. ledger/runs.csv (built by python tools/build_runs_index.py) indexes all 876 input files (868 pw.x calculations and 8 projwfc.x post-processing inputs) with these settings and the final energy, magnetisation and convergence of each run. converged means the SCF converged; for relaxations, the geometry also converged; for HSE06, the outer exact-exchange loop also converged. It is n/a for non-self-consistent (nscf, bands) runs. Most of the runs marked unconverged are earlier rounds of the cation-ordering study that the agents stopped or superseded.\n\nRun folders\n\nThe full index of inputs is in ledger/runs.csv. Folder descriptions are in ledger/run_folder_descriptions.json.\n\nKV[Cr(CN)₆] run folders\nYBaMnFeO₅ run folders\nClaims\n\nThe tables below are generated by python tools/verify.py --write-ledger. recorded is the value the agents wrote in their reports; recomputed is what the script gets from the files today.\n\nKV[Cr(CN)6]\nid\ttier\tclaim\trecorded\trecomputed\tstatus\traw files\nK01\tA\tRelaxed cubic lattice constant of the ideal anhydrous crystal (exp. 10.55 A, hydrated powder) (A)\t10.680\t10.680\tPASS\tKV_Cr_CN6/runs/A_pbeu_relax_scf_nscf_Ugrid/KVCr_vcrelax.out\nK02\tA\tNet spin moment of the ideal crystal (zero = fully compensated) (Bohr mag/cell)\t0.000\t-0.000\tPASS\tKV_Cr_CN6/runs/A_pbeu_relax_scf_nscf_Ugrid/KVCr_LCM.out\nK03\tA\tV moment (N-bound site), integrated in a small sphere: antiparallel to Cr (Bohr mag)\t-2.020\t-2.016\tPASS\tKV_Cr_CN6/runs/A_pbeu_relax_scf_nscf_Ugrid/KVCr_LCM.out\nK04\tA\tCr moment (C-bound site), integrated in a small sphere (Bohr mag)\t2.320\t2.318\tPASS\tKV_Cr_CN6/runs/A_pbeu_relax_scf_nscf_Ugrid/KVCr_LCM.out\nK05\tA\tBand gap (eV)\t1.950\t1.953\tPASS\tKV_Cr_CN6/runs/A_pbeu_relax_scf_nscf_Ugrid/KVCr_LCM_nscf.out\nK06\tA\tBoth band edges in the same spin channel (unipolar) (bool)\tyes\tyes\tPASS\tKV_Cr_CN6/runs/A_pbeu_relax_scf_nscf_Ugrid/KVCr_LCM_nscf.out\nK07\tA\tHole spin window (top of valence band that is 100 % one spin) (eV)\t2.020\t2.023\tPASS\tKV_Cr_CN6/runs/A_pbeu_relax_scf_nscf_Ugrid/KVCr_LCM_nscf.out\nK08\tA\tElectron spin window (bottom of conduction band that is 100 % one spin) (eV)\t1.150\t1.146\tPASS\tKV_Cr_CN6/runs/A_pbeu_relax_scf_nscf_Ugrid/KVCr_LCM_nscf.out\nK09\tA\tRobust to the Hubbard U choice: smallest hole window over the U grid (U_V, U_Cr in {2,3,4} eV) (eV)\t1.390\t1.387\tPASS\tKV_Cr_CN6/runs/A_pbeu_relax_scf_nscf_Ugrid/KVCr_*_LCM_nscf.out\nK10\tA\tSmallest electron window over the U grid (eV)\t0.870\t0.873\tPASS\tKV_Cr_CN6/runs/A_pbeu_relax_scf_nscf_Ugrid/KVCr_*_LCM_nscf.out\nK11\tA\tUnipolar at all five U points (bool)\tyes\tyes\tPASS\tKV_Cr_CN6/runs/A_pbeu_relax_scf_nscf_Ugrid/KVCr_*_LCM_nscf.out\nK12\tA\tCompensated state is far below the ferromagnet: E(FM) - E(compensated) per magnetic ion (meV)\t152.2\t152.2\tPASS\tKV_Cr_CN6/runs/A_pbeu_relax_scf_nscf_Ugrid/KVCr_LCM.out\nKV_Cr_CN6/runs/A_pbeu_relax_scf_nscf_Ugrid/KVCr_FM.out\nK13\tA\tHSE06: net spin moment (Bohr mag/cell)\t0.000\t-0.000\tPASS\tKV_Cr_CN6/runs/C_hse06_ideal_LCM/hse_lcm.out\nK14\tA\tHSE06: band gap (eV)\t2.090\t2.091\tPASS\tKV_Cr_CN6/runs/C_hse06_ideal_LCM/hse_lcm.out\nK15\tA\tHSE06: unipolar band edges (bool)\tyes\tyes\tPASS\tKV_Cr_CN6/runs/C_hse06_ideal_LCM/hse_lcm.out\nK16\tA\tHSE06: hole spin window (eV)\t2.640\t2.636\tPASS\tKV_Cr_CN6/runs/C_hse06_ideal_LCM/hse_lcm.out\nK17\tA\tHSE06: electron spin window (eV)\t1.570\t1.567\tPASS\tKV_Cr_CN6/runs/C_hse06_ideal_LCM/hse_lcm.out\nK18\tA\tHSE06: E(FM, moment fixed at 6) - E(compensated) per magnetic ion (meV)\t181.1\t181.1\tPASS\tKV_Cr_CN6/runs/C_hse06_ideal_LCM/hse_lcm.out\nKV_Cr_CN6/runs/D_hse06_ideal_FM_fixed_moment/KVCr_hse_FMfix.out\nK19\tA\tHSE06, dihydrate KV[Cr(CN)6]*2H2O (one water arrangement), agents' run stopped after 12 exact-exchange cycles, before converging: hole window (superseded by K19b) (eV)\t2.430\t2.432\tPASS\tKV_Cr_CN6/runs/F_hse06_dihydrate_LCM/hse_lcm.out\nK20\tA\tHSE06, dihydrate, same stopped run: electron window (superseded by K20b) (eV)\t1.420\t1.415\tPASS\tKV_Cr_CN6/runs/F_hse06_dihydrate_LCM/hse_lcm.out\nK19b\tA\tHSE06, dihydrate, the same input carried to convergence (41 exact-exchange cycles; the first 12 reproduce K19's run digit for digit): hole window (eV)\t2.310\t2.314\tPASS\tKV_Cr_CN6/runs/F2_hse06_dihydrate_LCM_converged/hse_lcm.out\nK20b\tA\tHSE06, dihydrate, converged: electron window (both edges still in the same spin channel) (eV)\t1.400\t1.400\tPASS\tKV_Cr_CN6/runs/F2_hse06_dihydrate_LCM_converged/hse_lcm.out\nK21\tA\tPBE+U, same dihydrate: hole window collapses (methods disagree about water) (eV)\t0.930\t0.929\tPASS\tKV_Cr_CN6/runs/G_pbeu_dihydrate/KVCr_2H2O_LCM_nscf.out\nK22\tA\tHSE06, water-filled [Cr(CN)6] vacancy (65-atom cell): net moment = -3 (composition, not symmetry, sets the moment) (Bohr mag/cell)\t-3.000\t-3.000\tPASS\tKV_Cr_CN6/runs/H_hse06_vacancy_with_water/hse_lcm.out\nK23\tA\tHSE06, water-filled vacancy: electron window (in-cell) (eV)\t0.740\t0.737\tPASS\tKV_Cr_CN6/runs/H_hse06_vacancy_with_water/hse_lcm.out\nK24\tA\tHSE06, water-filled vacancy: hole window (in-cell) (eV)\t2.800\t2.803\tPASS\tKV_Cr_CN6/runs/H_hse06_vacancy_with_water/hse_lcm.out\nK25\tA\tPBE+U, V/Cr antisite pair (60-atom cell): moment stays 0 ... (Bohr mag/cell)\t0.000\t0.000\tPASS\tKV_Cr_CN6/runs/K_pbeu_defect_antisite_pair/KVCr_AS_lcm.out\nK26\tA\t... but the hole window shrinks to (in-cell; 0.13 eV after alignment to the host) (eV)\t0.230\t0.229\tPASS\tKV_Cr_CN6/runs/K_pbeu_defect_antisite_pair/KVCr_AS_lcm_nscf.out\nK27\tA\tControl, same-element Cr[Cr(CN)6] (HSE06): edges in opposite spins (bipolar) ... (bool)\tno\tno\tPASS\tKV_Cr_CN6/runs/Q_hse06_control_CrCr_same_element/hse_lcm.out\nK28\tA\t... with a tiny hole window (why two different metals matter) (eV)\t0.100\t0.105\tPASS\tKV_Cr_CN6/runs/Q_hse06_control_CrCr_same_element/hse_lcm.out\nK29\tB\tSpin space group of the ideal crystal (findspingroup): compensated ferrimagnet, Zeeman-type (s-wave) splitting (label)\t216.216.1.1.L\t216.216.1.1.L\tPASS\tKV_Cr_CN6/analysis_data/pba_spingroup_check.txt\nK30\tE\tMeasured magnetic ordering temperature of KV[Cr(CN)6]*2H2O (Holmes & Girolami, JACS 121, 5593 (1999)) (K)\t376\t-\tn/a\tliterature\nK31\tE\tMeasured saturation moment at 5 K (expected 0 for perfect stoichiometry) (Bohr mag/f.u.)\t0.125\t-\tn/a\tliterature\nYBaMnFeO5\nid\ttier\tclaim\trecorded\trecomputed\tstatus\traw files\nY01\tA\tRelaxed cell, rock-salt-ordered P4/n: a (A)\t5.665\t5.665\tPASS\tYBaMnFeO5/runs/A_pbeu_vcrelax_110Ry/vc110.out\nY02\tA\tRelaxed cell: c (A)\t7.689\t7.689\tPASS\tYBaMnFeO5/runs/A_pbeu_vcrelax_110Ry/vc110.out\nY03\tA\tNet spin moment of the G-type compensated state (Bohr mag/cell)\t0.000\t0.000\tPASS\tYBaMnFeO5/runs/H_pbeu_stacking_vs_U/U44_G/single.out\nY04\tA\tMn moment (sphere-integrated); Fe moment is about -3.7, antiparallel (Bohr mag)\t4.000\t4.004\tPASS\tYBaMnFeO5/runs/H_pbeu_stacking_vs_U/U44_G/single.out\nY05\tA\tClosest competing magnetic order (spin flip across the Y layer) above the ground state, U = 4 eV (meV/mag. ion)\t8.900\t8.881\tPASS\tYBaMnFeO5/runs/H_pbeu_stacking_vs_U/U44_G/single.out\nYBaMnFeO5/runs/H_pbeu_stacking_vs_U/U44_Yflip/single.out\nY06\tA\tSame competitor at U = 0 eV (meV/mag. ion)\t16.400\t16.369\tPASS\tYBaMnFeO5/runs/H_pbeu_stacking_vs_U/U00_*\nY07\tA\tSame competitor at U = 6 eV (smallest margin in the U scan) (meV/mag. ion)\t7.000\t6.978\tPASS\tYBaMnFeO5/runs/H_pbeu_stacking_vs_U/U66_*\nY08\tA\tFerromagnet above the ground state, U = 4 eV (72-atom cell, 75 Ry) (meV/mag. ion)\t199.8\t199.8\tPASS\tYBaMnFeO5/runs/D_pbeu_72atom_G_FM_and_spin_flips/YBMFO110_snap_G.out\nYBaMnFeO5/runs/D_pbeu_72atom_G_FM_and_spin_flips/YBMFO110_snap_FM.out\nY09\tA\tHSE06: competitor (Y-layer flip) above the ground state (meV/mag. ion)\t8.500\t8.528\tPASS\tYBaMnFeO5/runs/B_hse06_G_type_LCM/hse_lcm.out\nYBaMnFeO5/runs/C_hse06_Yflip_competitor/hse_lcm.out\nY10\tA\tHSE06: band gap (eV)\t2.350\t2.351\tPASS\tYBaMnFeO5/runs/B_hse06_G_type_LCM/hse_lcm.out\nY11\tA\tHSE06: unipolar band edges (bool)\tyes\tyes\tPASS\tYBaMnFeO5/runs/B_hse06_G_type_LCM/hse_lcm.out\nY12\tA\tHSE06: hole spin window (eV)\t1.000\t0.995\tPASS\tYBaMnFeO5/runs/B_hse06_G_type_LCM/hse_lcm.out\nY13\tA\tHSE06: electron spin window (eV)\t1.400\t1.398\tPASS\tYBaMnFeO5/runs/B_hse06_G_type_LCM/hse_lcm.out\nY14\tA\tPBE+U band gap (72-atom cell) (eV)\t1.400\t1.401\tPASS\tYBaMnFeO5/runs/D_pbeu_72atom_G_FM_and_spin_flips/YBMFO110_snap_G_nscf.out\nY15\tA\tPBE+U windows: hole (eV)\t0.450\t0.445\tPASS\tYBaMnFeO5/runs/D_pbeu_72atom_G_FM_and_spin_flips/YBMFO110_snap_G_nscf.out\nY16\tA\tPBE+U windows: electron (eV)\t1.430\t1.432\tPASS\tYBaMnFeO5/runs/D_pbeu_72atom_G_FM_and_spin_flips/YBMFO110_snap_G_nscf.out\nY17\tA\tWorst-case spin disorder (2 of 16 spins flipped): electron edge keeps its spin, window (eV)\t0.155\t0.155\tPASS\tYBaMnFeO5/runs/D_pbeu_72atom_G_FM_and_spin_flips/YBMFO110_snap_flip2far_nscf.out\nY18\tA\t... while the hole edge switches to the other spin (holes need good magnetic order) (bool)\tno\tno\tPASS\tYBaMnFeO5/runs/D_pbeu_72atom_G_FM_and_spin_flips/YBMFO110_snap_flip2far_nscf.out\nY19\tA\tOne neighbouring Mn/Fe swap (12.5 % of sites, 72-atom cell): gap of the other spin channel collapses (dense grid) (eV)\t0.010\t0.011\tPASS\tYBaMnFeO5/runs/F_pbeu_antisite_pair_nearest/YBMFO_antisite_swap_NN_Gsite_nscf.out\nY20\tA\t... same, on the coarser self-consistent grid (eV)\t0.300\t0.300\tPASS\tYBaMnFeO5/runs/F_pbeu_antisite_pair_nearest/YBMFO_antisite_swap_NN_Gsite.out\nY21\tL2\tExchange fit from 25 raw energies: in-plane Mn-O-Fe coupling J_ip (meV)\t-32.600\t-32.609\tPASS\tYBaMnFeO5/exchange_fit_and_Neel_T/rerun_fit_and_mc.py\nYBaMnFeO5/runs/I_pbeu_exchange_fit_configs/\nYBaMnFeO5/runs/H_pbeu_stacking_vs_U/U44_*\nY22\tL2\tNeel temperature, classical Monte Carlo on the fitted model (Binder crossings, L = 6/8/10) (K)\t417\t414.3\tPASS\tYBaMnFeO5/exchange_fit_and_Neel_T/rerun_fit_and_mc.py\nYBaMnFeO5/exchange_fit_and_Neel_T/jfit110/mc_clean_Mle10.5_10.json\nY23\tB\tCalibrated Neel temperature: Y22 x (measured/simulated ratio for YFeO3 with the same protocol, 1.17-1.19) (K)\t490\t489.6\tPASS\tYBaMnFeO5/analysis_data/calibration_summary.json\nY24\tA\tEnergy above the 0 K convex hull, as the agents computed it: the 28 competing phases that had finished by then (superseded by Y24b) (meV/atom)\t2.600\t2.610\tPASS\tYBaMnFeO5/runs/K_hull_competing_phases_raw/\nYBaMnFeO5/analysis_data/hull_QE110.json\nY24b\tA\tEnergy above the 0 K convex hull with all 33 competing phases that completed (BaFe2O4 and Ba6Y2Fe4O15 finished later and lower the hull; Ba2Fe2O5 never finished) (meV/atom)\t13.700\t13.740\tPASS\tYBaMnFeO5/runs/K_hull_competing_phases_raw/\nY25\tL2\tDECISIVE: Mn/Fe order-disorder temperature from the paramagnetic cluster expansion (C peak, L = 16) (K)\t915\t915.0\tPASS\tYBaMnFeO5/cation_order_cluster_expansion/ce2_YBMFO.json\nYBaMnFeO5/cation_order_cluster_expansion/torder.py\nYBaMnFeO5/cation_order_cluster_expansion/rerun_torder.sh\nY26\tB\tHeadline order-disorder temperature with uncertainty (bootstrap + model variants) (K)\t950 (+250/-150)\t950 (+250/-150)\tPASS\tYBaMnFeO5/cation_order_cluster_expansion/ord2_summary.json\nY27\tE\tTypical synthesis/anneal window for these layered perovskites (900-1300 C); B-site exchange inferred to freeze below ~1150 K (YBaCuFeO5 benchmark: Morin et al., Nat. Commun. 7, 13758 (2016)) (K)\t1173-1573\t-\tn/a\tliterature\nIndependent re-runs (tier R)\n\nOn 2026-10-04 a fresh cloud container re-ran four sets of calculations from the input files in this repository, using:\n\na clean conda-forge QE 7.5 image with no campaign code;\npseudopotentials downloaded from pseudo-dojo.org, all md5-identical to the originals.\n\nThe procedure is reproduce/modal_repro.py, and the results are in reproduce/results/ and reproduce/RESULTS.md. All 16 re-derived values match the originals. The HSE06 band gap and windows and the YBaMnFeO₅ energies are identical to the printed digits, and the KV[Cr(CN)₆] PBE+U energy agrees to 6 µeV.\n\nA fifth case, kvcr_hydrate_hse, re-ran the agents' unconverged HSE06 dihydrate input (F) in the same way and carried it to convergence. Its first 12 exact-exchange cycles reproduce the agents' run to every printed digit; the converged run is runs/F2_hse06_dihydrate_LCM_converged/ (K19b, K20b). Check them with:\n\npython tools/verify.py --repro\nKnown caveats and method issues\n\nMost of these come from the agents' own adversarial reviews and cross-checks. They are listed so that nobody has to rediscover them.\n\nBoth materials\n\nIdeal crystals at 0 K. Every DFT number is for a perfectly ordered crystal at 0 K. Finite-temperature spin disorder was tested only for YBaMnFeO₅ (spin-flip snapshots, Y17–Y18).\nThe zero net spin moment is a 0 K result. At finite temperature two inequivalent sublattices generally lose order at different rates, so a small net magnetisation can appear; compensation is generally exact only at T = 0 (Şaşıoğlu, PRB 79, 100406 (2009)). Room-temperature compensation was not computed for either material.\nDFT+U is a choice. U values are literature-typical, not computed from first principles. Attempts to compute U by linear response (hp.x) never produced a result. That is why the U scans (K09–K11, Y05–Y07) and the independent HSE06 checks are part of the ledger.\nHSE06 windows come from the self-consistent k-grid, not a dense grid. For KV[Cr(CN)₆] the 4×4×4 grid includes Γ, X and L. Band extrema off the grid could make windows slightly smaller.\nHSE06 energy differences between states of different magnetic symmetry can carry exact-exchange k-set offsets. Gaps and windows are not affected. The KV[Cr(CN)₆] FM–LCM pair (K18) has the same crystal symmetry.\nSpin–orbit numbers were not used. Earlier spin–orbit runs began from antiparallel non-collinear starting moments, which can trigger a known QE sign issue, so they are marked unverified. Any net moment from spin–orbit coupling or orbital moments is therefore not quantified here. Luttinger counting protects only the spin moment, not orbital moments.\n\nKV[Cr(CN)₆]\n\nThe real material is not the ideal crystal. The only sample ever reported (1999) is a hydrated powder, never reproduced. Its saturation moment is 0.125 μB/f.u. instead of 0, and every missing [Cr(CN)₆] unit adds 3 μB. Its ordering temperature, 376 K, fell to 365 K after heat treatment (dehydration suspected). No band-gap, optical, transport or spin-resolved measurement of it has been reported, so the gap and the spin windows are predictions only.\nWater: the two methods disagree.\nPBE+U says the dihydrate's hole window drops from 2.02 to 0.93 eV (K21).\nHSE06 says 2.64 → 2.31 eV (K19b; with matched settings, 2.68 → 2.31). The electron window barely moves (1.44 → 1.40 eV, K20b), and both band edges stay in the same spin channel.\nThe agents judged HSE06 more reliable, because PBE+U misplaces the water levels. That is a judgement, not a measurement.\nThe agents' HSE06 hydrate run (F) stopped after 12 exact-exchange cycles, before the loop converged, and the old run index wrongly marked it converged. The same input has now been run to convergence (F2: 41 cycles, converged !! energy). Its first 12 cycles reproduce the agents' run digit for digit. Converged values: gap 2.14 eV, windows 2.31 / 1.40 eV (the stopped run gave 2.02 eV and 2.43 / 1.42 eV; the earlier estimate for the hole window was 2.35 eV, range 2.25–2.45).\nDefect windows are \"in-cell\". Aligning defect cells to the host bands (done by the original collectors, values in runs/*/results/*.json) gives smaller numbers in some cases. Examples: antisite hole window 0.23 eV in-cell vs 0.13 eV aligned; PBE+U water-filled-vacancy electron window 0.47 eV in-cell vs 0.07 eV aligned.\nThe 65-atom water-filled-vacancy cell was only partly relaxed. Its PBE+U relaxation (I_pbeu_vacancy_with_water/KVCr_VAC_w1_relax) stopped after 3 geometry steps on a time limit, with a residual total force of 0.035 Ry/Bohr against a 0.001 target, and the PBE+U and HSE06 band calculations (K22–K24) used that geometry. The net moment (K22) is fixed by composition; the windows could shift somewhat on full relaxation.\nCarriers will be heavy. The relevant bands are 0.4–0.6 eV wide and a doped hole self-traps (polaron), so do not expect silicon-like transport. No conductivity, optical-gap or spin-resolved measurement exists for this compound.\nAt room temperature the order is far from perfect. The sublattice order is about 0.6 at 300 K (T_C = 376 K), so the ideal spin polarisation would be reduced.\nThe physics is not new in general. Compensated ferrimagnets are known to have spin-split bands. What is new is identifying this room-temperature compound as one and putting numbers on its band edges. The closest prior work is Schart et al., Inorg. Chem. 63, 22856 (2024), on Cr[Cr(CN)₆]; its windows are small and bipolar (K27–K28).\nPrior work on KV[Cr(CN)₆] itself. It was designed as a compensated ferrimagnet (Holmes & Girolami 1999 expected a saturation moment of zero). Kabalan, Matar, Desplanches, Létard & Zakhour, Chem. Phys. 352, 85 (2008), arXiv:0802.3619, computed an antiparallel state with zero net moment that is an insulator \"with a gap opening of ∼1 eV\". They used LDA (ASW method) for the crystal; the B3LYP hybrid functional only for two-metal molecular models, to get the exchange constant. Their only figure for the zero-moment state is a total density of states whose two spin channels are mirror images. They report no per-spin gaps, no band-edge spin and no spin splitting.\nMiddlemiss, Lawton & Wilson, J. Phys.: Condens. Matter 20, 335231 (2008) is the closest prior study, and the agents' literature search missed it. It computed the same crystal with hybrid functionals (CRYSTAL03, Gaussian basis sets; 35%, 65% and 100% exact exchange), mainly to get exchange constants and ordering temperatures under pressure.\nTable 3: cell moment −0.003 μB; gap 4.01 eV at 35% exact exchange (2.1 eV when extrapolated to B3LYP's 20%); valence edge 87% V, conduction edge 51% Cr and 45% cyanide.\nFig. 3a plots the 35% density of states spin by spin. Both band edges are in the same spin channel (V's), and reading the figure gives windows of about 3.1 eV for holes and 1.5 eV for electrons.\nThe text discusses only the atomic make-up of the edges; it does not comment on their spin, on spin splitting or on spintronics.\nIndependent agreement with this ledger, from a different code: their extrapolated B3LYP gap (2.1 eV) matches our HSE06 gap (2.09 eV, K14), and the windows read from their figure are close to ours (2.64 and 1.57 eV, K16–K17).\nWhat this ledger adds beyond those papers: pointing out that the compound is a Luttinger-compensated semiconductor with spin-sorted band edges (spin-group identification, K29); explicit spin windows with PBE+U across U and with HSE06 (K14–K17); a second pseudopotential family (tier R); and the water and vacancy tests (K19–K24). The same-spin edges themselves were already visible, unremarked, in Middlemiss et al.'s Fig. 3a.\nContext. The 2025 paper that predicted the cyanide LCM semiconductors Mn(CN)₂ and Co(CN)₂ (Guo et al., arXiv:2502.18136) found Néel temperatures of 210 K and 75 K and wrote that future work needs LCMs with \"the transition temperature above the room temperature\". Their band edges also sit in opposite spin channels (\"bipolarized\"); KV[Cr(CN)₆]'s sit in the same one.\n\nYBaMnFeO₅\n\nIt has never been made. The key result is negative: the rock-salt Mn/Fe order needed for the effect is predicted to disorder at about 950 K (Y25–Y26). That is below the temperatures at which cations move quickly during standard synthesis.\nEvery chemically similar compound whose B-site arrangement has been determined (GdBaMnFeO₅, NdBaMnFeO₅₊δ, YBaMnCoO₅) is B-site disordered. SmBaMnFeO₅₊δ has been made, but its B-site order is not reported.\nA single nearest-neighbour Mn/Fe swap collapses the opposite-spin gap (Y19–Y20).\nThe freeze-out temperature is an analogy. The ~1150 K below which B-site exchange is taken to freeze comes from a different compound, YBaCuFeO₅ (Morin et al., Nat. Commun. 7, 13758 (2016)), computed with the same protocol.\nThat compound has Jahn–Teller physics that YBaMnFeO₅ lacks.\nThe highest cluster-expansion variant (1210 K) reaches into the synthesis window.\nThe cluster expansion is provisional. Weighted leave-one-out error is 39 meV/f.u.\nA charge-transfer-free variant predicts a different, non-rock-salt ground state, which has not been checked by DFT. If it held, rock-salt order would not be the ground state either.\nThe raw inputs and outputs of its 96 DFT runs, each arrangement's relaxation, and the YBaCuFeO₅ benchmark runs are in runs/J_cation_order_cluster_expansion_raw/. python tools/crosscheck_raw.py confirms that 183 of the 184 energies recorded in cation_order_cluster_expansion/results_*/ match those outputs exactly. One saved output (YBMFO_STRp_C, configuration r0) stops just before its final energy, so that single value cannot be re-derived.\nTwo arrangements (MIX_B, MIXap_A) reached the 120-step limit of their relaxation with residual total forces of 0.011–0.016 Ry/Bohr. The agents' parser recorded them as converged, and their single points use those geometries. A third arrangement (SQS_F) has no completed runs and carries no weight in the fit.\nThe HSE06 YBaMnFeO₅ runs used a 75 Ry cutoff on the 110 Ry geometry. An earlier HSE06 result (gap 2.32 eV, windows 1.10/1.25 eV) was on a superseded 75 Ry geometry; it is replaced by Y10–Y13.\nThe Néel temperature is a model estimate.\n417 K (raw classical Monte Carlo) and about 490 K (calibrated on YFeO₃) come from a fitted Heisenberg model.\nAt U = 6 eV the raw value drops to about 320–340 K.\nPBE+U gets the ground state of the twin compound YBaMn₂O₅ wrong at U ≥ 2 eV. It keeps the right ground state for YBaMnFeO₅ at all U, and HSE06 agrees (Y09).\nHull and phonons.\nThe hull distance is +13.7 meV/atom, not +2.6 (corrected while building this ledger). The agents' value (Y24) used the 28 competing phases that had finished when they computed it. tools/crosscheck_raw.py re-reads all 33 completed competing phases from their raw outputs: two that finished later, BaFe₂O₄ and Ba₆Y₂Fe₄O₁₅, lower the hull, giving +13.7 meV/atom (Y24b). Both numbers are recomputed from the raw files in runs/K_hull_competing_phases_raw/.\nOne more known phase, Ba₂Fe₂O₅, never finished (its job timed out after 22 hours). Missing competitors can only raise the distance.\nFor scale, the median distance above the hull for known inorganic crystals in a large DFT survey is about 15 meV/atom (Sun et al., Sci. Adv. 2, e1600225 (2016)). So +13.7 meV/atom does not rule the compound out, but \"at the edge of stability\" overstated it.\nSingle-cycle vc-relax energies should be re-relaxed once before precise reuse.\nPhonons are real at every exactly computed q-point (Γ, Z, X, Y, M). Fourier-interpolated branches between them show imaginary values in the 1×1×2 supercell, which the agents attributed to interpolation; larger supercells were not run (analysis_data/phonon110_summary.json).\nWhat is deliberately not in this repository\nThe rest of the campaign. This was one lane of a larger multi-agent search; the other lanes found nothing above their bars. Its other compounds, including several unpublished leads, are left out on purpose.\nVery large raw files. Wavefunctions and projections (atomic_proj.xml, up to 80 MB each). Their parsed results are included.\nThe agents' literature notes. They are working notes in shorthand; the references that support the claims are cited in this file and in the dossiers.\nLiterature PDFs and experimental crystal structures from databases with restrictive licences.\n ",
+  "meta": [
+    "<meta name=\"description\" content=\"Computational ledger for two room-temperature Luttinger-compensated magnet candidates, YBaMnFeO5 and KV[Cr(CN)6]: raw QE inputs/outputs, checker, re-runs - compensated-magnet-ledger/LEDGER.md at main · spicylemonade/compensated-magnet-ledger\">",
+    "<meta property=\"og:image\" content=\"https://opengraph.githubassets.com/d0bc92e5b1b1c756be4adaaaee4b6a317adcc9092145b7ba00c0181ab65b828e/spicylemonade/compensated-magnet-ledger\">",
+    "<meta property=\"og:image:alt\" content=\"Computational ledger for two room-temperature Luttinger-compensated magnet candidates, YBaMnFeO5 and KV[Cr(CN)6]: raw QE inputs/outputs, checker, re-runs - spicylemonade/compensated-magnet-ledger\">",
+    "<meta property=\"og:image:width\" content=\"1200\">",
+    "<meta property=\"og:image:height\" content=\"600\">",
+    "<meta property=\"og:site_name\" content=\"GitHub\">",
+    "<meta property=\"og:type\" content=\"object\">",
+    "<meta property=\"og:title\" content=\"compensated-magnet-ledger/LEDGER.md at main · spicylemonade/compensated-magnet-ledger\">",
+    "<meta property=\"og:url\" content=\"https://github.com/spicylemonade/compensated-magnet-ledger/blob/main/LEDGER.md\">",
+    "<meta property=\"og:description\" content=\"Computational ledger for two room-temperature Luttinger-compensated magnet candidates, YBaMnFeO5 and KV[Cr(CN)6]: raw QE inputs/outputs, checker, re-runs - spicylemonade/compensated-magnet-ledger\">"
+  ],
+  "links": [
+    {
+      "text": "Skip to content",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/blob/main/LEDGER.md#start-of-content"
+    },
+    {
+      "text": "",
+      "url": "https://github.com/"
+    },
+    {
+      "text": "spicylemonade",
+      "url": "https://github.com/spicylemonade"
+    },
+    {
+      "text": "compensated-magnet-ledger",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger"
+    },
+    {
+      "text": "",
+      "url": "https://github.com/copilot"
+    },
+    {
+      "text": "",
+      "url": "https://github.com/issues"
+    },
+    {
+      "text": "",
+      "url": "https://github.com/pulls"
+    },
+    {
+      "text": "",
+      "url": "https://github.com/repos"
+    },
+    {
+      "text": "",
+      "url": "https://github.com/notifications"
+    },
+    {
+      "text": "Code",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger"
+    },
+    {
+      "text": "Issues",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/issues"
+    },
+    {
+      "text": "Pull requests",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/pulls"
+    },
+    {
+      "text": "Agents",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/agents?author=COLLECTOR_REDACTED"
+    },
+    {
+      "text": "Actions",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/actions"
+    },
+    {
+      "text": "Projects",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/projects"
+    },
+    {
+      "text": "Security and quality",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/security"
+    },
+    {
+      "text": "Insights",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/pulse"
+    },
+    {
+      "text": "Reload",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/blob/main/LEDGER.md"
+    },
+    {
+      "text": "Reload",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/blob/main/LEDGER.md"
+    },
+    {
+      "text": "Reload",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/blob/main/LEDGER.md"
+    },
+    {
+      "text": "Please reload this page",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/blob/main/LEDGER.md"
+    },
+    {
+      "text": "Open in github.dev",
+      "url": "https://github.dev/"
+    },
+    {
+      "text": "Open in a new github.dev tab",
+      "url": "https://github.dev/"
+    },
+    {
+      "text": "Open in codespace",
+      "url": "https://github.com/codespaces/new/spicylemonade/compensated-magnet-ledger/tree/main?resume=1"
+    },
+    {
+      "text": "",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger"
+    },
+    {
+      "text": "compensated-magnet-ledger",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/tree/main"
+    },
+    {
+      "text": "spicylemonade",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/commits?author=spicylemonade"
+    },
+    {
+      "text": "claude",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/commits?author=claude"
+    },
+    {
+      "text": "Converge the dihydrate HSE06 run (new folder F2, claims K19b/K20b)",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/commit/45551de5fac4e69de3e03c420b31abb335d73ef4"
+    },
+    {
+      "text": "45551de",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/commit/45551de5fac4e69de3e03c420b31abb335d73ef4"
+    },
+    {
+      "text": "History",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/commits/main/LEDGER.md"
+    },
+    {
+      "text": "",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/commits/main/LEDGER.md"
+    },
+    {
+      "text": "compensated-magnet-ledger",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/tree/main"
+    },
+    {
+      "text": "Raw",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/raw/refs/heads/main/LEDGER.md"
+    },
+    {
+      "text": "",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/edit/main/LEDGER.md"
+    },
+    {
+      "text": "",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/blob/main/LEDGER.md#computational-ledger"
+    },
+    {
+      "text": "",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/blob/main/LEDGER.md#tiers"
+    },
+    {
+      "text": "",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/blob/main/LEDGER.md#definitions-used-throughout"
+    },
+    {
+      "text": "",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/blob/main/LEDGER.md#software-and-settings-common-to-all-runs"
+    },
+    {
+      "text": "",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/blob/main/LEDGER.md#run-folders"
+    },
+    {
+      "text": "",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/blob/main/LEDGER.md#claims"
+    },
+    {
+      "text": "",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/blob/main/LEDGER.md#kvcrcn6"
+    },
+    {
+      "text": "",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/blob/main/LEDGER.md#ybamnfeo5"
+    },
+    {
+      "text": "",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/blob/main/LEDGER.md#independent-re-runs-tier-r"
+    },
+    {
+      "text": "",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/blob/main/LEDGER.md#known-caveats-and-method-issues"
+    },
+    {
+      "text": "",
+      "url": "https://github.com/spicylemonade/compensated-magnet-ledger/blob/main/LEDGER.md#what-is-deliberately-not-in-this-repository"
+    },
+    {
+      "text": "\n        \n    \n\n",
+      "url": "https://github.com/"
+    },
+    {
+      "text": "Terms",
+      "url": "https://docs.github.com/site-policy/github-terms/github-terms-of-service"
+    },
+    {
+      "text": "Privacy",
+      "url": "https://docs.github.com/site-policy/privacy-policies/github-privacy-statement"
+    },
+    {
+      "text": "Security",
+      "url": "https://github.com/security"
+    },
+    {
+      "text": "Status",
+      "url": "https://www.githubstatus.com/"
+    },
+    {
+      "text": "Community",
+      "url": "https://github.community/"
+    },
+    {
+      "text": "Docs",
+      "url": "https://docs.github.com/"
+    },
+    {
+      "text": "Contact",
+      "url": "https://support.github.com/?tags=dotcom-footer"
+    }
+  ]
+}
