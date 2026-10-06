@@ -23,6 +23,7 @@ AI 吠点是由 **[Develata](https://github.com/Develata)** 主理的独立内�
 | 2026 / 1002 | [谷歌TPU上太空？OpenAI通报超百家](docs/2610/1002/doc_1002_publish.txt) | [配图说明](docs/2610/1002/images/README.md) | [来源入口](docs/2610/1002/sources/README.md) |
 | 2026 / 1003 | [AI解数学难题？48%当它真人](docs/2610/1003/doc_1003_publish.txt) | [配图说明](docs/2610/1003/images/README.md) | [来源入口](docs/2610/1003/sources/README.md) |
 | 2026 / 1004 | [AI安全员辞职？免费Gemini没了？](docs/2610/1004/doc_1004_publish.txt) | [配图说明](docs/2610/1004/images/README.md) | [来源入口](docs/2610/1004/sources/README.md) |
+| 2026 / 1005 | [维基点名OpenAI？水印改词剩17%](docs/2610/1005/doc_1005_publish.txt) | [配图说明](docs/2610/1005/images/README.md) | [来源入口](docs/2610/1005/sources/README.md) |
 
 正文采用可直接复制的纯文本，图片单独保存。阅读或发布时不需要依赖 Markdown 插图。
 
