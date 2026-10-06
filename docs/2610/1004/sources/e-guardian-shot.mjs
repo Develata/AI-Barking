@@ -1,0 +1,21 @@
+import fs from "node:fs";
+import {homedir} from "node:os";
+import {pathToFileURL} from "node:url";
+import {join} from "node:path";
+import {execFileSync} from "node:child_process";
+
+const {sendCommand} = await import(pathToFileURL(join(homedir(),"scoop/persist/bun/install/cache/@jackwener/opencli@1.8.7@@@1/dist/src/browser/daemon-client.js")).href);
+const session = "1004-e";
+const url = "https://www.theguardian.com/technology/2026/oct/03/openai-safety-leader-quits-warning-ai-companys-culture-is-broken";
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+const cdp = (method, params) => sendCommand("cdp", {session, surface:"browser", cdpMethod:method, cdpParams:params});
+const cli = (args) => execFileSync("opencli.exe", ["browser", session, ...args], {encoding:"utf8", timeout:90000});
+cli(["open", url]);
+await pause(2500);
+await cdp("Emulation.setDeviceMetricsOverride", {width:700,height:1200,deviceScaleFactor:2,mobile:false});
+await pause(1500);
+const raw = cli(["eval", "JSON.stringify({sh:document.documentElement.scrollHeight,title:document.title,h1:(document.querySelector('h1')||{}).innerText})"]).split("\n  Update available:")[0].trim();
+console.log(raw);
+const shot = await cdp("Page.captureScreenshot", {format:"png",captureBeyondViewport:true,clip:{x:0,y:0,width:700,height:1400,scale:1}});
+fs.writeFileSync("docs/2610/1004/images/30-guardian-headline-full.png", Buffer.from(shot.data,"base64"));
+console.log("saved", new Date(Date.now()+8*3600000).toISOString().replace("Z","+08:00"));
