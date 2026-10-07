@@ -1,0 +1,21 @@
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+const root='docs/2610/1006/sources/';
+const names=fs.readdirSync(root).filter(n=>n.startsWith('b-')||['evidence-b.md','capture-log-b.md'].includes(n));
+const evidence=fs.readFileSync(root+'evidence-b.md','utf8');
+const rows=evidence.split('\n').filter(l=>/^\| B[1-9] /.test(l));
+const allowed=['已找到','部分支持','与说法不符','未找到一手来源'];
+const stateOk=rows.length===9&&rows.every(l=>allowed.includes(l.split('|').at(-2).trim()));
+const forbidden=['_publish.txt','fact-check.md','README.md','cards.toml'];
+const pattern=/C:\\Users\\|auth_token["']?\s*[:=]|Bearer\s+[A-Za-z0-9_-]{15,}|data-testid=["']SideNav_AccountSwitcher_Button|Develata@|QQ@/i;
+const privateHits=names.filter(n=>n!=='b-validate.mjs'&&pattern.test(fs.readFileSync(root+n,'utf8')));
+const missingLinks=[];
+for(const n of names.filter(n=>n.endsWith('.md'))){for(const m of fs.readFileSync(root+n,'utf8').matchAll(/\]\(([^)]+)\)/g)){if(!m[1].startsWith('http')&&!fs.existsSync(root+m[1]))missingLinks.push({file:n,target:m[1]});}}
+const paths=names.filter(n=>!['b-files.tsv','b-validation.json'].includes(n)).sort();
+const entries=paths.map(n=>{const data=fs.readFileSync(root+n);return {file:n,bytes:data.length,sha256:crypto.createHash('sha256').update(data).digest('hex')};});
+fs.writeFileSync(root+'b-files.tsv','file\tbytes\tsha256\n'+entries.map(x=>`${x.file}\t${x.bytes}\t${x.sha256}`).join('\n')+'\n');
+const report={checked_bj:new Date(Date.now()+28800000).toISOString().replace('Z','+08:00'),B_rows:rows.length,states_valid:stateOk,forbidden_owned_files:names.filter(n=>forbidden.includes(n)),privacy_pattern_hits:privateHits,missing_local_links:missingLinks,over_1MB:entries.filter(x=>x.bytes>1000000),screenshots_delivered:0,full_acceptance:false,gaps:['B1 full browser text and HTML','publication metadata','B2 all original images and screenshots 15-21','B3 original chart verification','B4 screenshots 22-23 and HTML','B5 screenshot 24 and live posts','B6 live post','B7 HN total/X metrics','B8 original examples with timestamps','B9 comment permalinks and score verification'],git_status:execFileSync('git',['status','--short','-uall'],{encoding:'utf8'}),tracked_diff:execFileSync('git',['diff','--stat'],{encoding:'utf8'})};
+fs.writeFileSync(root+'b-validation.json',JSON.stringify(report,null,2)+'\n');
+console.log(JSON.stringify({B_rows:rows.length,states_valid:stateOk,privateHits,missingLinks,owned_files:new Set([...names,'b-files.tsv','b-validation.json']).size,full_acceptance:false}));
+if(!stateOk||privateHits.length||missingLinks.length)process.exitCode=1;

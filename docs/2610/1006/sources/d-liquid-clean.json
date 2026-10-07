@@ -1,0 +1,558 @@
+{
+  "url": "https://www.liquid.ai/blog/d1-decision-model",
+  "title": "Introducing d1: The most capable decision model, now with vision | Blog | Liquid AI",
+  "text": "Models\nResearch\nCompany\nConnect\nNEWS\n/\nMODELS\nIntroducing d1: The most capable decision model, now with vision\nOCT 5, 2026\n\nToday, we introduce d1, our first decision model, now supporting both text and images. With last week's experimental release, d1 became the first model to rival Jev on text decisions, and it is now the first to extend these capabilities to images. You can try it today at console.liquid.ai and in the d1 Playground.\n\nWe tested d1 against GPT-6.1 Sol and Claude Opus 5.5 on six real applications, from filtering support tickets to inspecting circuit boards. d1 matches or beats GPT-6.1 Sol on four of them. It costs 19x to 200x less than both models and answers significantly faster on every task.\n\nHow the d1 decision model works\n\nDecision models answer questions about a situation with a probability for each possible answer. The d1 decision model takes unstructured data (e.g., text, images, or both) and one or more questions as input, reads them in one forward pass, and returns the probabilities, without generating any tokens. A text decision takes 200 to 300 ms, fast enough for real-time applications.\n\nFigure 2: How the d1 decision model turns text and image inputs into decisions.\n\nd1 answers three types of questions:\n\nNoul: a yes/no question, answered with a probability between 0 and 1.\nChoice: pick one label among many, answered with a probability per label.\nScore: a position on a scale, weighted by the probability of each level.\n\nOne request can ask several questions about the same state, saving input tokens.\n\nd1 in action\n\nDecision models can replace expensive calls to language models when the answer is a structured decision. They also enable a variety of new use cases, some shown in this section. Every demo below runs live in the d1 Playground.\n\nVisual inspection. This industrial application reviews parts from four production lines that pass under a camera: circuit boards, candles, cashews, and chewing gum (public VisA dataset). d1 sorts good and defective parts with 85-97% accuracy. The most interesting part is that the model was never trained for this. Thanks to its excellent generalizability, it understands the task from a short description.\n\nText applications. Five applications use d1 for every decision:\n\nSmart Filter: d1 becomes a function in a SQL query, WHERE d1(ticket, 'the customer wants to cancel). It answers yes or no for each of 150 support tickets.\nCode Search: d1 browses the Hugging Face transformers repository (6,511 files) one folder at a time, down to the function that answers a question.\nSmart Folders: d1 files each new document into a folder, then a subfolder. It files search questions the same way, so keyword search only looks in one subfolder.\nWeb Agent: d1 operates a flight-search website from a one-sentence goal. At each step, it picks the next action among everything the page allows.\nContext Compaction: d1 reads each tool output in a coding agent's session and keeps, trims, or drops it for the next task. It removes 52% of the tokens and keeps every output the task needs.\n\nWe adapted four of these applications from the following open-source projects: pg-jev, jevgrep, jev-ultrafast, and fast-jev-compaction.\n\nGames. d1 plays eight classic games live and picks every move. Vision helps it in two ways:\n\nBetter decisions: Tetris can be fully described in text, but adding the screen raises d1's score from 70 to 81 cleared lines.\nSimpler integration: In Wordle, d1 reads the board directly from a screenshot. Developers don't need to write a text version of the game, and d1 still solved 12 of 12 games in 3.8 guesses on average.\n\nd1 also handles purely visual tasks. In Quick, Draw!, it guesses what a player's doodle shows among 62 words, and recognizes 5.2 of 6 drawings (random guessing gets 0.6).\n\nAvailability and pricing\n\nStart building today with the d1 decision model, available on the Liquid AI API as d1. Create an API key at console.liquid.ai (Dashboard > API Keys).\n\nTo use vision, you can simply send images as base64 data URLs in images:\n\nimport base64, os, requests\n\nimage = base64.b64encode(open(\"board.jpg\", \"rb\").read()).decode()\n\nresponse = requests.post(\n    \"https://api.liquid.ai/decisions/v1/systemone\",\n    headers={\"Authorization\": f\"Bearer {os.environ['LIQUID_API_KEY']}\"},\n    json={\n        \"model\": \"d1\",\n        \"images\": [f\"data:image/jpeg;base64,{image}\"],\n        \"state\": \"Camera image of a circuit board on the production line.\",\n        \"questions\": \n            {\"defect\": {\n                \"type\": \"noul\", \n                \"instructions\": \"Does this circuit board have a defect?\"\n             }\n         },\n    },\n)\n\nprint(response.json()[\"answers\"][\"defect\"][\"noul\"])\n\nThe full API reference is in the decision models documentation.\n\nd1 is billed on input tokens only, with no output tokens. Images are counted as input tokens at the same rate as text: 1.5 tokens per 32×32-pixel patch, so a 1024×1024 image costs 1,536 tokens. Each question is billed as its own prompt, including its text and all images.\n\nd1 is also available through Vercel and OpenRouter, with text only for now. Vision is coming to both soon.\n\nThis is an exciting time for creativity and exploration in AI, and d1 is only the beginning. We're continuing our work on decision models across a range of sizes, with new features, higher decision quality, and lower latency, and we plan to release open weights for upcoming models on Hugging Face soon.\n\nTry on Liquid Console\nRead our docs\nCitation\n\nFor citations, please use the following reference or BibTeX:\n\nLiquid AI, \"Introducing d1: The most capable decision model, now with vision\", Liquid AI Blog, Oct 2026.\n\n@article{liquidAI2026d1,\n  author = {Liquid AI},\n  title = {Introducing d1: The most capable decision model, now with vision},\n  journal = {Liquid AI Blog},\n  year = {2026},\n  note = {www.liquid.ai/blog/d1-decision-model},\n}\n\nMethodology. We ran each application once per model on October 5, 2026, with the d1 Playground's comparison script. GPT-6.1 Sol and Claude Opus 5.5 get each request as one chat message and answer in JSON, at their default reasoning setting. Where many questions share one input, such as the filter's tickets or the folders' passages, the chat models answer them in batches. Costs use list prices, without prompt-cache discounts. d1's costs use $0.04 per million input tokens. Time is per run, with up to 8 requests in flight. A Smart Filter run is one query over 150 tickets. A Smart Folders run files 105 passages, and its cost is per 1,000 passages. The filter's quality is its F1 score against hand labels, which counts both missed and wrong matches. The other text applications count the goals, questions, passages or needed outputs handled correctly. We wrote six of the 15 code questions and two of the four compaction sessions after d1's pipeline was set. In Visual Inspection, every model sees a good part from the same line next to the part to inspect.\n\nShare on social:\n\nFor press inquiries, email us at press@liquid.ai\n\nBuilding the fastest, most compute-efficient, and capable foundation models so intelligence can live anywhere.\n\nEST. 2023\n\nEmail address\nSubscribe\nMODELS\nLiquid Foundation Models (LFMs)\nModel Playground\nHugging Face\nApollo\nDEVELOPER RESOURCES\nDemos\nDocumentation\nHackathons\nDiscord\nGitHub\nINDUSTRY SOLUTIONS\nAutomotive\nConsumer electronics\nE-commerce\nFinancial services\nHealthcare\nIndustrial\nDefense\nAgentic AI\nRESEARCH\nLiquid Labs\nAutomated Foundation Model Design\nBlog\nCOMPANY\nAbout\nCareers\nNews\nEvents\nFAQ\nContact\nShoutouts\n\n© 2026 Liquid AI, Inc.\n\nTerms\nPrivacy\nPress\nYour Privacy Choices\n\nWe’ve updated our Privacy Policy. Please review the updated policy here.\n\nDismiss this notice anytime, or it will disappear after October 30, 2026 (UTC).",
+  "meta": [
+    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+    "<meta name=\"next-size-adjust\" content=\"\">",
+    "<meta name=\"description\" content=\"d1, Liquid AI's decision model, now handles text and images. It matches or beats GPT-6.1 Sol on 4 of 6 real tasks.\">",
+    "<meta property=\"og:title\" content=\"Introducing d1: The most capable decision model, now with vision | Blog\">",
+    "<meta property=\"og:description\" content=\"d1, Liquid AI's decision model, now handles text and images. It matches or beats GPT-6.1 Sol on 4 of 6 real tasks.\">",
+    "<meta property=\"og:url\" content=\"https://www.liquid.ai/blog/d1-decision-model\">",
+    "<meta property=\"og:site_name\" content=\"Liquid AI\">",
+    "<meta property=\"og:image\" content=\"https://aypchzzf9pftwuto.public.blob.vercel-storage.com/decision-model-d1-hero-93ya1hzrkDaJiY0U1HcpS7aFCtpMbC.png\">",
+    "<meta property=\"og:image:width\" content=\"1920\">",
+    "<meta property=\"og:image:height\" content=\"1080\">",
+    "<meta property=\"og:image:alt\" content=\"decision-model-d1-hero\">",
+    "<meta property=\"og:type\" content=\"article\">",
+    "<meta property=\"article:published_time\" content=\"2026-10-05\">",
+    "<meta property=\"article:author\" content=\"Liquid AI\">",
+    "<meta name=\"twitter:card\" content=\"summary_large_image\">",
+    "<meta name=\"twitter:title\" content=\"Introducing d1: The most capable decision model, now with vision | Blog\">",
+    "<meta name=\"twitter:description\" content=\"d1, Liquid AI's decision model, now handles text and images. It matches or beats GPT-6.1 Sol on 4 of 6 real tasks.\">",
+    "<meta name=\"twitter:image\" content=\"https://aypchzzf9pftwuto.public.blob.vercel-storage.com/decision-model-d1-hero-93ya1hzrkDaJiY0U1HcpS7aFCtpMbC.png\">",
+    "<meta name=\"twitter:image:alt\" content=\"decision-model-d1-hero\">",
+    "<meta name=\"twitter:image:width\" content=\"1920\">",
+    "<meta name=\"twitter:image:height\" content=\"1080\">",
+    "<time class=\"tracking-label text-muted-foreground font-label text-xs leading-5 font-medium uppercase self-start\" datetime=\"2026-10-05\">OCT 5, 2026</time>"
+  ],
+  "jsonld": [
+    "{\"@context\":\"https://schema.org\",\"@type\":\"Organization\",\"name\":\"Liquid AI\",\"url\":\"https://www.liquid.ai/\",\"description\":\"Liquid AI is an efficiency-first foundation model company. We build highly capable, compute-optimized models that bring intelligence to any device and medium of choice.\",\"logo\":\"https://www.liquid.ai/logos/liquid-ai-black.svg\",\"sameAs\":[\"https://discord.com/invite/liquid-ai\",\"https://x.com/liquidai\",\"https://github.com/Liquid4All\",\"https://www.linkedin.com/company/liquid-ai-inc/\",\"https://www.youtube.com/channel/UClzRQA8Un3AJnlD6h1hv6fA\",\"https://liquidai.substack.com/\",\"https://huggingface.co/LiquidAI\"]}",
+    "{\"@context\":\"https://schema.org\",\"@type\":\"WebSite\",\"name\":\"Liquid AI\",\"url\":\"https://www.liquid.ai/\",\"description\":\"Liquid AI is an efficiency-first foundation model company. We build highly capable, compute-optimized models that bring intelligence to any device and medium of choice.\",\"publisher\":{\"@type\":\"Organization\",\"name\":\"Liquid AI\",\"logo\":{\"@type\":\"ImageObject\",\"url\":\"https://www.liquid.ai/logos/liquid-ai-black.svg\"}}}",
+    "{\"@context\":\"https://schema.org\",\"@type\":\"Article\",\"headline\":\"Introducing d1: The most capable decision model, now with vision\",\"description\":\"d1, Liquid AI's decision model, now handles text and images. It matches or beats GPT-6.1 Sol on 4 of 6 real tasks.\",\"url\":\"https://www.liquid.ai/blog/d1-decision-model\",\"mainEntityOfPage\":\"https://www.liquid.ai/blog/d1-decision-model\",\"image\":{\"@type\":\"ImageObject\",\"url\":\"https://aypchzzf9pftwuto.public.blob.vercel-storage.com/decision-model-d1-hero-93ya1hzrkDaJiY0U1HcpS7aFCtpMbC.png\",\"width\":1920,\"height\":1080},\"datePublished\":\"2026-10-05\",\"author\":[{\"@type\":\"Person\",\"name\":\"Liquid AI\"}],\"publisher\":{\"@type\":\"Organization\",\"name\":\"Liquid AI\",\"logo\":{\"@type\":\"ImageObject\",\"url\":\"https://www.liquid.ai/logos/liquid-ai-black.svg\"}}}",
+    "{\"@context\":\"https://schema.org\",\"@type\":\"BreadcrumbList\",\"itemListElement\":[{\"@type\":\"ListItem\",\"position\":1,\"name\":\"News\",\"item\":\"https://www.liquid.ai/news\"},{\"@type\":\"ListItem\",\"position\":2,\"name\":\"Models\",\"item\":\"https://www.liquid.ai/news/models\"},{\"@type\":\"ListItem\",\"position\":3,\"name\":\"Introducing d1: The most capable decision model, now with vision\",\"item\":\"https://www.liquid.ai/blog/d1-decision-model\"}]}"
+  ],
+  "links": [
+    {
+      "text": "",
+      "url": "https://www.liquid.ai/"
+    },
+    {
+      "text": "Models",
+      "url": "https://www.liquid.ai/models"
+    },
+    {
+      "text": "Research",
+      "url": "https://www.liquid.ai/research"
+    },
+    {
+      "text": "Connect",
+      "url": "https://www.liquid.ai/connect"
+    },
+    {
+      "text": "",
+      "url": "https://www.liquid.ai/news"
+    },
+    {
+      "text": "NEWS",
+      "url": "https://www.liquid.ai/news"
+    },
+    {
+      "text": "MODELS",
+      "url": "https://www.liquid.ai/news/models"
+    },
+    {
+      "text": "How the d1 decision model works",
+      "url": "https://www.liquid.ai/blog/d1-decision-model#how-the-d1-decision-model-works"
+    },
+    {
+      "text": "d1 in action",
+      "url": "https://www.liquid.ai/blog/d1-decision-model#d1-in-action"
+    },
+    {
+      "text": "Availability and pricing",
+      "url": "https://www.liquid.ai/blog/d1-decision-model#availability-and-pricing"
+    },
+    {
+      "text": "Citation",
+      "url": "https://www.liquid.ai/blog/d1-decision-model#citation"
+    },
+    {
+      "text": "last week's experimental release",
+      "url": "https://x.com/liquidai/status/2105003472332693869"
+    },
+    {
+      "text": " ",
+      "url": "https://console.liquid.ai/"
+    },
+    {
+      "text": "console.liquid.ai",
+      "url": "http://console.liquid.ai/"
+    },
+    {
+      "text": "d1 Playground",
+      "url": "http://d1.liquid.ai/"
+    },
+    {
+      "text": " d1 Playground",
+      "url": "http://d1.liquid.ai/"
+    },
+    {
+      "text": " pg-jev",
+      "url": "https://github.com/realZachi/pg-jev"
+    },
+    {
+      "text": " jevgrep",
+      "url": "https://github.com/dzhng/jevgrep"
+    },
+    {
+      "text": " jev-ultrafast",
+      "url": "https://github.com/browser-use/jev-ultrafast"
+    },
+    {
+      "text": " fast-jev-compaction",
+      "url": "https://github.com/tamaratran/fast-jev-compaction"
+    },
+    {
+      "text": "",
+      "url": "https://console.liquid.ai/"
+    },
+    {
+      "text": "Liquid AI API",
+      "url": "http://console.liquid.ai/"
+    },
+    {
+      "text": " console.liquid.ai",
+      "url": "https://console.liquid.ai/"
+    },
+    {
+      "text": " decision models documentation",
+      "url": "https://docs.liquid.ai/lfm/models/decision-models"
+    },
+    {
+      "text": "Vercel",
+      "url": "https://vercel.com/ai-gateway/models/d1"
+    },
+    {
+      "text": "OpenRouter",
+      "url": "https://openrouter.ai/liquid/d1"
+    },
+    {
+      "text": "Try on Liquid Console",
+      "url": "https://console.liquid.ai/"
+    },
+    {
+      "text": "Read our docs",
+      "url": "https://docs.liquid.ai/lfm/models/decision-models"
+    },
+    {
+      "text": "",
+      "url": "https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fwww.liquid.ai%2Fblog%2Fd1-decision-model"
+    },
+    {
+      "text": "",
+      "url": "https://twitter.com/intent/tweet?url=https%3A%2F%2Fwww.liquid.ai%2Fblog%2Fd1-decision-model&text=Introducing%20d1%3A%20The%20most%20capable%20decision%20model%2C%20now%20with%20vision"
+    },
+    {
+      "text": "",
+      "url": "https://reddit.com/submit?url=https%3A%2F%2Fwww.liquid.ai%2Fblog%2Fd1-decision-model&title=Introducing%20d1%3A%20The%20most%20capable%20decision%20model%2C%20now%20with%20vision"
+    },
+    {
+      "text": "press@liquid.ai",
+      "url": "mailto:press@liquid.ai"
+    },
+    {
+      "text": "",
+      "url": "https://www.liquid.ai/"
+    },
+    {
+      "text": "",
+      "url": "https://discord.com/invite/liquid-ai"
+    },
+    {
+      "text": "",
+      "url": "https://x.com/liquidai"
+    },
+    {
+      "text": "",
+      "url": "https://liquidai.substack.com/"
+    },
+    {
+      "text": "",
+      "url": "https://github.com/Liquid4All"
+    },
+    {
+      "text": "",
+      "url": "https://huggingface.co/LiquidAI"
+    },
+    {
+      "text": "",
+      "url": "https://www.linkedin.com/company/liquid-ai-inc/"
+    },
+    {
+      "text": "",
+      "url": "https://www.youtube.com/channel/UClzRQA8Un3AJnlD6h1hv6fA"
+    },
+    {
+      "text": "Liquid Foundation Models (LFMs)",
+      "url": "https://www.liquid.ai/models"
+    },
+    {
+      "text": "Model Playground",
+      "url": "https://playground.liquid.ai/"
+    },
+    {
+      "text": "Hugging Face",
+      "url": "https://huggingface.co/LiquidAI"
+    },
+    {
+      "text": "Apollo",
+      "url": "https://www.liquid.ai/apollo"
+    },
+    {
+      "text": "Demos",
+      "url": "https://demos.liquid.ai/"
+    },
+    {
+      "text": "Documentation",
+      "url": "https://docs.liquid.ai/"
+    },
+    {
+      "text": "Hackathons",
+      "url": "https://www.liquid.ai/hackathons"
+    },
+    {
+      "text": "Discord",
+      "url": "https://discord.com/invite/liquid-ai"
+    },
+    {
+      "text": "GitHub",
+      "url": "https://github.com/Liquid4All"
+    },
+    {
+      "text": "Automotive",
+      "url": "https://www.liquid.ai/automotive"
+    },
+    {
+      "text": "Consumer electronics",
+      "url": "https://www.liquid.ai/consumer-electronics"
+    },
+    {
+      "text": "E-commerce",
+      "url": "https://www.liquid.ai/e-commerce"
+    },
+    {
+      "text": "Financial services",
+      "url": "https://www.liquid.ai/financial-services"
+    },
+    {
+      "text": "Healthcare",
+      "url": "https://www.liquid.ai/healthcare"
+    },
+    {
+      "text": "Industrial",
+      "url": "https://www.liquid.ai/industrial-robotics"
+    },
+    {
+      "text": "Defense",
+      "url": "https://www.liquid.ai/defense"
+    },
+    {
+      "text": "Agentic AI",
+      "url": "https://www.liquid.ai/agentic-ai"
+    },
+    {
+      "text": "Liquid Labs",
+      "url": "https://www.liquid.ai/research"
+    },
+    {
+      "text": "Automated Foundation Model Design",
+      "url": "https://www.liquid.ai/blog/automated-architecture-synthesis-via-targeted-evolution"
+    },
+    {
+      "text": "Blog",
+      "url": "https://www.liquid.ai/news/models"
+    },
+    {
+      "text": "About",
+      "url": "https://www.liquid.ai/company"
+    },
+    {
+      "text": "Careers",
+      "url": "https://www.liquid.ai/careers"
+    },
+    {
+      "text": "News",
+      "url": "https://www.liquid.ai/news"
+    },
+    {
+      "text": "Events",
+      "url": "https://www.liquid.ai/events"
+    },
+    {
+      "text": "FAQ",
+      "url": "https://www.liquid.ai/faq"
+    },
+    {
+      "text": "Contact",
+      "url": "https://www.liquid.ai/connect"
+    },
+    {
+      "text": "Shoutouts",
+      "url": "https://www.liquid.ai/shoutouts"
+    },
+    {
+      "text": "Terms",
+      "url": "https://www.liquid.ai/terms-conditions"
+    },
+    {
+      "text": "Privacy",
+      "url": "https://www.liquid.ai/privacy-policy"
+    },
+    {
+      "text": "Press",
+      "url": "https://www.liquid.ai/connect"
+    },
+    {
+      "text": "here",
+      "url": "https://www.liquid.ai/privacy-policy"
+    }
+  ],
+  "layout": [
+    {
+      "tag": "H1",
+      "text": "Introducing d1: The most capable decision model, now with vision",
+      "y": 504,
+      "height": 29
+    },
+    {
+      "tag": "P",
+      "text": "On this page",
+      "y": 0,
+      "height": 0
+    },
+    {
+      "tag": "P",
+      "text": "Today, we introduce d1, our first decision model, now supporting both text and images. With last week's experimental release, d1 became the first model to rival Jev on text decisio",
+      "y": 599,
+      "height": 109
+    },
+    {
+      "tag": "P",
+      "text": "We tested d1 against GPT-6.1 Sol and Claude Opus 5.5 on six real applications, from filtering support tickets to inspecting circuit boards. d1 matches or beats GPT-6.1 Sol on four ",
+      "y": 728,
+      "height": 109
+    },
+    {
+      "tag": "H2",
+      "text": "How the d1 decision model works",
+      "y": 1420,
+      "height": 29
+    },
+    {
+      "tag": "P",
+      "text": "Decision models answer questions about a situation with a probability for each possible answer. The d1 decision model takes unstructured data (e.g., text, images, or both) and one ",
+      "y": 1476,
+      "height": 136
+    },
+    {
+      "tag": "P",
+      "text": "d1 answers three types of questions:",
+      "y": 1990,
+      "height": 27
+    },
+    {
+      "tag": "P",
+      "text": "One request can ask several questions about the same state, saving input tokens.",
+      "y": 2155,
+      "height": 27
+    },
+    {
+      "tag": "H2",
+      "text": "d1 in action",
+      "y": 2230,
+      "height": 29
+    },
+    {
+      "tag": "P",
+      "text": "Decision models can replace expensive calls to language models when the answer is a structured decision. They also enable a variety of new use cases, some shown in this section. Ev",
+      "y": 2287,
+      "height": 82
+    },
+    {
+      "tag": "P",
+      "text": "Visual inspection. This industrial application reviews parts from four production lines that pass under a camera: circuit boards, candles, cashews, and chewing gum (public VisA dat",
+      "y": 2812,
+      "height": 136
+    },
+    {
+      "tag": "P",
+      "text": "Text applications. Five applications use d1 for every decision:",
+      "y": 3269,
+      "height": 27
+    },
+    {
+      "tag": "P",
+      "text": "We adapted four of these applications from the following open-source projects: pg-jev, jevgrep, jev-ultrafast, and fast-jev-compaction.",
+      "y": 3651,
+      "height": 54
+    },
+    {
+      "tag": "P",
+      "text": "Games. d1 plays eight classic games live and picks every move. Vision helps it in two ways:",
+      "y": 3998,
+      "height": 27
+    },
+    {
+      "tag": "P",
+      "text": "d1 also handles purely visual tasks. In Quick, Draw!, it guesses what a player's doodle shows among 62 words, and recognizes 5.2 of 6 drawings (random guessing gets 0.6).",
+      "y": 4217,
+      "height": 54
+    },
+    {
+      "tag": "H2",
+      "text": "Availability and pricing",
+      "y": 4320,
+      "height": 29
+    },
+    {
+      "tag": "P",
+      "text": "Start building today with the d1 decision model, available on the Liquid AI API as d1. Create an API key at console.liquid.ai (Dashboard > API Keys).",
+      "y": 4377,
+      "height": 54
+    },
+    {
+      "tag": "P",
+      "text": "To use vision, you can simply send images as base64 data URLs in images:",
+      "y": 4451,
+      "height": 27
+    },
+    {
+      "tag": "P",
+      "text": "The full API reference is in the decision models documentation.",
+      "y": 4992,
+      "height": 27
+    },
+    {
+      "tag": "P",
+      "text": "d1 is billed on input tokens only, with no output tokens. Images are counted as input tokens at the same rate as text: 1.5 tokens per 32×32-pixel patch, so a 1024×1024 image costs ",
+      "y": 5039,
+      "height": 82
+    },
+    {
+      "tag": "P",
+      "text": "d1 is also available through Vercel and OpenRouter, with text only for now. Vision is coming to both soon.",
+      "y": 5140,
+      "height": 54
+    },
+    {
+      "tag": "P",
+      "text": "This is an exciting time for creativity and exploration in AI, and d1 is only the beginning. We're continuing our work on decision models across a range of sizes, with new features",
+      "y": 5215,
+      "height": 109
+    },
+    {
+      "tag": "H2",
+      "text": "Citation",
+      "y": 5537,
+      "height": 29
+    },
+    {
+      "tag": "P",
+      "text": "For citations, please use the following reference or BibTeX:",
+      "y": 5594,
+      "height": 27
+    },
+    {
+      "tag": "P",
+      "text": "Liquid AI, \"Introducing d1: The most capable decision model, now with vision\", Liquid AI Blog, Oct 2026.",
+      "y": 5657,
+      "height": 22
+    },
+    {
+      "tag": "P",
+      "text": "Methodology. We ran each application once per model on October 5, 2026, with the d1 Playground's comparison script. GPT-6.1 Sol and Claude Opus 5.5 get each request as one chat mes",
+      "y": 5909,
+      "height": 245
+    },
+    {
+      "tag": "P",
+      "text": "Share on social:",
+      "y": 6259,
+      "height": 22
+    },
+    {
+      "tag": "P",
+      "text": "For press inquiries, email us at press@liquid.ai",
+      "y": 6313,
+      "height": 22
+    },
+    {
+      "tag": "P",
+      "text": "Building the fastest, most compute-efficient, and capable foundation models so intelligence can live anywhere.",
+      "y": 6632,
+      "height": 77
+    },
+    {
+      "tag": "P",
+      "text": "EST. 2023",
+      "y": 6749,
+      "height": 18
+    },
+    {
+      "tag": "P",
+      "text": "",
+      "y": 0,
+      "height": 0
+    },
+    {
+      "tag": "H2",
+      "text": "MODELS",
+      "y": 6939,
+      "height": 18
+    },
+    {
+      "tag": "H2",
+      "text": "DEVELOPER RESOURCES",
+      "y": 7123,
+      "height": 18
+    },
+    {
+      "tag": "H2",
+      "text": "INDUSTRY SOLUTIONS",
+      "y": 7343,
+      "height": 18
+    },
+    {
+      "tag": "H2",
+      "text": "RESEARCH",
+      "y": 7640,
+      "height": 18
+    },
+    {
+      "tag": "H2",
+      "text": "COMPANY",
+      "y": 7803,
+      "height": 18
+    },
+    {
+      "tag": "P",
+      "text": "© 2026 Liquid AI, Inc.",
+      "y": 8113,
+      "height": 21
+    },
+    {
+      "tag": "P",
+      "text": "We’ve updated our Privacy Policy. Please review the updated policy here.",
+      "y": 1125,
+      "height": 21
+    },
+    {
+      "tag": "P",
+      "text": "Dismiss this notice anytime, or it will disappear after October 30, 2026 (UTC).",
+      "y": 1150,
+      "height": 17
+    }
+  ],
+  "captured_bj": "2026-10-07T01:04:52.170+08:00"
+}

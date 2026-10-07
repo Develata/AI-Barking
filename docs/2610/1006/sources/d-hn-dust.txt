@@ -1,0 +1,212 @@
+ Dust: Pretraining Transformers Without Backpropagation | Hacker News Hacker News new | past | comments | ask | show | jobs | submit login 
+ Dust: Pretraining Transformers Without Backpropagation ( qlabs.sh ) 
+ 248 points by E-Reverance 19 hours ago | hide | past | favorite | 66 comments 
+ help 
+ blt 12 hours ago | next [–] 
+ Every few years, a derivative-free neural network optimization algorithm gets some hype. I'd bet my life savings that none of them ever make an impact. Derivative-free optimization can be useful for genuinely discontinuous objectives [1], but common neural network objectives are smooth and&#x2F;or Lipschitz. The gradient is useful. Instead of trying random directions and hoping that one of them is an improvement, it tells you where to go. The more parameters you have, the more useful it becomes. A strict complexity gap between gradient-based and derivative-free Lipschitz convex optimization has been suspected for decades and recently proved (using AI, [2]). Neural net optimization is nonconvex, but not radically different. IMO, a more promising direction is gradient-based optimizers specialized to the neural network structure, like Muon [3]. [1] https:&#x2F;&#x2F;arxiv.org&#x2F;abs&#x2F;2202.00817 [2] https:&#x2F;&#x2F;arxiv.org&#x2F;abs&#x2F;2607.13335 [3] https:&#x2F;&#x2F;jeremybernste.in&#x2F;writing&#x2F;deriving-muon 
+ reply 
+ accurrent 3 hours ago | parent | next [–] 
+ It's still important to support research in this direction cause us meatbags cost a LOT less energy to train than GPTs even if you assume that it takes 30 years to train a PhD. Our current training methods honestly leave a lot to be desired. We almost certainly dont do full backpropagation.
+ reply 
+ empath75 1 hour ago | root | parent | next [–] 
+ PHD inference doesn't scale, though.
+ reply 
+ refulgentis 1 hour ago | root | parent | prev | next [–] 
+ I think it's fun back-of-the-napkin sometimes to compare meat to matmuls but ultimately fallacious to its core, making it an intellectual tarpit. It's much harder to argue with the math and empirical results.
+ reply 
+ abecedarius 17 minutes ago | root | parent | next [–] 
+ Energy cost may be a pointless comparison since we don't eat electricity, but it's very reasonable to look at sample efficiency and ask what we have there that our theories miss.
+ reply 
+ syntacticsalt 11 hours ago | parent | prev | next [–] 
+ Even for non-smooth or discontinuous objectives, I'd still reach for methods that use gradient-like information over zeroth-order methods. For non-smooth objectives, Clarke-generalized subdifferentials have been pretty effective outside of ML, and have been used in automatic differentiation contexts at least 10-15 years ago. A carelessly quick literature search suggested conservative gradients, too. For discontinuous objectives, I know there's been work on using envelope approximations, but the little I'm aware of in that work was in low-dimensional settings where the structure of the discontinuity was known explicitly. On the other extreme, lack of continuity comes up all the time in infinite-dimensional, PDE-constrained optimization, and some methods rely on tangent cones or various generalized notions of subdifferentiability (e.g., Mordukhovich, Bouligand) to demonstrate convergence. Admittedly, that work was somewhat outside my area of expertise, so I may be getting the details there slightly wrong, but the broad point stands that even in those settings, some directional information can be obtained and used profitably without resorting to zeroth-order methods.
+ reply 
+ armcat 5 hours ago | parent | prev | next [–] 
+ Kind of like random projections. Pre ChatGPT there would every now and then come a paper that states something along the lines of: instantiate a large randomly populated matrix, multiply by the input, and win! It kinda makes sense because you "stretch out" the space and separation boundaries become easier, but I have never seen it fully utilised in production in any meaningful way. Anyone remember the DANs (Deep Averaging Networks)?
+ reply 
+ vatsachak 12 hours ago | parent | prev | next [–] 
+ Random selection seems to favor post training https:&#x2F;&#x2F;arxiv.org&#x2F;pdf&#x2F;2603.12228 
+ reply 
+ machiaweliczny 4 hours ago | parent | prev | next [–] 
+ If it's cheaper then I guess it will might get practical. Also more likely that mind uses simpler techniques more similar to these. I wonder though if someone tested mutating training objective though, like keeping original loss&#x2F;goal and somehow defining loss differently and then comparing against original. This intuitively feels like how mind tries to handle difficult tasks.
+ reply 
+ okintheory 4 hours ago | parent | prev | next [–] 
+ "A strict complexity gap between gradient-based and derivative-free Lipschitz convex optimization" has been known for decades. It's covered in standard textbooks like Nesterov's "Introductory lectures on convex optimization". That AI result is about establishing the gap in a fairly niche accuracy regime.
+ reply 
+ cubefox 6 hours ago | parent | prev | next [–] 
+ &gt; Derivative-free optimization can be useful for genuinely discontinuous objectives [1], but common neural network objectives are smooth and&#x2F;or Lipschitz. There is even an analog to the continuous derivative for discrete binary functions, called "Boolean variation": https:&#x2F;&#x2F;proceedings.neurips.cc&#x2F;paper_files&#x2F;paper&#x2F;2024&#x2F;hash&#x2F;7... Like for derivatives, there is a chain rule for Boolean variations, so you can use something like backpropagation, but without needing any expensive floating point math. Though I don't think this has been used much so far. There must be some other downside.
+ reply 
+ p1esk 7 hours ago | parent | prev | next [–] 
+ And yet the best learning algorithm we have is derivative-free!
+ reply 
+ ghm2180 5 hours ago | root | parent | next [–] 
+ Yes, SVMs and Random Forests still rule the many worlds of classification problems often not in the spotlight.
+ reply 
+ cyber_kinetist 4 hours ago | root | parent | next [–] 
+ Support Vector Machines involve solving a large QP optimization problem... which is often done by running a variant of gradient descent (or one of the second- or quasi-second-order optimization algorithms, which involves finding the Hessian as well as the gradient)
+ reply 
+ lynndotpy 4 hours ago | root | parent | prev | next [–] 
+ Back when I was a researcher, I had a classification problem where the default random forest classifier built into scikitlearn completely dominated the neural method. The best numbers we got were something like a ~30% improvement from baseline for the neural network to ~95% for the random forest. The disparity was so large that I was certain I must have made a mistake and I spent a few hours debugging, and then a few hours more trying different neural architectures. Turns out this is just a super common experience for anyone in NNs who would also try the more established learning algorithms.
+ reply 
+ cubefox 6 hours ago | root | parent | prev | next [–] 
+ Perhaps the optimizer is worse but the architecture or objective function is better.
+ reply 
+ WithinReason 6 hours ago | root | parent | prev | next [–] 
+ Imagine how good it would be with derivatives
+ reply 
+ YeGoblynQueenne 4 hours ago | root | parent | prev | next [–] 
+ Bayes Optimal Classifier?
+ reply 
+ syntacticsalt 11 hours ago | prev | next [–] 
+ I'm skeptical as to whether zeroth-order methods really lend themselves to a Bitter Lesson argument. First-order methods don't explore the loss landscape optimally, but the loss function tends to be nonconvex, and zeroth-order methods don't address that issue head on. Dust smooths, and so do applicable first-order methods. Remove the nonconvexity issue, and I suspect Dust's purported advantages evaporate (based on published theoretical work), so it's pretty odd to me that the paper never discusses convexity. I could buy that this method scales better than previous zeroth-order methods, and that's interesting, but it doesn't seem like enough of a moat to keep improved first-order methods from drinking its milkshake, except in cases where a zeroth-order method is already a primary option: the network needs to call a simulator that doesn't expose gradient-like information. (In cases where gradients don't exist , I'd still argue for other options, e.g., Clarke-generalized gradients where applicable, so long as those can be computed with the available information. I know this technology has been published for automatic differentiation, so I would imagine it could be incorporated into backprop and used with a suitable optimization algorithm.)
+ reply 
+ Buttons840 5 hours ago | parent | next [–] 
+ Is it fair to define Reinforcement Learning (RL) as forcing a gradient onto a system &#x2F; simulator? Though, I suppose RL has non-gradient based methods too.
+ reply 
+ Den_VR 11 hours ago | parent | prev | next [–] 
+ Orders-of-magnitude improvements in compute efficiency are needed to become a practical replacement for backprop… but those improvements are coming. As a mixture, could activation-space search produce useful teaching targets for backprop? Zeroth-order search would discover candidates, first-order learning would consolidate them. The potentially valuable step is converting a sparse judgment into a reusable training target. This also changes the relevance of convexity.
+ reply 
+ syntacticsalt 10 hours ago | root | parent | next [–] 
+ I'm not sure I follow why your argument changes the relevance of convexity? If the problems were convex, I don't think we'd be having this discussion -- first-order methods would tend to win.
+ reply 
+ mkaic 1 hour ago | prev | next [–] 
+ I'm excited to see a new thing in the Zero-Order Optimization (ZOO) world. I see most ZOO methods not as a "replacement for backprop" the way they are often marketed, but as a technique that can potentially work well in regimes where backprop is fundamentally weak. One of my favorite papers [0] in recent memory, for instance, is about using central-difference random gradient estimation (CD-RGE) to train large RNNs without using backprop-through-time. They also show it works decently for hard-to-optimize differentiable-neural-computers. Since reading that paper, I've had a lot of fun trying to apply this technique to settings I would describe as "a traditional differentiable neural network being applied in a non-traditional environment where you can't just call loss.backward and hope for the best". I am excited to try Dust out on my personal project now :)
+ reply 
+ usernametaken29 13 hours ago | prev | next [–] 
+ &gt; There are many interesting open questions. The first is whether, and how, Dust can find better directions than backprop’s first-order gradient Both algorithms are bound by the same Pareto frontier based on the Empirical Risk Minimisation Principle, so they’re already on the same trajectory.
+Interestingly backprop is limited by conditioning of the Hessian matrix in order to converge (differentiate correctly). So removing this limitation is actually a great step.
+I’m excited to see a comeback of evolutionary methods because they’re much more general, albeit costly and naive.
+We’re now very close to what can be described best as brute forcing the Pareto frontier out of our datasets. Not sure that’s what we want but I have no better ideas either.
+ reply 
+ stevemk14ebr 13 hours ago | parent | next [–] 
+ Pareto frontier the Pareto frontier and then with a little Pareto frontier you might get to the Pareto frontier
+ reply 
+ usernametaken29 13 hours ago | root | parent | next [–] 
+ P^2
+ reply 
+ AIorNot 12 hours ago | root | parent | next [–] 
+ Its just an insufferable AI way to say best set of options given
+ reply 
+ tomrod 12 hours ago | root | parent | next [–] 
+ Waaay older than AI. Basic econ 101,it is.
+ reply 
+ girvo 8 hours ago | root | parent | next [–] 
+ Though it being used constantly in AI-related topics from ~2024 onwards is very much a function of LLM output, I would argue.
+ reply 
+ tomrod 4 hours ago | root | parent | next [–] 
+ Oh for sure. As has em-dashes -- a glorious tidbit primarily used by writers in the past to circumvent parenthetical clauses. Also the incredibly abused "load-bearing." Meanwhile, I just want people to think about the production possibilities frontier.
+ reply 
+ usernametaken29 12 hours ago | root | parent | prev | next [–] 
+ Not really. The Pareto frontier is itself a distribution over all optimisation paths and dominance is a real and useful property we test when researching evolutionary methods. It’s not chosen to be insufferable but to try to be precise.
+ reply 
+ polyomino 18 hours ago | prev | next [–] 
+ Even though this is way more expensive than backprop, could a hybrid approach where you fine tune an existing checkpoint that's been backpropped unlock further gains? 
+It would be cool to apply this to different stages and see if that affects the learning trajectory
+ reply 
+ ghm2180 5 hours ago | prev | next [–] 
+ Intereting. There was a completely different take on how to "do" back propagation using optics at YC papers video the other day(I can't find the video). The technique presented diffusion networks with optics. If a hardware technique to make computation more efficient emerges, a lot of methods like this could apply no?
+ reply 
+ soltanov 9 hours ago | prev | next [–] 
+ I would like to see wall clock time, energy, peak memory and downstream quality compared at equal loss. Until the effiency gap closes, this is an interesting research direction.
+ reply 
+ sim04ful 9 hours ago | prev | next [–] 
+ For me credit assignment without a global clock is extremely important, i believe it's a necessary step towards end to end training of models In-materio.
+ reply 
+ api 18 hours ago | prev | next [–] 
+ It sounds like this is less computationally efficient than backprop, but more easily parallelizable. Is that fair?
+ reply 
+ vatsachak 18 hours ago | parent | next [–] 
+ Not necessarily, backprop is highly parallelizable since it is just a bunch of matrix mults. Something like Dust skips the backward pass on backprop. But other techniques like 
+Neural Predictive Coding can be completely asynchronous, each "weight" can fire independent of those far away from it. Innocenti, et. al have shown that NPC gradients converge to backprop within a certain "regime". The win with asynchronous techniques like NPC is that you do not need the extreme co-ordination that backprop requires and hence should be computationally much easier given the right device. Although at this point the industry has so much money in the forward-backward pass system that I doubt a backprop successor would win unless someone makes NPC hardware feasible and can prove scaling up to billions of params
+ reply 
+ tyromaniac 16 hours ago | root | parent | next [–] 
+ Also has the "advantage" of being slightly more biologically plausible as the optimization happens locally rather than globally. That idea was taken further by N'dri et al in PCL, in which "activation energy" was minimized as well, and inhibitory neurons added 
+ https:&#x2F;&#x2F;www.nature.com&#x2F;articles&#x2F;s41467-025-64234-z.pdf While trying to find the link for that I stumbled upon https:&#x2F;&#x2F;arxiv.org&#x2F;pdf&#x2F;2605.12732 Which also looks pretty interesting
+ reply 
+ ACCount39 5 hours ago | root | parent | next [–] 
+ I think this is the main thing I want out of "non-backprop ML" research - figuring out how the whole class of algorithms behaves. And then applying that to figure out how the brain implements its own deep learning. If we can figure out how the brain's learning dynamics function well enough? We could figure out how to interface with them and extend them.
+ reply 
+ ACCount39 17 hours ago | root | parent | prev | next [–] 
+ The reason why I don't see the promise for ML-only applications is that the coordination backprop requires comes very cheap to us. "Much easier given the right device" - the "right" there just isn't shaped like the devices we actually build. And the price of "not having backprop" is usually expending more FLOPs, getting worse sample efficiency, etc. The biggest "device" that doesn't do backprop is the brain, and that's because the brain doesn't have the connectivity or the coordination to pull it off. Both of those are "expensive" for something like it to implement. Cheap for us though. We aren't stuck with neurons that only get locally available information and have to implement learning rules based on that. So, skill issue?
+ reply 
+ vatsachak 16 hours ago | root | parent | next [–] 
+ I mean co-ordination requires energy though. The brain wattage looks at GPUs and says "skill issue". But you're right that we look at natural energy production techniques and say "skill issue"
+ reply 
+ dharma1 6 hours ago | root | parent | next [–] 
+ I think both can be true - ie. We can harness energy from the sun at much bigger scale than nature has so far, yet we can still learn a lot from how nature has spent massive parallel search over millions of years on coming up with incredible nano engineering we still have no clue how to do
+ reply 
+ ACCount39 16 hours ago | root | parent | prev | next [–] 
+ Even today's LLMs suddenly get power-competitive when you compare by "power per task". Sure, a GPU can draw 1000W under load. But it also works very fast, and doesn't have to spend any time on things like "sleep". The trick about comparing the two is that different things are expensive to different substrates. Coordination is cheap for GPGPU and expensive for brain. When you have a fixed number of reusable general purpose computational units, coordinating execution is more natural than not coordinating execution, and the power cost is nil. When your computational units are independent, purpose specific, and fully embedded into the data path, coordinating them can get less natural and, frankly, optional. When wiring is expensive, coordination can become expensive in turn. Another thing in the same "cheap for GPGPU but expensive for brain" regime is bandwidth. Look no further than optic nerve to see just how hard it is for nerves to push any appreciable amount of data. Another thing is connectivity. For GPGPU, global connectivity is natural - but the brain has to pay in physical wires for all the connectivity it has, and, see "bandwidth": it doesn't have any good wires. Yet another thing is weight reuse: a big part of why humans get "handedness" is that the brain can't just reuse the motion control circuitry for one hand for another nearly identical hand. And the final thing I can name off the top of my head is memory - but specifically, memory capable of fast R&#x2F;W. The capacity of human "working memory" is a disgrace, and not because there was no use for more. Humans rapidly lose visual fidelity of representations for objects they aren't directly looking at, and not at all because "being able to check how things looked 2 seconds ago" is useless. Those capabilities were just too expensive for the substrate to afford them easily. It's why brains, broadly, favor dataflow-like and SSM-like dynamics, with largely fixed asynchronous dataflows and recurrence over updated local information - instead of something that would require a lot of global connectivity and transformer-like many-to-many attention ops. SSM is not necessarily the "best" tool for the job in ML land, for most jobs - but when you struggle to fit "attention" into your connectivity&#x2F;bandwidth budget, and your memory is extremely expensive but hard-coupled to processing, SSM starts looking very appealing. Now, something that might be expensive for GPGPU but cheap for brain, for once? Online learning. Maybe it's substrate dependent, or maybe it's going to get cheap in GPU land too once we figure out the trick. But so far? No one figured out how to make it cheap, stable and usable. You'd be lucky to get "pick one".
+ reply 
+ vatsachak 15 hours ago | root | parent | next [–] 
+ I mean the reason why models are using less energy is because they are getting smarter per token and also engineering algorithms&#x2F;chips that make inference cheaper. If we could have success with spiking neural networks in silico they would take even less energy, because they don't require global co-ordination. Co-ordination is information and "information = energy by the second law of thermodynamics" is my crank proof Also the brain has way more parameters than LLMs and also has different neurotransmitters, loops, branching etc so they probably have WAY more capacity than LLMs. But coding output&#x2F;W LLMs have us beat
+ reply 
+ ACCount39 8 hours ago | root | parent | next [–] 
+ Coordination is fuck all bits worth of control information broadcast widely. It's very cheap to us. I frankly don't believe in spiking neural networks giving any advantages over what we have. It's a different way to implement ANNs, but "different" isn't "better". It's how the brain does things, sure, but the answer to "why the brain does what it does" is "workarounds for being made of flesh issues" at least half the time. I can believe in brain having more capacity than frontier LLMs quite easily. We know a single BNN neuron can have the expressiveness of many ANN neurons. And well leveraged overparametrization + compute overhang could explain a decent chunk of the apparent sample efficiency edge. But that apparent "extra capacity" could also be tied up in things like neurons having to contend with metabolism, in brain's learning algorithms being noisy, in brain having to use neuron circuits to implement "hot memory", etc - instead of contributing only to performance.
+ reply 
+ dharma1 6 hours ago | root | parent | prev | next [–] 
+ I think Jeff Dean is right in that we will see much more specialised silicon in the future. If something more bio inspired ie. predictive coding and in-memory compute fundamentally makes continual learning and much lower energy consumption possible there will be specialised hardware for it at some point FWIW I think the brain has multiple “learning rules” and operates at multiple timescales
+ reply 
+ janalsncm 17 hours ago | root | parent | prev | next [–] 
+ Knowing nothing about this, I wonder if it could be useful in situations where we can’t reliably sync with all the workers. Something like folding@home, where all the workers are just shaking weights and if one of them finds a winner it uploads to the central server?
+ reply 
+ vatsachak 16 hours ago | root | parent | next [–] 
+ No real advantage over Neural Nets here; backprop matmuls can be calculated layer by layer so you can chunk backprop across different machines. The real advantage comes from energy savings, you require no global co-ordination
+ reply 
+ janalsncm 16 hours ago | root | parent | next [–] 
+ Imagine we did that, split up a model layers as A-&gt;B-&gt;C. C will need to wait for B to compute a forward pass, which is waiting for A to compute its forward pass. To compute the forward pass, B needs all of the outputs from A, which is an upload and a download (maybe these can be done concurrently). Then A waits for B to compute its backwards pass, which is waiting for C to do the same thing. Again you are sending around potentially gigabytes of data. This is in contrast to mining bitcoins for example which doesn’t require any coordination from miners because their work is completely independent, and the answer is very small compared to the work needed to get it.
+ reply 
+ vatsachak 15 hours ago | root | parent | next [–] 
+ Yep. You need to transport all the weights at the boundary regardless of Backprop&#x2F;NPC. But the cool thing is that if your NN is split into mostly self contained chunks then you can go widthwise parallel. An architecture like MOE exploits this fact so that the active weights during pre-training you're backproping only through active experts
+ reply 
+ spindump8930 15 hours ago | root | parent | prev | next [–] 
+ The problem (and contrast with other approaches) is that mat muls requires synchronization. Arranging your networking and training structure to maximize compute and minimize communication is the main craft of ML training infra folks. In your example, yes you can compute layers on different machines (i.e. Tensor Parallelism), but you must be very careful in how you arrange it.
+ reply 
+ strbean 16 hours ago | root | parent | prev | next [–] 
+ Would these alternatives to backprop make it more feasible to have constant live-training going on in a model? Giving it something akin to neuro-plasticity?
+ reply 
+ nbutton762 15 hours ago | root | parent | next [–] 
+ One aspect of how current training and continual learning are somewhat at odds is that the memory required to train a model is often times 2-3x the memory required to just run it (probably not as bad for PEFT, not sure). DUST does have an advantage specifically along those lines because it doesn't have to save a ton of intermediate state other than each layer's input activations during a single forward pass. There are many other issues that this algorithm does not address thoigh like catastrophic forgetting. it's still operating on a transformer which contains no inherent mechanism for selecting the relative value of a training step based on current knowledge, nor does it have segmentation of functionalities with specialized areas used for specific things that can be sequestered off and ignore new updates (we do not risk forgetting how to walk as we increase our French vocabulary)
+ reply 
+ mochizou 5 hours ago | root | parent | prev | next [–] 
+ Maybe the practical path is to separate fast-changing memory from slow-changing weights. Most things an agent learns during use probably don't need to become parameters immediately.
+ reply 
+ vatsachak 15 hours ago | root | parent | prev | next [–] 
+ Models suffer from "catastrophic forgetting" if you train them on new data. People are working on this field, recent results suggest that continual learning can be possible by converting the input data to "LLMese"
+ reply 
+ SerdarGl 14 hours ago | parent | prev | next [–] 
+ At massive scales 0th order methods will parallelize better than backprop especially along depth, u can train very deep models pipeline parallel without bubbles
+ reply 
+ wg0 12 hours ago | prev | next [–] 
+ It's computationally expensive and infeasible but what's the upside? Genuine question due to unfamiliarity with the subject.
+ reply 
+ alpu 9 hours ago | parent | next [–] 
+ I think it can be useful for optical hardware
+ reply 
+ ammarmalik17 7 hours ago | prev | next [–] 
+ Bigger Dust models needing fewer population samples?
+ reply 
+ ContinuityLab 8 hours ago | prev | next [–] 
+ Moving beyond traditional backpropagation for transformer pretraining opens up fascinating avenues for alternative learning dynamics and architectural efficiency.
+ reply 
+ vivzkestrel 10 hours ago | prev | next [–] 
+ - stupid question from a neural network rookie - isnt the whole point of back propoagation so that you dont guess weights by brute forcing them since that is computationally infeasible once you go beyond a dozen weights? - if you dont use backpropogation, how exactly are the initial weights assigned them if they are not random values?
+ reply 
+ AIorNot 12 hours ago | prev | next [–] 
+ Hmm I was more interested in this alternative to backprop: https:&#x2F;&#x2F;news.ycombinator.com&#x2F;item?id=49701182 
+ reply 
+ oofbey 12 hours ago | prev | next [–] 
+ This is super yawn-worthy. Instead of backprop for the exact gradient you can run forward passes a thousand times with perturbed weights and get a Monte Carlo estimate of the gradient. Not very clever. Extremely NOT useful. But I guess the industry is littered with techniques for computing the same thing but vastly slower that some people find interesting. Homomorphic encryption. Zero knowledge proofs. Blockchain computing. Except in those cases there might be a legitimate reason to use it occasionally.
+ reply 
+ wrecked_em 15 hours ago | prev | next [–] 
+ Definitely more than meets the eye.
+ reply 
+ whatever1 9 hours ago | prev | next [–] 
+ Remember kids, whoever is pitching space searching via complete enumeration just wants your wallet.
+ reply 
+ eriwang915 15 hours ago | prev [–] 
+ Dust's 243M model beating a 120x smaller one at most population sizes is the surprising part; bigger nets got more population-efficient, not less.
+ reply 
+ Consider applying for YC's Winter 2027 batch! Applications are open till November 2. 
+ Guidelines | FAQ | Lists | API | Security | Legal | Apply to YC | Contact 
+ Search: 
+ 
