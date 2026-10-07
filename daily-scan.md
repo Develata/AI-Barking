@@ -22,7 +22,6 @@
 2. 主动排查：
    - OpenAI、Anthropic、Google/DeepMind、Meta、xAI、Microsoft、Apple、NVIDIA、Mistral、DeepSeek、阿里通义/Qwen、字节 Seed/豆包、月之暗面 Kimi、智谱、MiniMax、腾讯混元：官方博客、新闻稿、文档与价格页更新日志、官方 X 账号；
    - Hacker News 首页；
-   - 额度重置：ChatGPT/Codex 与 Claude 近 3 天已发生、或已官宣将发生的额度重置（全局重置，以及 banked reset 的发放与到期日）。线索站只当线索：https://opentherank.com/codex-reset/ 与 https://claude-resets.com/ ；事实回溯到官方帖或官方帮助中心页，并注明适用套餐；
    - Artificial Analysis、LMArena、LiveBench 等榜单的更新；
    - 重要论文、开源发布、政策与诉讼、安全事故。
 
@@ -57,7 +56,7 @@
    - 来源等级：只收 L1–L4，L5–L7 不列；
    - 题材提示：涉外国政府与政治，或美方机构点名指控中国公司的，标“风控”。
 
-   上述“额度重置”有新动向时，单独列在速览候选最前，不占 8–12 条名额，也不要求有爆点。
+   “额度重置”（ChatGPT/Codex、Claude 的全局重置，以及 banked reset 的发放与到期日）不属于本任务：Develata 自己发在评论区，不要检索、不要列入速览候选。额度下调、套餐或价格变化不算“重置”，仍按第 3 节判断。
 
    文末“近 3 天速览已收”里的条目不要再列，除非有实质新进展（标“跟进”）。这张表只用于速览候选去重：其中的事件若出现了吠点，仍可作为上面的发帖候选。
 
