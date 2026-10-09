@@ -35,7 +35,7 @@ pub const ROUNDUP_MAX: usize = 10;
 /// Character caps (every scalar counts) that keep ten entries legible at
 /// 36 px on one card: a main-post title stays on one line, others on two.
 const ROUNDUP_MAIN_MAX: usize = 20;
-const ROUNDUP_TEXT_MAX: usize = 44;
+const ROUNDUP_TEXT_MAX: usize = 40; // EDITORIAL.md 速览：其余条目 ≤40 字
 const TAG_MAX: usize = 12;
 /// Cards and the 3:4 cover; the wide cover has its own size.
 const CARD_SIZE: (u32, u32) = (1080, 1440);
