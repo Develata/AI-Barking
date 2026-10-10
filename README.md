@@ -27,6 +27,7 @@ AI 吠点是由 **[Develata](https://github.com/Develata)** 主理的独立内�
 | 2026 / 1006 | [AI证明拟黎曼猜想？Claude报警？](docs/2610/1006/doc_1006_publish.txt) | [配图说明](docs/2610/1006/images/README.md) | [来源入口](docs/2610/1006/sources/README.md) |
 | 2026 / 1007 | [Haiku降价90%？美AI开药获批？](docs/2610/1007/doc_1007_publish.txt) | [配图说明](docs/2610/1007/images/README.md) | [来源入口](docs/2610/1007/sources/README.md) |
 | 2026 / 1008 | [OpenAI撤稿？骂Claude封号？](docs/2610/1008/doc_1008_publish.txt) | [配图说明](docs/2610/1008/images/README.md) | [来源入口](docs/2610/1008/sources/README.md) |
+| 2026 / 1009 | [Claude编命案线索？谷歌买员工邮件？](docs/2610/1009/doc_1009_publish.txt) | [配图说明](docs/2610/1009/images/README.md) | [来源入口](docs/2610/1009/sources/README.md) |
 
 正文采用可直接复制的纯文本，图片单独保存。阅读或发布时不需要依赖 Markdown 插图。
 
