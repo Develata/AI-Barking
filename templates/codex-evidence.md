@@ -16,6 +16,7 @@
 
 1. 每条说法都要回溯到一手来源（EDITORIAL.md 中 L1–L3）。聚合站和媒体报道只能作为线索；找不到一手来源的，如实标为“未找到一手来源”。
 2. 用 opencli（`opencli browser`）或 agent-reach 打开一手页面（X 等社交平台优先 agent-reach），把页面快照保存到 `docs/{YYMM}/{MMDD}/sources/`，把关键区域截图保存到 `docs/{YYMM}/{MMDD}/images/`（文件名 `NN-简短英文名.png`，只截与说法相关的区域，保留单位、列名和测试条件标签）。不重绘、不改数字、不用转载图。截图用 2 倍设备像素比（device scale factor 2），以便批注截图放大到 1080 宽时不发虚；下面的宽度上限按页面 CSS 像素计。
+   - 截图、PDF 页裁切、HTML 转纯文本与 HN/Reddit 热度采样用仓库自带的工具：`cargo run --release --manifest-path tools/barking/Cargo.toml -- shot <期次目录> <组前缀> render|pdf|lines|crop|cropbox|stack …`、`-- html2txt <in.html> <out.txt>`、`-- heat <期次目录> <组前缀> --hn "…" --reddit "…"`（不带参数运行 `barking` 看用法）。它们只裁切、不改像素，并自动把每次动作记进 `sources/<组前缀>-shots-log.jsonl` 与 `<组前缀>-heat.json`。不要再每期重写同样的脚本；只有站点特定的处理（如展开折叠区域、登录态页面的 DOM 操作）才自写脚本放进 `sources/`，文件名以组前缀开头。
    - 官方 benchmark 表格与评测图例外：截全，不只截说法涉及的那一两行。整张表的标题、全部行与列、列头（模型名、effort/档位）以及表下脚注都要进图，读者能自己看到对比全貌和测试条件。表太长时竖向拼接成一张，不删行；宽度仍不超过 1400 px，字太小就分成上下两张完整截图，而不是裁掉行列。
 3. 同一指标在不同来源数值不一致时，全部记录，不要自行取舍。
 4. 输出 `docs/{YYMM}/{MMDD}/sources/evidence.md`，每条一行：

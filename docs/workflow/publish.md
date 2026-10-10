@@ -10,14 +10,18 @@ Develata 在对话中说“已发布”，即授权 Claude 对当期完成下面
 
 ## 步骤
 
-1. **已发过**：在 `daily-scan.md` 末尾“已发过”追加本期一行，按最终发布版的标题和口径写；速览专帖没有主帖，不写这一行。再把本期速览的非主帖条目（`cards.toml` 中没有 `main = true` 的）追加到“近 3 天速览已收”，每条一行：期次、标签、图上那句事实；同时删掉期次早于三天前的行。只在发布后写：未发布的选题一旦写入并推送，就会被定时检索排除。
-2. **检查**（任一不过就停下报告）：
-   - `cargo run --release --manifest-path tools/barking/Cargo.toml -- lint <期次目录>`，0 个错误；
-   - 配图无损压缩（默认执行，2026-10-02 起）：`oxipng -o 4 --strip safe <期次目录>/images/*.png`。像素不变，但文件字节和 SHA-256 会变、文本类元数据会被删，所以必须在 `offsite` 生成清单和上传**之前**做，已上传的期次不再压；不加 `-a`（它会改全透明像素的颜色值，不是严格无损）；只压 PNG，JPEG、WebP 不动；需要逐字节保留的原件放进 `sources/` 或单独跳过；
-   - 大文件：`cargo run --release --manifest-path tools/barking/Cargo.toml -- offsite <期次目录>` 生成 `sources/offsite.tsv`（全部图片与原件都在清单里）；待提交文件中没有单个超过 1 MB 的，有就先问；
-   - 身份：按 `templates/codex-evidence.md` 第 7 条，grep 抓取者的头像链接、显示名与 handle，确认未入库；
-   - 凭据与会话状态（`.env`、cookies、storage-state）未入库。
-3. **提交**：按 `AGENTS.md` 的提交约定分三批、依序提交。
+下面的 `barking` 即 `cargo run --release --manifest-path tools/barking/Cargo.toml --`。
+
+1. **已发过与索引**：`barking scan-rows <期次目录>` 生成机械部分：`README.md` 的期次索引行；`daily-scan.md`“近 3 天速览已收”的本期条目（`cards.toml` 中没有 `main = true` 的 `[[roundup]]`，每条一行：期次、标签、图上那句事实），并删掉期次早于三天前的行；“已发过”的占位行（速览专帖没有主帖，不写）。然后把占位行改成本期摘要：按最终发布版的标题和口径写选题、关键数字与吠点——这是编辑内容，工具只放占位，`待填` 没改掉时 `publish-check` 与 `stage --batch 1` 都会拒绝。只在发布后写：未发布的选题一旦写入并推送，就会被定时检索排除。
+2. **检查**：`barking publish-check <期次目录>`，按固定顺序做下面七项，任一不过就停下报告：
+   - lint，0 个错误；
+   - 发布后标记齐全：README 索引行、已发过行（无占位）、速览已收条目与 `cards.toml` 逐字一致；
+   - 配图无损压缩（默认执行，2026-10-02 起）：`oxipng -o 4 --strip safe`，只压 `images/` 下的 PNG。像素不变，但文件字节和 SHA-256 会变、文本类元数据会被删，所以必须在 offsite 清单和上传**之前**做；已记入 `offsite.tsv` 且 SHA-256 未变的文件不再压（已上传的期次因此不会被重压）；不加 `-a`（它会改全透明像素的颜色值，不是严格无损）；JPEG、WebP 不动；需要逐字节保留的原件放进 `sources/`；
+   - 生成 `sources/offsite.tsv`（全部图片与原件都在清单里）；
+   - 大文件：待提交文件中没有单个超过 1 MB 的，有就先问；
+   - 身份：按 `templates/codex-evidence.md` 第 7 条，用 `.env` 里 `BARKING_IDENTITY_PATTERNS` 列出的抓取者头像链接、显示名与 handle 片段搜索待提交文件与文件名，确认未入库（未配置时只警告）；
+   - 凭据与会话状态（`.env`、cookies、storage-state）仍被 `.gitignore` 排除，且没有进入待提交集合。
+3. **提交**：`barking stage <期次目录>` 列出三批文件与建议提交信息；按 `AGENTS.md` 的提交约定依序 `barking stage <期次目录> --batch 1 --add` 后 `git commit`，再 `--batch 2`、`--batch 3`。第②批的提交信息要按组描述存档内容后再提交；工具只暂存精确路径，不提交。
 4. **推送**：`git push origin main`，再 `git fetch` 核对 `origin/main` 上的 `daily-scan.md` 与本地一致。
 5. **上传**：`cargo run --release --manifest-path tools/barking/Cargo.toml -- offsite <期次目录> --upload`，逐个核对远端大小一致。
 6. **回报**：各批提交哈希、推送结果、上传数量与失败项。
@@ -45,5 +49,6 @@ Develata 在对话中说“已发布”，即授权 Claude 对当期完成下面
 | `OPENLIST_USERNAME` | 上传专用用户名 |
 | `OPENLIST_PASSWORD` | 该用户的密码 |
 | `OPENLIST_ROOT` | 归档根目录，相对该用户的基本路径。WebDAV 地址 `https://openlist.develata.me/dav/AI-Barking` 对应的 OpenList 路径是 `/AI-Barking`：用户基本路径为 `/` 时填 `/AI-Barking`；基本路径已限定为 `/AI-Barking` 时填 `/` |
+| `BARKING_IDENTITY_PATTERNS` | `publish-check` 身份检查用：抓取者的头像链接、显示名与 handle 的片段，`;` 分隔，大小写不敏感。这些字符串只能写在 `.env` 里，不要出现在仓库任何文件中 |
 
 建议在 OpenList 后台为上传单独建一个用户：基本路径限定到归档所在的网盘目录；权限只勾“创建目录或上传”（源码 `internal/model/user.go` 权限位 3，覆盖同名文件也只需这一项），不勾删除、重命名、移动、WebDAV 等；不开二步验证（脚本无法输入验证码）。凭据由 Develata 直接写进 `.env`，不在对话中发送。
