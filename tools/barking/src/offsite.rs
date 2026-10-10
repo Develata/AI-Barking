@@ -14,18 +14,18 @@ use std::time::Duration;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
-const MANIFEST: &str = "offsite.tsv";
+pub(crate) const MANIFEST: &str = "offsite.tsv";
 const MANIFEST_HEADER: &str = "# 存于 OpenList 的文件（见 docs/workflow/publish.md；1002 期起图片与原件不入 Git，更早期次的图片与原件已于历史改写时移出 Git，仍在网盘）。列：相对期次目录的路径	字节数	SHA-256";
 const USAGE: &str = "用法：barking offsite <期次目录>... [--upload]";
 
 /// One git-ignored file of an issue. Owned strings: entries are few and are
 /// used after the `git ls-files` output buffer is gone.
-struct Entry {
+pub(crate) struct Entry {
     /// Path relative to the issue directory, `/`-separated.
-    rel: String,
-    abs: PathBuf,
-    size: u64,
-    sha256: String,
+    pub(crate) rel: String,
+    pub(crate) abs: PathBuf,
+    pub(crate) size: u64,
+    pub(crate) sha256: String,
 }
 
 pub fn run(args: &[String]) -> ExitCode {
@@ -65,7 +65,7 @@ pub fn run(args: &[String]) -> ExitCode {
 }
 
 /// Returns the number of files that failed to upload.
-fn process(
+pub(crate) fn process(
     root: &Path,
     dir: &Path,
     upload: bool,
@@ -152,7 +152,7 @@ fn issue_key(root: &Path, dir: &Path) -> Result<(String, String), String> {
 /// Files under the issue that match the offsite rules. `--cached` adds files
 /// committed before the rules existed (0928 and earlier originals, older
 /// backup images): they stay in git but are archived offsite too.
-fn ignored_files(root: &Path, yymm: &str, mmdd: &str) -> Result<Vec<Entry>, String> {
+pub(crate) fn ignored_files(root: &Path, yymm: &str, mmdd: &str) -> Result<Vec<Entry>, String> {
     let prefix = format!("docs/{yymm}/{mmdd}/");
     let mut entries = Vec::new();
     for path in git_ls_files(
@@ -180,7 +180,11 @@ fn ignored_files(root: &Path, yymm: &str, mmdd: &str) -> Result<Vec<Entry>, Stri
 }
 
 /// `git ls-files -z <flags> -- <pathspec>`, as repo-relative `/` paths.
-fn git_ls_files(root: &Path, flags: &[&str], pathspec: &str) -> Result<Vec<String>, String> {
+pub(crate) fn git_ls_files(
+    root: &Path,
+    flags: &[&str],
+    pathspec: &str,
+) -> Result<Vec<String>, String> {
     let out = Command::new("git")
         .current_dir(root)
         .arg("ls-files")
@@ -203,7 +207,7 @@ fn git_ls_files(root: &Path, flags: &[&str], pathspec: &str) -> Result<Vec<Strin
 
 /// Write `text` unless the file already holds it; the working copy may have
 /// CRLF (`core.autocrlf`), so compare with line endings folded.
-fn write_if_changed(path: &Path, text: &str, what: &str) -> Result<(), String> {
+pub(crate) fn write_if_changed(path: &Path, text: &str, what: &str) -> Result<(), String> {
     let current = fs::read_to_string(path)
         .unwrap_or_default()
         .replace("\r\n", "\n");
@@ -214,6 +218,22 @@ fn write_if_changed(path: &Path, text: &str, what: &str) -> Result<(), String> {
         println!("写入 {}（{what}）", path.display());
     }
     Ok(())
+}
+
+/// Rows of an `offsite.tsv`: `(issue-relative path, bytes, sha256)`.
+/// Comment lines and malformed rows are skipped.
+#[allow(dead_code)] // used by the publish-check subcommand
+pub(crate) fn parse_manifest(text: &str) -> Vec<(String, u64, String)> {
+    text.lines()
+        .filter(|l| !l.starts_with('#'))
+        .filter_map(|l| {
+            let mut f = l.split('\t');
+            let path = f.next()?.trim();
+            let size = f.next()?.trim().parse().ok()?;
+            let sha = f.next()?.trim();
+            (!path.is_empty()).then(|| (path.to_string(), size, sha.to_string()))
+        })
+        .collect()
 }
 
 fn write_manifest(issue: &Path, entries: &[Entry]) -> Result<(), String> {
@@ -230,7 +250,7 @@ fn write_manifest(issue: &Path, entries: &[Entry]) -> Result<(), String> {
 
 /// Minimal OpenList API client: `/api/auth/login`, `/api/fs/get`, `/api/fs/put`
 /// (OpenListTeam/OpenList `server/router.go`, `server/handles/fsup.go`).
-struct OpenList {
+pub(crate) struct OpenList {
     agent: ureq::Agent,
     base: String,
     token: String,
@@ -339,7 +359,7 @@ fn encode_path(p: &str) -> String {
 
 /// `KEY=VALUE` lines from the repo's `.env`; `#` comments and blank lines are
 /// skipped, one pair of surrounding double quotes is stripped.
-fn load_env(root: &Path) -> HashMap<String, String> {
+pub(crate) fn load_env(root: &Path) -> HashMap<String, String> {
     fs::read_to_string(root.join(".env"))
         .unwrap_or_default()
         .lines()

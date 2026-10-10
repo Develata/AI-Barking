@@ -1,6 +1,7 @@
 mod card;
 mod lint;
 mod offsite;
+mod repo;
 
 use std::io;
 use std::path::{Path, PathBuf};

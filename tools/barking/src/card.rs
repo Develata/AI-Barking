@@ -420,7 +420,7 @@ fn cover_html(spec: &Spec, (w, h): (u32, u32), avatar: &str) -> Result<String, S
 }
 
 /// The repository root: the nearest ancestor of `dir` holding EDITORIAL.md.
-fn repo_root(dir: &Path) -> Result<PathBuf, String> {
+pub(crate) fn repo_root(dir: &Path) -> Result<PathBuf, String> {
     let abs = std::path::absolute(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     abs.ancestors()
         .find(|p| p.join("EDITORIAL.md").is_file())
@@ -572,7 +572,7 @@ fn esc(s: &str) -> String {
 }
 
 /// Width and height from a PNG's IHDR chunk.
-fn png_size(path: &Path) -> Result<(u32, u32), String> {
+pub(crate) fn png_size(path: &Path) -> Result<(u32, u32), String> {
     let bytes = fs::read(path).map_err(|e| format!("底图 {}: {e}", path.display()))?;
     if bytes.len() < 24 || &bytes[..8] != b"\x89PNG\r\n\x1a\n" || &bytes[12..16] != b"IHDR" {
         return Err(format!("{} 不是 PNG", path.display()));
@@ -581,7 +581,7 @@ fn png_size(path: &Path) -> Result<(u32, u32), String> {
     Ok((be(16), be(20)))
 }
 
-fn file_url(path: &Path) -> Result<String, String> {
+pub(crate) fn file_url(path: &Path) -> Result<String, String> {
     let abs = std::path::absolute(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let s = abs.to_string_lossy().replace('\\', "/");
     let mut url = String::from("file:///");
@@ -595,7 +595,7 @@ fn file_url(path: &Path) -> Result<String, String> {
     Ok(url)
 }
 
-fn find_chrome() -> Result<PathBuf, String> {
+pub(crate) fn find_chrome() -> Result<PathBuf, String> {
     if let Some(p) = std::env::var_os("BARKING_CHROME") {
         return Ok(PathBuf::from(p));
     }
@@ -612,7 +612,7 @@ fn find_chrome() -> Result<PathBuf, String> {
     .ok_or_else(|| "找不到 Chrome / Edge；用环境变量 BARKING_CHROME 指定可执行文件".into())
 }
 
-fn chrome_cmd(chrome: &Path, work: &Path, (w, h): (u32, u32)) -> Command {
+pub(crate) fn chrome_cmd(chrome: &Path, work: &Path, (w, h): (u32, u32)) -> Command {
     let mut cmd = Command::new(chrome);
     cmd.args([
         "--headless=new",
@@ -700,15 +700,15 @@ fn layout_state(dom: &str) -> Option<&str> {
 }
 
 /// A Tesseract word with its box in raw-image pixels.
-struct Word {
-    text: String,
-    left: u32,
-    top: u32,
-    right: u32,
-    bottom: u32,
-    conf: f32,
+pub(crate) struct Word {
+    pub(crate) text: String,
+    pub(crate) left: u32,
+    pub(crate) top: u32,
+    pub(crate) right: u32,
+    pub(crate) bottom: u32,
+    pub(crate) conf: f32,
     /// (block, paragraph, line) — words sharing it sit on one text line.
-    line: (u32, u32, u32),
+    pub(crate) line: (u32, u32, u32),
 }
 
 #[derive(Debug, PartialEq)]
@@ -762,7 +762,12 @@ fn ocr_words<'a>(
     Ok(cache.as_deref().unwrap_or_default())
 }
 
-fn run_ocr(raw: &Path, width: u32, lang: &str, work: &Path) -> Result<Vec<Word>, String> {
+pub(crate) fn run_ocr(
+    raw: &Path,
+    width: u32,
+    lang: &str,
+    work: &Path,
+) -> Result<Vec<Word>, String> {
     // 1x screenshots read better upscaled; 2x captures are fine as they are.
     let factor: u32 = if width < 1000 { 3 } else { 1 };
     let input = if factor == 1 {
@@ -810,7 +815,7 @@ fn run_ocr(raw: &Path, width: u32, lang: &str, work: &Path) -> Result<Vec<Word>,
 }
 
 /// Word rows (level 5) of Tesseract TSV, with boxes scaled back by `factor`.
-fn parse_tsv(tsv: &str, factor: u32) -> Vec<Word> {
+pub(crate) fn parse_tsv(tsv: &str, factor: u32) -> Vec<Word> {
     tsv.lines()
         .skip(1)
         .filter_map(|line| {
