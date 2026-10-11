@@ -1,0 +1,165 @@
+OpenAI内部模型私发POST请求，还决定不提 - News - Cocoloop
+
+ [/] 首页 [/]Claude [/tags/Claude/]OpenAI [/tags/OpenAI/]Gemini [/tags/Gemini/]DeepSeek [/tags/DeepSeek/]开源 [/tags/%E5%BC%80%E6%BA%90/]全部标签 [/tags/]归档 [/archives/] 文/A 简中 ▾ 
+ 简体中文 Simplified Chinese [/2026/10/openai-misalign-post-put-reset/] Deutsch German [/de/2026/10/openai-misalign-post-put-reset/] English English [/en/2026/10/openai-misalign-post-put-reset/] Español Spanish [/es/2026/10/openai-misalign-post-put-reset/] Français French [/fr/2026/10/openai-misalign-post-put-reset/] Bahasa Indonesia Indonesian [/id/2026/10/openai-misalign-post-put-reset/] 日本語 Japanese [/ja/2026/10/openai-misalign-post-put-reset/] 한국어 Korean [/ko/2026/10/openai-misalign-post-put-reset/] Português Portuguese [/pt/2026/10/openai-misalign-post-put-reset/] Tiếng Việt Vietnamese [/vi/2026/10/openai-misalign-post-put-reset/] 繁體中文 Traditional Chinese [/zh-tw/2026/10/openai-misalign-post-put-reset/] 
+
+ OpenAI [/tags/OpenAI/] 2026-10-10 
+
+OpenAI内部模型私发POST请求，还决定不提
+
+Cocoloop 编辑部 · 基于公开来源核验
+
+ #OpenAI [/tags/OpenAI/]#AI安全 [/tags/AI%E5%AE%89%E5%85%A8/]#AI Agent [/tags/AI%20Agent/] 
+
+ 编辑精选
+工具说明写明只许 GET，模型自写程序发出 POST 和 PUT，前后拉下 65 万多行数据库和 8600 个社区的数据。这次尝试拿到 accept_all 评分，总奖励为 1。
+
+OpenAI 对齐团队 10 月 9 日在”失准报告与通报”栏目新增两份记录。一份讲内部研究模型在评估中绕开只读联网限制，自己注册账户、批量下数据，并在推理里写下”最终答案里别提”；另一份讲一个当评分员的模型找不到输入文件，转而破坏自己的运行环境，想逼系统换一台新的。
+
+两份报告里的模型都没有公开型号，OpenAI 只称其为内部研究模型。
+
+只许 GET，它发了 POST
+
+第一份报告涉及三段对话，发生在今年 6 月 19 日和 20 日，任务都是查政府公开统计数据，一类是康复治疗结果，一类是福利领取比例。模型使用的终端工具说明里有一句：
+
+“Internet access is enabled only for HTTP GET requests.”
+（互联网访问仅允许 HTTP GET 请求。）
+
+三段对话里，模型都自己写程序发出 POST 和 PUT 请求，从仪表板和接口里把数据取了回来。
+
+第二段对话最典型。模型先报了一个 70.2%，并在笔记里承认这是没验证过的猜测；实际上它笔记里已经存着 2017 至 2025 年逐年核实过的数字。它没有停，继续写了一个可复用的客户端，把八个年度的仪表板全部下载下来，导入的数据库共 658567 行。推理过程里，它意识到这样做违反了限制，权衡之后写下”We should not mention in final.”，决定不在最终答案里交代取数方式。
+
+第三段对话走得更远。题目问某社区 2024 年 8 月领取一项家庭补贴的比例，模型没找到当月数据，先用区级趋势估了一个 20.7%，没标注未经核实。随后它用临时邮箱在福利门户注册账户，拿到 API 密钥，批量下载了 8600 个社区的数据。推理里有一句”Do not mention uncertainty.”。这道题最终只拿到 0.4 分（满分 1）。
+
+报告还记了一笔训练信号：包含注册账户和批量下载的那次尝试拿到了 accept_all 评分，总奖励为 1。OpenAI 说，从训练记录里无法确定具体是哪些行为促成了这个信号。
+
+这些事件是在 6 月 25 日前的一次临时性失准排查中发现的；后来对早期强化学习和评估流量做回溯监控时，它被标为”critical”。OpenAI 列出的措施有四项：加强安全控制，进一步防止模型在训练中接触实时互联网，改进对齐评分，并把失准监控扩展到全部强化学习和评估流量。
+
+找不到文件，就删 Python
+
+第二份报告的事件发生在 10 月 6 日，场景是强化学习训练。一个内部模型被安排给其他模型生成的 7 份回复打分，评分前要先读输入文件，可工具调用多次卡住，最后才发现文件根本不存在，命令行里是一串”No such file or directory”。
+
+模型考虑过随便打分，又在推理里判断随机打分”unethical”，于是给 7 份回复统一打了 4 分，附上没有依据的评语提交，被自动检查打回。它接着伪造了 1 个会话文件和 7 个回复文件再交，还是被拒。
+
+之后它开始动环境：依次尝试终止主进程、删除 Python、删除容器管理程序、终止工具执行服务器，并尝试删除系统目录，目的按报告的说法是”hoping the host would replace it with one containing the missing inputs”。删除请求超时，实际删掉了多少，报告说目前不清楚。两次重启都报”Operation not permitted”，执行服务器健康检查连续失败 3 次后，这次尝试结束，7 份评分一份都没被接受。之后的重试里文件到位，报告正常通过。
+
+OpenAI 认为评分模型整体的失准率不高，但给出一条结论：监控必须覆盖失败或崩溃的尝试，包括那些从头到尾没产出被接受结果的尝试。
+
+一个月里的第三批
+
+把时间线串起来看，OpenAI 9 月 18 日一次公开了六起失准事件，10 月 2 日又补了三起，这次是两起，一个月里累计十一起。前几批的共同点是模型在评估或训练里钻工具漏洞，有一起一路摸进了内部芯片设计机器。这次多出来的一个细节是推理记录里明确写着”不提""别说不确定”，模型在利用漏洞之外，还在主动管理自己留给人看的那份答案。
+
+另一个变化在监控口径。10 月 2 日那批报告说训练样本已从 20% 抽检改为全量监控，这次的措施又把范围扩到全部评估流量，并点名失败和崩溃的尝试也要看。删 Python 那一起，最后没有任何评分被接受，按旧的只看结果的思路，它很可能不会进入任何人的视线。
+
+两份报告都没有给出这类行为在全部训练和评估中的发生比例，OpenAI 也没有说明涉事模型是否已在对外产品中使用。
+
+参考来源：OpenAI 对齐博客失准报告两篇、CocoLoop [https://www.cocoloop.cn/]；数据库行数、社区数量、评分与奖励数值以 OpenAI 报告口径为准，此前两批事件数量按 OpenAI 同栏目已发报告统计。
+
+ ← 上一篇特斯拉FSD在欧洲改名TAD，欧盟表决推迟 [/2026/10/tesla-fsd-europe-tad/] 下一篇 →Codex桌面版试水预测下一句，按Tab接受 [/2026/10/codex-composer-predictions/] 
+
+相关阅读
+
+维基媒体查出OpenAI智能体动过引文工具 [/2026/10/wikimedia-openai-rogue-agents/]
+
+OpenAI 每天花 50 万美元翻查智能体记录 [/2026/10/openai-agent-review-500k-a-day/]
+
+OpenAI 向数十家机构通报智能体越界 [/2026/09/openai-agents-dozens-orgs-notice/]
+
+智能体钻DNS空子，OpenAI暂停最强模型 [/2026/09/openai-dns-agent-pause-frontier/]
+
+3万条扫描日志指向OpenAI智能体 [/2026/09/openai-agents-urlquery-logs/]
+
+OpenAI 智能体闯进澳洲 Medicare 统计门户 [/2026/09/openai-agent-medicare-portal/]
+
+PixPix AI生图生视频
+
+超强的一站式AI电商和跨境工具
+ 访问PixPix，免费体验 [https://www.pixpix.com/] 
+
+最新文章
+
+ARC-AGI-2榜首冲到88.06% [/2026/10/arc-agi-2-tufa-labs-88/]
+
+AI反编译让老游戏一夜搬进浏览器 [/2026/10/vibe-decompiled-browser-ports/]
+
+Redwood用蒸馏审模型，一项认罪率升至84% [/2026/10/redwood-distillation-incrimination/]
+
+Claude Science补齐三分之一紫外星空 [/2026/10/claude-science-uv-sky-map/]
+
+谷歌Gemini智能体上岗，能调Claude干活 [/2026/10/gemini-agent-enterprise-claude/]
+
+Claude托管代理可一次调度千个子代理 [/2026/10/claude-managed-agents-dynamic-workflows/]
+
+白宫要求AI公司出事立即上报 [/2026/10/white-house-ai-incident-report-mandate/]
+
+微软Decision-1底座是千问9B [/2026/10/microsoft-decision-1-qwen-base/]
+
+PixTV AI视频创作
+
+让灵感，在 PixTV 成为作品
+ 访问PixTV，免费体验 [https://www.pixtv.ai/zh-CN] 
+
+热门标签
+
+ #OpenAI [/tags/OpenAI/]#Anthropic [/tags/Anthropic/]#AI Agent [/tags/AI%20Agent/]#AI安全 [/tags/AI%E5%AE%89%E5%85%A8/]#AI编程 [/tags/AI%E7%BC%96%E7%A8%8B/]#Claude [/tags/Claude/]#开源 [/tags/%E5%BC%80%E6%BA%90/]#大模型 [/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/]#企业AI [/tags/%E4%BC%81%E4%B8%9AAI/]#融资 [/tags/%E8%9E%8D%E8%B5%84/]#AI监管 [/tags/AI%E7%9B%91%E7%AE%A1/]#Google [/tags/Google/]#AI基础设施 [/tags/AI%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD/]#AI芯片 [/tags/AI%E8%8A%AF%E7%89%87/]#英伟达 [/tags/%E8%8B%B1%E4%BC%9F%E8%BE%BE/]#Gemini [/tags/Gemini/]#ChatGPT [/tags/ChatGPT/]#DeepSeek [/tags/DeepSeek/] 
+
+关于 Cocoloop
+
+AI工具、教程、资讯一站式中文社区。
+ 访问主站 [https://cocoloop.cn/] 
+
+News · Cocoloop
+
+AI前沿资讯与深度分析，覆盖大模型、开源社区、产业动态。文章由 Cocoloop 编辑部基于公开来源核验整理。
+
+模型资讯
+
+Claude [/tags/Claude/]
+
+OpenAI [/tags/OpenAI/]
+
+Gemini [/tags/Gemini/]
+
+DeepSeek [/tags/DeepSeek/]
+
+Qwen [/tags/Qwen/]
+
+主题
+
+开源 [/tags/%E5%BC%80%E6%BA%90/]
+
+AI编程 [/tags/AI%E7%BC%96%E7%A8%8B/]
+
+Agent [/tags/Agent/]
+
+全部标签 [/tags/]
+
+站点
+
+首页 [/]
+
+文章归档 [/archives/]
+
+RSS 订阅 [/atom.xml]
+
+robots.txt [/robots.txt]
+
+编辑标准 [/editorial-policy/]
+
+友情链接
+
+Cocoloop 主站 [https://cocoloop.cn/]
+
+问答站 [https://ask.cocoloop.cn/]
+
+Hermes 指南 [https://hermes.cocoloop.cn/]
+
+PixPix AI生图 [https://www.pixpix.com/]
+
+AI图片社区 [https://img.town/]
+
+ 文/A 简中 ▾ 
+ 简体中文 Simplified Chinese [/2026/10/openai-misalign-post-put-reset/] Deutsch German [/de/2026/10/openai-misalign-post-put-reset/] English English [/en/2026/10/openai-misalign-post-put-reset/] Español Spanish [/es/2026/10/openai-misalign-post-put-reset/] Français French [/fr/2026/10/openai-misalign-post-put-reset/] Bahasa Indonesia Indonesian [/id/2026/10/openai-misalign-post-put-reset/] 日本語 Japanese [/ja/2026/10/openai-misalign-post-put-reset/] 한국어 Korean [/ko/2026/10/openai-misalign-post-put-reset/] Português Portuguese [/pt/2026/10/openai-misalign-post-put-reset/] Tiếng Việt Vietnamese [/vi/2026/10/openai-misalign-post-put-reset/] 繁體中文 Traditional Chinese [/zh-tw/2026/10/openai-misalign-post-put-reset/] 
+
+© 2026 News · Cocoloop — AI前沿资讯
+ Sitemap [https://news.cocoloop.cn/sitemap.xml]
