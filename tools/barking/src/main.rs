@@ -3,6 +3,7 @@ mod lint;
 mod offsite;
 mod publish;
 mod repo;
+mod scan;
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -17,6 +18,7 @@ const USAGE: &str = "\
   barking card <期次目录> [文件名...]       按 images/cards.toml 渲染省流卡、速览聚合图与批注截图（见 templates/cards/）
   barking publish-check <期次目录>          发布后检查七步：lint、标记行、oxipng、offsite 清单、大文件、身份、凭据（docs/workflow/publish.md）
   barking stage <期次目录> [--batch 1|2|3] [--add]  按提交约定分三批列出待提交文件与建议提交信息；--add 暂存该批（不 commit）
+  barking scan-rows <期次目录> [--dry-run]  发布后补 README 期次索引与 daily-scan 的速览已收/已发过行；只在 Develata 说“已发布”后运行
 
 退出码：0 无错误；1 有错误；2 用法错误";
 
@@ -28,6 +30,7 @@ fn main() -> ExitCode {
         Some((cmd, rest)) if cmd == "card" => card::run(rest),
         Some((cmd, rest)) if cmd == "publish-check" => publish::run_check(rest),
         Some((cmd, rest)) if cmd == "stage" => publish::run_stage(rest),
+        Some((cmd, rest)) if cmd == "scan-rows" => scan::run(rest),
         _ => {
             eprintln!("{USAGE}");
             ExitCode::from(2)
