@@ -7,6 +7,7 @@ mod publish;
 mod repo;
 mod scan;
 mod shot;
+mod review;
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -26,6 +27,7 @@ const USAGE: &str = "\
   barking shot <期次目录> <组前缀> <动作>   网页或 PDF 渲染截图，按锚点或像素框裁切、拼接（render|pdf|lines|crop|cropbox|stack；不带动作看用法）
   barking html2txt <in> <out> [--force]     把保存的网页转成纯文本：去 script/style，保留链接目标
   barking heat <期次目录> <组前缀> [选项]   取 HN / Reddit 热度存入 sources/<组前缀>-heat.json（--hn --reddit --item --since）
+  barking review <期次目录> --visual|--reverse [--effort 档位] [--run]  拼出跨模型复核（WSL Codex）的提示词与命令；--run 同步执行
 
 退出码：0 无错误；1 有错误；2 用法错误";
 
@@ -41,6 +43,7 @@ fn main() -> ExitCode {
         Some((cmd, rest)) if cmd == "handoff" => handoff::run(rest),
         Some((cmd, rest)) if cmd == "shot" => shot::run(rest),
         Some((cmd, _)) if cmd == "html2txt" || cmd == "heat" => fetch::run(&args),
+        Some((cmd, rest)) if cmd == "review" => review::run(rest),
         _ => {
             eprintln!("{USAGE}");
             ExitCode::from(2)
