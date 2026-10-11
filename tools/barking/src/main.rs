@@ -1,6 +1,7 @@
 mod card;
 mod lint;
 mod offsite;
+mod publish;
 mod repo;
 
 use std::io;
@@ -14,6 +15,8 @@ const USAGE: &str = "\
   barking lint [期次目录...]                定稿前机械检查；不给目录则检查 docs/<YYMM>/<MMDD> 下全部期次（如 docs/2609/0925）
   barking offsite <期次目录>... [--upload]  把不入库的原件记入 sources/offsite.tsv；--upload 同时上传 OpenList
   barking card <期次目录> [文件名...]       按 images/cards.toml 渲染省流卡、速览聚合图与批注截图（见 templates/cards/）
+  barking publish-check <期次目录>          发布后检查七步：lint、标记行、oxipng、offsite 清单、大文件、身份、凭据（docs/workflow/publish.md）
+  barking stage <期次目录> [--batch 1|2|3] [--add]  按提交约定分三批列出待提交文件与建议提交信息；--add 暂存该批（不 commit）
 
 退出码：0 无错误；1 有错误；2 用法错误";
 
@@ -23,6 +26,8 @@ fn main() -> ExitCode {
         Some((cmd, rest)) if cmd == "lint" => run_lint(rest),
         Some((cmd, rest)) if cmd == "offsite" => offsite::run(rest),
         Some((cmd, rest)) if cmd == "card" => card::run(rest),
+        Some((cmd, rest)) if cmd == "publish-check" => publish::run_check(rest),
+        Some((cmd, rest)) if cmd == "stage" => publish::run_stage(rest),
         _ => {
             eprintln!("{USAGE}");
             ExitCode::from(2)
