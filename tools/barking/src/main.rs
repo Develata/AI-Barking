@@ -1,5 +1,6 @@
 mod card;
 mod handoff;
+mod fetch;
 mod lint;
 mod offsite;
 mod publish;
@@ -23,6 +24,8 @@ const USAGE: &str = "\
   barking scan-rows <期次目录> [--dry-run]  发布后补 README 期次索引与 daily-scan 的速览已收/已发过行；只在 Develata 说“已发布”后运行
   barking handoff <期次目录> --groups \"A=主题,B=速览\" [--note 要点]... [--force] | --index  生成取证派工单（.handoff/）并重写其索引
   barking shot <期次目录> <组前缀> <动作>   网页或 PDF 渲染截图，按锚点或像素框裁切、拼接（render|pdf|lines|crop|cropbox|stack；不带动作看用法）
+  barking html2txt <in> <out> [--force]     把保存的网页转成纯文本：去 script/style，保留链接目标
+  barking heat <期次目录> <组前缀> [选项]   取 HN / Reddit 热度存入 sources/<组前缀>-heat.json（--hn --reddit --item --since）
 
 退出码：0 无错误；1 有错误；2 用法错误";
 
@@ -37,6 +40,7 @@ fn main() -> ExitCode {
         Some((cmd, rest)) if cmd == "scan-rows" => scan::run(rest),
         Some((cmd, rest)) if cmd == "handoff" => handoff::run(rest),
         Some((cmd, rest)) if cmd == "shot" => shot::run(rest),
+        Some((cmd, _)) if cmd == "html2txt" || cmd == "heat" => fetch::run(&args),
         _ => {
             eprintln!("{USAGE}");
             ExitCode::from(2)
