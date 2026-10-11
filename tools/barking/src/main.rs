@@ -5,6 +5,7 @@ mod offsite;
 mod publish;
 mod repo;
 mod scan;
+mod shot;
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -21,6 +22,7 @@ const USAGE: &str = "\
   barking stage <期次目录> [--batch 1|2|3] [--add]  按提交约定分三批列出待提交文件与建议提交信息；--add 暂存该批（不 commit）
   barking scan-rows <期次目录> [--dry-run]  发布后补 README 期次索引与 daily-scan 的速览已收/已发过行；只在 Develata 说“已发布”后运行
   barking handoff <期次目录> --groups \"A=主题,B=速览\" [--note 要点]... [--force] | --index  生成取证派工单（.handoff/）并重写其索引
+  barking shot <期次目录> <组前缀> <动作>   网页或 PDF 渲染截图，按锚点或像素框裁切、拼接（render|pdf|lines|crop|cropbox|stack；不带动作看用法）
 
 退出码：0 无错误；1 有错误；2 用法错误";
 
@@ -34,6 +36,7 @@ fn main() -> ExitCode {
         Some((cmd, rest)) if cmd == "stage" => publish::run_stage(rest),
         Some((cmd, rest)) if cmd == "scan-rows" => scan::run(rest),
         Some((cmd, rest)) if cmd == "handoff" => handoff::run(rest),
+        Some((cmd, rest)) if cmd == "shot" => shot::run(rest),
         _ => {
             eprintln!("{USAGE}");
             ExitCode::from(2)
