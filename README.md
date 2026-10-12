@@ -29,6 +29,7 @@ AI 吠点是由 **[Develata](https://github.com/Develata)** 主理的独立内�
 | 2026 / 1008 | [OpenAI撤稿？骂Claude封号？](docs/2610/1008/doc_1008_publish.txt) | [配图说明](docs/2610/1008/images/README.md) | [来源入口](docs/2610/1008/sources/README.md) |
 | 2026 / 1009 | [Claude编命案线索？谷歌买员工邮件？](docs/2610/1009/doc_1009_publish.txt) | [配图说明](docs/2610/1009/images/README.md) | [来源入口](docs/2610/1009/sources/README.md) |
 | 2026 / 1010 | [AI砸环境求重开？AI把余额发公司群？](docs/2610/1010/doc_1010_publish.txt) | [配图说明](docs/2610/1010/images/README.md) | [来源入口](docs/2610/1010/sources/README.md) |
+| 2026 / 1012 | [只有5000人见过真AI？AI造PS？](docs/2610/1012/doc_1012_publish.txt) | [配图说明](docs/2610/1012/images/README.md) | [来源入口](docs/2610/1012/sources/README.md) |
 
 正文采用可直接复制的纯文本，图片单独保存。阅读或发布时不需要依赖 Markdown 插图。
 
