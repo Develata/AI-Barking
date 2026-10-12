@@ -9,7 +9,7 @@
 `{OUT}` 为草稿目录下的新子目录（如 `cover-1/`、`cover-2/`），候选图不放进仓库。
 
 ```bash
-codex exec -m gpt-6-astra -c 'model_reasoning_effort="medium"' -s danger-full-access --skip-git-repo-check --ephemeral -C "E:/gitclone/AI-Barking" -i "E:/gitclone/AI-Barking/common_images/profile_picture.png" -o "{OUT}/report.md" - < "{OUT}/prompt.md"
+codex exec -m gpt-6-astra -c 'model_reasoning_effort="medium"' -s danger-full-access --skip-git-repo-check --ephemeral -C "E:/gitclone/AI-Barking" -i "E:/gitclone/AI-Barking/common_images/mascot-reference.png" -o "{OUT}/report.md" - < "{OUT}/prompt.md"
 ```
 
 在后台运行，约 3 分钟。`image_generation` 是 Codex CLI 的内置功能（0.156 起为 stable，默认开启）。
@@ -18,7 +18,7 @@ codex exec -m gpt-6-astra -c 'model_reasoning_effort="medium"' -s danger-full-ac
 
 ---
 
-你是图像生成执行者。用你的图像生成能力生成两张封面图，附带的参考图是账号看板娘头像（务必保持其外观一致：蓝色长发、狗耳、鲸鱼尾巴、女仆装、白色肉垫手套、胸前“AI 吠点”圆牌）。
+你是图像生成执行者。用你的图像生成能力生成两张封面图，附带的参考图是账号看板娘的全身设定图（务必保持其外观一致：蓝色长发、狗耳、鲸鱼尾巴、女仆装、胸前“AI 吠点”圆牌；双手是正常的人手，不戴肉垫手套）。
 
 输出：
 - `{OUT}/00-cover.png`（竖版 3:4）与 `{OUT}/00-cover-wide.png`（横版 2.35:1，不支持则取最接近的横版比例并说明）。
