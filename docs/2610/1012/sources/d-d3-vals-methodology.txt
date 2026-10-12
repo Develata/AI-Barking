@@ -1,0 +1,227 @@
+AI Evaluation Methodology | Vals AI
+
+ [/home] 
+
+Benchmarks
+
+ [/benchmarks]
+
+Models
+
+ [/models/anthropic_claude-haiku-5-5]
+
+Comparison
+
+ [/comparison]
+
+Vals Smith
+
+ [/vals-smith]
+
+App Reports
+
+ [/application-reports/alexi]
+
+Government
+
+ [/gov]
+
+News
+
+ [/news]
+
+Blog
+
+ [/blogs]
+
+About
+
+ [/about]
+
+ [/home] 
+
+Benchmarks
+
+ [/benchmarks]
+
+Models
+
+ [/models/anthropic_claude-haiku-5-5]
+
+Comparison
+
+ [/comparison]
+
+Vals Smith
+
+ [/vals-smith]
+
+App Reports
+
+ [/application-reports/alexi]
+
+Government
+
+ [/gov]
+
+News
+
+ [/news]
+
+Blog
+
+ [/blogs]
+
+About
+
+ [/about]
+
+About [/about]Methodology [/methodology]
+
+Methodology
+
+Our benchmarks measure the capability and reliability of
+ AI models and agents in realistic tasks. In contrast
+ with contrived exam-style benchmarks, we focus on
+ economically valuable and scientifically important
+ domains—finance, healthcare, math, coding, and more.
+ Developed in collaboration with domain experts, our
+ datasets are carefully curated to be of extremely high
+ quality and push models to their limits.
+
+Task Design
+
+Our benchmarks reflect the complexity of real-world tasks, which necessitates evaluating multiple types of capabilities:
+
+Tool-Use: How well can models call the right tools to solve problems?
+
+Multiple Modalities: How well can models handle images, tabular data, files, and other modalities beyond text?
+
+Reasoning: Models are increasingly trained to output reasoning before answering; do these capabilities actually improve real-world utility?
+
+Long-Context Capabilities: Can models reason over long contexts, such as extensive legal documents or large codebases?
+
+Long-Horizon Tasks: Can models autonomously work on tasks that take minutes, hours, or longer?
+
+Agentic Work: Can models drive a coding agent, a terminal, or a browser end-to-end in a real environment, from software engineering and code migration to computer-use tasks?
+
+Public and Private Sets
+
+A major problem with evaluations of AI models is test-set leakage 1 [#references]. Benchmark data can contaminate training sets either directly or through synthetic data 2 [#references], undermining the validity of reported results.
+Thus, our proprietary benchmarks are evaluated on private data. For transparency and fairness, most of them come with:
+
+Public Validation Set: A completely open dataset, to provide transparency in the types of samples we use for evaluation.
+
+Private Validation Set: A larger, privately held dataset, which we license to companies for their own internal validation. We provide statistical evidence that it is correlated with our test set.
+
+Test Set: This dataset remains private at all times, and is the only dataset used for the proprietary benchmark results we publish. It is private to prevent leakage into the training data of foundation models.
+
+We also run selected public benchmarks (for example, Terminal-Bench, SWE-bench, and IOI). For these, we run every model ourselves under the same harness and settings, so results are comparable across models even though the tasks are open.
+
+Metrics and Evaluation
+
+Benchmarks often report only accuracy numbers; however, it is important to consider factors such as efficiency, cost, time taken per test, failure modes, and more.
+Our evaluation framework provides detailed insights into model performance through multiple metrics:
+
+Accuracy: Evaluates the correctness of model outputs for each task and benchmark. This includes strict accuracy checks, as well as rubric-based LLM-as-a-judge accuracy metrics.
+
+Latency: Measures the time a model takes to return a complete response, or, for agentic benchmarks, the wall-clock time to complete a task.
+
+Cost: Analyzes the operational cost of running each model from an API provider.
+
+Additional quantitative and qualitative insights: For each benchmark, we also provide further information, including but not limited to statistics regarding tool-use, qualitative insights about the nature of the errors, and comparisons between different models. This provides information beyond the raw benchmark numbers, and also helps contextualize the performance of models.
+
+This information enables us to offer a more comprehensive, holistic view of model performance, including accuracy, reliability, efficiency, and qualitative insights.
+
+Error Bars
+
+We report standard errors alongside benchmark scores to reflect statistical uncertainty.
+Our methodology depends on how the benchmark is structured:
+
+Single-run benchmarks
+
+For benchmarks evaluated once, we follow standard uncertainty reporting practice, as suggested by “Adding Error Bars to Evals:
+A Statistical Approach to Language Model Evaluations” by Evan Miller 3 [#references]. Error bars are computed as the standard error of the mean (SEM) over instance-level scores.
+
+In particular, let x1,…,xnx_1, \dots, x_nx1​,…,xn​ be instance-level scores. Standard error of the mean (SEM), using sample standard deviation is given by:
+
+SE=1n−1∑i=1n(xi−xˉ)2n\mathrm{SE} =
+\frac{
+\sqrt{\frac{1}{n-1} \sum_{i=1}^{n} (x_i - \bar{x})^2}
+}{
+\sqrt{n}
+}SE=n​n−11​∑i=1n​(xi​−xˉ)2​​
+
+where xˉ=1n∑i=1nxi\bar{x} = \frac{1}{n} \sum_{i=1}^{n} x_ixˉ=n1​∑i=1n​xi​ is the mean.
+
+These error bars capture measurement uncertainty in the benchmark itself. They do not reflect variability across prompts, seeds, deployment settings, or the stochastic nature of LLM generation.
+
+Multiple-run benchmarks (Terminal-Bench, Finance Agent v2, BioMysteryBench)
+
+When a benchmark includes multiple independent runs of each model (currently three), we compute the SEM over the per-run scores, estimating uncertainty over runs rather than over individual instances.
+
+Let a1,…,aRa_1, \dots, a_Ra1​,…,aR​ be the average score from each of RRR independent runs and the average score be aˉ=1R∑r=1Rar\bar{a} = \frac{1}{R} \sum_{r=1}^{R} a_raˉ=R1​∑r=1R​ar​.
+
+Standard error over runs is then given by:
+
+SEruns=σR=1R−1∑r=1R(ar−aˉ)2R\mathrm{SE}_{\text{runs}} = \frac{\sigma}{\sqrt{R}} =
+\frac{
+\sqrt{\frac{1}{R-1} \sum_{r=1}^{R} (a_r - \bar{a})^2}
+}{
+\sqrt{R}
+}SEruns​=R​σ​=R​R−11​∑r=1R​(ar​−aˉ)2​​
+
+Composite benchmarks
+
+For benchmarks that combine multiple tasks, we propagate uncertainty from each component using weighted variance pooling.
+
+Let component standard errors be SE1,…,SEK\mathrm{SE}_1, \dots, \mathrm{SE}_KSE1​,…,SEK​ and weights w1,…,wKw_1, \dots, w_Kw1​,…,wK​.
+
+The propagated standard error is then:
+
+SEoverall=∑k=1Kwk2 SEk2∑k=1Kwk\mathrm{SE}_{\text{overall}} =
+\frac{
+\sqrt{\sum_{k=1}^{K} w_k^2 \, \mathrm{SE}_k^2}
+}{
+\sum_{k=1}^{K} w_k
+}SEoverall​=∑k=1K​wk​∑k=1K​wk2​SEk2​​​
+
+In all cases, we use standard statistical definitions of the standard error of the mean, with sample standard deviation where applicable.
+
+Evaluating models, agents, and products
+
+LLMs are increasingly used inside agentic systems, and as part of larger workflows or products, so we evaluate at each of these levels:
+
+Models: Models are called through a fixed harness that we control, so that differences in scores reflect the model rather than the scaffold.
+
+Agents and scaffolds: Many of our benchmarks run models inside coding and terminal agents, including a model’s own native agent where one exists (for example, Claude Code or Codex), as well as custom scaffolds provided by the teams we work with.
+
+Products: We evaluate end-user applications built on top of models, such as legal research and drafting tools, against the same private task sets and rubrics.
+
+These benchmarks exercise tool-calling, multi-turn flows, coding, and computer-use in real environments, measuring how AI systems perform when they have to function autonomously as part of a larger system.
+
+References
+
+https://arxiv.org/abs/2410.08385 [https://arxiv.org/abs/2410.08385]
+
+https://arxiv.org/abs/2407.07565 [https://arxiv.org/abs/2407.07565]
+
+https://arxiv.org/abs/2411.00640 [https://arxiv.org/abs/2411.00640]
+
+ Methodology 
+ Task Design [#task-design] Public and Private Sets [#public-and-private-sets] Metrics and Evaluation [#metrics-and-evaluation] Error Bars [#error-bars] Evaluating models, agents, and products [#evaluating-models-agents-and-products] 
+
+ [/home] 
+
+ Benchmarks [/benchmarks] Models [/models/anthropic_claude-haiku-5-5] Comparison [/comparison] Vals Smith [/vals-smith] App Reports [/application-reports/alexi] 
+
+ About [/about] Methodology [/methodology] News [/news] Blogs [/blogs] Government [/gov] 
+
+ Security [/vulnerability-disclosure-program] Careers [https://jobs.ashbyhq.com/vals-ai] 
+
+Copyright © 2026 Vals AI. All rights reserved.
+
+X (Twitter)
+ [https://x.com/ValsAI] 
+LinkedIn
+ [https://www.linkedin.com/company/vals-ai/posts/?feedView=all]

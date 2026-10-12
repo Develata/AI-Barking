@@ -1,0 +1,194 @@
+Skip to content
+Navigation Menu
+Sign in
+storytold
+photocraft
+Repository navigation
+Code
+Issues
+772
+ (772)
+Pull requests
+486
+ (486)
+Actions
+Projects
+More
+items
+Open HEIC/HEIF photos (#355)
+- #372
+#372
+Merged
+echelon
+merged 6 commits into
+storytold:main
+from
+ljkx:heic-support
+Conversation4
+ (4)
+Commits6
+ (6)
+Checks11
+ (11)
+Files changed43
+ (43)
+Conversation
+ljkx
+commented
+Contributor
+
+Fixes #355.
+
+HEIC is what every iPhone (and a Mac screenshot or export) saves by default, and PhotoCraft had no HEIF code at all: .heic files didn't appear in File › Open's "All Formats" filter, and opening one anyway failed with "unrecognized image format". Photoshop opens them.
+
+What changed
+photocraft-codecs: new Format::Heif (.heic / .heif / .hif, image/heif), decoded by heic-rs. It is pure Rust, #![forbid(unsafe_code)], MIT OR Apache-2.0, needs no C toolchain, and builds for wasm. That means it works on the web build too, not only behind a C feature as docs/architecture.md had planned for libheif.
+It handles single pictures and grid-tiled photos (how every iPhone photo is stored). Tiles decode in parallel on native and on one thread on wasm.
+8-bit → U8; 10/12-bit → U16, so depth is kept. Auxiliary alpha → RGBA.
+Keeps the ICC profile (colr/prof, e.g. Display P3), EXIF and XMP. Pixels stay in the file's own colour space; PhotoCraft colour-manages them through the ICC, rather than clipping them to sRGB.
+Orientation: the container's irot/imir/clap are applied and EXIF Orientation is rewritten to 1. HEIF's EXIF tag only repeats the container's, so applying both would rotate the photo twice. keep_orientation returns the coded pixels and the original EXIF.
+Limits are checked against the container's declared size before any pixel is decoded, and passed down as max_pixels.
+Read-only, listed in ASYMMETRIC_EXCEPTIONS: writing needs an HEVC encoder, and the mature ones (x265, libheif) are C. Saving still works through every other format.
+Detection uses the ftyp brands (heic, heix, heim, heis, mif1, miaf, …). AVIF still wins when a file carries both mif1 and avif. Sequence-only files (msf1/hevc) are recognised, so opening one says "image sequence, not supported" instead of "unrecognized format".
+File › Open (desktop and web) and the batch-folder list now include heic, heif and hif. The CLI already follows caps().read.
+Docs: codecs README capability matrix and limitations, the book's raster-formats page, the README formats blurb, and docs/architecture.md (HEIF no longer needs a C dependency).
+Testing
+crates/codecs/tests/heif.rs (11 tests): output matches Apple's own decode (macOS sips) within 3/255 for a single picture and a 2×2 grid. Also covered: RGB channel order, irot applied once (patched in memory), EXIF/XMP kept, EXIF Orientation not applied on top of the container's, limits checked before decoding, a clear error for image sequences, and every truncation length of three files errors without panicking. A 10-bit RGBA file decodes to U16 RGBA with real depth (not 8 bits stretched), alpha within 0.002 of the 16-bit source it was encoded from, and colour within the encoder's loss. Locally, the 16-bit output also matches heif-oxide to half a 10-bit step on average.
+HEIF is added to malformed.rs's fixture set (truncations, bit flips, header overwrites, proptest mutations) and to the proptest magic and format lists.
+crates/io/tests/heif.rs (5 tests): a HEIC opens through photocraft_io::import as an 8-bit RGB document, and a 10-bit one with alpha as a 16-bit document with an unlocked layer. Its EXIF/XMP reach the document and exports to JPEG upright (Orientation 1). A HEIC export fails cleanly, and truncated files are errors.
+All pass: cargo test --locked -p photocraft-codecs -p photocraft-io -p photocraft-engine -p photocraft-cli (1,320 tests), cargo clippy --workspace --all-targets --locked -- -D warnings, cargo fmt --check, cargo xtask layers, cargo xtask wasm, cargo xtask scorecard --check and cargo xtask corpus --all && cargo xtask test-corpus.
+Cargo.lock only gains the heic-rs entry. The fuzz target decode_any reaches HEIF through detect.
+
+Also swept 109 files locally through photocraft_io::import, most of which can't be committed (not redistributable): the Nokia HEIF conformance suite, pillow-heif's test images, libheif's example, heic-rs's fixtures, and real iPhone photos, including a 12 MP 4032×3024 grid photo with a Display P3 profile, which opens in about 160 ms in release. 88 open. As a cross-check I used a second, independent pure-Rust decoder (heif-oxide): on every file both can decode, the two agree to a mean difference under 0.5/255. Of the 21 files that don't open here, it opens just one (a multilayer conformance file). All 21 are clean errors, never a panic:
+
+image sequences (video tracks, no still image)
+overlay/identity-derived items
+multilayer/3D HEVC
+Canon's 10-bit 4:2:2 .hif and one 4:4:4 file. These two are heic-rs limitations ("picture is not fully covered by slices"), to report upstream.
+Notes for review
+
+No UI screenshots: the only UI change is three more extensions in the File › Open filter.
+
+Committed fixtures. ATTRIBUTION.md said no test fixtures are committed, but there is no other oracle for HEIF in Rust. I added 9 tiny files (about 100 KB), all synthetic, with licence files beside them and a new ATTRIBUTION section: 7 from heic-rs (MIT OR Apache-2.0, encoded and decoded by Apple's sips) and 2 from pillow-heif (BSD-3-Clause, a 10-bit RGBA HEIF and its 16-bit source PNG). If you'd rather keep them in photocraft-corpus behind the corpus feature, I'm happy to move them.
+
+Not in this PR:
+
+Files that describe their colours only with nclx primaries (e.g. P3 or BT.2020 without an ICC profile) open untagged, so they are treated as sRGB. Fixing that means synthesising a profile in io from the nclx, as is already done for EXR.
+Grayscale HEIF decodes to RGB.
+HDR gain maps are ignored, so you get the SDR base image, as most viewers show.
+
+🤖 Generated with Claude Code
+
+👍
+1
+ coygeek mentioned this pull request 
+fix(docs): README, architecture and the book overstate format support and give outdated decode limits #520
+Closed
+bflatastic
+commented
+Member
+
+Thanks @ljkx! Opening HEIC photos is a much-wanted feature (#355), and the integration is clean: limits are checked before decoding, orientation is handled once, malformed-input tests are extended, and I verified the fixtures are byte-identical to their upstream sources. Two things need the maintainers' decision before this can land, so I'll flag them:
+
+Decoder maturity: heic-rs 0.1.1 is forbid(unsafe_code) with a verified checksum, which is good. But it's a very young single-author crate with no fuzzing yet (its own SECURITY.md says so) and open decoding bugs, on a path that reads untrusted files. Panics are caught on the job path, but hangs are not.
+Fixtures: this would be the first binary test files committed under crates/. Our policy is that real-file oracles live in photocraft-corpus behind the corpus feature.
+
+If they approve, please:
+
+pin heic-rs = "=0.1.1" in crates/codecs/Cargo.toml;
+add a decode_heif fuzz target under crates/codecs/fuzz/, run it for a few hours and post the results;
+move the fixtures to photocraft-corpus, unless the owners sign off on committing them.
+echelon
+commented
+Member
+
+Thank you @ljkx for this very thorough HEIC/HEIF work: the pure-Rust, wasm-friendly approach, the cross-checks against Apple's own decode and a second decoder, the truncation and malformed-file coverage, and the honest list of what doesn't open yet are all excellent. Because it adds a new decoder dependency (and the format brings some licensing questions of its own), the maintainers are reviewing it before it can land. We'll follow up here. If you haven't joined yet, come say hi on Discord: https://discord.gg/artcraft
+
+ljkx
+commented
+Contributor
+Author
+
+Thanks @bflatastic and @echelon. While the maintainers decide, I've done the technical items so the decision has data behind it:
+
+Pinned: heic-rs = "=0.1.1" (327e3ab).
+Fuzz target: crates/codecs/fuzz/fuzz_targets/decode_heif.rs, added to the CI fuzz matrix. It covers both orientation paths and is meant to run with -timeout=10 so hangs get reported.
+Fuzz results: about 400k executions over roughly 3.5 hours with 6–12 workers, seeded with every HEIC I have (Nokia conformance, pillow-heif, iPhone photos, the fixtures). Inputs were capped at 64 KB.
+0 hangs, 0 out-of-memory, every input bounded by Limits.
+2 distinct panics in heic-rs 0.1.1, both out-of-range slices on malformed files:
+in the box parser, boxes.rs:130 ("slice index starts at 24 but ends at 16"), reachable from a 72-byte file, even through the metadata-only probe;
+in HEVC reconstruction, hevc/decode/recon.rs:70 (a block starting past the plane's edge).
+Fix here (b423a8e): the HEIF codec runs the decoder under catch_unwind and reports a panic as CodecError::Malformed, the same pattern gpu/health.rs uses around wgpu. The job path already caught panics; the synchronous paths (jobs off, the CLI) didn't. The 72-byte input is an inlined regression test, which fails without the guard. The fuzz target also calls heic-rs directly, so its panics stay visible to the fuzzer.
+
+So your maturity concern was well founded: real bugs, but all contained now. Both should go upstream to heic-rs, and I'm happy to file them with the inputs. On the fixtures: I'll move them to photocraft-corpus behind the corpus feature unless the owners prefer to keep them committed. Just say which.
+
+The FreeBSD failure is the known GPU-test segfault on main (drag_preview_canvas), which #576 addresses. All other checks pass.
+
+ljkx and others added 6 commits 
+Open HEIC/HEIF photos (storytold#355) …
+a098d9d
+HEIF: pin heic-rs exactly and add a decode_heif fuzz target …
+fdd49e5
+HEIF: a heic-rs panic is a malformed-file error, not a crash …
+41127a7
+HEIF: move the decoder into an optional photocraft-heif crate …
+47d588b
+Build CI and official binaries with HEIC support (--features heif) …
+94c3d31
+Docs: HEIC open is an optional build feature, on in official builds …
+ec3fb39
+echelon force-pushed the heic-support branch from b423a8e to ec3fb39 
+Compare
+echelon merged commit 47f9306 into storytold:main 
+echelon
+commented
+Member
+
+Merged, thank you @ljkx! This is excellent work: a pure-Rust HEIC decoder with the container transforms, 10-bit, alpha and metadata handled carefully, plus fuzzing that found and contained two heic-rs panics.
+
+The one change we made is structural. Your decoder landed nearly verbatim as its own optional crate, photocraft-heif, behind a heif build feature, so anyone building PhotoCraft can choose whether to ship HEVC decoding. All official builds and CI turn it on, so iPhone photos open out of the box. Without it, a HEIC file gives a clear "not included in this build" error. The test files are now fetched from heic-rs and pillow-heif at pinned commits instead of being committed, and your tests run against them unchanged. If you're not already there, come say hi in our Discord: https://discord.gg/artcraft
+
+This was referenced 
+Format Request: HEIC #632
+Closed
+Preset store: a missing store folder no longer warns about actions.json (Windows test failures on main) #863
+ Closed
+This was referenced 
+HEIC/HEIF support #1191
+Open
+[Feature request] - iPhone HEIC/HEIF support, Pixelmator support #1225
+Open
+[Feature request]: Adobe AE project (AEP) support, HEIC/HEIF support, Pixelmator support storytold/artcraft#1998
+Open
+ davidmann4 mentioned this pull request 
+Ticket to close tickets: already done, duplicates, or expected behaviour #2993
+Open
+Sign up for free to join this conversation on GitHub. Already have an account? Sign in to comment
+Reviewers
+No reviews
+Assignees
+No one assigned
+Labels
+None yet
+Projects
+None yet
+Milestone
+No milestone
+Development
+
+Successfully merging this pull request may close these issues.
+
+ HEIC Support missing
+3 participants
+Footer
+© 2026 GitHub, Inc.
+Footer navigation
+Terms
+Privacy
+Security
+Status
+Community
+Docs
+Contact
+Manage cookies
+Do not share my personal information

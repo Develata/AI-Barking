@@ -1,0 +1,898 @@
+Cloudflare/clef-omni · Hugging Face
+
+ Hugging Face [/] 
+
+ Models [/models]
+
+ Datasets [/datasets]
+
+ Spaces [/spaces]
+
+ Buckets new [/storage]
+
+ Docs [/docs]
+
+ Enterprise [/enterprise]
+
+Pricing [/pricing]
+
+Website
+
+ Tasks [/tasks] 
+
+ HuggingChat [/chat] 
+
+ Collections [/collections] 
+
+ Languages [/languages] 
+
+ Organizations [/organizations] 
+
+Community
+
+ Blog [/blog] 
+
+ Posts [/posts] 
+
+ Daily Papers [/papers] 
+
+ Hardware [/hardware] 
+
+ Learn [/learn] 
+
+ Discord [/join/discord] 
+
+ Forum [https://discuss.huggingface.co/] 
+
+ GitHub [https://github.com/huggingface] 
+
+Solutions
+
+ Team & Enterprise [/enterprise] 
+
+ Hugging Face PRO [/pro] 
+
+ Enterprise Support [/support] 
+
+ Inference Providers [/inference/models] 
+
+ Inference Endpoints [/inference-endpoints] 
+
+ Storage Buckets [/storage] 
+
+Log In [/login]
+
+Sign Up [/join]
+
+","pad_token":"<|endoftext|>","unk_token":null},"chat_template_jinja":"{%- if tools %}\n {{- '<|im_start|>system\\n' }}\n {%- if messages[0].role == 'system' %}\n {%- if messages[0].content is string %}\n {{- messages[0].content }}\n {%- else %}\n {%- for content in messages[0].content %}\n {%- if content.type == 'image' or 'image' in content or 'image_url' in content %}\n {{- \"<|vision_start|><|image_pad|><|vision_end|>\" }}\n {%- elif content.type == 'audio' or 'audio' in content or 'audio_url' in content %}\n {{- \"<|audio_start|><|audio_pad|><|audio_end|>\" }}\n {%- elif content.type == 'video' or 'video' in content %}\n {{- \"<|vision_start|><|video_pad|><|vision_end|>\" }}\n {%- elif content.type == 'text' %}\n {{- content.text }}\n {%- endif %}\n {%- endfor %}\n {%- endif %}\n {%- endif %}\n {{- '\\n\\n' }}\n {{- \"# Tools\\n\\nYou may call one or more functions to assist with the user query.\\n\\nYou are provided with function signatures within <tools></tools> XML tags:\\n<tools>\" }}\n {%- for tool in tools %}\n {{- \"\\n\" }}\n {{- tool | tojson }}\n {%- endfor %}\n {{- \"\\n</tools>\\n\\nFor each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:\\n<tool_call>\\n{\\\"name\\\": <function-name>, \\\"arguments\\\": <args-json-object>}\\n</tool_call><|im_end|>\\n\" }}\n{%- else %}\n {%- if messages[0].role == 'system' %}\n {%- if messages[0].content is string %}\n {{- '<|im_start|>system\\n' + messages[0].content + '<|im_end|>\\n' }}\n {%- else %}\n {%- for content in messages[0].content %}\n {%- if content.type == 'image' or 'image' in content or 'image_url' in content %}\n {{- '<|im_start|>system\\n' +\"<|vision_start|><|image_pad|><|vision_end|>\"+ '<|im_end|>\\n' }}\n {%- elif content.type == 'audio' or 'audio' in content or 'audio_url' in content %}\n {{- '<|im_start|>system\\n' +\"<|audio_start|><|audio_pad|><|audio_end|>\"+ '<|im_end|>\\n' }}\n {%- elif content.type == 'video' or 'video' in content %}\n {{- '<|im_start|>system\\n' +\"<|vision_start|><|video_pad|><|vision_end|>\"+ '<|im_end|>\\n' }}\n {%- elif content.type == 'text' %}\n {{- '<|im_start|>system\\n' +content.text+ '<|im_end|>\\n' }}\n {%- endif %}\n {%- endfor %}\n {%- endif %}\n {%- endif %}\n{%- endif %}\n{%- set ns = namespace(multi_step_tool=true, last_query_index=messages|length - 1) %}\n{%- for message in messages[::-1] %}\n {%- set index = (messages|length - 1) - loop.index0 %}\n {%- if ns.multi_step_tool and message.role == \"user\" and message.content is string and not(message.content.startswith('<tool_response>') and message.content.endswith('</tool_response>')) %}\n {%- set ns.multi_step_tool = false %}\n {%- set ns.last_query_index = index %}\n {%- endif %}\n{%- endfor %}\n{%- for message in messages %}\n {%- if message.content is string %}\n {%- set content = message.content %}\n {%- else %}\n {%- set content = namespace(text=\"\") %}\n {%- for mcontent in message.content %}\n {%- if mcontent.type == 'image' or 'image' in mcontent or 'image_url' in mcontent %}\n {%- set content.text = content.text~\"<|vision_start|><|image_pad|><|vision_end|>\" %}\n {%- elif mcontent.type == 'audio' or 'audio' in mcontent or 'audio_url' in mcontent %}\n {%- set content.text = content.text~\"<|audio_start|><|audio_pad|><|audio_end|>\" %}\n {%- elif mcontent.type == 'video' or 'video' in mcontent %}\n {%- set content.text = content.text~\"<|vision_start|><|video_pad|><|vision_end|>\" %}\n {%- elif mcontent.type == 'text' %}\n {%- set content.text = content.text~mcontent.text %}\n {%- endif %}\n {%- endfor %}\n {%- set content = content.text %}\n {%- endif %}\n {%- if (message.role == \"user\") or (message.role == \"system\" and not loop.first) %}\n {{- '<|im_start|>' + message.role + '\\n' + content + '<|im_end|>' + '\\n' }}\n {%- elif message.role == \"assistant\" %}\n {%- set reasoning_content = \"\" %}\n {%- if message.reasoning_content is string %}\n {%- set reasoning_content = message.reasoning_content %}\n {%- else %}\n {%- if '</think>' in content %}\n {%- set reasoning_content = content.split('</think>')[0].rstrip('\\n').split('<think>')[-1].lstrip('\\n') %}\n {%- set content = content.split('</think>')[-1].lstrip('\\n') %}\n {%- endif %}\n {%- endif %}\n {%- if loop.index0 > ns.last_query_index %}\n {%- if loop.last or (not loop.last and reasoning_content) %}\n {{- '<|im_start|>' + message.role + '\\n<think>\\n' + reasoning_content.strip(\"\\n\") + '\\n</think>\\n\\n' + content.lstrip('\\n') }}\n {%- else %}\n {{- '<|im_start|>' + message.role + '\\n' + content }}\n {%- endif %}\n {%- else %}\n {{- '<|im_start|>' + message.role + '\\n' + content }}\n {%- endif %}\n {%- if message.tool_calls %}\n {%- for tool_call in message.tool_calls %}\n {%- if (loop.first and content) or (not loop.first) %}{{- '\\n' }}{%- endif %}\n {%- if tool_call.function %}\n {%- set tool_call = tool_call.function %}\n {%- endif %}\n {{- '<tool_call>\\n{\"name\": \"' }}\n {{- tool_call.name }}\n {{- '\", \"arguments\": ' }}\n {%- if tool_call.arguments is string %}\n {{- tool_call.arguments }}\n {%- else %}\n {{- tool_call.arguments | tojson }}\n {%- endif %}\n {{- '}\\n</tool_call>' }}\n {%- endfor %}\n {%- endif %}\n {{- '<|im_end|>\\n' }}\n {%- elif message.role == \"tool\" %}\n {%- if loop.first or (messages[loop.index0 - 1].role != \"tool\") %}{{- '<|im_start|>user' }}{%- endif %}\n {{- '\\n<tool_response>\\n' }}\n {{- content }}\n {{- '\\n</tool_response>' }}\n {%- if loop.last or (messages[loop.index0 + 1].role != \"tool\") %}{{- '<|im_end|>\\n' }}{%- endif %}\n {%- endif %}\n{%- endfor %}\n{%- if add_generation_prompt %}\n {{- '<|im_start|>assistant\\n' }}\n {%- if enable_thinking is defined and enable_thinking is false %}{{- '<think>\\n\\n</think>\\n\\n' }}{%- endif %}\n{%- endif %}"},"createdAt":"2026-10-09T04:10:22.000Z","discussionsDisabled":false,"discussionsSorting":"recently-created","downloads":297,"downloadsAllTime":297,"id":"Cloudflare/clef-omni","isLikedByUser":false,"availableInferenceProviders":[],"showHuggingChatEntry":false,"inference":"","lastModified":"2026-10-09T17:49:32.000Z","likes":101,"pipeline_tag":"image-text-to-text","library_name":"transformers","librariesOther":[],"trackDownloads":true,"model-index":null,"private":false,"repoType":"model","gated":false,"tags":["transformers","safetensors","qwen3_omni_moe","text-to-audio","clef","cloudflare","systemone","decision-model","qwen3-omni","post-train","image-text-to-typed-output","multimodal","audio","video","structured-output","classification","custom-code","image-text-to-text","conversational","base_model:Qwen/Qwen3-Omni-30B-A3B-Instruct","base_model:finetune:Qwen/Qwen3-Omni-30B-A3B-Instruct","license:apache-2.0","endpoints_compatible","region:us"],"tag_objs":[{"id":"image-text-to-text","label":"Image-Text-to-Text","type":"pipeline_tag","subType":"multimodal"},{"id":"transformers","label":"Transformers","type":"library"},{"id":"safetensors","label":"Safetensors","type":"library"},{"id":"qwen3_omni_moe","label":"qwen3_omni_moe","type":"other","clickable":true},{"id":"text-to-audio","label":"text-to-audio","type":"other","clickable":true},{"id":"clef","label":"clef","type":"other","clickable":true},{"id":"cloudflare","label":"cloudflare","type":"other","clickable":true},{"id":"systemone","label":"systemone","type":"other","clickable":true},{"id":"decision-model","label":"decision-model","type":"other","clickable":true},{"id":"qwen3-omni","label":"qwen3-omni","type":"other","clickable":true},{"id":"post-train","label":"post-train","type":"other","clickable":true},{"id":"image-text-to-typed-output","label":"image-text-to-typed-output","type":"other","clickable":true},{"id":"multimodal","label":"multimodal","type":"other","clickable":true},{"id":"audio","label":"audio","type":"other","clickable":true},{"id":"video","label":"video","type":"other","clickable":true},{"id":"structured-output","label":"structured-output","type":"other","clickable":true},{"id":"classification","label":"classification","type":"other","clickable":true},{"id":"custom-code","label":"custom-code","type":"other","clickable":true},{"id":"conversational","label":"conversational","type":"other","clickable":true},{"id":"base_model:Qwen/Qwen3-Omni-30B-A3B-Instruct","label":"base_model:Qwen/Qwen3-Omni-30B-A3B-Instruct","type":"other","clickable":true},{"id":"base_model:finetune:Qwen/Qwen3-Omni-30B-A3B-Instruct","label":"base_model:finetune:Qwen/Qwen3-Omni-30B-A3B-Instruct","type":"other","clickable":true},{"id":"endpoints_compatible","label":"Inference Endpoints","type":"other","clickable":true},{"id":"license:apache-2.0","label":"apache-2.0","type":"license"},{"type":"region","label":"🇺🇸 Region: US","id":"region:us"}],"transformersInfo":{"auto_model":"AutoModelForMultimodalLM","pipeline_tag":"text-to-audio","processor":"AutoProcessor"},"widgetData":[{"text":"Hi, what can you help me with?"},{"text":"What is 84 * 3 / 2?"},{"text":"Tell me an interesting fact about the universe!"},{"text":"Explain quantum computing in simple terms."}],"safetensors":{"parameters":{"BF16":35259818545},"total":35259818545,"sharded":true,"totalFileSize":70526026515},"hasBlockedOids":false,"region":"us","isQuantized":false,"licenseFilePath":"LICENSE"},"discussionsStats":{"closed":0,"open":1,"total":1},"query":{},"inferenceContextData":{"billableEntities":[],"entityName2Providers":{}},"hasQuantizations":true,"copyToBucketNamespaces":[]}"> 
+
+ [/Cloudflare] 
+ Cloudflare [/Cloudflare] 
+/
+
+clef-omni [/Cloudflare/clef-omni] 
+
+ Like 101
+
+Follow
+ Cloudflare 1.16k
+
+ Image-Text-to-Text 
+ [/models?pipeline_tag=image-text-to-text]
+ Transformers 
+ [/models?library=transformers]
+ Safetensors 
+ [/models?library=safetensors]
+ qwen3_omni_moe 
+ [/models?other=qwen3_omni_moe]
+ text-to-audio 
+ [/models?other=text-to-audio]
+ clef 
+ [/models?other=clef]
+ cloudflare 
+ [/models?other=cloudflare]
+ systemone 
+ [/models?other=systemone]
+ decision-model 
+ [/models?other=decision-model]
+ qwen3-omni 
+ [/models?other=qwen3-omni]
+ post-train 
+ [/models?other=post-train]
+ image-text-to-typed-output 
+ [/models?other=image-text-to-typed-output]
+ multimodal 
+ [/models?other=multimodal]
+ audio 
+ [/models?other=audio]
+ video 
+ [/models?other=video]
+ structured-output 
+ [/models?other=structured-output]
+ classification 
+ [/models?other=classification]
+ custom-code 
+ [/models?other=custom-code]
+ conversational 
+ [/models?other=conversational]
+
+ License: apache-2.0 
+
+ Model card [/Cloudflare/clef-omni] Files Files and versions 
+ xet
+ [/Cloudflare/clef-omni/tree/main] Community 
+1
+ [/Cloudflare/clef-omni/discussions]
+
+ Deploy 
+
+ Copy to bucket new 
+
+ Use this model 
+Instructions to use Cloudflare/clef-omni with libraries, inference providers, notebooks, and local apps. Follow these links to get started.
+
+Libraries
+
+ Transformers [/Cloudflare/clef-omni?library=transformers] 
+How to use Cloudflare/clef-omni with Transformers:
+
+# Use a pipeline as a high-level helper
+from transformers import pipeline
+
+pipe = pipeline("image-text-to-text", model="Cloudflare/clef-omni")
+messages = [
+ {
+ "role": "user",
+ "content": [
+ {"type": "image", "url": "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/p-blog/candy.JPG"},
+ {"type": "text", "text": "What animal is on the candy?"}
+ ]
+ },
+]
+pipe(text=messages)
+
+# pip install -U transformers accelerate
+# Load model directly
+from transformers import AutoProcessor, AutoModelForMultimodalLM
+
+processor = AutoProcessor.from_pretrained("Cloudflare/clef-omni")
+model = AutoModelForMultimodalLM.from_pretrained("Cloudflare/clef-omni", device_map="auto")
+messages = [
+ {
+ "role": "user",
+ "content": [
+ {"type": "image", "url": "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/p-blog/candy.JPG"},
+ {"type": "text", "text": "What animal is on the candy?"}
+ ]
+ },
+]
+inputs = processor.apply_chat_template(
+ messages,
+ add_generation_prompt=True,
+ tokenize=True,
+ return_dict=True,
+ return_tensors="pt",
+).to(model.device)
+
+outputs = model.generate(**inputs, max_new_tokens=256)
+print(processor.decode(outputs[0][inputs["input_ids"].shape[-1]:]))
+
+Notebooks
+
+ Google Colab [/Cloudflare/clef-omni/colab] 
+
+ Kaggle [/Cloudflare/clef-omni/kaggle] 
+
+Local Apps Settings [/settings/local-apps]
+
+ vLLM [/Cloudflare/clef-omni?local-app=vllm] 
+How to use Cloudflare/clef-omni with vLLM:
+
+Install from pip and serve model
+
+# Install vLLM from pip:
+pip install vllm
+# Start the vLLM server:
+vllm serve "Cloudflare/clef-omni"
+# Call the server using curl (OpenAI-compatible API):
+curl -X POST "http://localhost:8000/v1/chat/completions" \
+ -H "Content-Type: application/json" \
+ --data '{
+ "model": "Cloudflare/clef-omni",
+ "messages": [
+ {
+ "role": "user",
+ "content": [
+ {
+ "type": "text",
+ "text": "Describe this image in one sentence."
+ },
+ {
+ "type": "image_url",
+ "image_url": {
+ "url": "https://cdn.britannica.com/61/93061-050-99147DCE/Statue-of-Liberty-Island-New-York-Bay.jpg"
+ }
+ }
+ ]
+ }
+ ]
+ }'
+
+Use Docker
+
+docker model run hf.co/Cloudflare/clef-omni
+
+ SGLang [/Cloudflare/clef-omni?local-app=sglang] 
+How to use Cloudflare/clef-omni with SGLang:
+
+Install from pip and serve model
+
+# Install SGLang from pip:
+pip install sglang
+# Start the SGLang server:
+python3 -m sglang.launch_server \
+ --model-path "Cloudflare/clef-omni" \
+ --host 0.0.0.0 \
+ --port 30000
+# Call the server using curl (OpenAI-compatible API):
+curl -X POST "http://localhost:30000/v1/chat/completions" \
+ -H "Content-Type: application/json" \
+ --data '{
+ "model": "Cloudflare/clef-omni",
+ "messages": [
+ {
+ "role": "user",
+ "content": [
+ {
+ "type": "text",
+ "text": "Describe this image in one sentence."
+ },
+ {
+ "type": "image_url",
+ "image_url": {
+ "url": "https://cdn.britannica.com/61/93061-050-99147DCE/Statue-of-Liberty-Island-New-York-Bay.jpg"
+ }
+ }
+ ]
+ }
+ ]
+ }'
+
+Use Docker images
+
+docker run --gpus all \
+ --shm-size 32g \
+ -p 30000:30000 \
+ -v ~/.cache/huggingface:/root/.cache/huggingface \
+ --env "HF_TOKEN=<secret>" \
+ --ipc=host \
+ lmsysorg/sglang:latest \
+ python3 -m sglang.launch_server \
+ --model-path "Cloudflare/clef-omni" \
+ --host 0.0.0.0 \
+ --port 30000
+# Call the server using curl (OpenAI-compatible API):
+curl -X POST "http://localhost:30000/v1/chat/completions" \
+ -H "Content-Type: application/json" \
+ --data '{
+ "model": "Cloudflare/clef-omni",
+ "messages": [
+ {
+ "role": "user",
+ "content": [
+ {
+ "type": "text",
+ "text": "Describe this image in one sentence."
+ },
+ {
+ "type": "image_url",
+ "image_url": {
+ "url": "https://cdn.britannica.com/61/93061-050-99147DCE/Statue-of-Liberty-Island-New-York-Bay.jpg"
+ }
+ }
+ ]
+ }
+ ]
+ }'
+
+ Docker Model Runner [/Cloudflare/clef-omni?local-app=docker-model-runner] 
+How to use Cloudflare/clef-omni with Docker Model Runner:
+
+docker model run hf.co/Cloudflare/clef-omni
+
+Browse
+ Quantizations [/models?other=base_model:quantized:Cloudflare/clef-omni] to use this model in llama.cpp, Ollama, LM Studio, or any compatible app.
+
+Clef-Omni [#clef-omni] 
+
+Model [#model] 
+
+Files [#files] 
+
+Usage [#usage] 
+
+Jev / SystemOne API [#jev--systemone-api]
+
+Images, audio, and video [#images-audio-and-video]
+
+SGLang [#sglang]
+
+Input format [#input-format] 
+
+Results [#results] 
+
+Decision Index [#decision-index]
+
+Workflow evals [#workflow-evals]
+
+License [#license] 
+
+ [#clef-omni]
+
+ Clef-Omni
+
+Announcement: Clef-omni model relase on the Cloudflare blog [https://blog.cloudflare.com/clef-faster-cheaper-multimodal]
+
+Clef-Omni is a 30B-A3B mixture-of-experts multimodal model that turns a state and a schema of typed
+questions into decisions. It reads the state as text, JSON, images, audio, or video, and returns a
+probability for every allowed option of every question in a single forward pass. There is no
+free-form text generation and no output parsing.
+
+The Clef-Omni API is fully compatible with Jev and SystemOne.
+
+Clef-Omni is post-trained from
+Qwen/Qwen3-Omni-30B-A3B-Instruct [https://huggingface.co/Qwen/Qwen3-Omni-30B-A3B-Instruct]. See
+Clef [https://huggingface.co/Cloudflare/clef] and Clef-Flash [https://huggingface.co/Cloudflare/clef-flash]
+for the dense image and video variants.
+
+ [#model]
+
+ Model
+
+Backbone: the Qwen/Qwen3-Omni-30B-A3B-Instruct thinker with its vision and audio encoders, stored
+as standard sharded safetensors. The base model's speech-output weights (talker and code2wav) are
+included unchanged but are not used; load_release_model does not load them.
+
+Joint schema head: a small transformer head that reads the backbone's final hidden states,
+routes evidence from the state to each question, and scores all options of all questions jointly.
+
+Output: one logit per allowed option for each question. Apply a softmax per question to get
+probabilities.
+
+ [#files]
+
+ Files
+
+File
+Purpose
+
+model-*.safetensors, model.safetensors.index.json, config.json, generation_config.json
+Backbone, including the vision and audio encoders
+
+joint_head.safetensors, joint_head_config.json
+Joint schema head
+
+joint_schema_model.py
+Record encoding, media decoding, batching, the model, load_release_model, and systemone
+
+tokenizer.json, tokenizer_config.json, chat_template.jinja, processor_config.json
+Tokenizer and image/audio/video processor
+
+LICENSE
+Apache-2.0 license
+
+ [#usage]
+
+ Usage
+
+Tested with torch 2.11 and transformers 5.10.2 on a single H200; the backbone needs about 64 GB
+of GPU memory in bfloat16. Image inputs also need pillow, and audio and video files need av.
+
+import sys
+
+import torch
+from huggingface_hub import snapshot_download
+
+path = snapshot_download("Cloudflare/clef-omni")
+sys.path.insert(0, path)
+from joint_schema_model import collate_records, encode_record, load_release_model
+
+model, processor = load_release_model(path, device="cuda")
+
+record = {
+ "state": {"invoice": {"vendor": "Acme", "total": 1250.0, "currency": "USD", "status": "overdue"}},
+ "questions": {
+ "status": {
+ "type": "choice",
+ "instructions": "What is the invoice status?",
+ "criteria": {"paid": "Invoice is paid.", "overdue": "Invoice is past due.", "draft": "Not sent."},
+ },
+ "large": {"type": "noul", "instructions": "Is the total above 1000 USD?"},
+ },
+}
+
+encoded = encode_record(processor.tokenizer, record, processor=processor)
+batch = collate_records([encoded], processor.tokenizer.pad_token_id, torch.device("cuda"))
+with torch.inference_mode():
+ logits = model(batch)[0]
+
+for question, question_logits in zip(encoded.questions, logits):
+ probabilities = question_logits.float().softmax(-1).tolist()
+ print(question.question_id, dict(zip(question.option_ids, probabilities)))
+
+ [#jev--systemone-api]
+
+ Jev / SystemOne API
+
+systemone takes a Jev/SystemOne POST /v1/systemone request body and returns the same response
+body: model, answers keyed by question ID, and usage. A choice answer has choice,
+confidence, and probabilities; a score answer has the expected score, confidence, legend,
+and probabilities; a noul answer has the probability of true. instructions is optional, and
+images, audio, and videos (base64 data URLs) may be added to the request.
+
+from joint_schema_model import systemone
+
+response = systemone(model, processor, {
+ "model": "clef-omni",
+ "state": "Our checkout started returning errors and orders are blocked.",
+ "questions": {
+ "department": {
+ "type": "choice",
+ "instructions": "Which team should handle the message?",
+ "criteria": {"billing": "Payments or invoices", "technical": "Bugs or outages"},
+ },
+ "urgency": {"type": "score", "criteria": ["Can wait", "This week", "Today"]},
+ "outage": {"type": "noul", "instructions": "Is a service down?"},
+ },
+})
+print(response["answers"])
+
+ [#images-audio-and-video]
+
+ Images, audio, and video
+
+Add images, audio, or videos to the record and pass the processor to encode_record. Each item
+can be a file path, URL, base64 data URL, or raw bytes. Images may also be PIL images, audio may be
+16 kHz mono sample arrays, and videos may be RGB frame arrays sampled at 2 frames per second. Video
+files are sampled at 2 frames per second, and their soundtracks are heard alongside the frames when
+every video in the record has one. Optional processor arguments go in media_kwargs.
+
+record = {
+ "state": {"task": "Review the attached call recording and dashcam clip."},
+ "audio": ["call.wav"],
+ "videos": ["dashcam.mp4"],
+ "questions": {
+ "glass": {"type": "noul", "instructions": "Is glass breaking in the audio clip?"},
+ "collision": {"type": "noul", "instructions": "Does the video show a collision?"},
+ },
+}
+encoded = encode_record(processor.tokenizer, record, processor=processor)
+
+Text-only and multimodal records can be mixed in the same batch.
+
+ [#sglang]
+
+ SGLang
+
+Use SGLang (coming soon!)
+
+ [#input-format]
+
+ Input format
+
+Field
+Description
+
+state
+Any JSON value or string describing the situation
+
+images
+Optional list of images
+
+audio
+Optional list of audio clips
+
+videos
+Optional list of videos
+
+media_kwargs
+Optional keyword arguments for the processor
+
+questions
+Mapping of question ID to question
+
+Each question has:
+
+type: noul (true/false), choice (named options), or score (ordered options)
+
+instructions: what to decide; optional, and the question ID is used when it is omitted
+
+criteria: for choice, a mapping of option ID to description; for score, a list of option
+descriptions indexed from 0; for noul, optional descriptions for true and false
+
+encode_record accepts max_length (default 64,000 tokens) and max_state_tokens to bound the input.
+
+ [#results]
+
+ Results
+
+ [#decision-index]
+
+ Decision Index
+
+Per-benchmark results from our internal run of the Decision Index [https://clef-evals.workers-ai-mle.workers.dev] 0.2.1 suite. Scores are percentages; ForecastBench is a Brier score, where lower is better. The best value in each row is in bold.
+
+Benchmark
+Clef-Omni
+Clef
+Clef-flash
+Jev
+
+BFCL (case exact accuracy)
+98.2
+98.5
+98.8
+95.8
+
+ToolRet (nDCG@10)
+66.6
+69.2
+66.4
+65.3
+
+API-Bank (accuracy)
+92.7
+91.9
+93.1
+88.2
+
+BANKING77 (macro-F1)
+94.8
+94.2
+90.9
+79.7
+
+CLINC150+OOS (macro-F1)
+97.7
+97.4
+66.8
+89.3
+
+RouterBench (selected quality)
+79.9
+79.7
+79.9
+79.9
+
+Home appliance simulator (case exact accuracy)
+69.3
+83.0
+97.7
+52.3
+
+SGD/SGD-X (macro-F1)
+39.2
+43.8
+34.2
+43.0
+
+ContractNLI (macro-F1)
+80.3
+81.4
+84.3
+71.7
+
+ANLI (macro-F1)
+65.5
+69.8
+59.1
+74.8
+
+BPoMP (accuracy)
+96.8
+96.9
+95.4
+90.6
+
+Humicroedit (accuracy)
+70.1
+66.7
+75.1
+61.9
+
+POP909-CL (accuracy)
+2.6
+15.8
+1.6
+18.1
+
+cfcolor (accuracy)
+62.9
+66.0
+65.8
+64.7
+
+MMLU (accuracy)
+92.7
+90.3
+91.8
+91.7
+
+GPQA Diamond (accuracy)
+47.4
+48.0
+51.0
+78.3
+
+ARC-Easy (accuracy)
+99.8
+99.0
+99.5
+99.3
+
+ARC-Challenge (accuracy)
+97.8
+97.7
+98.3
+97.8
+
+WinoGrande (accuracy)
+96.7
+93.5
+97.5
+92.0
+
+HellaSwag (accuracy)
+99.1
+98.2
+98.6
+94.5
+
+GSM8K (accuracy)
+79.0
+80.8
+67.3
+79.9
+
+ChessBench (accuracy)
+22.1
+24.7
+23.0
+17.2
+
+MuSR (accuracy)
+83.8
+83.5
+86.0
+66.1
+
+SATA-Bench (case exact accuracy)
+31.9
+33.8
+36.7
+26.4
+
+BRIGHT (nDCG@10)
+42.0
+45.9
+39.3
+47.5
+
+Amazon ESCI (macro-F1)
+57.8
+57.5
+57.4
+55.2
+
+ACOS (per-review F1)
+28.4
+33.3
+25.9
+29.5
+
+FinEntity (macro-F1)
+96.3
+96.2
+97.1
+87.0
+
+VAST (macro-F1)
+50.9
+59.5
+49.6
+64.6
+
+NLI4CT (macro-F1)
+76.8
+82.9
+78.6
+84.1
+
+CRUXEval (accuracy)
+88.8
+86.7
+86.1
+73.0
+
+CLadder (accuracy)
+97.2
+94.0
+97.7
+72.6
+
+ForecastBench (Brier, lower is better)
+11.7
+13.9
+10.6
+17.4
+
+Habermas Machine (accuracy)
+67.8
+68.7
+71.8
+45.9
+
+PhishNChips (accuracy)
+73.2
+79.6
+75.0
+62.5
+
+MMLU-Pro (accuracy)
+70.6
+65.9
+65.3
+82.7
+
+BBH (accuracy)
+69.0
+73.7
+68.9
+92.9
+
+RAGTruth (hallucination F1)
+42.0
+79.4
+35.6
+76.5
+
+HoVer (accuracy)
+64.2
+65.2
+61.2
+72.9
+
+When2Call MCQ (accuracy)
+63.3
+72.4
+65.6
+81.0
+
+New Yorker (accuracy)
+64.2
+69.5
+66.1
+70.1
+
+ [#workflow-evals]
+
+ Workflow evals
+
+Decision accuracy on four end-to-end business workflows from Typesafe Evals [https://evals.typesafe.ai/], scored against consensus reference labels. All models are scored on the same dataset revision and case cohort.
+
+Workflow
+Metric
+Clef-Omni
+Clef
+Clef-flash
+Jev
+
+Invoice processing
+Exact actions
+60.2
+64.7
+57.1
+61.8
+
+Invoice processing
+Primary action
+82.0
+86.2
+73.3
+83.1
+
+Customer service
+Exact actions
+71.6
+76.3
+77.0
+76.0
+
+Security incidents
+Exact actions
+61.7
+62.9
+61.7
+61.7
+
+Agent trace observability
+Primary action
+65.8
+68.5
+69.8
+71.6
+
+ [#license]
+
+ License
+
+Released under the Apache-2.0 license, following the base model
+Qwen/Qwen3-Omni-30B-A3B-Instruct [https://huggingface.co/Qwen/Qwen3-Omni-30B-A3B-Instruct].
+
+Downloads last month 297 
+
+","pad_token":"<|endoftext|>","unk_token":null},"chat_template_jinja":"{%- if tools %}\n {{- '<|im_start|>system\\n' }}\n {%- if messages[0].role == 'system' %}\n {%- if messages[0].content is string %}\n {{- messages[0].content }}\n {%- else %}\n {%- for content in messages[0].content %}\n {%- if content.type == 'image' or 'image' in content or 'image_url' in content %}\n {{- \"<|vision_start|><|image_pad|><|vision_end|>\" }}\n {%- elif content.type == 'audio' or 'audio' in content or 'audio_url' in content %}\n {{- \"<|audio_start|><|audio_pad|><|audio_end|>\" }}\n {%- elif content.type == 'video' or 'video' in content %}\n {{- \"<|vision_start|><|video_pad|><|vision_end|>\" }}\n {%- elif content.type == 'text' %}\n {{- content.text }}\n {%- endif %}\n {%- endfor %}\n {%- endif %}\n {%- endif %}\n {{- '\\n\\n' }}\n {{- \"# Tools\\n\\nYou may call one or more functions to assist with the user query.\\n\\nYou are provided with function signatures within <tools></tools> XML tags:\\n<tools>\" }}\n {%- for tool in tools %}\n {{- \"\\n\" }}\n {{- tool | tojson }}\n {%- endfor %}\n {{- \"\\n</tools>\\n\\nFor each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:\\n<tool_call>\\n{\\\"name\\\": <function-name>, \\\"arguments\\\": <args-json-object>}\\n</tool_call><|im_end|>\\n\" }}\n{%- else %}\n {%- if messages[0].role == 'system' %}\n {%- if messages[0].content is string %}\n {{- '<|im_start|>system\\n' + messages[0].content + '<|im_end|>\\n' }}\n {%- else %}\n {%- for content in messages[0].content %}\n {%- if content.type == 'image' or 'image' in content or 'image_url' in content %}\n {{- '<|im_start|>system\\n' +\"<|vision_start|><|image_pad|><|vision_end|>\"+ '<|im_end|>\\n' }}\n {%- elif content.type == 'audio' or 'audio' in content or 'audio_url' in content %}\n {{- '<|im_start|>system\\n' +\"<|audio_start|><|audio_pad|><|audio_end|>\"+ '<|im_end|>\\n' }}\n {%- elif content.type == 'video' or 'video' in content %}\n {{- '<|im_start|>system\\n' +\"<|vision_start|><|video_pad|><|vision_end|>\"+ '<|im_end|>\\n' }}\n {%- elif content.type == 'text' %}\n {{- '<|im_start|>system\\n' +content.text+ '<|im_end|>\\n' }}\n {%- endif %}\n {%- endfor %}\n {%- endif %}\n {%- endif %}\n{%- endif %}\n{%- set ns = namespace(multi_step_tool=true, last_query_index=messages|length - 1) %}\n{%- for message in messages[::-1] %}\n {%- set index = (messages|length - 1) - loop.index0 %}\n {%- if ns.multi_step_tool and message.role == \"user\" and message.content is string and not(message.content.startswith('<tool_response>') and message.content.endswith('</tool_response>')) %}\n {%- set ns.multi_step_tool = false %}\n {%- set ns.last_query_index = index %}\n {%- endif %}\n{%- endfor %}\n{%- for message in messages %}\n {%- if message.content is string %}\n {%- set content = message.content %}\n {%- else %}\n {%- set content = namespace(text=\"\") %}\n {%- for mcontent in message.content %}\n {%- if mcontent.type == 'image' or 'image' in mcontent or 'image_url' in mcontent %}\n {%- set content.text = content.text~\"<|vision_start|><|image_pad|><|vision_end|>\" %}\n {%- elif mcontent.type == 'audio' or 'audio' in mcontent or 'audio_url' in mcontent %}\n {%- set content.text = content.text~\"<|audio_start|><|audio_pad|><|audio_end|>\" %}\n {%- elif mcontent.type == 'video' or 'video' in mcontent %}\n {%- set content.text = content.text~\"<|vision_start|><|video_pad|><|vision_end|>\" %}\n {%- elif mcontent.type == 'text' %}\n {%- set content.text = content.text~mcontent.text %}\n {%- endif %}\n {%- endfor %}\n {%- set content = content.text %}\n {%- endif %}\n {%- if (message.role == \"user\") or (message.role == \"system\" and not loop.first) %}\n {{- '<|im_start|>' + message.role + '\\n' + content + '<|im_end|>' + '\\n' }}\n {%- elif message.role == \"assistant\" %}\n {%- set reasoning_content = \"\" %}\n {%- if message.reasoning_content is string %}\n {%- set reasoning_content = message.reasoning_content %}\n {%- else %}\n {%- if '</think>' in content %}\n {%- set reasoning_content = content.split('</think>')[0].rstrip('\\n').split('<think>')[-1].lstrip('\\n') %}\n {%- set content = content.split('</think>')[-1].lstrip('\\n') %}\n {%- endif %}\n {%- endif %}\n {%- if loop.index0 > ns.last_query_index %}\n {%- if loop.last or (not loop.last and reasoning_content) %}\n {{- '<|im_start|>' + message.role + '\\n<think>\\n' + reasoning_content.strip(\"\\n\") + '\\n</think>\\n\\n' + content.lstrip('\\n') }}\n {%- else %}\n {{- '<|im_start|>' + message.role + '\\n' + content }}\n {%- endif %}\n {%- else %}\n {{- '<|im_start|>' + message.role + '\\n' + content }}\n {%- endif %}\n {%- if message.tool_calls %}\n {%- for tool_call in message.tool_calls %}\n {%- if (loop.first and content) or (not loop.first) %}{{- '\\n' }}{%- endif %}\n {%- if tool_call.function %}\n {%- set tool_call = tool_call.function %}\n {%- endif %}\n {{- '<tool_call>\\n{\"name\": \"' }}\n {{- tool_call.name }}\n {{- '\", \"arguments\": ' }}\n {%- if tool_call.arguments is string %}\n {{- tool_call.arguments }}\n {%- else %}\n {{- tool_call.arguments | tojson }}\n {%- endif %}\n {{- '}\\n</tool_call>' }}\n {%- endfor %}\n {%- endif %}\n {{- '<|im_end|>\\n' }}\n {%- elif message.role == \"tool\" %}\n {%- if loop.first or (messages[loop.index0 - 1].role != \"tool\") %}{{- '<|im_start|>user' }}{%- endif %}\n {{- '\\n<tool_response>\\n' }}\n {{- content }}\n {{- '\\n</tool_response>' }}\n {%- if loop.last or (messages[loop.index0 + 1].role != \"tool\") %}{{- '<|im_end|>\\n' }}{%- endif %}\n {%- endif %}\n{%- endfor %}\n{%- if add_generation_prompt %}\n {{- '<|im_start|>assistant\\n' }}\n {%- if enable_thinking is defined and enable_thinking is false %}{{- '<think>\\n\\n</think>\\n\\n' }}{%- endif %}\n{%- endif %}"},"createdAt":"2026-10-09T04:10:22.000Z","discussionsDisabled":false,"discussionsSorting":"recently-created","downloads":297,"downloadsAllTime":297,"id":"Cloudflare/clef-omni","isLikedByUser":false,"availableInferenceProviders":[],"showHuggingChatEntry":false,"inference":"","lastModified":"2026-10-09T17:49:32.000Z","likes":101,"pipeline_tag":"image-text-to-text","library_name":"transformers","librariesOther":[],"trackDownloads":true,"model-index":null,"private":false,"repoType":"model","gated":false,"tags":["transformers","safetensors","qwen3_omni_moe","text-to-audio","clef","cloudflare","systemone","decision-model","qwen3-omni","post-train","image-text-to-typed-output","multimodal","audio","video","structured-output","classification","custom-code","image-text-to-text","conversational","base_model:Qwen/Qwen3-Omni-30B-A3B-Instruct","base_model:finetune:Qwen/Qwen3-Omni-30B-A3B-Instruct","license:apache-2.0","endpoints_compatible","region:us"],"tag_objs":[{"id":"image-text-to-text","label":"Image-Text-to-Text","type":"pipeline_tag","subType":"multimodal"},{"id":"transformers","label":"Transformers","type":"library"},{"id":"safetensors","label":"Safetensors","type":"library"},{"id":"qwen3_omni_moe","label":"qwen3_omni_moe","type":"other","clickable":true},{"id":"text-to-audio","label":"text-to-audio","type":"other","clickable":true},{"id":"clef","label":"clef","type":"other","clickable":true},{"id":"cloudflare","label":"cloudflare","type":"other","clickable":true},{"id":"systemone","label":"systemone","type":"other","clickable":true},{"id":"decision-model","label":"decision-model","type":"other","clickable":true},{"id":"qwen3-omni","label":"qwen3-omni","type":"other","clickable":true},{"id":"post-train","label":"post-train","type":"other","clickable":true},{"id":"image-text-to-typed-output","label":"image-text-to-typed-output","type":"other","clickable":true},{"id":"multimodal","label":"multimodal","type":"other","clickable":true},{"id":"audio","label":"audio","type":"other","clickable":true},{"id":"video","label":"video","type":"other","clickable":true},{"id":"structured-output","label":"structured-output","type":"other","clickable":true},{"id":"classification","label":"classification","type":"other","clickable":true},{"id":"custom-code","label":"custom-code","type":"other","clickable":true},{"id":"conversational","label":"conversational","type":"other","clickable":true},{"id":"base_model:Qwen/Qwen3-Omni-30B-A3B-Instruct","label":"base_model:Qwen/Qwen3-Omni-30B-A3B-Instruct","type":"other","clickable":true},{"id":"base_model:finetune:Qwen/Qwen3-Omni-30B-A3B-Instruct","label":"base_model:finetune:Qwen/Qwen3-Omni-30B-A3B-Instruct","type":"other","clickable":true},{"id":"endpoints_compatible","label":"Inference Endpoints","type":"other","clickable":true},{"id":"license:apache-2.0","label":"apache-2.0","type":"license"},{"type":"region","label":"🇺🇸 Region: US","id":"region:us"}],"transformersInfo":{"auto_model":"AutoModelForMultimodalLM","pipeline_tag":"text-to-audio","processor":"AutoProcessor"},"widgetData":[{"text":"Hi, what can you help me with?"},{"text":"What is 84 * 3 / 2?"},{"text":"Tell me an interesting fact about the universe!"},{"text":"Explain quantum computing in simple terms."}],"safetensors":{"parameters":{"BF16":35259818545},"total":35259818545,"sharded":true,"totalFileSize":70526026515},"hasBlockedOids":false,"region":"us","isQuantized":false,"licenseFilePath":"LICENSE"},"inferenceContextData":{"billableEntities":[],"entityName2Providers":{}},"canWrite":false}">
+
+Safetensors [https://huggingface.co/docs/safetensors]
+
+Model size
+
+35B params
+
+Tensor type
+
+BF16 
+·
+
+Chat template
+
+Files info
+
+","pad_token":"<|endoftext|>","unk_token":null},"chat_template_jinja":"{%- if tools %}\n {{- '<|im_start|>system\\n' }}\n {%- if messages[0].role == 'system' %}\n {%- if messages[0].content is string %}\n {{- messages[0].content }}\n {%- else %}\n {%- for content in messages[0].content %}\n {%- if content.type == 'image' or 'image' in content or 'image_url' in content %}\n {{- \"<|vision_start|><|image_pad|><|vision_end|>\" }}\n {%- elif content.type == 'audio' or 'audio' in content or 'audio_url' in content %}\n {{- \"<|audio_start|><|audio_pad|><|audio_end|>\" }}\n {%- elif content.type == 'video' or 'video' in content %}\n {{- \"<|vision_start|><|video_pad|><|vision_end|>\" }}\n {%- elif content.type == 'text' %}\n {{- content.text }}\n {%- endif %}\n {%- endfor %}\n {%- endif %}\n {%- endif %}\n {{- '\\n\\n' }}\n {{- \"# Tools\\n\\nYou may call one or more functions to assist with the user query.\\n\\nYou are provided with function signatures within <tools></tools> XML tags:\\n<tools>\" }}\n {%- for tool in tools %}\n {{- \"\\n\" }}\n {{- tool | tojson }}\n {%- endfor %}\n {{- \"\\n</tools>\\n\\nFor each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:\\n<tool_call>\\n{\\\"name\\\": <function-name>, \\\"arguments\\\": <args-json-object>}\\n</tool_call><|im_end|>\\n\" }}\n{%- else %}\n {%- if messages[0].role == 'system' %}\n {%- if messages[0].content is string %}\n {{- '<|im_start|>system\\n' + messages[0].content + '<|im_end|>\\n' }}\n {%- else %}\n {%- for content in messages[0].content %}\n {%- if content.type == 'image' or 'image' in content or 'image_url' in content %}\n {{- '<|im_start|>system\\n' +\"<|vision_start|><|image_pad|><|vision_end|>\"+ '<|im_end|>\\n' }}\n {%- elif content.type == 'audio' or 'audio' in content or 'audio_url' in content %}\n {{- '<|im_start|>system\\n' +\"<|audio_start|><|audio_pad|><|audio_end|>\"+ '<|im_end|>\\n' }}\n {%- elif content.type == 'video' or 'video' in content %}\n {{- '<|im_start|>system\\n' +\"<|vision_start|><|video_pad|><|vision_end|>\"+ '<|im_end|>\\n' }}\n {%- elif content.type == 'text' %}\n {{- '<|im_start|>system\\n' +content.text+ '<|im_end|>\\n' }}\n {%- endif %}\n {%- endfor %}\n {%- endif %}\n {%- endif %}\n{%- endif %}\n{%- set ns = namespace(multi_step_tool=true, last_query_index=messages|length - 1) %}\n{%- for message in messages[::-1] %}\n {%- set index = (messages|length - 1) - loop.index0 %}\n {%- if ns.multi_step_tool and message.role == \"user\" and message.content is string and not(message.content.startswith('<tool_response>') and message.content.endswith('</tool_response>')) %}\n {%- set ns.multi_step_tool = false %}\n {%- set ns.last_query_index = index %}\n {%- endif %}\n{%- endfor %}\n{%- for message in messages %}\n {%- if message.content is string %}\n {%- set content = message.content %}\n {%- else %}\n {%- set content = namespace(text=\"\") %}\n {%- for mcontent in message.content %}\n {%- if mcontent.type == 'image' or 'image' in mcontent or 'image_url' in mcontent %}\n {%- set content.text = content.text~\"<|vision_start|><|image_pad|><|vision_end|>\" %}\n {%- elif mcontent.type == 'audio' or 'audio' in mcontent or 'audio_url' in mcontent %}\n {%- set content.text = content.text~\"<|audio_start|><|audio_pad|><|audio_end|>\" %}\n {%- elif mcontent.type == 'video' or 'video' in mcontent %}\n {%- set content.text = content.text~\"<|vision_start|><|video_pad|><|vision_end|>\" %}\n {%- elif mcontent.type == 'text' %}\n {%- set content.text = content.text~mcontent.text %}\n {%- endif %}\n {%- endfor %}\n {%- set content = content.text %}\n {%- endif %}\n {%- if (message.role == \"user\") or (message.role == \"system\" and not loop.first) %}\n {{- '<|im_start|>' + message.role + '\\n' + content + '<|im_end|>' + '\\n' }}\n {%- elif message.role == \"assistant\" %}\n {%- set reasoning_content = \"\" %}\n {%- if message.reasoning_content is string %}\n {%- set reasoning_content = message.reasoning_content %}\n {%- else %}\n {%- if '</think>' in content %}\n {%- set reasoning_content = content.split('</think>')[0].rstrip('\\n').split('<think>')[-1].lstrip('\\n') %}\n {%- set content = content.split('</think>')[-1].lstrip('\\n') %}\n {%- endif %}\n {%- endif %}\n {%- if loop.index0 > ns.last_query_index %}\n {%- if loop.last or (not loop.last and reasoning_content) %}\n {{- '<|im_start|>' + message.role + '\\n<think>\\n' + reasoning_content.strip(\"\\n\") + '\\n</think>\\n\\n' + content.lstrip('\\n') }}\n {%- else %}\n {{- '<|im_start|>' + message.role + '\\n' + content }}\n {%- endif %}\n {%- else %}\n {{- '<|im_start|>' + message.role + '\\n' + content }}\n {%- endif %}\n {%- if message.tool_calls %}\n {%- for tool_call in message.tool_calls %}\n {%- if (loop.first and content) or (not loop.first) %}{{- '\\n' }}{%- endif %}\n {%- if tool_call.function %}\n {%- set tool_call = tool_call.function %}\n {%- endif %}\n {{- '<tool_call>\\n{\"name\": \"' }}\n {{- tool_call.name }}\n {{- '\", \"arguments\": ' }}\n {%- if tool_call.arguments is string %}\n {{- tool_call.arguments }}\n {%- else %}\n {{- tool_call.arguments | tojson }}\n {%- endif %}\n {{- '}\\n</tool_call>' }}\n {%- endfor %}\n {%- endif %}\n {{- '<|im_end|>\\n' }}\n {%- elif message.role == \"tool\" %}\n {%- if loop.first or (messages[loop.index0 - 1].role != \"tool\") %}{{- '<|im_start|>user' }}{%- endif %}\n {{- '\\n<tool_response>\\n' }}\n {{- content }}\n {{- '\\n</tool_response>' }}\n {%- if loop.last or (messages[loop.index0 + 1].role != \"tool\") %}{{- '<|im_end|>\\n' }}{%- endif %}\n {%- endif %}\n{%- endfor %}\n{%- if add_generation_prompt %}\n {{- '<|im_start|>assistant\\n' }}\n {%- if enable_thinking is defined and enable_thinking is false %}{{- '<think>\\n\\n</think>\\n\\n' }}{%- endif %}\n{%- endif %}"},"createdAt":"2026-10-09T04:10:22.000Z","discussionsDisabled":false,"discussionsSorting":"recently-created","downloads":297,"downloadsAllTime":297,"id":"Cloudflare/clef-omni","isLikedByUser":false,"availableInferenceProviders":[],"showHuggingChatEntry":false,"inference":"","lastModified":"2026-10-09T17:49:32.000Z","likes":101,"pipeline_tag":"image-text-to-text","library_name":"transformers","librariesOther":[],"trackDownloads":true,"model-index":null,"private":false,"repoType":"model","gated":false,"tags":["transformers","safetensors","qwen3_omni_moe","text-to-audio","clef","cloudflare","systemone","decision-model","qwen3-omni","post-train","image-text-to-typed-output","multimodal","audio","video","structured-output","classification","custom-code","image-text-to-text","conversational","base_model:Qwen/Qwen3-Omni-30B-A3B-Instruct","base_model:finetune:Qwen/Qwen3-Omni-30B-A3B-Instruct","license:apache-2.0","endpoints_compatible","region:us"],"tag_objs":[{"id":"image-text-to-text","label":"Image-Text-to-Text","type":"pipeline_tag","subType":"multimodal"},{"id":"transformers","label":"Transformers","type":"library"},{"id":"safetensors","label":"Safetensors","type":"library"},{"id":"qwen3_omni_moe","label":"qwen3_omni_moe","type":"other","clickable":true},{"id":"text-to-audio","label":"text-to-audio","type":"other","clickable":true},{"id":"clef","label":"clef","type":"other","clickable":true},{"id":"cloudflare","label":"cloudflare","type":"other","clickable":true},{"id":"systemone","label":"systemone","type":"other","clickable":true},{"id":"decision-model","label":"decision-model","type":"other","clickable":true},{"id":"qwen3-omni","label":"qwen3-omni","type":"other","clickable":true},{"id":"post-train","label":"post-train","type":"other","clickable":true},{"id":"image-text-to-typed-output","label":"image-text-to-typed-output","type":"other","clickable":true},{"id":"multimodal","label":"multimodal","type":"other","clickable":true},{"id":"audio","label":"audio","type":"other","clickable":true},{"id":"video","label":"video","type":"other","clickable":true},{"id":"structured-output","label":"structured-output","type":"other","clickable":true},{"id":"classification","label":"classification","type":"other","clickable":true},{"id":"custom-code","label":"custom-code","type":"other","clickable":true},{"id":"conversational","label":"conversational","type":"other","clickable":true},{"id":"base_model:Qwen/Qwen3-Omni-30B-A3B-Instruct","label":"base_model:Qwen/Qwen3-Omni-30B-A3B-Instruct","type":"other","clickable":true},{"id":"base_model:finetune:Qwen/Qwen3-Omni-30B-A3B-Instruct","label":"base_model:finetune:Qwen/Qwen3-Omni-30B-A3B-Instruct","type":"other","clickable":true},{"id":"endpoints_compatible","label":"Inference Endpoints","type":"other","clickable":true},{"id":"license:apache-2.0","label":"apache-2.0","type":"license"},{"type":"region","label":"🇺🇸 Region: US","id":"region:us"}],"transformersInfo":{"auto_model":"AutoModelForMultimodalLM","pipeline_tag":"text-to-audio","processor":"AutoProcessor"},"widgetData":[{"text":"Hi, what can you help me with?"},{"text":"What is 84 * 3 / 2?"},{"text":"Tell me an interesting fact about the universe!"},{"text":"Explain quantum computing in simple terms."}],"safetensors":{"parameters":{"BF16":35259818545},"total":35259818545,"sharded":true,"totalFileSize":70526026515},"hasBlockedOids":false,"region":"us","isQuantized":false,"licenseFilePath":"LICENSE"},"queryParams":{},"inferenceContextData":{"billableEntities":[],"entityName2Providers":{}},"isLoggedIn":false,"canWrite":false,"examples":[],"widgetType":"conversational","isMaximized":false,"isMac":false}}"> 
+
+ Inference Providers NEW [https://huggingface.co/docs/inference-providers]
+
+ Image-Text-to-Text
+ [/tasks/image-text-to-text]
+
+This model isn't deployed by any Inference Provider. 🙋 Ask for provider support [/spaces/huggingface/InferenceSupport/discussions/new?title=Cloudflare/clef-omni&description=React%20to%20this%20comment%20with%20an%20emoji%20to%20vote%20for%20%5BCloudflare%2Fclef-omni%5D(%2FCloudflare%2Fclef-omni)%20to%20be%20supported%20by%20Inference%20Providers.%0A%0A(optional)%20Which%20providers%20are%20you%20interested%20in%3F%20(Novita%2C%20Hyperbolic%2C%20Together%E2%80%A6)%0A]
+
+ Model tree for Cloudflare/clef-omni [/docs/hub/model-cards#specifying-a-base-model]
+
+Base model
+
+ Qwen/Qwen3-Omni-30B-A3B-Instruct [/Qwen/Qwen3-Omni-30B-A3B-Instruct]
+
+ Finetuned
+ (38 [/models?other=base_model:finetune:Qwen/Qwen3-Omni-30B-A3B-Instruct]) 
+
+this model
+
+Quantizations
+
+ 8 models [/models?other=base_model:quantized:Cloudflare/clef-omni]
+
+ Spaces using Cloudflare/clef-omni 3
+
+📈
+
+tardellirs/model-pulse
+
+ [/spaces/tardellirs/model-pulse]
+⚡
+
+fastgpu/vram-and-gpu-cost-calculator
+ [/spaces/fastgpu/vram-and-gpu-cost-calculator]
+🎼
+
+hugging-apps/clef-omni
+ [/spaces/hugging-apps/clef-omni] 
+
+","pad_token":"<|endoftext|>","unk_token":null},"chat_template_jinja":"{%- if tools %}\n {{- '<|im_start|>system\\n' }}\n {%- if messages[0].role == 'system' %}\n {%- if messages[0].content is string %}\n {{- messages[0].content }}\n {%- else %}\n {%- for content in messages[0].content %}\n {%- if content.type == 'image' or 'image' in content or 'image_url' in content %}\n {{- \"<|vision_start|><|image_pad|><|vision_end|>\" }}\n {%- elif content.type == 'audio' or 'audio' in content or 'audio_url' in content %}\n {{- \"<|audio_start|><|audio_pad|><|audio_end|>\" }}\n {%- elif content.type == 'video' or 'video' in content %}\n {{- \"<|vision_start|><|video_pad|><|vision_end|>\" }}\n {%- elif content.type == 'text' %}\n {{- content.text }}\n {%- endif %}\n {%- endfor %}\n {%- endif %}\n {%- endif %}\n {{- '\\n\\n' }}\n {{- \"# Tools\\n\\nYou may call one or more functions to assist with the user query.\\n\\nYou are provided with function signatures within <tools></tools> XML tags:\\n<tools>\" }}\n {%- for tool in tools %}\n {{- \"\\n\" }}\n {{- tool | tojson }}\n {%- endfor %}\n {{- \"\\n</tools>\\n\\nFor each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:\\n<tool_call>\\n{\\\"name\\\": <function-name>, \\\"arguments\\\": <args-json-object>}\\n</tool_call><|im_end|>\\n\" }}\n{%- else %}\n {%- if messages[0].role == 'system' %}\n {%- if messages[0].content is string %}\n {{- '<|im_start|>system\\n' + messages[0].content + '<|im_end|>\\n' }}\n {%- else %}\n {%- for content in messages[0].content %}\n {%- if content.type == 'image' or 'image' in content or 'image_url' in content %}\n {{- '<|im_start|>system\\n' +\"<|vision_start|><|image_pad|><|vision_end|>\"+ '<|im_end|>\\n' }}\n {%- elif content.type == 'audio' or 'audio' in content or 'audio_url' in content %}\n {{- '<|im_start|>system\\n' +\"<|audio_start|><|audio_pad|><|audio_end|>\"+ '<|im_end|>\\n' }}\n {%- elif content.type == 'video' or 'video' in content %}\n {{- '<|im_start|>system\\n' +\"<|vision_start|><|video_pad|><|vision_end|>\"+ '<|im_end|>\\n' }}\n {%- elif content.type == 'text' %}\n {{- '<|im_start|>system\\n' +content.text+ '<|im_end|>\\n' }}\n {%- endif %}\n {%- endfor %}\n {%- endif %}\n {%- endif %}\n{%- endif %}\n{%- set ns = namespace(multi_step_tool=true, last_query_index=messages|length - 1) %}\n{%- for message in messages[::-1] %}\n {%- set index = (messages|length - 1) - loop.index0 %}\n {%- if ns.multi_step_tool and message.role == \"user\" and message.content is string and not(message.content.startswith('<tool_response>') and message.content.endswith('</tool_response>')) %}\n {%- set ns.multi_step_tool = false %}\n {%- set ns.last_query_index = index %}\n {%- endif %}\n{%- endfor %}\n{%- for message in messages %}\n {%- if message.content is string %}\n {%- set content = message.content %}\n {%- else %}\n {%- set content = namespace(text=\"\") %}\n {%- for mcontent in message.content %}\n {%- if mcontent.type == 'image' or 'image' in mcontent or 'image_url' in mcontent %}\n {%- set content.text = content.text~\"<|vision_start|><|image_pad|><|vision_end|>\" %}\n {%- elif mcontent.type == 'audio' or 'audio' in mcontent or 'audio_url' in mcontent %}\n {%- set content.text = content.text~\"<|audio_start|><|audio_pad|><|audio_end|>\" %}\n {%- elif mcontent.type == 'video' or 'video' in mcontent %}\n {%- set content.text = content.text~\"<|vision_start|><|video_pad|><|vision_end|>\" %}\n {%- elif mcontent.type == 'text' %}\n {%- set content.text = content.text~mcontent.text %}\n {%- endif %}\n {%- endfor %}\n {%- set content = content.text %}\n {%- endif %}\n {%- if (message.role == \"user\") or (message.role == \"system\" and not loop.first) %}\n {{- '<|im_start|>' + message.role + '\\n' + content + '<|im_end|>' + '\\n' }}\n {%- elif message.role == \"assistant\" %}\n {%- set reasoning_content = \"\" %}\n {%- if message.reasoning_content is string %}\n {%- set reasoning_content = message.reasoning_content %}\n {%- else %}\n {%- if '</think>' in content %}\n {%- set reasoning_content = content.split('</think>')[0].rstrip('\\n').split('<think>')[-1].lstrip('\\n') %}\n {%- set content = content.split('</think>')[-1].lstrip('\\n') %}\n {%- endif %}\n {%- endif %}\n {%- if loop.index0 > ns.last_query_index %}\n {%- if loop.last or (not loop.last and reasoning_content) %}\n {{- '<|im_start|>' + message.role + '\\n<think>\\n' + reasoning_content.strip(\"\\n\") + '\\n</think>\\n\\n' + content.lstrip('\\n') }}\n {%- else %}\n {{- '<|im_start|>' + message.role + '\\n' + content }}\n {%- endif %}\n {%- else %}\n {{- '<|im_start|>' + message.role + '\\n' + content }}\n {%- endif %}\n {%- if message.tool_calls %}\n {%- for tool_call in message.tool_calls %}\n {%- if (loop.first and content) or (not loop.first) %}{{- '\\n' }}{%- endif %}\n {%- if tool_call.function %}\n {%- set tool_call = tool_call.function %}\n {%- endif %}\n {{- '<tool_call>\\n{\"name\": \"' }}\n {{- tool_call.name }}\n {{- '\", \"arguments\": ' }}\n {%- if tool_call.arguments is string %}\n {{- tool_call.arguments }}\n {%- else %}\n {{- tool_call.arguments | tojson }}\n {%- endif %}\n {{- '}\\n</tool_call>' }}\n {%- endfor %}\n {%- endif %}\n {{- '<|im_end|>\\n' }}\n {%- elif message.role == \"tool\" %}\n {%- if loop.first or (messages[loop.index0 - 1].role != \"tool\") %}{{- '<|im_start|>user' }}{%- endif %}\n {{- '\\n<tool_response>\\n' }}\n {{- content }}\n {{- '\\n</tool_response>' }}\n {%- if loop.last or (messages[loop.index0 + 1].role != \"tool\") %}{{- '<|im_end|>\\n' }}{%- endif %}\n {%- endif %}\n{%- endfor %}\n{%- if add_generation_prompt %}\n {{- '<|im_start|>assistant\\n' }}\n {%- if enable_thinking is defined and enable_thinking is false %}{{- '<think>\\n\\n</think>\\n\\n' }}{%- endif %}\n{%- endif %}"},"createdAt":"2026-10-09T04:10:22.000Z","discussionsDisabled":false,"discussionsSorting":"recently-created","downloads":297,"downloadsAllTime":297,"id":"Cloudflare/clef-omni","isLikedByUser":false,"availableInferenceProviders":[],"showHuggingChatEntry":false,"inference":"","lastModified":"2026-10-09T17:49:32.000Z","likes":101,"pipeline_tag":"image-text-to-text","library_name":"transformers","librariesOther":[],"trackDownloads":true,"model-index":null,"private":false,"repoType":"model","gated":false,"tags":["transformers","safetensors","qwen3_omni_moe","text-to-audio","clef","cloudflare","systemone","decision-model","qwen3-omni","post-train","image-text-to-typed-output","multimodal","audio","video","structured-output","classification","custom-code","image-text-to-text","conversational","base_model:Qwen/Qwen3-Omni-30B-A3B-Instruct","base_model:finetune:Qwen/Qwen3-Omni-30B-A3B-Instruct","license:apache-2.0","endpoints_compatible","region:us"],"tag_objs":[{"id":"image-text-to-text","label":"Image-Text-to-Text","type":"pipeline_tag","subType":"multimodal"},{"id":"transformers","label":"Transformers","type":"library"},{"id":"safetensors","label":"Safetensors","type":"library"},{"id":"qwen3_omni_moe","label":"qwen3_omni_moe","type":"other","clickable":true},{"id":"text-to-audio","label":"text-to-audio","type":"other","clickable":true},{"id":"clef","label":"clef","type":"other","clickable":true},{"id":"cloudflare","label":"cloudflare","type":"other","clickable":true},{"id":"systemone","label":"systemone","type":"other","clickable":true},{"id":"decision-model","label":"decision-model","type":"other","clickable":true},{"id":"qwen3-omni","label":"qwen3-omni","type":"other","clickable":true},{"id":"post-train","label":"post-train","type":"other","clickable":true},{"id":"image-text-to-typed-output","label":"image-text-to-typed-output","type":"other","clickable":true},{"id":"multimodal","label":"multimodal","type":"other","clickable":true},{"id":"audio","label":"audio","type":"other","clickable":true},{"id":"video","label":"video","type":"other","clickable":true},{"id":"structured-output","label":"structured-output","type":"other","clickable":true},{"id":"classification","label":"classification","type":"other","clickable":true},{"id":"custom-code","label":"custom-code","type":"other","clickable":true},{"id":"conversational","label":"conversational","type":"other","clickable":true},{"id":"base_model:Qwen/Qwen3-Omni-30B-A3B-Instruct","label":"base_model:Qwen/Qwen3-Omni-30B-A3B-Instruct","type":"other","clickable":true},{"id":"base_model:finetune:Qwen/Qwen3-Omni-30B-A3B-Instruct","label":"base_model:finetune:Qwen/Qwen3-Omni-30B-A3B-Instruct","type":"other","clickable":true},{"id":"endpoints_compatible","label":"Inference Endpoints","type":"other","clickable":true},{"id":"license:apache-2.0","label":"apache-2.0","type":"license"},{"type":"region","label":"🇺🇸 Region: US","id":"region:us"}],"transformersInfo":{"auto_model":"AutoModelForMultimodalLM","pipeline_tag":"text-to-audio","processor":"AutoProcessor"},"widgetData":[{"text":"Hi, what can you help me with?"},{"text":"What is 84 * 3 / 2?"},{"text":"Tell me an interesting fact about the universe!"},{"text":"Explain quantum computing in simple terms."}],"safetensors":{"parameters":{"BF16":35259818545},"total":35259818545,"sharded":true,"totalFileSize":70526026515},"hasBlockedOids":false,"region":"us","isQuantized":false,"licenseFilePath":"LICENSE"}}">
+
+ System theme 
+
+Company
+ TOS [/terms-of-service] Privacy [/privacy] About [/huggingface] Careers [https://apply.workable.com/huggingface/] [/] 
+Website
+ Models [/models] Datasets [/datasets] Spaces [/spaces] Pricing [/pricing] Docs [/docs]

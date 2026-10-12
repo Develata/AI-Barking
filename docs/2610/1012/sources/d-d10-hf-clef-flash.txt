@@ -1,0 +1,1037 @@
+Cloudflare/clef-flash · Hugging Face
+
+ Hugging Face [/] 
+
+ Models [/models]
+
+ Datasets [/datasets]
+
+ Spaces [/spaces]
+
+ Buckets new [/storage]
+
+ Docs [/docs]
+
+ Enterprise [/enterprise]
+
+Pricing [/pricing]
+
+Website
+
+ Tasks [/tasks] 
+
+ HuggingChat [/chat] 
+
+ Collections [/collections] 
+
+ Languages [/languages] 
+
+ Organizations [/organizations] 
+
+Community
+
+ Blog [/blog] 
+
+ Posts [/posts] 
+
+ Daily Papers [/papers] 
+
+ Hardware [/hardware] 
+
+ Learn [/learn] 
+
+ Discord [/join/discord] 
+
+ Forum [https://discuss.huggingface.co/] 
+
+ GitHub [https://github.com/huggingface] 
+
+Solutions
+
+ Team & Enterprise [/enterprise] 
+
+ Hugging Face PRO [/pro] 
+
+ Enterprise Support [/support] 
+
+ Inference Providers [/inference/models] 
+
+ Inference Endpoints [/inference-endpoints] 
+
+ Storage Buckets [/storage] 
+
+Log In [/login]
+
+Sign Up [/join]
+
+","pad_token":"<|endoftext|>","unk_token":null},"chat_template_jinja":"{%- set image_count = namespace(value=0) %}\n{%- set video_count = namespace(value=0) %}\n{%- macro render_content(content, do_vision_count, is_system_content=false) %}\n {%- if content is string %}\n {{- content }}\n {%- elif content is iterable and content is not mapping %}\n {%- for item in content %}\n {%- if 'image' in item or 'image_url' in item or item.type == 'image' %}\n {%- if is_system_content %}\n {{- raise_exception('System message cannot contain images.') }}\n {%- endif %}\n {%- if do_vision_count %}\n {%- set image_count.value = image_count.value + 1 %}\n {%- endif %}\n {%- if add_vision_id %}\n {{- 'Picture ' ~ image_count.value ~ ': ' }}\n {%- endif %}\n {{- '<|vision_start|><|image_pad|><|vision_end|>' }}\n {%- elif 'video' in item or item.type == 'video' %}\n {%- if is_system_content %}\n {{- raise_exception('System message cannot contain videos.') }}\n {%- endif %}\n {%- if do_vision_count %}\n {%- set video_count.value = video_count.value + 1 %}\n {%- endif %}\n {%- if add_vision_id %}\n {{- 'Video ' ~ video_count.value ~ ': ' }}\n {%- endif %}\n {{- '<|vision_start|><|video_pad|><|vision_end|>' }}\n {%- elif 'text' in item %}\n {{- item.text }}\n {%- else %}\n {{- raise_exception('Unexpected item type in content.') }}\n {%- endif %}\n {%- endfor %}\n {%- elif content is none or content is undefined %}\n {{- '' }}\n {%- else %}\n {{- raise_exception('Unexpected content type.') }}\n {%- endif %}\n{%- endmacro %}\n{%- if not messages %}\n {{- raise_exception('No messages provided.') }}\n{%- endif %}\n{%- if tools and tools is iterable and tools is not mapping %}\n {{- '<|im_start|>system\\n' }}\n {{- \"# Tools\\n\\nYou have access to the following functions:\\n\\n<tools>\" }}\n {%- for tool in tools %}\n {{- \"\\n\" }}\n {{- tool | tojson }}\n {%- endfor %}\n {{- \"\\n</tools>\" }}\n {{- '\\n\\nIf you choose to call a function ONLY reply in the following format with NO suffix:\\n\\n<tool_call>\\n<function=example_function_name>\\n<parameter=example_parameter_1>\\nvalue_1\\n</parameter>\\n<parameter=example_parameter_2>\\nThis is the value for the second parameter\\nthat can span\\nmultiple lines\\n</parameter>\\n</function>\\n</tool_call>\\n\\n<IMPORTANT>\\nReminder:\\n- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags\\n- Required parameters MUST be specified\\n- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after\\n- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls\\n</IMPORTANT>' }}\n {%- if messages[0].role == 'system' %}\n {%- set content = render_content(messages[0].content, false, true)|trim %}\n {%- if content %}\n {{- '\\n\\n' + content }}\n {%- endif %}\n {%- endif %}\n {{- '<|im_end|>\\n' }}\n{%- else %}\n {%- if messages[0].role == 'system' %}\n {%- set content = render_content(messages[0].content, false, true)|trim %}\n {{- '<|im_start|>system\\n' + content + '<|im_end|>\\n' }}\n {%- endif %}\n{%- endif %}\n{%- set ns = namespace(multi_step_tool=true, last_query_index=messages|length - 1) %}\n{%- for message in messages[::-1] %}\n {%- set index = (messages|length - 1) - loop.index0 %}\n {%- if ns.multi_step_tool and message.role == \"user\" %}\n {%- set content = render_content(message.content, false)|trim %}\n {%- if not(content.startswith('<tool_response>') and content.endswith('</tool_response>')) %}\n {%- set ns.multi_step_tool = false %}\n {%- set ns.last_query_index = index %}\n {%- endif %}\n {%- endif %}\n{%- endfor %}\n{%- if ns.multi_step_tool %}\n {{- raise_exception('No user query found in messages.') }}\n{%- endif %}\n{%- for message in messages %}\n {%- set content = render_content(message.content, true)|trim %}\n {%- if message.role == \"system\" %}\n {%- if not loop.first %}\n {{- raise_exception('System message must be at the beginning.') }}\n {%- endif %}\n {%- elif message.role == \"user\" %}\n {{- '<|im_start|>' + message.role + '\\n' + content + '<|im_end|>' + '\\n' }}\n {%- elif message.role == \"assistant\" %}\n {%- set reasoning_content = '' %}\n {%- if message.reasoning_content is string %}\n {%- set reasoning_content = message.reasoning_content %}\n {%- else %}\n {%- if '</think>' in content %}\n {%- set reasoning_content = content.split('</think>')[0].rstrip('\\n').split('<think>')[-1].lstrip('\\n') %}\n {%- set content = content.split('</think>')[-1].lstrip('\\n') %}\n {%- endif %}\n {%- endif %}\n {%- set reasoning_content = reasoning_content|trim %}\n {%- if loop.index0 > ns.last_query_index %}\n {{- '<|im_start|>' + message.role + '\\n<think>\\n' + reasoning_content + '\\n</think>\\n\\n' + content }}\n {%- else %}\n {{- '<|im_start|>' + message.role + '\\n' + content }}\n {%- endif %}\n {%- if message.tool_calls and message.tool_calls is iterable and message.tool_calls is not mapping %}\n {%- for tool_call in message.tool_calls %}\n {%- if tool_call.function is defined %}\n {%- set tool_call = tool_call.function %}\n {%- endif %}\n {%- if loop.first %}\n {%- if content|trim %}\n {{- '\\n\\n<tool_call>\\n<function=' + tool_call.name + '>\\n' }}\n {%- else %}\n {{- '<tool_call>\\n<function=' + tool_call.name + '>\\n' }}\n {%- endif %}\n {%- else %}\n {{- '\\n<tool_call>\\n<function=' + tool_call.name + '>\\n' }}\n {%- endif %}\n {%- if tool_call.arguments is defined %}\n {%- for args_name, args_value in tool_call.arguments|items %}\n {{- '<parameter=' + args_name + '>\\n' }}\n {%- set args_value = args_value | tojson | safe if args_value is mapping or (args_value is sequence and args_value is not string) else args_value | string %}\n {{- args_value }}\n {{- '\\n</parameter>\\n' }}\n {%- endfor %}\n {%- endif %}\n {{- '</function>\\n</tool_call>' }}\n {%- endfor %}\n {%- endif %}\n {{- '<|im_end|>\\n' }}\n {%- elif message.role == \"tool\" %}\n {%- if loop.previtem and loop.previtem.role != \"tool\" %}\n {{- '<|im_start|>user' }}\n {%- endif %}\n {{- '\\n<tool_response>\\n' }}\n {{- content }}\n {{- '\\n</tool_response>' }}\n {%- if not loop.last and loop.nextitem.role != \"tool\" %}\n {{- '<|im_end|>\\n' }}\n {%- elif loop.last %}\n {{- '<|im_end|>\\n' }}\n {%- endif %}\n {%- else %}\n {{- raise_exception('Unexpected message role.') }}\n {%- endif %}\n{%- endfor %}\n{%- if add_generation_prompt %}\n {{- '<|im_start|>assistant\\n' }}\n {%- if enable_thinking is defined and enable_thinking is false %}\n {{- '<think>\\n\\n</think>\\n\\n' }}\n {%- else %}\n {{- '<think>\\n' }}\n {%- endif %}\n{%- endif %}"},"createdAt":"2026-09-30T21:15:36.000Z","discussionsDisabled":false,"discussionsSorting":"recently-created","downloads":22123,"downloadsAllTime":22123,"id":"Cloudflare/clef-flash","isLikedByUser":false,"availableInferenceProviders":[],"showHuggingChatEntry":false,"inference":"","lastModified":"2026-10-09T18:46:58.000Z","likes":759,"pipeline_tag":"image-text-to-text","library_name":"transformers","librariesOther":[],"trackDownloads":true,"model-index":null,"private":false,"repoType":"model","gated":false,"tags":["transformers","safetensors","qwen3_5","image-text-to-text","clef","cloudflare","systemone","decision-model","qwen3.5","post-train","image-text-to-typed-output","multimodal","structured-output","classification","custom-code","conversational","base_model:Qwen/Qwen3.5-9B","base_model:finetune:Qwen/Qwen3.5-9B","license:apache-2.0","endpoints_compatible","region:us"],"tag_objs":[{"id":"image-text-to-text","label":"Image-Text-to-Text","type":"pipeline_tag","subType":"multimodal"},{"id":"transformers","label":"Transformers","type":"library"},{"id":"safetensors","label":"Safetensors","type":"library"},{"id":"qwen3_5","label":"qwen3_5","type":"other","clickable":true},{"id":"clef","label":"clef","type":"other","clickable":true},{"id":"cloudflare","label":"cloudflare","type":"other","clickable":true},{"id":"systemone","label":"systemone","type":"other","clickable":true},{"id":"decision-model","label":"decision-model","type":"other","clickable":true},{"id":"qwen3.5","label":"qwen3.5","type":"other","clickable":true},{"id":"post-train","label":"post-train","type":"other","clickable":true},{"id":"image-text-to-typed-output","label":"image-text-to-typed-output","type":"other","clickable":true},{"id":"multimodal","label":"multimodal","type":"other","clickable":true},{"id":"structured-output","label":"structured-output","type":"other","clickable":true},{"id":"classification","label":"classification","type":"other","clickable":true},{"id":"custom-code","label":"custom-code","type":"other","clickable":true},{"id":"conversational","label":"conversational","type":"other","clickable":true},{"id":"base_model:Qwen/Qwen3.5-9B","label":"base_model:Qwen/Qwen3.5-9B","type":"other","clickable":true},{"id":"base_model:finetune:Qwen/Qwen3.5-9B","label":"base_model:finetune:Qwen/Qwen3.5-9B","type":"other","clickable":true},{"id":"endpoints_compatible","label":"Inference Endpoints","type":"other","clickable":true},{"id":"license:apache-2.0","label":"apache-2.0","type":"license"},{"type":"region","label":"🇺🇸 Region: US","id":"region:us"}],"transformersInfo":{"auto_model":"AutoModelForMultimodalLM","pipeline_tag":"image-text-to-text","processor":"AutoProcessor"},"widgetData":[{"text":"Hi, what can you help me with?"},{"text":"What is 84 * 3 / 2?"},{"text":"Tell me an interesting fact about the universe!"},{"text":"Explain quantum computing in simple terms."}],"safetensors":{"parameters":{"BF16":9409813744},"total":9409813744,"sharded":true,"totalFileSize":18819790373},"hasBlockedOids":false,"region":"us","isQuantized":false,"licenseFilePath":"LICENSE"},"discussionsStats":{"closed":2,"open":3,"total":5},"query":{},"inferenceContextData":{"billableEntities":[],"entityName2Providers":{}},"hasQuantizations":true,"copyToBucketNamespaces":[]}"> 
+
+ [/Cloudflare] 
+ Cloudflare [/Cloudflare] 
+/
+
+clef-flash [/Cloudflare/clef-flash] 
+
+ Like 759
+
+Follow
+ Cloudflare 1.16k
+
+ Image-Text-to-Text 
+ [/models?pipeline_tag=image-text-to-text]
+ Transformers 
+ [/models?library=transformers]
+ Safetensors 
+ [/models?library=safetensors]
+ qwen3_5 
+ [/models?other=qwen3_5]
+ clef 
+ [/models?other=clef]
+ cloudflare 
+ [/models?other=cloudflare]
+ systemone 
+ [/models?other=systemone]
+ decision-model 
+ [/models?other=decision-model]
+ qwen3.5 
+ [/models?other=qwen3.5]
+ post-train 
+ [/models?other=post-train]
+ image-text-to-typed-output 
+ [/models?other=image-text-to-typed-output]
+ multimodal 
+ [/models?other=multimodal]
+ structured-output 
+ [/models?other=structured-output]
+ classification 
+ [/models?other=classification]
+ custom-code 
+ [/models?other=custom-code]
+ conversational 
+ [/models?other=conversational]
+
+ License: apache-2.0 
+
+ Model card [/Cloudflare/clef-flash] Files Files and versions 
+ xet
+ [/Cloudflare/clef-flash/tree/main] Community 
+5
+ [/Cloudflare/clef-flash/discussions]
+
+ Deploy 
+
+ Copy to bucket new 
+
+ Use this model 
+Instructions to use Cloudflare/clef-flash with libraries, inference providers, notebooks, and local apps. Follow these links to get started.
+
+Libraries
+
+ Transformers [/Cloudflare/clef-flash?library=transformers] 
+How to use Cloudflare/clef-flash with Transformers:
+
+# Use a pipeline as a high-level helper
+from transformers import pipeline
+
+pipe = pipeline("image-text-to-text", model="Cloudflare/clef-flash")
+messages = [
+ {
+ "role": "user",
+ "content": [
+ {"type": "image", "url": "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/p-blog/candy.JPG"},
+ {"type": "text", "text": "What animal is on the candy?"}
+ ]
+ },
+]
+pipe(text=messages)
+
+# pip install -U transformers accelerate
+# Load model directly
+from transformers import AutoProcessor, AutoModelForMultimodalLM
+
+processor = AutoProcessor.from_pretrained("Cloudflare/clef-flash")
+model = AutoModelForMultimodalLM.from_pretrained("Cloudflare/clef-flash", device_map="auto")
+messages = [
+ {
+ "role": "user",
+ "content": [
+ {"type": "image", "url": "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/p-blog/candy.JPG"},
+ {"type": "text", "text": "What animal is on the candy?"}
+ ]
+ },
+]
+inputs = processor.apply_chat_template(
+ messages,
+ add_generation_prompt=True,
+ tokenize=True,
+ return_dict=True,
+ return_tensors="pt",
+).to(model.device)
+
+outputs = model.generate(**inputs, max_new_tokens=256)
+print(processor.decode(outputs[0][inputs["input_ids"].shape[-1]:]))
+
+Notebooks
+
+ Google Colab [/Cloudflare/clef-flash/colab] 
+
+ Kaggle [/Cloudflare/clef-flash/kaggle] 
+
+Local Apps Settings [/settings/local-apps]
+
+ vLLM [/Cloudflare/clef-flash?local-app=vllm] 
+How to use Cloudflare/clef-flash with vLLM:
+
+Install from pip and serve model
+
+# Install vLLM from pip:
+pip install vllm
+# Start the vLLM server:
+vllm serve "Cloudflare/clef-flash"
+# Call the server using curl (OpenAI-compatible API):
+curl -X POST "http://localhost:8000/v1/chat/completions" \
+ -H "Content-Type: application/json" \
+ --data '{
+ "model": "Cloudflare/clef-flash",
+ "messages": [
+ {
+ "role": "user",
+ "content": [
+ {
+ "type": "text",
+ "text": "Describe this image in one sentence."
+ },
+ {
+ "type": "image_url",
+ "image_url": {
+ "url": "https://cdn.britannica.com/61/93061-050-99147DCE/Statue-of-Liberty-Island-New-York-Bay.jpg"
+ }
+ }
+ ]
+ }
+ ]
+ }'
+
+Use Docker
+
+docker model run hf.co/Cloudflare/clef-flash
+
+ SGLang [/Cloudflare/clef-flash?local-app=sglang] 
+How to use Cloudflare/clef-flash with SGLang:
+
+Install from pip and serve model
+
+# Install SGLang from pip:
+pip install sglang
+# Start the SGLang server:
+python3 -m sglang.launch_server \
+ --model-path "Cloudflare/clef-flash" \
+ --host 0.0.0.0 \
+ --port 30000
+# Call the server using curl (OpenAI-compatible API):
+curl -X POST "http://localhost:30000/v1/chat/completions" \
+ -H "Content-Type: application/json" \
+ --data '{
+ "model": "Cloudflare/clef-flash",
+ "messages": [
+ {
+ "role": "user",
+ "content": [
+ {
+ "type": "text",
+ "text": "Describe this image in one sentence."
+ },
+ {
+ "type": "image_url",
+ "image_url": {
+ "url": "https://cdn.britannica.com/61/93061-050-99147DCE/Statue-of-Liberty-Island-New-York-Bay.jpg"
+ }
+ }
+ ]
+ }
+ ]
+ }'
+
+Use Docker images
+
+docker run --gpus all \
+ --shm-size 32g \
+ -p 30000:30000 \
+ -v ~/.cache/huggingface:/root/.cache/huggingface \
+ --env "HF_TOKEN=<secret>" \
+ --ipc=host \
+ lmsysorg/sglang:latest \
+ python3 -m sglang.launch_server \
+ --model-path "Cloudflare/clef-flash" \
+ --host 0.0.0.0 \
+ --port 30000
+# Call the server using curl (OpenAI-compatible API):
+curl -X POST "http://localhost:30000/v1/chat/completions" \
+ -H "Content-Type: application/json" \
+ --data '{
+ "model": "Cloudflare/clef-flash",
+ "messages": [
+ {
+ "role": "user",
+ "content": [
+ {
+ "type": "text",
+ "text": "Describe this image in one sentence."
+ },
+ {
+ "type": "image_url",
+ "image_url": {
+ "url": "https://cdn.britannica.com/61/93061-050-99147DCE/Statue-of-Liberty-Island-New-York-Bay.jpg"
+ }
+ }
+ ]
+ }
+ ]
+ }'
+
+ Docker Model Runner [/Cloudflare/clef-flash?local-app=docker-model-runner] 
+How to use Cloudflare/clef-flash with Docker Model Runner:
+
+docker model run hf.co/Cloudflare/clef-flash
+
+Browse
+ Quantizations [/models?other=base_model:quantized:Cloudflare/clef-flash] to use this model in llama.cpp, Ollama, LM Studio, or any compatible app.
+
+Clef-Flash [#clef-flash] 
+
+Model [#model] 
+
+Files [#files] 
+
+Usage [#usage] 
+
+SGLang [#sglang]
+
+Jev / SystemOne API [#jev--systemone-api]
+
+Images and video [#images-and-video]
+
+Input format [#input-format] 
+
+Results [#results] 
+
+Decision Index [#decision-index]
+
+Workflow evals [#workflow-evals]
+
+License [#license] 
+
+ [#clef-flash]
+
+ Clef-Flash
+
+Announcement: Clef decision models on the Cloudflare blog [https://blog.cloudflare.com/clef-decision-models]
+
+Decision Index leaderboard: clef-evals.workers-ai-mle.workers.dev [https://clef-evals.workers-ai-mle.workers.dev]
+
+Clef-Flash is a 9B multimodal model that turns a state and a schema of typed
+questions into decisions. It reads the state as text, JSON, images, or video, and returns a
+probability for every allowed option of every question in a single forward pass. There is no
+free-form text generation and no output parsing.
+
+The Clef-Flash API is fully compatible with Jev and SystemOne.
+
+Clef-Flash is post-trained from Qwen/Qwen3.5-9B [https://huggingface.co/Qwen/Qwen3.5-9B]. See
+Clef [https://huggingface.co/Cloudflare/clef] for the
+larger variant.
+
+ [#model]
+
+ Model
+
+Backbone: Qwen/Qwen3.5-9B with its vision encoder, stored as standard sharded safetensors.
+
+Joint schema head: a small transformer head that reads the backbone's final hidden states,
+routes evidence from the state to each question, and scores all options of all questions jointly.
+
+Output: one logit per allowed option for each question. Apply a softmax per question to get
+probabilities.
+
+ [#files]
+
+ Files
+
+File
+Purpose
+
+model-*.safetensors, model.safetensors.index.json, config.json, generation_config.json
+Backbone, including the vision encoder
+
+joint_head.safetensors, joint_head_config.json
+Joint schema head
+
+joint_schema_model.py
+Record encoding, batching, the model, load_release_model, and systemone
+
+tokenizer.json, tokenizer_config.json, chat_template.jinja, processor_config.json
+Tokenizer and image/video processor
+
+LICENSE
+Apache-2.0 license
+
+ [#usage]
+
+ Usage
+
+Tested with torch 2.11 and transformers 5.10.2 on a single H200. Image and video inputs also
+need pillow.
+
+import sys
+
+import torch
+from huggingface_hub import snapshot_download
+
+path = snapshot_download("Cloudflare/clef-flash")
+sys.path.insert(0, path)
+from joint_schema_model import collate_records, encode_record, load_release_model
+
+model, processor = load_release_model(path, device="cuda")
+
+record = {
+ "state": {"invoice": {"vendor": "Acme", "total": 1250.0, "currency": "USD", "status": "overdue"}},
+ "questions": {
+ "status": {
+ "type": "choice",
+ "instructions": "What is the invoice status?",
+ "criteria": {"paid": "Invoice is paid.", "overdue": "Invoice is past due.", "draft": "Not sent."},
+ },
+ "large": {"type": "noul", "instructions": "Is the total above 1000 USD?"},
+ },
+}
+
+encoded = encode_record(processor.tokenizer, record, processor=processor)
+batch = collate_records([encoded], processor.tokenizer.pad_token_id, torch.device("cuda"))
+with torch.inference_mode():
+ logits = model(batch)[0]
+
+for question, question_logits in zip(encoded.questions, logits):
+ probabilities = question_logits.float().softmax(-1).tolist()
+ print(question.question_id, dict(zip(question.option_ids, probabilities)))
+
+ [#sglang]
+
+ SGLang
+
+Clef-Flash can be served with SGLang. See the SGLang cookbook [https://docs.sglang.io/cookbook/autoregressive/Cloudflare/clef#hw=h200&variant=flash&quant=bf16&strategy=balanced&nodes=single] for
+launch commands on H200, B200, and B300. On a single H200:
+
+docker run --gpus all \
+ --shm-size 32g \
+ -p 30000:30000 \
+ -v ~/.cache/huggingface:/root/.cache/huggingface \
+ --ipc=host \
+ lmsysorg/sglang:dev-clef \
+ sglang serve \
+ --model-path Cloudflare/clef-flash \
+ --host 0.0.0.0 \
+ --port 30000
+
+The server answers Jev/SystemOne requests at /v1/systemone:
+
+curl http://localhost:30000/v1/systemone \
+ -H 'Content-Type: application/json' \
+ -d '{"model":"Cloudflare/clef-flash","state":"My Stripe integration keeps failing. Please help ASAP.","questions":{"urgency":{"type":"noul","instructions":"Does this message express urgency?"}}}'
+
+ [#jev--systemone-api]
+
+ Jev / SystemOne API
+
+systemone takes a Jev/SystemOne POST /v1/systemone request body and returns the same response
+body: model, answers keyed by question ID, and usage. A choice answer has choice,
+confidence, and probabilities; a score answer has the expected score, confidence, legend,
+and probabilities; a noul answer has the probability of true. instructions is optional, and
+images and videos may be added to the request.
+
+from joint_schema_model import systemone
+
+response = systemone(model, processor, {
+ "model": "clef-flash",
+ "state": "Our checkout started returning errors and orders are blocked.",
+ "questions": {
+ "department": {
+ "type": "choice",
+ "instructions": "Which team should handle the message?",
+ "criteria": {"billing": "Payments or invoices", "technical": "Bugs or outages"},
+ },
+ "urgency": {"type": "score", "criteria": ["Can wait", "This week", "Today"]},
+ "outage": {"type": "noul", "instructions": "Is a service down?"},
+ },
+})
+print(response["answers"])
+
+ [#images-and-video]
+
+ Images and video
+
+Add images (PIL images) or videos (frame arrays) to the record and pass the processor to
+encode_record. Optional processor arguments go in media_kwargs.
+
+from PIL import Image
+
+record = {
+ "state": {"task": "Review the attached receipt."},
+ "images": [Image.open("receipt.jpg")],
+ "questions": {
+ "legible": {"type": "noul", "instructions": "Is the receipt total legible?"},
+ },
+}
+encoded = encode_record(processor.tokenizer, record, processor=processor)
+
+Text-only and multimodal records can be mixed in the same batch.
+
+ [#input-format]
+
+ Input format
+
+Field
+Description
+
+state
+Any string or JSON value describing the situation to decide on
+
+images, videos
+Optional lists of images or video frame arrays
+
+media_kwargs
+Optional keyword arguments for the image/video processor
+
+questions
+Mapping of question ID to question
+
+Each question has:
+
+type: noul (true/false), choice (named options), or score (ordered options)
+
+instructions: what to decide; optional, and the question ID is used when it is omitted
+
+criteria: for choice, a mapping of option ID to description; for score, a list of option
+descriptions indexed from 0; for noul, optional descriptions for true and false
+
+encode_record accepts max_length (default 16,384 tokens) and max_state_tokens to bound the input.
+
+ [#results]
+
+ Results
+
+ [#decision-index]
+
+ Decision Index
+
+Per-benchmark results from our internal run of the Decision Index [https://clef-evals.workers-ai-mle.workers.dev] 0.2.1 suite. Scores are percentages; ForecastBench is a Brier score, where lower is better. The last two rows are request latency in milliseconds, where lower is better. The best value in each row is in bold.
+
+Benchmark
+Clef
+Clef-flash
+Jev
+DiffusionGemma Jev
+Kev 9B
+Laya
+
+BFCL (case exact accuracy)
+98.5
+98.8
+95.8
+96.5
+94.5
+38.1
+
+ToolRet (nDCG@10)
+69.2
+66.4
+65.3
+61.2
+64.3
+12.8
+
+API-Bank (accuracy)
+91.9
+93.1
+88.2
+83.7
+56.3
+11.5
+
+BANKING77 (macro-F1)
+94.2
+90.9
+79.7
+74.3
+84.8
+14.3
+
+CLINC150+OOS (macro-F1)
+97.4
+66.8
+89.3
+83.5
+79.0
+3.2
+
+RouterBench (selected quality)
+79.7
+79.9
+79.9
+79.0
+80.0
+57.1
+
+Home appliance simulator (case exact accuracy)
+83.0
+97.7
+52.3
+42.0
+25.0
+0.0
+
+SGD/SGD-X (macro-F1)
+43.8
+34.2
+43.0
+40.6
+64.0
+42.4
+
+ContractNLI (macro-F1)
+81.4
+84.3
+71.7
+76.0
+57.8
+29.0
+
+ANLI (macro-F1)
+69.8
+59.1
+74.8
+66.4
+56.3
+48.7
+
+BPoMP (accuracy)
+96.9
+95.4
+90.6
+86.9
+67.0
+51.6
+
+Humicroedit (accuracy)
+66.7
+75.1
+61.9
+63.0
+55.8
+47.2
+
+POP909-CL (accuracy)
+15.8
+1.6
+18.1
+2.5
+10.8
+5.1
+
+cfcolor (accuracy)
+66.0
+65.8
+64.7
+58.2
+56.3
+52.3
+
+MMLU (accuracy)
+90.3
+91.8
+91.7
+79.3
+75.3
+30.7
+
+GPQA Diamond (accuracy)
+48.0
+51.0
+78.3
+44.9
+38.8
+27.6
+
+ARC-Easy (accuracy)
+99.0
+99.5
+99.3
+98.2
+97.7
+47.0
+
+ARC-Challenge (accuracy)
+97.7
+98.3
+97.8
+94.5
+93.7
+28.6
+
+WinoGrande (accuracy)
+93.5
+97.5
+92.0
+73.6
+73.2
+50.5
+
+HellaSwag (accuracy)
+98.2
+98.6
+94.5
+83.3
+81.9
+33.1
+
+GSM8K (accuracy)
+80.8
+67.3
+79.9
+50.3
+48.7
+21.6
+
+ChessBench (accuracy)
+24.7
+23.0
+17.2
+14.2
+11.2
+7.7
+
+MuSR (accuracy)
+83.5
+86.0
+66.1
+61.2
+57.9
+43.2
+
+SATA-Bench (case exact accuracy)
+33.8
+36.7
+26.4
+27.5
+26.7
+0.3
+
+BRIGHT (nDCG@10)
+45.9
+39.3
+47.5
+42.9
+38.5
+19.9
+
+Amazon ESCI (macro-F1)
+57.5
+57.4
+55.2
+53.4
+49.2
+24.4
+
+ACOS (per-review F1)
+33.3
+25.9
+29.5
+24.5
+18.3
+3.5
+
+FinEntity (macro-F1)
+96.2
+97.1
+87.0
+89.0
+88.4
+61.0
+
+VAST (macro-F1)
+59.5
+49.6
+64.6
+55.7
+55.4
+40.5
+
+NLI4CT (macro-F1)
+82.9
+78.6
+84.1
+78.4
+74.9
+47.7
+
+CRUXEval (accuracy)
+86.7
+86.1
+73.0
+64.7
+51.2
+40.2
+
+CLadder (accuracy)
+94.0
+97.7
+72.6
+67.8
+62.0
+52.9
+
+ForecastBench (Brier, lower is better)
+13.9
+10.6
+17.4
+29.6
+17.6
+41.1
+
+Habermas Machine (accuracy)
+68.7
+71.8
+45.9
+45.0
+39.4
+33.4
+
+PhishNChips (accuracy)
+79.6
+75.0
+62.5
+85.4
+50.7
+50.1
+
+MMLU-Pro (accuracy)
+65.9
+65.3
+82.7
+56.9
+51.1
+13.6
+
+BBH (accuracy)
+73.7
+68.9
+92.9
+70.7
+65.2
+34.1
+
+RAGTruth (hallucination F1)
+79.4
+35.6
+76.5
+70.4
+46.2
+48.8
+
+HoVer (accuracy)
+65.2
+61.2
+72.9
+70.9
+58.8
+55.8
+
+When2Call MCQ (accuracy)
+72.4
+65.6
+81.0
+75.4
+49.6
+11.9
+
+New Yorker (accuracy)
+69.5
+66.1
+70.1
+63.6
+58.1
+27.1
+
+Median latency (ms)
+209.3
+38.8
+524.1
+84.4
+51.4
+5.8
+
+p95 latency (ms)
+238.6
+122.4
+536.0
+211.2
+187.9
+222.5
+
+ [#workflow-evals]
+
+ Workflow evals
+
+Decision accuracy on four end-to-end business workflows from Typesafe Evals [https://evals.typesafe.ai/], scored against consensus reference labels. All models are scored on the same dataset revision and case cohort.
+
+Workflow
+Metric
+Clef
+Clef-flash
+Jev
+
+Invoice processing
+Exact actions
+64.7
+57.1
+61.8
+
+Invoice processing
+Primary action
+86.2
+73.3
+83.1
+
+Customer service
+Exact actions
+76.3
+77.0
+76.0
+
+Security incidents
+Exact actions
+62.9
+61.7
+61.7
+
+Agent trace observability
+Primary action
+68.5
+69.8
+71.6
+
+ [#license]
+
+ License
+
+Released under the Apache-2.0 license, following the base model
+Qwen/Qwen3.5-9B [https://huggingface.co/Qwen/Qwen3.5-9B].
+
+Downloads last month 22,123 
+
+","pad_token":"<|endoftext|>","unk_token":null},"chat_template_jinja":"{%- set image_count = namespace(value=0) %}\n{%- set video_count = namespace(value=0) %}\n{%- macro render_content(content, do_vision_count, is_system_content=false) %}\n {%- if content is string %}\n {{- content }}\n {%- elif content is iterable and content is not mapping %}\n {%- for item in content %}\n {%- if 'image' in item or 'image_url' in item or item.type == 'image' %}\n {%- if is_system_content %}\n {{- raise_exception('System message cannot contain images.') }}\n {%- endif %}\n {%- if do_vision_count %}\n {%- set image_count.value = image_count.value + 1 %}\n {%- endif %}\n {%- if add_vision_id %}\n {{- 'Picture ' ~ image_count.value ~ ': ' }}\n {%- endif %}\n {{- '<|vision_start|><|image_pad|><|vision_end|>' }}\n {%- elif 'video' in item or item.type == 'video' %}\n {%- if is_system_content %}\n {{- raise_exception('System message cannot contain videos.') }}\n {%- endif %}\n {%- if do_vision_count %}\n {%- set video_count.value = video_count.value + 1 %}\n {%- endif %}\n {%- if add_vision_id %}\n {{- 'Video ' ~ video_count.value ~ ': ' }}\n {%- endif %}\n {{- '<|vision_start|><|video_pad|><|vision_end|>' }}\n {%- elif 'text' in item %}\n {{- item.text }}\n {%- else %}\n {{- raise_exception('Unexpected item type in content.') }}\n {%- endif %}\n {%- endfor %}\n {%- elif content is none or content is undefined %}\n {{- '' }}\n {%- else %}\n {{- raise_exception('Unexpected content type.') }}\n {%- endif %}\n{%- endmacro %}\n{%- if not messages %}\n {{- raise_exception('No messages provided.') }}\n{%- endif %}\n{%- if tools and tools is iterable and tools is not mapping %}\n {{- '<|im_start|>system\\n' }}\n {{- \"# Tools\\n\\nYou have access to the following functions:\\n\\n<tools>\" }}\n {%- for tool in tools %}\n {{- \"\\n\" }}\n {{- tool | tojson }}\n {%- endfor %}\n {{- \"\\n</tools>\" }}\n {{- '\\n\\nIf you choose to call a function ONLY reply in the following format with NO suffix:\\n\\n<tool_call>\\n<function=example_function_name>\\n<parameter=example_parameter_1>\\nvalue_1\\n</parameter>\\n<parameter=example_parameter_2>\\nThis is the value for the second parameter\\nthat can span\\nmultiple lines\\n</parameter>\\n</function>\\n</tool_call>\\n\\n<IMPORTANT>\\nReminder:\\n- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags\\n- Required parameters MUST be specified\\n- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after\\n- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls\\n</IMPORTANT>' }}\n {%- if messages[0].role == 'system' %}\n {%- set content = render_content(messages[0].content, false, true)|trim %}\n {%- if content %}\n {{- '\\n\\n' + content }}\n {%- endif %}\n {%- endif %}\n {{- '<|im_end|>\\n' }}\n{%- else %}\n {%- if messages[0].role == 'system' %}\n {%- set content = render_content(messages[0].content, false, true)|trim %}\n {{- '<|im_start|>system\\n' + content + '<|im_end|>\\n' }}\n {%- endif %}\n{%- endif %}\n{%- set ns = namespace(multi_step_tool=true, last_query_index=messages|length - 1) %}\n{%- for message in messages[::-1] %}\n {%- set index = (messages|length - 1) - loop.index0 %}\n {%- if ns.multi_step_tool and message.role == \"user\" %}\n {%- set content = render_content(message.content, false)|trim %}\n {%- if not(content.startswith('<tool_response>') and content.endswith('</tool_response>')) %}\n {%- set ns.multi_step_tool = false %}\n {%- set ns.last_query_index = index %}\n {%- endif %}\n {%- endif %}\n{%- endfor %}\n{%- if ns.multi_step_tool %}\n {{- raise_exception('No user query found in messages.') }}\n{%- endif %}\n{%- for message in messages %}\n {%- set content = render_content(message.content, true)|trim %}\n {%- if message.role == \"system\" %}\n {%- if not loop.first %}\n {{- raise_exception('System message must be at the beginning.') }}\n {%- endif %}\n {%- elif message.role == \"user\" %}\n {{- '<|im_start|>' + message.role + '\\n' + content + '<|im_end|>' + '\\n' }}\n {%- elif message.role == \"assistant\" %}\n {%- set reasoning_content = '' %}\n {%- if message.reasoning_content is string %}\n {%- set reasoning_content = message.reasoning_content %}\n {%- else %}\n {%- if '</think>' in content %}\n {%- set reasoning_content = content.split('</think>')[0].rstrip('\\n').split('<think>')[-1].lstrip('\\n') %}\n {%- set content = content.split('</think>')[-1].lstrip('\\n') %}\n {%- endif %}\n {%- endif %}\n {%- set reasoning_content = reasoning_content|trim %}\n {%- if loop.index0 > ns.last_query_index %}\n {{- '<|im_start|>' + message.role + '\\n<think>\\n' + reasoning_content + '\\n</think>\\n\\n' + content }}\n {%- else %}\n {{- '<|im_start|>' + message.role + '\\n' + content }}\n {%- endif %}\n {%- if message.tool_calls and message.tool_calls is iterable and message.tool_calls is not mapping %}\n {%- for tool_call in message.tool_calls %}\n {%- if tool_call.function is defined %}\n {%- set tool_call = tool_call.function %}\n {%- endif %}\n {%- if loop.first %}\n {%- if content|trim %}\n {{- '\\n\\n<tool_call>\\n<function=' + tool_call.name + '>\\n' }}\n {%- else %}\n {{- '<tool_call>\\n<function=' + tool_call.name + '>\\n' }}\n {%- endif %}\n {%- else %}\n {{- '\\n<tool_call>\\n<function=' + tool_call.name + '>\\n' }}\n {%- endif %}\n {%- if tool_call.arguments is defined %}\n {%- for args_name, args_value in tool_call.arguments|items %}\n {{- '<parameter=' + args_name + '>\\n' }}\n {%- set args_value = args_value | tojson | safe if args_value is mapping or (args_value is sequence and args_value is not string) else args_value | string %}\n {{- args_value }}\n {{- '\\n</parameter>\\n' }}\n {%- endfor %}\n {%- endif %}\n {{- '</function>\\n</tool_call>' }}\n {%- endfor %}\n {%- endif %}\n {{- '<|im_end|>\\n' }}\n {%- elif message.role == \"tool\" %}\n {%- if loop.previtem and loop.previtem.role != \"tool\" %}\n {{- '<|im_start|>user' }}\n {%- endif %}\n {{- '\\n<tool_response>\\n' }}\n {{- content }}\n {{- '\\n</tool_response>' }}\n {%- if not loop.last and loop.nextitem.role != \"tool\" %}\n {{- '<|im_end|>\\n' }}\n {%- elif loop.last %}\n {{- '<|im_end|>\\n' }}\n {%- endif %}\n {%- else %}\n {{- raise_exception('Unexpected message role.') }}\n {%- endif %}\n{%- endfor %}\n{%- if add_generation_prompt %}\n {{- '<|im_start|>assistant\\n' }}\n {%- if enable_thinking is defined and enable_thinking is false %}\n {{- '<think>\\n\\n</think>\\n\\n' }}\n {%- else %}\n {{- '<think>\\n' }}\n {%- endif %}\n{%- endif %}"},"createdAt":"2026-09-30T21:15:36.000Z","discussionsDisabled":false,"discussionsSorting":"recently-created","downloads":22123,"downloadsAllTime":22123,"id":"Cloudflare/clef-flash","isLikedByUser":false,"availableInferenceProviders":[],"showHuggingChatEntry":false,"inference":"","lastModified":"2026-10-09T18:46:58.000Z","likes":759,"pipeline_tag":"image-text-to-text","library_name":"transformers","librariesOther":[],"trackDownloads":true,"model-index":null,"private":false,"repoType":"model","gated":false,"tags":["transformers","safetensors","qwen3_5","image-text-to-text","clef","cloudflare","systemone","decision-model","qwen3.5","post-train","image-text-to-typed-output","multimodal","structured-output","classification","custom-code","conversational","base_model:Qwen/Qwen3.5-9B","base_model:finetune:Qwen/Qwen3.5-9B","license:apache-2.0","endpoints_compatible","region:us"],"tag_objs":[{"id":"image-text-to-text","label":"Image-Text-to-Text","type":"pipeline_tag","subType":"multimodal"},{"id":"transformers","label":"Transformers","type":"library"},{"id":"safetensors","label":"Safetensors","type":"library"},{"id":"qwen3_5","label":"qwen3_5","type":"other","clickable":true},{"id":"clef","label":"clef","type":"other","clickable":true},{"id":"cloudflare","label":"cloudflare","type":"other","clickable":true},{"id":"systemone","label":"systemone","type":"other","clickable":true},{"id":"decision-model","label":"decision-model","type":"other","clickable":true},{"id":"qwen3.5","label":"qwen3.5","type":"other","clickable":true},{"id":"post-train","label":"post-train","type":"other","clickable":true},{"id":"image-text-to-typed-output","label":"image-text-to-typed-output","type":"other","clickable":true},{"id":"multimodal","label":"multimodal","type":"other","clickable":true},{"id":"structured-output","label":"structured-output","type":"other","clickable":true},{"id":"classification","label":"classification","type":"other","clickable":true},{"id":"custom-code","label":"custom-code","type":"other","clickable":true},{"id":"conversational","label":"conversational","type":"other","clickable":true},{"id":"base_model:Qwen/Qwen3.5-9B","label":"base_model:Qwen/Qwen3.5-9B","type":"other","clickable":true},{"id":"base_model:finetune:Qwen/Qwen3.5-9B","label":"base_model:finetune:Qwen/Qwen3.5-9B","type":"other","clickable":true},{"id":"endpoints_compatible","label":"Inference Endpoints","type":"other","clickable":true},{"id":"license:apache-2.0","label":"apache-2.0","type":"license"},{"type":"region","label":"🇺🇸 Region: US","id":"region:us"}],"transformersInfo":{"auto_model":"AutoModelForMultimodalLM","pipeline_tag":"image-text-to-text","processor":"AutoProcessor"},"widgetData":[{"text":"Hi, what can you help me with?"},{"text":"What is 84 * 3 / 2?"},{"text":"Tell me an interesting fact about the universe!"},{"text":"Explain quantum computing in simple terms."}],"safetensors":{"parameters":{"BF16":9409813744},"total":9409813744,"sharded":true,"totalFileSize":18819790373},"hasBlockedOids":false,"region":"us","isQuantized":false,"licenseFilePath":"LICENSE"},"inferenceContextData":{"billableEntities":[],"entityName2Providers":{}},"canWrite":false}">
+
+Safetensors [https://huggingface.co/docs/safetensors]
+
+Model size
+
+9B params
+
+Tensor type
+
+BF16 
+·
+
+Chat template
+
+Files info
+
+","pad_token":"<|endoftext|>","unk_token":null},"chat_template_jinja":"{%- set image_count = namespace(value=0) %}\n{%- set video_count = namespace(value=0) %}\n{%- macro render_content(content, do_vision_count, is_system_content=false) %}\n {%- if content is string %}\n {{- content }}\n {%- elif content is iterable and content is not mapping %}\n {%- for item in content %}\n {%- if 'image' in item or 'image_url' in item or item.type == 'image' %}\n {%- if is_system_content %}\n {{- raise_exception('System message cannot contain images.') }}\n {%- endif %}\n {%- if do_vision_count %}\n {%- set image_count.value = image_count.value + 1 %}\n {%- endif %}\n {%- if add_vision_id %}\n {{- 'Picture ' ~ image_count.value ~ ': ' }}\n {%- endif %}\n {{- '<|vision_start|><|image_pad|><|vision_end|>' }}\n {%- elif 'video' in item or item.type == 'video' %}\n {%- if is_system_content %}\n {{- raise_exception('System message cannot contain videos.') }}\n {%- endif %}\n {%- if do_vision_count %}\n {%- set video_count.value = video_count.value + 1 %}\n {%- endif %}\n {%- if add_vision_id %}\n {{- 'Video ' ~ video_count.value ~ ': ' }}\n {%- endif %}\n {{- '<|vision_start|><|video_pad|><|vision_end|>' }}\n {%- elif 'text' in item %}\n {{- item.text }}\n {%- else %}\n {{- raise_exception('Unexpected item type in content.') }}\n {%- endif %}\n {%- endfor %}\n {%- elif content is none or content is undefined %}\n {{- '' }}\n {%- else %}\n {{- raise_exception('Unexpected content type.') }}\n {%- endif %}\n{%- endmacro %}\n{%- if not messages %}\n {{- raise_exception('No messages provided.') }}\n{%- endif %}\n{%- if tools and tools is iterable and tools is not mapping %}\n {{- '<|im_start|>system\\n' }}\n {{- \"# Tools\\n\\nYou have access to the following functions:\\n\\n<tools>\" }}\n {%- for tool in tools %}\n {{- \"\\n\" }}\n {{- tool | tojson }}\n {%- endfor %}\n {{- \"\\n</tools>\" }}\n {{- '\\n\\nIf you choose to call a function ONLY reply in the following format with NO suffix:\\n\\n<tool_call>\\n<function=example_function_name>\\n<parameter=example_parameter_1>\\nvalue_1\\n</parameter>\\n<parameter=example_parameter_2>\\nThis is the value for the second parameter\\nthat can span\\nmultiple lines\\n</parameter>\\n</function>\\n</tool_call>\\n\\n<IMPORTANT>\\nReminder:\\n- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags\\n- Required parameters MUST be specified\\n- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after\\n- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls\\n</IMPORTANT>' }}\n {%- if messages[0].role == 'system' %}\n {%- set content = render_content(messages[0].content, false, true)|trim %}\n {%- if content %}\n {{- '\\n\\n' + content }}\n {%- endif %}\n {%- endif %}\n {{- '<|im_end|>\\n' }}\n{%- else %}\n {%- if messages[0].role == 'system' %}\n {%- set content = render_content(messages[0].content, false, true)|trim %}\n {{- '<|im_start|>system\\n' + content + '<|im_end|>\\n' }}\n {%- endif %}\n{%- endif %}\n{%- set ns = namespace(multi_step_tool=true, last_query_index=messages|length - 1) %}\n{%- for message in messages[::-1] %}\n {%- set index = (messages|length - 1) - loop.index0 %}\n {%- if ns.multi_step_tool and message.role == \"user\" %}\n {%- set content = render_content(message.content, false)|trim %}\n {%- if not(content.startswith('<tool_response>') and content.endswith('</tool_response>')) %}\n {%- set ns.multi_step_tool = false %}\n {%- set ns.last_query_index = index %}\n {%- endif %}\n {%- endif %}\n{%- endfor %}\n{%- if ns.multi_step_tool %}\n {{- raise_exception('No user query found in messages.') }}\n{%- endif %}\n{%- for message in messages %}\n {%- set content = render_content(message.content, true)|trim %}\n {%- if message.role == \"system\" %}\n {%- if not loop.first %}\n {{- raise_exception('System message must be at the beginning.') }}\n {%- endif %}\n {%- elif message.role == \"user\" %}\n {{- '<|im_start|>' + message.role + '\\n' + content + '<|im_end|>' + '\\n' }}\n {%- elif message.role == \"assistant\" %}\n {%- set reasoning_content = '' %}\n {%- if message.reasoning_content is string %}\n {%- set reasoning_content = message.reasoning_content %}\n {%- else %}\n {%- if '</think>' in content %}\n {%- set reasoning_content = content.split('</think>')[0].rstrip('\\n').split('<think>')[-1].lstrip('\\n') %}\n {%- set content = content.split('</think>')[-1].lstrip('\\n') %}\n {%- endif %}\n {%- endif %}\n {%- set reasoning_content = reasoning_content|trim %}\n {%- if loop.index0 > ns.last_query_index %}\n {{- '<|im_start|>' + message.role + '\\n<think>\\n' + reasoning_content + '\\n</think>\\n\\n' + content }}\n {%- else %}\n {{- '<|im_start|>' + message.role + '\\n' + content }}\n {%- endif %}\n {%- if message.tool_calls and message.tool_calls is iterable and message.tool_calls is not mapping %}\n {%- for tool_call in message.tool_calls %}\n {%- if tool_call.function is defined %}\n {%- set tool_call = tool_call.function %}\n {%- endif %}\n {%- if loop.first %}\n {%- if content|trim %}\n {{- '\\n\\n<tool_call>\\n<function=' + tool_call.name + '>\\n' }}\n {%- else %}\n {{- '<tool_call>\\n<function=' + tool_call.name + '>\\n' }}\n {%- endif %}\n {%- else %}\n {{- '\\n<tool_call>\\n<function=' + tool_call.name + '>\\n' }}\n {%- endif %}\n {%- if tool_call.arguments is defined %}\n {%- for args_name, args_value in tool_call.arguments|items %}\n {{- '<parameter=' + args_name + '>\\n' }}\n {%- set args_value = args_value | tojson | safe if args_value is mapping or (args_value is sequence and args_value is not string) else args_value | string %}\n {{- args_value }}\n {{- '\\n</parameter>\\n' }}\n {%- endfor %}\n {%- endif %}\n {{- '</function>\\n</tool_call>' }}\n {%- endfor %}\n {%- endif %}\n {{- '<|im_end|>\\n' }}\n {%- elif message.role == \"tool\" %}\n {%- if loop.previtem and loop.previtem.role != \"tool\" %}\n {{- '<|im_start|>user' }}\n {%- endif %}\n {{- '\\n<tool_response>\\n' }}\n {{- content }}\n {{- '\\n</tool_response>' }}\n {%- if not loop.last and loop.nextitem.role != \"tool\" %}\n {{- '<|im_end|>\\n' }}\n {%- elif loop.last %}\n {{- '<|im_end|>\\n' }}\n {%- endif %}\n {%- else %}\n {{- raise_exception('Unexpected message role.') }}\n {%- endif %}\n{%- endfor %}\n{%- if add_generation_prompt %}\n {{- '<|im_start|>assistant\\n' }}\n {%- if enable_thinking is defined and enable_thinking is false %}\n {{- '<think>\\n\\n</think>\\n\\n' }}\n {%- else %}\n {{- '<think>\\n' }}\n {%- endif %}\n{%- endif %}"},"createdAt":"2026-09-30T21:15:36.000Z","discussionsDisabled":false,"discussionsSorting":"recently-created","downloads":22123,"downloadsAllTime":22123,"id":"Cloudflare/clef-flash","isLikedByUser":false,"availableInferenceProviders":[],"showHuggingChatEntry":false,"inference":"","lastModified":"2026-10-09T18:46:58.000Z","likes":759,"pipeline_tag":"image-text-to-text","library_name":"transformers","librariesOther":[],"trackDownloads":true,"model-index":null,"private":false,"repoType":"model","gated":false,"tags":["transformers","safetensors","qwen3_5","image-text-to-text","clef","cloudflare","systemone","decision-model","qwen3.5","post-train","image-text-to-typed-output","multimodal","structured-output","classification","custom-code","conversational","base_model:Qwen/Qwen3.5-9B","base_model:finetune:Qwen/Qwen3.5-9B","license:apache-2.0","endpoints_compatible","region:us"],"tag_objs":[{"id":"image-text-to-text","label":"Image-Text-to-Text","type":"pipeline_tag","subType":"multimodal"},{"id":"transformers","label":"Transformers","type":"library"},{"id":"safetensors","label":"Safetensors","type":"library"},{"id":"qwen3_5","label":"qwen3_5","type":"other","clickable":true},{"id":"clef","label":"clef","type":"other","clickable":true},{"id":"cloudflare","label":"cloudflare","type":"other","clickable":true},{"id":"systemone","label":"systemone","type":"other","clickable":true},{"id":"decision-model","label":"decision-model","type":"other","clickable":true},{"id":"qwen3.5","label":"qwen3.5","type":"other","clickable":true},{"id":"post-train","label":"post-train","type":"other","clickable":true},{"id":"image-text-to-typed-output","label":"image-text-to-typed-output","type":"other","clickable":true},{"id":"multimodal","label":"multimodal","type":"other","clickable":true},{"id":"structured-output","label":"structured-output","type":"other","clickable":true},{"id":"classification","label":"classification","type":"other","clickable":true},{"id":"custom-code","label":"custom-code","type":"other","clickable":true},{"id":"conversational","label":"conversational","type":"other","clickable":true},{"id":"base_model:Qwen/Qwen3.5-9B","label":"base_model:Qwen/Qwen3.5-9B","type":"other","clickable":true},{"id":"base_model:finetune:Qwen/Qwen3.5-9B","label":"base_model:finetune:Qwen/Qwen3.5-9B","type":"other","clickable":true},{"id":"endpoints_compatible","label":"Inference Endpoints","type":"other","clickable":true},{"id":"license:apache-2.0","label":"apache-2.0","type":"license"},{"type":"region","label":"🇺🇸 Region: US","id":"region:us"}],"transformersInfo":{"auto_model":"AutoModelForMultimodalLM","pipeline_tag":"image-text-to-text","processor":"AutoProcessor"},"widgetData":[{"text":"Hi, what can you help me with?"},{"text":"What is 84 * 3 / 2?"},{"text":"Tell me an interesting fact about the universe!"},{"text":"Explain quantum computing in simple terms."}],"safetensors":{"parameters":{"BF16":9409813744},"total":9409813744,"sharded":true,"totalFileSize":18819790373},"hasBlockedOids":false,"region":"us","isQuantized":false,"licenseFilePath":"LICENSE"},"queryParams":{},"inferenceContextData":{"billableEntities":[],"entityName2Providers":{}},"linkToInferenceDiscussion":{"url":"/spaces/huggingface/InferenceSupport/discussions/12751","numReactions":2},"isLoggedIn":false,"canWrite":false,"examples":[],"widgetType":"conversational","isMaximized":false,"isMac":false}}"> 
+
+ Inference Providers NEW [https://huggingface.co/docs/inference-providers]
+
+ Image-Text-to-Text
+ [/tasks/image-text-to-text]
+
+This model isn't deployed by any Inference Provider. 🙋 2 Ask for provider support [/spaces/huggingface/InferenceSupport/discussions/12751]
+
+ Model tree for Cloudflare/clef-flash [/docs/hub/model-cards#specifying-a-base-model]
+
+Base model
+
+ Qwen/Qwen3.5-9B-Base [/Qwen/Qwen3.5-9B-Base]
+
+ Finetuned
+
+ Qwen/Qwen3.5-9B [/Qwen/Qwen3.5-9B]
+
+ Finetuned
+ (1002 [/models?other=base_model:finetune:Qwen/Qwen3.5-9B]) 
+
+this model
+
+Adapters
+
+ 4 models [/models?other=base_model:adapter:Cloudflare/clef-flash]
+
+Finetunes
+
+ 8 models [/models?other=base_model:finetune:Cloudflare/clef-flash]
+
+Quantizations
+
+ 53 models [/models?other=base_model:quantized:Cloudflare/clef-flash]
+
+ Spaces using Cloudflare/clef-flash 12
+
+🔬
+
+multimodalart/jev-decision-index
+
+ [/spaces/multimodalart/jev-decision-index]
+📈
+
+tardellirs/model-pulse
+
+ [/spaces/tardellirs/model-pulse]
+📊
+
+hotchpotch/S1MB-leaderboard
+
+ [/spaces/hotchpotch/S1MB-leaderboard]
+🟩
+
+embedl/hfviewer
+ [/spaces/embedl/hfviewer]
+⚡
+
+fastgpu/vram-and-gpu-cost-calculator
+ [/spaces/fastgpu/vram-and-gpu-cost-calculator]
+🏆
+
+muratcanlaloglu/TurkishDecisionBenchmark
+ [/spaces/muratcanlaloglu/TurkishDecisionBenchmark]
+🎼
+
+hugging-apps/clef-flash
+ [/spaces/hugging-apps/clef-flash]
+⚖️
+
+benchmarkheaven/JevBench
+ [/spaces/benchmarkheaven/JevBench] + 7 Spaces + 4 Spaces
+
+ Collection including Cloudflare/clef-flash
+
+Clef
+
+ Collection
+
+Clef is a family of open-weight decision models trained by Cloudflare, optimized for speed, quality and a new vision encoder. • 2 items • Updated 6 days ago • 5
+ [/collections/Cloudflare/clef]
+
+","pad_token":"<|endoftext|>","unk_token":null},"chat_template_jinja":"{%- set image_count = namespace(value=0) %}\n{%- set video_count = namespace(value=0) %}\n{%- macro render_content(content, do_vision_count, is_system_content=false) %}\n {%- if content is string %}\n {{- content }}\n {%- elif content is iterable and content is not mapping %}\n {%- for item in content %}\n {%- if 'image' in item or 'image_url' in item or item.type == 'image' %}\n {%- if is_system_content %}\n {{- raise_exception('System message cannot contain images.') }}\n {%- endif %}\n {%- if do_vision_count %}\n {%- set image_count.value = image_count.value + 1 %}\n {%- endif %}\n {%- if add_vision_id %}\n {{- 'Picture ' ~ image_count.value ~ ': ' }}\n {%- endif %}\n {{- '<|vision_start|><|image_pad|><|vision_end|>' }}\n {%- elif 'video' in item or item.type == 'video' %}\n {%- if is_system_content %}\n {{- raise_exception('System message cannot contain videos.') }}\n {%- endif %}\n {%- if do_vision_count %}\n {%- set video_count.value = video_count.value + 1 %}\n {%- endif %}\n {%- if add_vision_id %}\n {{- 'Video ' ~ video_count.value ~ ': ' }}\n {%- endif %}\n {{- '<|vision_start|><|video_pad|><|vision_end|>' }}\n {%- elif 'text' in item %}\n {{- item.text }}\n {%- else %}\n {{- raise_exception('Unexpected item type in content.') }}\n {%- endif %}\n {%- endfor %}\n {%- elif content is none or content is undefined %}\n {{- '' }}\n {%- else %}\n {{- raise_exception('Unexpected content type.') }}\n {%- endif %}\n{%- endmacro %}\n{%- if not messages %}\n {{- raise_exception('No messages provided.') }}\n{%- endif %}\n{%- if tools and tools is iterable and tools is not mapping %}\n {{- '<|im_start|>system\\n' }}\n {{- \"# Tools\\n\\nYou have access to the following functions:\\n\\n<tools>\" }}\n {%- for tool in tools %}\n {{- \"\\n\" }}\n {{- tool | tojson }}\n {%- endfor %}\n {{- \"\\n</tools>\" }}\n {{- '\\n\\nIf you choose to call a function ONLY reply in the following format with NO suffix:\\n\\n<tool_call>\\n<function=example_function_name>\\n<parameter=example_parameter_1>\\nvalue_1\\n</parameter>\\n<parameter=example_parameter_2>\\nThis is the value for the second parameter\\nthat can span\\nmultiple lines\\n</parameter>\\n</function>\\n</tool_call>\\n\\n<IMPORTANT>\\nReminder:\\n- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags\\n- Required parameters MUST be specified\\n- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after\\n- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls\\n</IMPORTANT>' }}\n {%- if messages[0].role == 'system' %}\n {%- set content = render_content(messages[0].content, false, true)|trim %}\n {%- if content %}\n {{- '\\n\\n' + content }}\n {%- endif %}\n {%- endif %}\n {{- '<|im_end|>\\n' }}\n{%- else %}\n {%- if messages[0].role == 'system' %}\n {%- set content = render_content(messages[0].content, false, true)|trim %}\n {{- '<|im_start|>system\\n' + content + '<|im_end|>\\n' }}\n {%- endif %}\n{%- endif %}\n{%- set ns = namespace(multi_step_tool=true, last_query_index=messages|length - 1) %}\n{%- for message in messages[::-1] %}\n {%- set index = (messages|length - 1) - loop.index0 %}\n {%- if ns.multi_step_tool and message.role == \"user\" %}\n {%- set content = render_content(message.content, false)|trim %}\n {%- if not(content.startswith('<tool_response>') and content.endswith('</tool_response>')) %}\n {%- set ns.multi_step_tool = false %}\n {%- set ns.last_query_index = index %}\n {%- endif %}\n {%- endif %}\n{%- endfor %}\n{%- if ns.multi_step_tool %}\n {{- raise_exception('No user query found in messages.') }}\n{%- endif %}\n{%- for message in messages %}\n {%- set content = render_content(message.content, true)|trim %}\n {%- if message.role == \"system\" %}\n {%- if not loop.first %}\n {{- raise_exception('System message must be at the beginning.') }}\n {%- endif %}\n {%- elif message.role == \"user\" %}\n {{- '<|im_start|>' + message.role + '\\n' + content + '<|im_end|>' + '\\n' }}\n {%- elif message.role == \"assistant\" %}\n {%- set reasoning_content = '' %}\n {%- if message.reasoning_content is string %}\n {%- set reasoning_content = message.reasoning_content %}\n {%- else %}\n {%- if '</think>' in content %}\n {%- set reasoning_content = content.split('</think>')[0].rstrip('\\n').split('<think>')[-1].lstrip('\\n') %}\n {%- set content = content.split('</think>')[-1].lstrip('\\n') %}\n {%- endif %}\n {%- endif %}\n {%- set reasoning_content = reasoning_content|trim %}\n {%- if loop.index0 > ns.last_query_index %}\n {{- '<|im_start|>' + message.role + '\\n<think>\\n' + reasoning_content + '\\n</think>\\n\\n' + content }}\n {%- else %}\n {{- '<|im_start|>' + message.role + '\\n' + content }}\n {%- endif %}\n {%- if message.tool_calls and message.tool_calls is iterable and message.tool_calls is not mapping %}\n {%- for tool_call in message.tool_calls %}\n {%- if tool_call.function is defined %}\n {%- set tool_call = tool_call.function %}\n {%- endif %}\n {%- if loop.first %}\n {%- if content|trim %}\n {{- '\\n\\n<tool_call>\\n<function=' + tool_call.name + '>\\n' }}\n {%- else %}\n {{- '<tool_call>\\n<function=' + tool_call.name + '>\\n' }}\n {%- endif %}\n {%- else %}\n {{- '\\n<tool_call>\\n<function=' + tool_call.name + '>\\n' }}\n {%- endif %}\n {%- if tool_call.arguments is defined %}\n {%- for args_name, args_value in tool_call.arguments|items %}\n {{- '<parameter=' + args_name + '>\\n' }}\n {%- set args_value = args_value | tojson | safe if args_value is mapping or (args_value is sequence and args_value is not string) else args_value | string %}\n {{- args_value }}\n {{- '\\n</parameter>\\n' }}\n {%- endfor %}\n {%- endif %}\n {{- '</function>\\n</tool_call>' }}\n {%- endfor %}\n {%- endif %}\n {{- '<|im_end|>\\n' }}\n {%- elif message.role == \"tool\" %}\n {%- if loop.previtem and loop.previtem.role != \"tool\" %}\n {{- '<|im_start|>user' }}\n {%- endif %}\n {{- '\\n<tool_response>\\n' }}\n {{- content }}\n {{- '\\n</tool_response>' }}\n {%- if not loop.last and loop.nextitem.role != \"tool\" %}\n {{- '<|im_end|>\\n' }}\n {%- elif loop.last %}\n {{- '<|im_end|>\\n' }}\n {%- endif %}\n {%- else %}\n {{- raise_exception('Unexpected message role.') }}\n {%- endif %}\n{%- endfor %}\n{%- if add_generation_prompt %}\n {{- '<|im_start|>assistant\\n' }}\n {%- if enable_thinking is defined and enable_thinking is false %}\n {{- '<think>\\n\\n</think>\\n\\n' }}\n {%- else %}\n {{- '<think>\\n' }}\n {%- endif %}\n{%- endif %}"},"createdAt":"2026-09-30T21:15:36.000Z","discussionsDisabled":false,"discussionsSorting":"recently-created","downloads":22123,"downloadsAllTime":22123,"id":"Cloudflare/clef-flash","isLikedByUser":false,"availableInferenceProviders":[],"showHuggingChatEntry":false,"inference":"","lastModified":"2026-10-09T18:46:58.000Z","likes":759,"pipeline_tag":"image-text-to-text","library_name":"transformers","librariesOther":[],"trackDownloads":true,"model-index":null,"private":false,"repoType":"model","gated":false,"tags":["transformers","safetensors","qwen3_5","image-text-to-text","clef","cloudflare","systemone","decision-model","qwen3.5","post-train","image-text-to-typed-output","multimodal","structured-output","classification","custom-code","conversational","base_model:Qwen/Qwen3.5-9B","base_model:finetune:Qwen/Qwen3.5-9B","license:apache-2.0","endpoints_compatible","region:us"],"tag_objs":[{"id":"image-text-to-text","label":"Image-Text-to-Text","type":"pipeline_tag","subType":"multimodal"},{"id":"transformers","label":"Transformers","type":"library"},{"id":"safetensors","label":"Safetensors","type":"library"},{"id":"qwen3_5","label":"qwen3_5","type":"other","clickable":true},{"id":"clef","label":"clef","type":"other","clickable":true},{"id":"cloudflare","label":"cloudflare","type":"other","clickable":true},{"id":"systemone","label":"systemone","type":"other","clickable":true},{"id":"decision-model","label":"decision-model","type":"other","clickable":true},{"id":"qwen3.5","label":"qwen3.5","type":"other","clickable":true},{"id":"post-train","label":"post-train","type":"other","clickable":true},{"id":"image-text-to-typed-output","label":"image-text-to-typed-output","type":"other","clickable":true},{"id":"multimodal","label":"multimodal","type":"other","clickable":true},{"id":"structured-output","label":"structured-output","type":"other","clickable":true},{"id":"classification","label":"classification","type":"other","clickable":true},{"id":"custom-code","label":"custom-code","type":"other","clickable":true},{"id":"conversational","label":"conversational","type":"other","clickable":true},{"id":"base_model:Qwen/Qwen3.5-9B","label":"base_model:Qwen/Qwen3.5-9B","type":"other","clickable":true},{"id":"base_model:finetune:Qwen/Qwen3.5-9B","label":"base_model:finetune:Qwen/Qwen3.5-9B","type":"other","clickable":true},{"id":"endpoints_compatible","label":"Inference Endpoints","type":"other","clickable":true},{"id":"license:apache-2.0","label":"apache-2.0","type":"license"},{"type":"region","label":"🇺🇸 Region: US","id":"region:us"}],"transformersInfo":{"auto_model":"AutoModelForMultimodalLM","pipeline_tag":"image-text-to-text","processor":"AutoProcessor"},"widgetData":[{"text":"Hi, what can you help me with?"},{"text":"What is 84 * 3 / 2?"},{"text":"Tell me an interesting fact about the universe!"},{"text":"Explain quantum computing in simple terms."}],"safetensors":{"parameters":{"BF16":9409813744},"total":9409813744,"sharded":true,"totalFileSize":18819790373},"hasBlockedOids":false,"region":"us","isQuantized":false,"licenseFilePath":"LICENSE"}}">
+
+ System theme 
+
+Company
+ TOS [/terms-of-service] Privacy [/privacy] About [/huggingface] Careers [https://apply.workable.com/huggingface/] [/] 
+Website
+ Models [/models] Datasets [/datasets] Spaces [/spaces] Pricing [/pricing] Docs [/docs]
