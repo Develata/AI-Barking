@@ -122,12 +122,10 @@ pub(crate) fn patterns(root: &Path) -> (Vec<String>, Vec<String>) {
             notes.push(format!("warn: 身份缓存未能写入 {}：{e}", path.display()));
         }
     }
-    let (kept, short): (Vec<String>, Vec<String>) = out
-        .into_iter()
-        .partition(|p| p.chars().count() >= MIN_PATTERN_LEN);
+    let (kept, short): (Vec<String>, Vec<String>) = out.into_iter().partition(|p| usable(p));
     if !short.is_empty() {
         notes.push(format!(
-            "warn: {} 个模式短于 {MIN_PATTERN_LEN} 个字符，太常见，已忽略",
+            "warn: {} 个模式太短（英文数字不足 {MIN_PATTERN_LEN} 个字符，中文不足 2 个字），太常见，已忽略",
             short.len()
         ));
     }
@@ -177,6 +175,16 @@ pub(crate) fn patterns_from_user(user: &Value) -> Vec<String> {
         push(v.to_string());
     }
     out
+}
+
+/// Long enough to be a signal: four ASCII characters, or two CJK characters
+/// (a two-character Chinese display name is as specific as a word).
+fn usable(p: &str) -> bool {
+    let n = p.chars().count();
+    let cjk = p
+        .chars()
+        .any(|c| matches!(c, '\u{3400}'..='\u{4dbf}' | '\u{4e00}'..='\u{9fff}'));
+    n >= MIN_PATTERN_LEN || (cjk && n >= 2)
 }
 
 fn fetch(handle: &str) -> Result<Vec<String>, String> {
@@ -299,6 +307,7 @@ mod tests {
         }
         assert_eq!(e.patterns, ["old name", "new name"]);
         assert_eq!(split(" @A ;; b;"), ["@a", "b"]);
+        assert!(usable("只影") && usable("abcd") && !usable("abc") && !usable("影"));
         let _ = fs::remove_dir_all(&dir);
     }
 }
