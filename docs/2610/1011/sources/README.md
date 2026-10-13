@@ -1,4 +1,6 @@
-# 1012 来源入口
+# 1011 来源入口
+
+> 2026-10-13 Develata 决定把本期期次由 1012 改为 1011（目录原为 `docs/2610/1012/`）；下文与派工单、抓取日志、脚本里的历史路径保持原样。
 
 事实核验见 [fact-check.md](fact-check.md)；取证清单见 `evidence-a.md`（Karpathy 漏斗）、`evidence-b.md`（GPT-6.1 Sol 500k）、`evidence-c.md`（ArtCraft）、`evidence-d.md`（速览）；抓取日志见 `capture-log-a.md`–`capture-log-d.md`；派工单见 `../../../../.handoff/2026-10-12-1012-evidence.md`。Claude 重截批注底图的脚本与记录：`m-shot.mjs`、`m-browser-records.jsonl`、`m-raw-crops.py`。
 

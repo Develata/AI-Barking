@@ -1,6 +1,6 @@
 # 1012 配图说明
 
-正文：`../doc_1012_publish.txt`。来源见[来源入口](../sources/README.md)，事实核验见 `../sources/fact-check.md`，一手存档在 `../sources/`。卡片文字与批注内容写在 `cards.toml`，由 `barking card` 渲染。
+正文：`../doc_1011_publish.txt`。来源见[来源入口](../sources/README.md)，事实核验见 `../sources/fact-check.md`，一手存档在 `../sources/`。卡片文字与批注内容写在 `cards.toml`，由 `barking card` 渲染。
 
 状态：批注底图（`-raw`）由 `../sources/m-raw-crops.py` 从取证截图裁切（像素未改）；视觉复核后 `41`、`44`、`45` 改用 `m-shot.mjs` 重截（`41` 原底图末行被裁，现截到第一、二层末行；`44` 补作者栏；`45` 用 480 CSS px 窄窗加大字号，高亮改用 rects）。初版：`41` 为 `01` 全图，`42` 为 `02` 全图，`47` 取自 `25` 的 README 页头段，`48` 为 `29` 全图。`43`–`46` 是 Claude 用 `../sources/m-shot.mjs` 在匿名 headless Chrome（全新 profile、不登录、700 CSS px、2 倍像素比）重截的窄版：`43`、`44` 为 Tibo 主帖与自回复（取证图 `13` 被“Show more”截断，`24` 来自登录会话、界面为中文并带翻译插件图标，均不用作底图），`45` 为 API 模型页定价段（截自“Text tokens”起，文档站浮层已隐藏），`46` 为 Codex 定价页 FAQ（取证图 `16`、`18` 宽 1000 CSS px，缩进卡片后英文过小）。`01`–`33` 为取证截图，本期只作核验。
 
