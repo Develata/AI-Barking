@@ -186,14 +186,30 @@ fn fetch(handle: &str) -> Result<Vec<String>, String> {
     {
         return Err("handle 只能含字母、数字和下划线".into());
     }
-    let v = crate::fetch::get_json_pub(&format!("{USER_API}{handle}"))?;
-    if v.get("code").and_then(Value::as_i64) != Some(200) {
-        return Err(format!(
-            "接口返回 {}",
-            v.get("message").and_then(Value::as_str).unwrap_or("未知")
-        ));
+    // fxtwitter answers the same lookup with "User not found" now and then
+    // (observed 1 in 5 for one account), so a miss is retried before it counts.
+    let mut last = String::new();
+    let mut user = None;
+    for attempt in 0..3 {
+        if attempt > 0 {
+            std::thread::sleep(std::time::Duration::from_secs(2));
+        }
+        match crate::fetch::get_json_any_status(&format!("{USER_API}{handle}")) {
+            Ok(v) if v.get("code").and_then(Value::as_i64) == Some(200) => {
+                user = v.get("user").cloned();
+                break;
+            }
+            Ok(v) => {
+                last = format!(
+                    "接口返回 {}",
+                    v.get("message").and_then(Value::as_str).unwrap_or("未知")
+                );
+            }
+            Err(e) => last = e,
+        }
     }
-    let user = v.get("user").ok_or("响应缺少 user")?;
+    let user = user.ok_or_else(|| format!("{last}（已重试 3 次）"))?;
+    let user = &user;
     let found = patterns_from_user(user);
     if found.is_empty() {
         return Err("响应里没有可用字段".into());

@@ -1019,9 +1019,22 @@ fn get_json(agent: &ureq::Agent, url: &str, query: &[(&str, &str)]) -> Result<Va
     http_get(agent, url, query)?.json()
 }
 
-/// One JSON GET with the module's agent, for other subcommands.
-pub(crate) fn get_json_pub(url: &str) -> Result<Value, String> {
-    get_json(&http_agent(), url, &[])
+/// One JSON GET for other subcommands, judged by the body rather than the
+/// status: fxtwitter answers a user lookup with 404 plus a full JSON object
+/// (`code: 200`) for accounts without tweets, so the status alone misleads.
+pub(crate) fn get_json_any_status(url: &str) -> Result<Value, String> {
+    let mut resp = http_agent()
+        .get(url)
+        .call()
+        .map_err(|e| format!("请求失败：{e}"))?;
+    let status = resp.status();
+    let body = resp
+        .body_mut()
+        .with_config()
+        .limit(MAX_BODY)
+        .read_to_vec()
+        .map_err(|e| format!("读取响应失败：{e}"))?;
+    serde_json::from_slice(&body).map_err(|e| format!("HTTP {status}，响应不是 JSON：{e}"))
 }
 
 /// A failed request is not fatal: it is shown now and kept in the record.
