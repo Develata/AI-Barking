@@ -404,32 +404,77 @@ fn compress_pngs(issue: &Issue) -> Result<Step, String> {
 fn step_offsite(issue: &Issue) -> Step {
     // Checked before the manifest is written: a cookies.json under sources/
     // would otherwise get its size and hash committed before step 7 objects.
-    match offsite::ignored_files(&issue.root, &issue.yymm, &issue.mmdd) {
-        Ok(entries) => {
-            let secrets: Vec<&str> = entries
-                .iter()
-                .map(|e| e.rel.as_str())
-                .filter(|p| is_secret_name(p))
-                .collect();
-            if !secrets.is_empty() {
-                return Step::fail(vec![format!(
-                    "不入库原件里有凭据或会话状态类文件，不登记、不上传：{}",
-                    secrets.join("、")
-                )]);
-            }
-        }
+    let entries = match offsite::ignored_files(&issue.root, &issue.yymm, &issue.mmdd) {
+        Ok(entries) => entries,
         Err(e) => return Step::fail(vec![e]),
+    };
+    let secrets: Vec<&str> = entries
+        .iter()
+        .map(|e| e.rel.as_str())
+        .filter(|p| is_secret_name(p))
+        .collect();
+    if !secrets.is_empty() {
+        return Step::fail(vec![format!(
+            "不入库原件里有凭据或会话状态类文件，不登记、不上传：{}",
+            secrets.join("、")
+        )]);
+    }
+    // `offsite::process` rewrites the manifest from the files present here.
+    // In a clone without images, or with some originals not yet fetched back,
+    // that would silently drop their size and hash: the archive's only proof.
+    let path = issue.sources().join(offsite::MANIFEST);
+    let old = match fs::read_to_string(&path) {
+        Ok(t) => offsite::parse_manifest(&t),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        Err(e) => return Step::fail(vec![format!("{}: {e}", path.display())]),
+    };
+    let present: BTreeSet<&str> = entries.iter().map(|e| e.rel.as_str()).collect();
+    let missing = missing_offsite(&old, &present);
+    if !missing.is_empty() {
+        let mut notes = vec![format!(
+            "{}/sources/{} 已登记、但本地不在不入库原件里的 {} 个文件（重写清单会删掉它们的大小与 SHA-256，未写入）：",
+            issue.rel(),
+            offsite::MANIFEST,
+            missing.len()
+        )];
+        notes.extend(missing.iter().take(MAX_LISTED).map(|p| {
+            if issue.dir.join(p).is_file() {
+                format!("{p}（本地存在，但不再匹配不入库规则）")
+            } else {
+                format!("{p}（本地不存在）")
+            }
+        }));
+        let rest = missing.len().saturating_sub(MAX_LISTED);
+        if rest > 0 {
+            notes.push(format!("…另有 {rest} 个"));
+        }
+        notes.push(
+            "先从 OpenList 取回这些原件再重跑；确属应删除的，确认后手动从清单删去对应行。"
+                .to_string(),
+        );
+        return Step::fail(notes);
     }
     if let Err(e) = offsite::process(&issue.root, &issue.dir, false, &mut None) {
         return Step::fail(vec![e]);
     }
-    let path = issue.sources().join(offsite::MANIFEST);
     let n = fs::read_to_string(&path).map_or(0, |t| offsite::parse_manifest(&t).len());
     Step::pass(vec![format!(
         "{}/sources/{} 登记 {n} 个文件",
         issue.rel(),
         offsite::MANIFEST
     )])
+}
+
+/// Paths in the old manifest (`old`, as [`offsite::parse_manifest`] gives
+/// them) that the rewritten manifest would lose because they are not among
+/// the offsite files found now (`present`). In manifest order, deduplicated.
+fn missing_offsite(old: &[(String, u64, String)], present: &BTreeSet<&str>) -> Vec<String> {
+    let mut seen = BTreeSet::new();
+    old.iter()
+        .map(|(p, _, _)| p.as_str())
+        .filter(|p| !present.contains(p) && seen.insert(*p))
+        .map(str::to_string)
+        .collect()
 }
 
 /// Files that would go into the commits: pending files of the issue and of
@@ -930,7 +975,13 @@ fn circled(n: u8) -> char {
 
 fn git_staged(root: &Path) -> Result<Vec<String>, String> {
     // NUL-separated: with newlines git would quote names holding odd characters.
-    let out = repo::git(root, &["diff", "--cached", "--name-only", "-z"])?;
+    // --no-renames: `git status` lists a rename inside a batch as delete-old
+    // plus add-new, and both are staged; with rename detection this would
+    // show only the new path and the comparison in `stage` would misfire.
+    let out = repo::git(
+        root,
+        &["diff", "--cached", "--name-only", "--no-renames", "-z"],
+    )?;
     Ok(out
         .split('\0')
         .filter(|s| !s.is_empty())
@@ -1459,6 +1510,33 @@ mod tests {
         assert!(
             message_product("1009").starts_with("1009：本期成品——发布正文、配图说明与 cards.toml")
         );
+    }
+
+    #[test]
+    fn manifest_rows_missing_locally_are_reported() {
+        let manifest = "# header\n\
+images/00-cover.png\t10\taa\n\
+sources/a-page.html\t20\tbb\n\
+images/01-shot.png\t30\tcc\n\
+images/00-cover.png\t10\taa\n";
+        let old = offsite::parse_manifest(manifest);
+        // Partly fetched back: only the HTML original is here.
+        let present = BTreeSet::from(["sources/a-page.html", "images/02-new.png"]);
+        assert_eq!(
+            missing_offsite(&old, &present),
+            ["images/00-cover.png", "images/01-shot.png"],
+            "manifest order, each path once; new local files are not missing"
+        );
+        // A clone with no originals at all loses every row.
+        assert_eq!(missing_offsite(&old, &BTreeSet::new()).len(), 3);
+        // Everything present, or no manifest yet: nothing to report.
+        let all = BTreeSet::from([
+            "images/00-cover.png",
+            "sources/a-page.html",
+            "images/01-shot.png",
+        ]);
+        assert!(missing_offsite(&old, &all).is_empty());
+        assert!(missing_offsite(&[], &BTreeSet::new()).is_empty());
     }
 
     #[test]

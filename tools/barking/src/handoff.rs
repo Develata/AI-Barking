@@ -56,7 +56,8 @@ const USAGE: &str = "\
   barking handoff --index
     --groups  各组的组号与主题，组号为升序的单个大写字母；组之间用半角逗号分隔，主题里不能有逗号；
               主题以“速览”开头的组不截图、不计入上限，但仍占所在位置的编号区间；
-              截图组最多 4 个，且须在前 4 位，截图编号区间按组序 01–12、13–24、25–36、37–48
+              截图组最多 4 个，且须在前 4 位，截图编号区间按组序 01–12、13–24、25–36、37–48；
+              全部为速览组（速览专帖，没有主帖）也可以，派工单写明本期不截图
     --note    本期特有的隐私/风控要点，可重复；每条成为“通用规则”里的一项
     --force   覆盖已存在的派工单
     --out     预览：写到指定文件，不建目录、不动 .handoff（含索引）
@@ -224,11 +225,8 @@ fn parse_groups(raw: &str) -> Result<Vec<Group>, String> {
             n = IMAGE_RANGES.len(),
         ));
     }
-    if out.iter().all(Group::is_roundup) {
-        return Err(format!(
-            "至少要有一个需要截图的组（主题不以“{ROUNDUP_TOPIC}”开头）"
-        ));
-    }
+    // All groups 速览 is fine: the roundup-only issue (EDITORIAL.md “速览”)
+    // has no main post and no screenshots; `render` words the brief for it.
     Ok(out)
 }
 
@@ -394,6 +392,11 @@ fn has_capture_log(issue: &Issue) -> bool {
 /// Pure: the same context always gives the same brief (LF line endings).
 fn render(c: &Ctx) -> Result<String, String> {
     let (body, main_skeleton, roundup_skeleton) = split_template(TEMPLATE)?;
+    let body = if c.groups.iter().all(Group::is_roundup) {
+        without_shots(&body)?
+    } else {
+        body
+    };
 
     let mut sections = Vec::new();
     let mut nth = 0;
@@ -425,6 +428,38 @@ fn render(c: &Ctx) -> Result<String, String> {
     text.truncate(text.trim_end().len());
     text.push('\n');
     Ok(text)
+}
+
+/// The image rule for a roundup-only issue, which has no screenshot group.
+const NO_SHOT_RULE: &str = "- 图片：本期没有截图组，只存档与摘句。";
+
+/// The brief's body for an issue whose groups are all 速览: the image rule
+/// (the line holding `{SHOT_GROUPS}` and the range list `{IMAGE_RANGES}`)
+/// becomes [`NO_SHOT_RULE`], and the acceptance line about screenshots in
+/// each group's range goes. Missing the rule line is a template drift and an
+/// error, so a changed template cannot ship a dangling `（仅  组）`.
+fn without_shots(body: &str) -> Result<String, String> {
+    let mut replaced = false;
+    let mut out = String::with_capacity(body.len());
+    for line in body.lines() {
+        if line.contains("{SHOT_GROUPS}") || line.contains("{IMAGE_RANGES}") {
+            if !replaced {
+                out.push_str(NO_SHOT_RULE);
+                out.push('\n');
+                replaced = true;
+            }
+            continue;
+        }
+        if line.starts_with("- ") && line.contains("截图") && line.contains("区间") {
+            continue;
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    if !replaced {
+        return Err("模板里找不到图片规则行（含 {SHOT_GROUPS}），无法改写为速览专帖".into());
+    }
+    Ok(out)
 }
 
 fn title_groups(groups: &[Group]) -> String {
@@ -1027,8 +1062,6 @@ mod tests {
             "A=",
             "B=x,A=y",
             "A=x,A=y",
-            "A=速览",
-            "A=速览候选（不截图）",
             "A=1,B=2,C=3,D=4,E=5",
             // Four shot groups, but a 速览 group pushes the last out of range.
             "A=1,B=速览,C=3,D=4,E=5",
@@ -1036,6 +1069,10 @@ mod tests {
             assert!(parse_groups(bad).is_err(), "{bad:?} should be rejected");
         }
         assert!(parse_groups("A=1,B=2,C=3,D=4").is_ok());
+        // A roundup-only issue (EDITORIAL.md “速览”) has no main post.
+        for ok in ["A=速览", "A=速览候选（不截图）", "A=速览,B=速览（二）"] {
+            assert!(parse_groups(ok).is_ok(), "{ok:?} should be accepted");
+        }
         // 速览 groups do not count towards the four: the 1007 layout.
         let g = parse_groups("A=1,B=2,C=3,D=速览,E=速览候选（二）").unwrap();
         assert_eq!(g.iter().filter(|g| g.is_roundup()).count(), 2);
@@ -1174,6 +1211,15 @@ mod tests {
         assert!(skipped.contains("（A 组 01–12，B 组 13–24）"));
         assert!(skipped.contains("D 组不需要截图"));
         assert!(skipped.contains("# D 组：速览候选（不截图）\n\n速览聚合图"));
+        // Roundup only: no screenshot rule, no ranges, no range acceptance.
+        let only = render(&ctx(parse_groups("A=速览").unwrap())).unwrap();
+        assert!(only.contains("\n- 图片：本期没有截图组，只存档与摘句。\n"));
+        assert!(!only.contains("（仅"), "{only}");
+        assert!(!only.contains("区间"), "{only}");
+        assert!(!only.contains("主帖第"));
+        assert!(only.contains("A 组只需“扫描说法勘误”和各条的一句事实。"));
+        assert!(only.contains("# A 组：速览\n\n速览聚合图"));
+        assert!(only.contains("本文件分一组（A）"), "{only}");
         let five = parse_groups("A=1,B=2,C=3,D=速览,E=速览").unwrap();
         let five = render(&ctx(five)).unwrap();
         assert!(five.contains("本文件分五组（A/B/C/D/E）"));

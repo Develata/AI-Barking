@@ -480,13 +480,18 @@ fn strip_raw_text_elements(s: &str) -> String {
     })
 }
 
+/// Drop `<!-- … -->`. Every tag is copied whole and stepped over, as in
+/// `strip_raw_text_elements`, so a `<!--` inside an attribute value
+/// (`title="<!--"`) opens no comment and cannot eat the text after it.
 fn strip_comments(s: &str) -> String {
     let mut memo = Memo::default();
-    rewrite(s, |s, at, _| {
-        if !s[at..].starts_with("<!--") {
-            return None;
+    rewrite(s, |s, at, out| {
+        if s[at..].starts_with("<!--") {
+            return memo.comment_end(s, at);
         }
-        memo.comment_end(s, at)
+        let tag = parse_tag(s, at, &mut memo)?;
+        out.push_str(&s[at..tag.end]);
+        Some(tag.end)
     })
 }
 
@@ -1229,6 +1234,15 @@ mod tests {
     fn drops_comments() {
         assert_eq!(strip_comments("a<!-- <p>x</p> -->b<!---->c"), "abc");
         assert_eq!(strip_comments("a<!-- open"), "a<!-- open");
+        // `<!--` inside an attribute value is not a comment opener.
+        let html = "<p title=\"<!--\">价格20美元</p><!--x--><p>尾</p>";
+        assert_eq!(
+            strip_comments(html),
+            "<p title=\"<!--\">价格20美元</p><p>尾</p>"
+        );
+        let text = html_to_text(html);
+        assert!(text.contains("价格20美元"), "{text:?}");
+        assert!(text.contains('尾'), "{text:?}");
     }
 
     #[test]

@@ -9,7 +9,8 @@
 //! expected outcome goes into the prompt.
 
 use std::fmt::Write as _;
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 use std::time::Instant;
@@ -175,11 +176,7 @@ fn execute(opts: &Opts) -> Result<ExitCode, String> {
         .join("barking-review")
         .join(&issue.mmdd);
     fs::create_dir_all(&work).map_err(|e| format!("{}: {e}", work.display()))?;
-    let serial = pick_serial(&work, opts.mode);
-    let (prompt_name, report_name) = artifact_names(opts.mode, serial);
-    let (prompt_path, report_path) = (work.join(prompt_name), work.join(report_name));
-    fs::write(&prompt_path, &review.prompt)
-        .map_err(|e| format!("{}: {e}", prompt_path.display()))?;
+    let (prompt_path, report_path) = claim_serial(&work, opts.mode, &review.prompt)?;
 
     // Shown before the WSL hop: when WSL is unavailable the prompt still goes
     // to the fallback reviewer (templates/cards/README.md step 5).
@@ -550,17 +547,40 @@ fn is_text_file(rel: &str) -> bool {
 
 // ---- prompt and report files ------------------------------------------
 
-/// Smallest `n >= 1` whose prompt and report both do not exist yet. The
-/// report is the output of a run that may take an hour, so it is never
-/// overwritten; a prompt claims its serial too, because its run may still be
-/// in flight and about to write that report.
-fn pick_serial(dir: &Path, mode: Mode) -> u32 {
-    (1..)
-        .find(|&n| {
-            let (p, r) = artifact_names(mode, n);
-            !dir.join(p).exists() && !dir.join(r).exists()
-        })
-        .unwrap_or(1)
+/// Upper bound on serials tried, so a directory that refuses every create
+/// in some unforeseen way ends in an error rather than a spin.
+const MAX_SERIAL: u32 = 10_000;
+
+/// Write `prompt` to the prompt file of the smallest serial `n >= 1` whose
+/// prompt and report both do not exist yet, and return `(prompt, report)`
+/// paths of that serial. The report is the output of a run that may take an
+/// hour, so it is never overwritten; a prompt claims its serial too, because
+/// its run may still be in flight and about to write that report.
+///
+/// The prompt is created with `create_new`, which fails if the file exists:
+/// two runs started together cannot both take the same serial, the loser
+/// moves on to the next one.
+fn claim_serial(dir: &Path, mode: Mode, prompt: &str) -> Result<(PathBuf, PathBuf), String> {
+    for n in 1..=MAX_SERIAL {
+        let (p, r) = artifact_names(mode, n);
+        let (p, r) = (dir.join(p), dir.join(r));
+        if r.exists() {
+            continue;
+        }
+        let mut file = match OpenOptions::new().write(true).create_new(true).open(&p) {
+            Ok(f) => f,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(format!("{}: {e}", p.display())),
+        };
+        file.write_all(prompt.as_bytes())
+            .map_err(|e| format!("{}: {e}", p.display()))?;
+        return Ok((p, r));
+    }
+    Err(format!(
+        "{} 下 {} 的编号 1..={MAX_SERIAL} 都已占用，先清理旧的提示词与报告",
+        dir.display(),
+        mode.name()
+    ))
 }
 
 /// `(prompt, report)` file names; serial 1 carries no suffix.
@@ -1049,15 +1069,60 @@ text = "a"
         let dir = std::env::temp_dir()
             .join("barking-review-test")
             .join(std::process::id().to_string());
+        let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
-        assert_eq!(pick_serial(&dir, Mode::Visual), 1);
+        let claim = |mode, text| {
+            let (p, r) = claim_serial(&dir, mode, text).unwrap();
+            let name = |x: &Path| x.file_name().unwrap().to_str().unwrap().to_string();
+            (name(&p), name(&r))
+        };
+        assert_eq!(
+            claim(Mode::Visual, "p1"),
+            ("visual-prompt.md".into(), "visual-report.md".into())
+        );
+        assert_eq!(
+            fs::read_to_string(dir.join("visual-prompt.md")).unwrap(),
+            "p1"
+        );
         // A prompt claims its serial (its run may still be writing the
-        // report); so does a report on its own.
-        fs::write(dir.join("visual-prompt.md"), "p").unwrap();
-        assert_eq!(pick_serial(&dir, Mode::Visual), 2);
-        fs::write(dir.join("visual-report-2.md"), "r").unwrap();
-        assert_eq!(pick_serial(&dir, Mode::Visual), 3);
-        assert_eq!(pick_serial(&dir, Mode::Reverse), 1);
+        // report): the next claim moves on and leaves the first prompt alone.
+        assert_eq!(
+            claim(Mode::Visual, "p2"),
+            ("visual-prompt-2.md".into(), "visual-report-2.md".into())
+        );
+        assert_eq!(
+            fs::read_to_string(dir.join("visual-prompt.md")).unwrap(),
+            "p1"
+        );
+        // So does a report on its own.
+        fs::write(dir.join("visual-report-3.md"), "r").unwrap();
+        assert_eq!(
+            claim(Mode::Visual, "p4"),
+            ("visual-prompt-4.md".into(), "visual-report-4.md".into())
+        );
+        assert_eq!(
+            fs::read_to_string(dir.join("visual-report-3.md")).unwrap(),
+            "r"
+        );
+        assert_eq!(
+            claim(Mode::Reverse, "q"),
+            ("reverse-prompt.md".into(), "reverse-report.md".into())
+        );
+        // Concurrent claims never share a serial.
+        let racers: Vec<_> = (0..8)
+            .map(|i| {
+                let dir = dir.clone();
+                std::thread::spawn(move || {
+                    claim_serial(&dir, Mode::Reverse, &format!("r{i}"))
+                        .unwrap()
+                        .0
+                })
+            })
+            .collect();
+        let mut got: Vec<PathBuf> = racers.into_iter().map(|t| t.join().unwrap()).collect();
+        got.sort();
+        got.dedup();
+        assert_eq!(got.len(), 8);
         fs::remove_dir_all(&dir).unwrap();
     }
 

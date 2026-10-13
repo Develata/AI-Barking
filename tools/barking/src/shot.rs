@@ -42,8 +42,9 @@ const USAGE: &str = "\
   先用 lines 找锚点行，再用 crop / cropbox / stack 裁成 <期次目录>/images/<out.png>（已存在则拒绝覆盖）。
   --part 的 <png> 可写文件路径，或 render / pdf 的 <name>；像素框取 [x0,x1) × [y0,y1)，单位是该图的像素。
   选项可写 --key value 或 --key=value；--help 打印本说明。
-  每次出图在 sources/<组>-shots-log.jsonl 追加一行记录（路径记仓库内相对路径，库外文件只记文件名）。
-  只裁切、拼接，不改像素；iCCP / sRGB / gAMA / cHRM / pHYs 原样带到输出。
+  每次出图在 sources/<组>-shots-log.jsonl 追加一行记录（路径记仓库内相对路径，库外文件只记文件名；
+  URL 与 --chrome-arg 去掉 user:pass@，键名像凭据的查询参数值记为 [REDACTED]）。
+  只裁切、拼接，不改像素；iCCP / sRGB / gAMA / cHRM / pHYs 原样带到输出；含 cICP / mDCV / cLLI 的 PNG 拒绝处理。
   pdf 需要 poppler：先找环境变量 BARKING_POPPLER 指定的目录，再找 ~/scoop/apps/poppler/current/bin，最后 PATH。";
 
 /// A hung Chrome must not hang the session; the page timeout flag alone does
@@ -597,6 +598,36 @@ struct Img {
     meta: Meta,
 }
 
+/// Colour chunks `Meta` cannot carry through a re-encode: cICP replaces the
+/// colour space (HDR PQ / HLG, Display P3 by code point) and mDCV / cLLI tell
+/// a display how to tone-map. Dropping them changes how a crop looks, so such
+/// a source is refused instead of being cut "losslessly".
+const UNKEPT_CHUNKS: [&str; 3] = ["cICP", "mDCV", "cLLI"];
+
+/// The first `UNKEPT_CHUNKS` entry in the raw chunk list, if any. Only walks
+/// the chunk headers: a missing signature or a truncated chunk ends the walk
+/// silently and is left for the decoder to report.
+fn unkept_colour_chunk(bytes: &[u8]) -> Option<&'static str> {
+    const SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
+    if !bytes.starts_with(SIGNATURE) {
+        return None;
+    }
+    let mut i = SIGNATURE.len();
+    while let Some(head) = bytes.get(i..i.checked_add(8)?) {
+        let len = u32::from_be_bytes([head[0], head[1], head[2], head[3]]) as usize;
+        let kind = &head[4..8];
+        if let Some(hit) = UNKEPT_CHUNKS.iter().find(|c| c.as_bytes() == kind) {
+            return Some(*hit);
+        }
+        if kind == b"IEND" {
+            break;
+        }
+        // Length, type, data, CRC.
+        i = i.checked_add(len)?.checked_add(12)?;
+    }
+    None
+}
+
 /// (has colour, has alpha) of a decoded colour type.
 fn channels(ct: ColorType) -> (bool, bool) {
     match ct {
@@ -637,6 +668,11 @@ impl Img {
     /// alpha `EXPAND` derives from the key is dropped again and the key kept,
     /// so its crop is written back exactly as the source stored it.
     fn decode(bytes: &[u8]) -> Result<Img, String> {
+        if let Some(name) = unkept_colour_chunk(bytes) {
+            return Err(format!(
+                "不支持 cICP/mDCV/cLLI 色彩块的 PNG，先用其他工具转换或另取底图（本图含 {name}）"
+            ));
+        }
         let limits = png::Limits { bytes: MAX_BYTES };
         let mut dec = png::Decoder::new_with_limits(io::Cursor::new(bytes), limits);
         dec.set_transformations(png::Transformations::EXPAND);
@@ -823,6 +859,11 @@ impl Img {
         if (colour && !to_colour) || (alpha && !to_alpha) {
             return Err(format!("内部错误：{:?} 不能无损转成 {to:?}", self.ct));
         }
+        // A gray ICC profile is not valid on an RGB image, and swapping it for
+        // anything else changes how the pixels look.
+        if self.meta.icc.is_some() && colour != to_colour {
+            return Err(gray_icc_msg(None, to));
+        }
         let mut data = Vec::with_capacity(self.w as usize * self.h as usize * to.samples());
         for px in self.data.chunks_exact(self.ct.samples()) {
             let rgb = if colour {
@@ -845,6 +886,15 @@ impl Img {
             ..self
         })
     }
+}
+
+/// Why a gray part tagged with an ICC profile cannot join a colour canvas.
+fn gray_icc_msg(part: Option<usize>, to: ColorType) -> String {
+    let which = part.map_or("灰度图".to_string(), |i| format!("第 {i} 段是灰度图且"));
+    format!(
+        "{which}带 ICC 配置文件，拼接需要把它提升为 {to:?}（彩色背景，或与彩色、带透明的段混拼），\
+         灰度 ICC 用在彩色图上不合规，换掉又会改变显示颜色；请把各段分别出图，或去掉彩色背景（--bg 用灰色）"
+    )
 }
 
 /// Layout of a stack: the parts' own layout when they all agree and can hold
@@ -888,7 +938,8 @@ fn stack_meta(parts: &[Img]) -> Result<Meta, String> {
         .find(|(_, p)| !p.meta.same_colour(first))
     {
         return Err(format!(
-            "各段色彩元数据不一致：第 1 段为「{}」，第 {} 段为「{}」。拼在一张图里会让其中一段按错误的色彩空间显示；             请把不同来源分别裁切出图，或从同一来源（同一次 render / pdf）取各段",
+            "各段色彩元数据不一致：第 1 段为「{}」，第 {} 段为「{}」。拼在一张图里会让其中一段按错误的色彩空间显示；\
+             请把不同来源分别裁切出图，或从同一来源（同一次 render / pdf）取各段",
             first.describe(),
             i + 1,
             odd.meta.describe()
@@ -911,6 +962,13 @@ fn stack(parts: Vec<Img>, gap: u32, bg: [u8; 4]) -> Result<Img, String> {
     let parts: Vec<Img> = parts.into_iter().map(Img::unkey).collect();
     let types: Vec<ColorType> = parts.iter().map(|p| p.ct).collect();
     let ct = stack_type(&types, bg);
+    // Before the canvas is allocated; `promote` guards the same case.
+    if meta.icc.is_some()
+        && channels(ct).0
+        && let Some(i) = types.iter().position(|&t| !channels(t).0)
+    {
+        return Err(gray_icc_msg(Some(i + 1), ct));
+    }
     let bpp = ct.samples();
     let w = parts.iter().map(|p| p.w).max().ok_or("没有可拼接的片段")?;
     let rows: u64 = parts.iter().map(|p| u64::from(p.h)).sum::<u64>()
@@ -1479,6 +1537,181 @@ impl LogPath {
     }
 }
 
+/// Query keys whose values are credentials more often than not. Matched as
+/// case-insensitive substrings, so `author=` or `keyword=` are redacted too:
+/// over-redacting costs a log detail, under-redacting puts a token into a
+/// committed file.
+const SECRET_KEYS: [&str; 10] = [
+    "token",
+    "key",
+    "secret",
+    "auth",
+    "sig",
+    "signature",
+    "session",
+    "password",
+    "cookie",
+    "access",
+];
+const REDACTED: &str = "[REDACTED]";
+
+/// `%XX` escapes decoded (invalid ones kept literally), lossy UTF-8.
+fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        let hex = |c: u8| char::from(c).to_digit(16);
+        if b[i] == b'%'
+            && let (Some(Some(hi)), Some(Some(lo))) =
+                (b.get(i + 1).map(|&c| hex(c)), b.get(i + 2).map(|&c| hex(c)))
+        {
+            out.push((hi * 16 + lo) as u8);
+            i += 3;
+        } else {
+            out.push(b[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+fn secret_key(key: &str) -> bool {
+    let key = percent_decode(key).to_lowercase();
+    SECRET_KEYS.iter().any(|s| key.contains(s))
+}
+
+/// `a=1&token=x` → `a=1&token=[REDACTED]`; parameters without `=` are kept.
+fn redact_params(params: &str) -> String {
+    params
+        .split('&')
+        .map(|p| match p.split_once('=') {
+            Some((k, _)) if secret_key(k) => format!("{k}={REDACTED}"),
+            _ => p.to_string(),
+        })
+        .collect::<Vec<_>>()
+        .join("&")
+}
+
+fn starts_with_ci(s: &str, prefix: &str) -> bool {
+    s.get(..prefix.len())
+        .is_some_and(|h| h.eq_ignore_ascii_case(prefix))
+}
+
+/// A `file://` URL as the file it names, through `LogPath`: the repository-
+/// relative path, or only the file name. Query and fragment are dropped.
+fn log_file_url(root: &Path, url: &str) -> String {
+    let rest = url.get("file://".len()..).unwrap_or("");
+    let rest = rest.split(['?', '#']).next().unwrap_or("");
+    let mut path = percent_decode(rest);
+    let b = path.as_bytes();
+    if b.len() >= 3 && b[0] == b'/' && b[1].is_ascii_alphabetic() && b[2] == b':' {
+        // `file:///C:/x` (what `card::file_url` writes) → `C:/x`.
+        path.remove(0);
+    } else if !path.starts_with('/') {
+        // `file://host/share/x`: a UNC path.
+        path.insert_str(0, "//");
+    }
+    LogPath::of(root, Path::new(&path)).path
+}
+
+/// A URL as the committed log may hold it: a `file://` URL becomes a
+/// repository-relative path or a bare file name (see `LogPath`); any other URL
+/// loses its `user:pass@` and the values of credential-like query (and
+/// fragment) parameters. The scratch `.tool.txt` keeps the raw URL: it lives
+/// in the temp directory, never in the repository.
+fn log_url(root: &Path, url: &str) -> String {
+    if starts_with_ci(url, "file://") {
+        return log_file_url(root, url);
+    }
+    let (base, fragment) = match url.split_once('#') {
+        Some((b, f)) => (b, Some(f)),
+        None => (url, None),
+    };
+    let (head, query) = match base.split_once('?') {
+        Some((h, q)) => (h, Some(q)),
+        None => (base, None),
+    };
+    let mut out = match head.find("://") {
+        Some(i) => {
+            let (scheme, rest) = head.split_at(i + 3);
+            let host_end = rest.find('/').unwrap_or(rest.len());
+            match rest[..host_end].rfind('@') {
+                Some(at) => format!("{scheme}{}", &rest[at + 1..]),
+                None => head.to_string(),
+            }
+        }
+        None => head.to_string(),
+    };
+    if let Some(q) = query {
+        out.push('?');
+        out.push_str(&redact_params(q));
+    }
+    if let Some(f) = fragment {
+        out.push('#');
+        out.push_str(&redact_params(f));
+    }
+    out
+}
+
+/// An absolute local path in Windows or POSIX form, whatever the host.
+fn looks_absolute(s: &str) -> bool {
+    let b = s.as_bytes();
+    s.starts_with(['/', '\\'])
+        || (b.len() >= 3
+            && b[0].is_ascii_alphabetic()
+            && b[1] == b':'
+            && matches!(b[2], b'/' | b'\\'))
+}
+
+/// A `--chrome-arg` value as the log may hold it: a `file://` URL anywhere in
+/// it goes through `log_url`; `--key=value` loses its value when the key looks
+/// like a credential, and otherwise has a URL value cleaned and an absolute
+/// path value cut to its `LogPath` (a `--user-data-dir` would name the user).
+fn log_chrome_arg(root: &Path, arg: &str) -> String {
+    if let Some(i) = arg.to_ascii_lowercase().find("file://") {
+        return format!("{}{}", &arg[..i], log_url(root, &arg[i..]));
+    }
+    let clean = |v: &str| {
+        if starts_with_ci(v, "http://") || starts_with_ci(v, "https://") {
+            log_url(root, v)
+        } else if looks_absolute(v) {
+            LogPath::of(root, Path::new(v)).path
+        } else {
+            v.to_string()
+        }
+    };
+    // A bare URL first: its own query holds the `=`s, not a `key=`.
+    if starts_with_ci(arg, "http://") || starts_with_ci(arg, "https://") {
+        return log_url(root, arg);
+    }
+    match arg.split_once('=') {
+        Some((k, _)) if secret_key(k) => format!("{k}={REDACTED}"),
+        Some((k, v)) => format!("{k}={}", clean(v)),
+        None => clean(arg),
+    }
+}
+
+/// A log value with every string under a `url` key passed through `log_url`
+/// and every string under `extra` (the `--chrome-arg`s) through
+/// `log_chrome_arg`, at any depth (a stack's per-part URLs sit in `parts`).
+fn scrub(root: &Path, key: &str, v: Value) -> Value {
+    match v {
+        Value::String(s) if key == "url" => Value::String(log_url(root, &s)),
+        Value::String(s) if key == "extra" => Value::String(log_chrome_arg(root, &s)),
+        Value::Array(a) => Value::Array(a.into_iter().map(|x| scrub(root, key, x)).collect()),
+        Value::Object(m) => Value::Object(
+            m.into_iter()
+                .map(|(k, x)| {
+                    let x = scrub(root, &k, x);
+                    (k, x)
+                })
+                .collect(),
+        ),
+        other => other,
+    }
+}
+
 struct Ctx {
     issue: Issue,
     group: String,
@@ -1631,8 +1864,15 @@ impl Ctx {
     }
 
     /// Appends one line to `sources/<group>-shots-log.jsonl`, stamped with the
-    /// Beijing time first.
-    fn log(&self, mut fields: Vec<(&str, Value)>) -> Result<(), String> {
+    /// Beijing time first. Every URL and Chrome argument is cleaned here, in
+    /// one place, so no action (nor a URL inherited from a scratch image) can
+    /// write a credential or a local path into the committed log.
+    fn log(&self, fields: Vec<(&str, Value)>) -> Result<(), String> {
+        let root = &self.issue.root;
+        let mut fields: Vec<(&str, Value)> = fields
+            .into_iter()
+            .map(|(k, v)| (k, scrub(root, k, v)))
+            .collect();
         fields.insert(0, ("time_bj", Value::from(repo::beijing_now())));
         let dir = self.issue.sources();
         fs::create_dir_all(&dir).map_err(io_err(&dir))?;
@@ -3582,5 +3822,255 @@ mod tests {
         assert!(e.is_err());
         assert!(!out.exists() && !out.with_extension(SIDECAR_TOOL).exists());
         let _ = fs::remove_dir_all(&root);
+    }
+
+    // --- log hygiene, unsupported colour chunks, gray ICC -------------------
+
+    #[test]
+    fn urls_are_cleaned_for_the_log() {
+        let root = Path::new("/nowhere-repo");
+        let u = |s: &str| log_url(root, s);
+        assert_eq!(
+            u("https://example.com/?token=abc&x=1"),
+            "https://example.com/?token=[REDACTED]&x=1"
+        );
+        assert_eq!(
+            u("https://user:p%40ss@example.com:8443/a@b?q=1"),
+            "https://example.com:8443/a@b?q=1"
+        );
+        assert_eq!(u("http://bob@h/"), "http://h/");
+        assert_eq!(
+            u(
+                "https://s3.example.com/o?X-Amz-Signature=f00&X-Amz-Credential=c&API_KEY=k&sig=1&Session_ID=2&PassWord=3&cookie=4&access=5&secret=6&auth=7&api%5Fkey=8&page=2"
+            ),
+            "https://s3.example.com/o?X-Amz-Signature=[REDACTED]&X-Amz-Credential=c&API_KEY=[REDACTED]&sig=[REDACTED]&Session_ID=[REDACTED]&PassWord=[REDACTED]&cookie=[REDACTED]&access=[REDACTED]&secret=[REDACTED]&auth=[REDACTED]&api%5Fkey=[REDACTED]&page=2"
+        );
+        // Substring rule, on purpose: `author` and `keyword` are redacted too.
+        assert_eq!(
+            u("https://h/?author=a&keyword=b&id=c"),
+            "https://h/?author=[REDACTED]&keyword=[REDACTED]&id=c"
+        );
+        // Fragment parameters (OAuth implicit flow) are treated alike; a plain
+        // anchor or a bare flag is kept.
+        assert_eq!(
+            u("https://h/cb#access_token=t&state=s"),
+            "https://h/cb#access_token=[REDACTED]&state=s"
+        );
+        assert_eq!(u("https://h/p?token#sec-2"), "https://h/p?token#sec-2");
+        assert_eq!(u("https://example.com"), "https://example.com");
+        assert_eq!(u(""), "");
+    }
+
+    #[test]
+    fn file_urls_become_repo_paths_or_file_names() {
+        let (ctx, root) = test_ctx("fileurl");
+        let src = ctx.issue.sources();
+        fs::create_dir_all(&src).unwrap();
+        let inside = src.join("a b.html");
+        fs::write(&inside, b"x").unwrap();
+        let url = card::file_url(&inside).unwrap();
+        assert!(url.contains("%20"), "{url}");
+        assert_eq!(
+            log_url(&root, &url),
+            "docs/2610/1009/sources/a b.html",
+            "{url}"
+        );
+        assert_eq!(
+            log_url(&root, &format!("{url}?token=x#y")),
+            "docs/2610/1009/sources/a b.html"
+        );
+        let out_root = scratch_root("fileurl-out");
+        let outside = out_root.join("secret dir").join("page.html");
+        let url = card::file_url(&outside).unwrap();
+        assert_eq!(log_url(&root, &url), "page.html", "{url}");
+        assert_eq!(
+            log_url(&root, "file:///C:/Users/someone/Desktop/x%20y.html"),
+            "x y.html"
+        );
+        assert_eq!(log_url(&root, "FILE://server/share/z.pdf"), "z.pdf");
+        let _ = fs::remove_dir_all(&out_root);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn chrome_args_are_cleaned_for_the_log() {
+        let (ctx, root) = test_ctx("chromearg");
+        let a = |s: &str| log_chrome_arg(&root, s);
+        assert_eq!(a("--lang=en-US"), "--lang=en-US");
+        assert_eq!(a("--no-sandbox"), "--no-sandbox");
+        assert_eq!(
+            a("--user-agent=Mozilla/5.0 x"),
+            "--user-agent=Mozilla/5.0 x"
+        );
+        assert_eq!(a("--Auth-Token=abc"), "--Auth-Token=[REDACTED]");
+        assert_eq!(a("--session=s=1"), "--session=[REDACTED]");
+        assert_eq!(a("token=abc"), "token=[REDACTED]");
+        assert_eq!(
+            a("--proxy-server=http://u:pw@proxy:8080"),
+            "--proxy-server=http://proxy:8080"
+        );
+        assert_eq!(
+            a("https://u:pw@h/?key=k&x=1"),
+            "https://h/?key=[REDACTED]&x=1"
+        );
+        assert_eq!(
+            a("--user-data-dir=C:\\Users\\someone\\AppData\\prof"),
+            "--user-data-dir=prof"
+        );
+        let page = ctx.issue.dir.join("p.html");
+        fs::write(&page, b"x").unwrap();
+        let url = card::file_url(&page).unwrap();
+        assert_eq!(a(&format!("--app={url}")), "--app=docs/2610/1009/p.html");
+        assert_eq!(
+            a("--token-file=file:///C:/Users/someone/t.txt"),
+            "--token-file=t.txt"
+        );
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn log_scrubs_every_url_and_chrome_arg() {
+        let (ctx, root) = test_ctx("scrub");
+        ctx.log(vec![
+            ("action", json!("render")),
+            ("url", json!("https://u:p@example.com/?token=abc&x=1")),
+            ("name", json!("ex")),
+            ("extra", json!(["--lang=en-US", "--cookie=c1"])),
+        ])
+        .unwrap();
+        let text = fs::read_to_string(ctx.issue.sources().join("t-shots-log.jsonl")).unwrap();
+        let v: Value = serde_json::from_str(text.lines().next().unwrap()).unwrap();
+        assert_eq!(v["url"], "https://example.com/?token=[REDACTED]&x=1");
+        assert_eq!(v["extra"], json!(["--lang=en-US", "--cookie=[REDACTED]"]));
+        assert_eq!(v["name"], "ex");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn inherited_urls_are_scrubbed_in_crops_and_stacks() {
+        let (ctx, root) = test_ctx("inherit");
+        fs::create_dir_all(&ctx.scratch).unwrap();
+        let png = ctx.scratch_png("pg");
+        fs::write(&png, test_img(8, 8, ColorType::Rgb).encode().unwrap()).unwrap();
+        let raw = "https://me:pw@example.com/doc?access_token=SECRET1&x=1";
+        let prov = Prov {
+            tool: "headless Chrome 700 CSS px, DPR 2".into(),
+            url: Some(raw.into()),
+            ..Prov::default()
+        };
+        fs::write(png.with_extension(SIDECAR_TOOL), prov.text()).unwrap();
+        let rect = Rect {
+            x0: 0,
+            y0: 0,
+            x1: 4,
+            y1: 4,
+        };
+        do_cropbox(&ctx, &Source::Name("pg".into()), "c.png", rect, "").unwrap();
+        let parts = [Part {
+            src: Source::Name("pg".into()),
+            rect,
+        }];
+        do_stack(
+            &ctx,
+            "s.png",
+            &parts,
+            0,
+            &Bg::Auto,
+            "https://h/?sig=SECRET2",
+        )
+        .unwrap();
+        let text = fs::read_to_string(ctx.issue.sources().join("t-shots-log.jsonl")).unwrap();
+        assert!(
+            !text.contains("SECRET") && !text.contains("me:pw"),
+            "{text}"
+        );
+        let clean = "https://example.com/doc?access_token=[REDACTED]&x=1";
+        let lines: Vec<Value> = text
+            .lines()
+            .map(|l| serde_json::from_str(l).unwrap())
+            .collect();
+        assert_eq!(lines[0]["url"], clean);
+        assert_eq!(lines[1]["url"], "https://h/?sig=[REDACTED]");
+        assert_eq!(lines[1]["parts"][0]["url"], clean);
+        // The scratch sidecar keeps the raw URL: it never enters the repo.
+        assert_eq!(read_prov(&png).unwrap().url.as_deref(), Some(raw));
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// `png` with an extra chunk spliced in right after IHDR. The CRC is
+    /// bogus: the refusal has to come before the decoder reads the chunk.
+    fn with_chunk(png: &[u8], name: &[u8; 4], data: &[u8]) -> Vec<u8> {
+        let ihdr_end = 8 + 12 + 13;
+        let mut out = png[..ihdr_end].to_vec();
+        out.extend_from_slice(&(data.len() as u32).to_be_bytes());
+        out.extend_from_slice(name);
+        out.extend_from_slice(data);
+        out.extend_from_slice(&[0; 4]);
+        out.extend_from_slice(&png[ihdr_end..]);
+        out
+    }
+
+    #[test]
+    fn hdr_colour_chunks_are_refused() {
+        let base = raw_png(
+            (2, 1),
+            ColorType::Rgb,
+            BitDepth::Eight,
+            None,
+            None,
+            &[1, 2, 3, 4, 5, 6],
+        );
+        assert_eq!(chunk_names(&base)[..2], ["IHDR", "IDAT"]);
+        assert!(unkept_colour_chunk(&base).is_none());
+        for (name, data) in [
+            (b"cICP", &[9u8, 16, 0, 1][..]),
+            (b"mDCV", &[0u8; 24][..]),
+            (b"cLLI", &[0u8; 8][..]),
+        ] {
+            let png = with_chunk(&base, name, data);
+            let e = Img::decode(&png).unwrap_err();
+            assert!(
+                e.starts_with("不支持 cICP/mDCV/cLLI 色彩块的 PNG，先用其他工具转换或另取底图")
+                    && e.contains(std::str::from_utf8(name).unwrap()),
+                "{e}"
+            );
+        }
+        // Not a PNG, or a chunk length that runs off the end: left to the
+        // decoder, never a panic or a false hit.
+        assert!(unkept_colour_chunk(b"nope").is_none());
+        let mut huge = base.clone();
+        huge[8..12].copy_from_slice(&u32::MAX.to_be_bytes());
+        assert!(unkept_colour_chunk(&huge).is_none());
+    }
+
+    #[test]
+    fn gray_with_icc_is_not_promoted_to_colour() {
+        let icc = Some(vec![1u8, 2, 3]);
+        let mut g = plain(2, 1, ColorType::Grayscale, vec![10, 20]);
+        g.meta.icc = icc.clone();
+        for to in [ColorType::Rgb, ColorType::Rgba] {
+            let e = g.clone().promote(to).unwrap_err();
+            assert!(e.contains("ICC") && e.contains("分别出图"), "{e}");
+        }
+        // Same colour model: fine, the profile still fits.
+        assert_eq!(
+            g.clone().promote(ColorType::GrayscaleAlpha).unwrap().data,
+            [10, 255, 20, 255]
+        );
+        let mut rgb = plain(1, 1, ColorType::Rgb, vec![1, 2, 3]);
+        rgb.meta.icc = icc.clone();
+        assert_eq!(rgb.promote(ColorType::Rgba).unwrap().data, [1, 2, 3, 255]);
+
+        // Through `stack`: a coloured background would need RGB.
+        let e = stack(vec![g.clone(), g.clone()], 1, [255, 0, 0, 255]).unwrap_err();
+        assert!(e.contains("第 1 段") && e.contains("ICC"), "{e}");
+        let out = stack(vec![g.clone(), g.clone()], 1, [7, 7, 7, 255]).unwrap();
+        assert_eq!((out.ct, out.meta.icc), (ColorType::Grayscale, icc));
+        // Without a profile the old promotion still applies.
+        g.meta.icc = None;
+        assert_eq!(
+            stack(vec![g.clone()], 0, [255, 0, 0, 255]).unwrap().ct,
+            ColorType::Rgb
+        );
     }
 }
