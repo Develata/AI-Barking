@@ -37,7 +37,7 @@ barking publish-check <期次目录>
 3. oxipng：对 `images/*.png`（不含子目录）：若 `sources/offsite.tsv` 已存在且记录了该文件、SHA-256 与当前一致，则跳过（已登记、可能已上传，压了会让清单失效）；否则运行 `oxipng -o 4 --strip safe <文件…>`（一次传多个文件）。找不到 oxipng → 失败并提示 `scoop install oxipng`。打印压缩前后总字节数。
 4. offsite 清单：先读旧 `sources/offsite.tsv`，凡旧清单有而本次找到的不入库原件里没有的路径（本地未取回或不再匹配规则），列出并失败，不重写清单（先从 OpenList 取回，确属删除的手动改清单）；否则 `offsite::process(&root, dir, false, &mut None)`，打印文件数。
 5. 大文件：候选入库集合 = 本期目录与 `.handoff/` 下未跟踪（`git ls-files --others --exclude-standard`）与已修改（`git diff --name-only HEAD --`）的文件，加上 `README.md`、`daily-scan.md`；任一文件 > 1 MiB（1_048_576 字节）即失败并列出（规则：先问 Develata）。
-6. 身份：从 `.env`（`offsite::load_env`，环境变量优先）读 `BARKING_IDENTITY_PATTERNS`（`;` 分隔的子串，大小写不敏感）；对第 5 步的候选集合逐个文件搜索内容（按 UTF-8 lossy 读取，按行报 `文件:行号`）与文件名；命中即失败。未配置 → 打印 warn“身份检查跳过：.env 未设置 BARKING_IDENTITY_PATTERNS”，不失败。
+6. 身份：模式由 `identity.rs` 提供——`.env` 的 `BARKING_IDENTITY_HANDLES`（X handle，经 `https://api.fxtwitter.com/<handle>` 解析出 screen_name、显示名、`profile_images/<id>`、数字用户 ID，缓存 `~/.config/barking/identity.json`，一天后刷新，缓存保留历史值以覆盖改名前的存档）加 `BARKING_IDENTITY_PATTERNS`（手填，`;` 分隔）；短于 4 字符的忽略；环境变量优先于 `.env`；对第 5 步的候选集合逐个文件搜索内容（按 UTF-8 lossy 读取，按行报 `文件:行号`）与文件名；命中即失败。未配置 → 打印 warn“身份检查跳过：.env 未设置 BARKING_IDENTITY_PATTERNS”，不失败。
 7. 凭据与会话状态：`git check-ignore -q` 确认 `.env`、`cookies.txt`、`cookies.json`、`storage-state.json`、`.playwright-cli/` 仍被忽略；候选集合中不得出现文件名匹配 `.env*`（`.env.example` 除外）、`cookies.*`、`storage-state*.json`；否则失败。
 
 成功时打印摘要并提示下一步（`barking stage`）。

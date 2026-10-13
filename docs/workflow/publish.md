@@ -19,7 +19,7 @@ Develata 在对话中说“已发布”，即授权 Claude 对当期完成下面
    - 配图无损压缩（默认执行，2026-10-02 起）：`oxipng -o 4 --strip safe`，只压 `images/` 下的 PNG。像素不变，但文件字节和 SHA-256 会变、文本类元数据会被删，所以必须在 offsite 清单和上传**之前**做；已记入 `offsite.tsv` 且 SHA-256 未变的文件不再压（已上传的期次因此不会被重压）；不加 `-a`（它会改全透明像素的颜色值，不是严格无损）；JPEG、WebP 不动；需要逐字节保留的原件放进 `sources/`；
    - 生成 `sources/offsite.tsv`（全部图片与原件都在清单里）；
    - 大文件：待提交文件中没有单个超过 1 MB 的，有就先问；
-   - 身份：按 `templates/codex-evidence.md` 第 7 条，用 `.env` 里 `BARKING_IDENTITY_PATTERNS` 列出的抓取者头像链接、显示名与 handle 片段搜索待提交文件与文件名，确认未入库（未配置时只警告）；
+   - 身份：按 `templates/codex-evidence.md` 第 7 条，用 `.env` 里 `BARKING_IDENTITY_HANDLES` 列出的抓取账号 X handle，经 fxtwitter 公开接口解析出显示名、头像 ID 与数字用户 ID（缓存在 `~/.config/barking/identity.json`，一天后自动刷新，改名后旧名仍保留在缓存里），加上 `BARKING_IDENTITY_PATTERNS` 手填的片段，搜索待提交文件与文件名，确认未入库（两者都未配置时只警告）；
    - 凭据与会话状态（`.env`、cookies、storage-state）仍被 `.gitignore` 排除，且没有进入待提交集合。
 3. **提交**：`barking stage <期次目录>` 列出三批文件与建议提交信息；按 `AGENTS.md` 的提交约定依序 `barking stage <期次目录> --batch 1 --add` 后 `git commit`，再 `--batch 2`、`--batch 3`。第②批的提交信息要按组描述存档内容后再提交；工具只暂存精确路径，不提交。
 4. **推送**：`git push origin main`，再 `git fetch` 核对 `origin/main` 上的 `daily-scan.md` 与本地一致。
@@ -49,6 +49,7 @@ Develata 在对话中说“已发布”，即授权 Claude 对当期完成下面
 | `OPENLIST_USERNAME` | 上传专用用户名 |
 | `OPENLIST_PASSWORD` | 该用户的密码 |
 | `OPENLIST_ROOT` | 归档根目录，相对该用户的基本路径。WebDAV 地址 `https://openlist.develata.me/dav/AI-Barking` 对应的 OpenList 路径是 `/AI-Barking`：用户基本路径为 `/` 时填 `/AI-Barking`；基本路径已限定为 `/AI-Barking` 时填 `/` |
-| `BARKING_IDENTITY_PATTERNS` | `publish-check` 身份检查用：抓取者的头像链接、显示名与 handle 的片段，`;` 分隔，大小写不敏感。这些字符串只能写在 `.env` 里，不要出现在仓库任何文件中 |
+| `BARKING_IDENTITY_HANDLES` | `publish-check` 身份检查用：抓取时登录的 X 账号 handle（不带 `@`，多个用 `;` 分隔）。显示名、头像 ID、数字用户 ID 由工具经 fxtwitter 公开接口解析并缓存在仓库外，改名后自动跟上且保留旧名 |
+| `BARKING_IDENTITY_PATTERNS` | 可选，身份检查的手填补充片段（如其他平台的用户名），`;` 分隔，大小写不敏感，至少 4 个字符。这些字符串只能写在 `.env` 里，不要出现在仓库任何文件中 |
 
 建议在 OpenList 后台为上传单独建一个用户：基本路径限定到归档所在的网盘目录；权限只勾“创建目录或上传”（源码 `internal/model/user.go` 权限位 3，覆盖同名文件也只需这一项），不勾删除、重命名、移动、WebDAV 等；不开二步验证（脚本无法输入验证码）。凭据由 Develata 直接写进 `.env`，不在对话中发送。

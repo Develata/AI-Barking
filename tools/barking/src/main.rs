@@ -1,6 +1,7 @@
 mod card;
 mod fetch;
 mod handoff;
+mod identity;
 mod lint;
 mod offsite;
 mod publish;

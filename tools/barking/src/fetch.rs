@@ -1019,6 +1019,11 @@ fn get_json(agent: &ureq::Agent, url: &str, query: &[(&str, &str)]) -> Result<Va
     http_get(agent, url, query)?.json()
 }
 
+/// One JSON GET with the module's agent, for other subcommands.
+pub(crate) fn get_json_pub(url: &str) -> Result<Value, String> {
+    get_json(&http_agent(), url, &[])
+}
+
 /// A failed request is not fatal: it is shown now and kept in the record.
 fn record_error(errors: &mut Vec<String>, msg: String) {
     println!("warn: {msg}");

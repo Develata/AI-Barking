@@ -531,14 +531,6 @@ fn step_size(issue: &Issue) -> Step {
     Step::fail(notes)
 }
 
-/// `;`-separated, case-insensitive substrings; blanks dropped.
-fn parse_patterns(raw: &str) -> Vec<String> {
-    raw.split(';')
-        .map(|s| s.trim().to_lowercase())
-        .filter(|s| !s.is_empty())
-        .collect()
-}
-
 /// One identity hit: `line` is `None` when the file *name* matched. Only the
 /// index of the pattern is kept, so the report never echoes the identity.
 #[derive(Debug, PartialEq, Eq)]
@@ -569,20 +561,13 @@ fn identity_hits(rel: &str, content: &str, patterns: &[String]) -> Vec<Hit> {
 }
 
 fn step_identity(issue: &Issue) -> Step {
-    let raw = std::env::var("BARKING_IDENTITY_PATTERNS")
-        .ok()
-        .filter(|v| !v.trim().is_empty())
-        .or_else(|| {
-            offsite::load_env(&issue.root)
-                .get("BARKING_IDENTITY_PATTERNS")
-                .cloned()
-        })
-        .unwrap_or_default();
-    let patterns = parse_patterns(&raw);
+    let (patterns, mut notes) = crate::identity::patterns(&issue.root);
     if patterns.is_empty() {
-        return Step::pass(vec![
-            "warn: 身份检查跳过：.env 未设置 BARKING_IDENTITY_PATTERNS".to_string(),
-        ]);
+        notes.push(
+            "warn: 身份检查跳过：.env 未设置 BARKING_IDENTITY_HANDLES（抓取账号的 X handle）或 BARKING_IDENTITY_PATTERNS"
+                .to_string(),
+        );
+        return Step::pass(notes);
     }
     let rows = match repo::git_status(&issue.root) {
         Ok(r) => r,
@@ -602,16 +587,16 @@ fn step_identity(issue: &Issue) -> Step {
             });
         }
     }
-    let mut notes = vec![format!(
+    notes.push(format!(
         "按 {} 个模式检查 {} 个候选文件",
         patterns.len(),
         files.len()
-    )];
+    ));
     if hits.is_empty() {
         return Step::pass(notes);
     }
     notes.push(format!(
-        "命中 {} 处，须先脱敏再提交（模式序号对应 .env 里 BARKING_IDENTITY_PATTERNS 的顺序）：",
+        "命中 {} 处，须先脱敏再提交（模式序号：先手填的 BARKING_IDENTITY_PATTERNS，再各 handle 解析出的）：",
         hits.len()
     ));
     let rest = hits.len().saturating_sub(MAX_LISTED);
@@ -1317,7 +1302,7 @@ mod tests {
 
     #[test]
     fn identity_matches_case_insensitively_without_echoing() {
-        let pats = parse_patterns(" Alice ; ;@Bob_99;");
+        let pats = crate::identity::split(" Alice ; ;@Bob_99;");
         assert_eq!(pats, ["alice", "@bob_99"]);
         let hits = identity_hits(
             "docs/2610/1009/sources/ALICE-profile.txt",
@@ -1338,7 +1323,7 @@ mod tests {
             ]
         );
         assert!(identity_hits("a.txt", "clean", &pats).is_empty());
-        assert!(parse_patterns("  ;; ").is_empty());
+        assert!(crate::identity::split("  ;; ").is_empty());
     }
 
     #[test]
