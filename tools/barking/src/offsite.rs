@@ -235,7 +235,7 @@ pub(crate) fn parse_manifest(text: &str) -> Vec<(String, u64, String)> {
         .collect()
 }
 
-fn write_manifest(issue: &Path, entries: &[Entry]) -> Result<(), String> {
+pub(crate) fn write_manifest(issue: &Path, entries: &[Entry]) -> Result<(), String> {
     let mut text = format!("{MANIFEST_HEADER}\n");
     for e in entries {
         text.push_str(&format!("{}\t{}\t{}\n", e.rel, e.size, e.sha256));

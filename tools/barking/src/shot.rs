@@ -1669,27 +1669,65 @@ fn looks_absolute(s: &str) -> bool {
 /// like a credential, and otherwise has a URL value cleaned and an absolute
 /// path value cut to its `LogPath` (a `--user-data-dir` would name the user).
 fn log_chrome_arg(root: &Path, arg: &str) -> String {
-    if let Some(i) = arg.to_ascii_lowercase().find("file://") {
-        return format!("{}{}", &arg[..i], log_url(root, &arg[i..]));
-    }
-    let clean = |v: &str| {
-        if starts_with_ci(v, "http://") || starts_with_ci(v, "https://") {
-            log_url(root, v)
-        } else if looks_absolute(v) {
-            LogPath::of(root, Path::new(v)).path
-        } else {
-            v.to_string()
-        }
-    };
     // A bare URL first: its own query holds the `=`s, not a `key=`.
     if starts_with_ci(arg, "http://") || starts_with_ci(arg, "https://") {
-        return log_url(root, arg);
+        return scrub_file_urls(root, &log_url(root, arg));
     }
     match arg.split_once('=') {
-        Some((k, _)) if secret_key(k) => format!("{k}={REDACTED}"),
-        Some((k, v)) => format!("{k}={}", clean(v)),
-        None => clean(arg),
+        // A file URL under a secret-looking key (`--token-file=`) names a
+        // path, not a credential: keep its name like any other path.
+        Some((k, v)) if secret_key(k) && !starts_with_ci(v, "file://") => {
+            format!("{k}={REDACTED}")
+        }
+        Some((k, v)) => format!("{k}={}", log_arg_value(root, v)),
+        None => log_arg_value(root, arg),
     }
+}
+
+/// One `--chrome-arg` value: a URL goes through `log_url` (credentials and
+/// secret query keys), an absolute path keeps only what `LogPath` would, and
+/// any `file://` URL embedded anywhere (a `next=file:///...` parameter, say)
+/// is cut to its path name afterwards, so no branch skips the others.
+fn log_arg_value(root: &Path, v: &str) -> String {
+    let cleaned = if starts_with_ci(v, "file://")
+        || starts_with_ci(v, "http://")
+        || starts_with_ci(v, "https://")
+    {
+        log_url(root, v)
+    } else if looks_absolute(v) {
+        last_segment(&LogPath::of(root, Path::new(v)).path)
+    } else {
+        v.to_string()
+    };
+    scrub_file_urls(root, &cleaned)
+}
+
+/// Every `file://…` run inside `s` (ending at `&`, whitespace or a quote)
+/// replaced by its log form.
+fn scrub_file_urls(root: &Path, s: &str) -> String {
+    let lower = s.to_ascii_lowercase();
+    let mut out = String::with_capacity(s.len());
+    let mut from = 0;
+    while let Some(off) = lower[from..].find("file://") {
+        let start = from + off;
+        let end = s[start..]
+            .find(|c: char| c == '&' || c == '"' || c == '\'' || c.is_whitespace())
+            .map_or(s.len(), |e| start + e);
+        out.push_str(&s[from..start]);
+        out.push_str(&log_url(root, &s[start..end]));
+        from = end;
+    }
+    out.push_str(&s[from..]);
+    out
+}
+
+/// Last path segment by either separator, so a Windows path logged on a
+/// Linux host (where `\` is not a separator) still loses its directories.
+fn last_segment(p: &str) -> String {
+    p.rsplit(['/', '\\'])
+        .find(|seg| !seg.is_empty())
+        .unwrap_or("")
+        .to_string()
 }
 
 /// A log value with every string under a `url` key passed through `log_url`
@@ -3897,6 +3935,17 @@ mod tests {
         let (ctx, root) = test_ctx("chromearg");
         let a = |s: &str| log_chrome_arg(&root, s);
         assert_eq!(a("--lang=en-US"), "--lang=en-US");
+        // A credential URL whose query also carries a file URL: both cleaned.
+        assert_eq!(
+            a("--proxy-pac-url=https://u:pw@example.com/pac?token=SECRET&next=file:///tmp/x"),
+            "--proxy-pac-url=https://example.com/pac?token=[REDACTED]&next=x"
+        );
+        assert_eq!(
+            a("https://u:pw@h/?key=k&x=file:///home/alice/p.html"),
+            "https://h/?key=[REDACTED]&x=p.html"
+        );
+        assert_eq!(last_segment("C:\\Users\\someone\\AppData\\prof"), "prof");
+        assert_eq!(last_segment("/home/alice/prof/"), "prof");
         assert_eq!(a("--no-sandbox"), "--no-sandbox");
         assert_eq!(
             a("--user-agent=Mozilla/5.0 x"),

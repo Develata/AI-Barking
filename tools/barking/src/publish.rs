@@ -454,14 +454,16 @@ fn step_offsite(issue: &Issue) -> Step {
         );
         return Step::fail(notes);
     }
-    if let Err(e) = offsite::process(&issue.root, &issue.dir, false, &mut None) {
+    // Written from the very entries just checked: a second scan could see a
+    // file moved away in between and shrink the manifest after all.
+    if let Err(e) = offsite::write_manifest(&issue.dir, &entries) {
         return Step::fail(vec![e]);
     }
-    let n = fs::read_to_string(&path).map_or(0, |t| offsite::parse_manifest(&t).len());
     Step::pass(vec![format!(
-        "{}/sources/{} 登记 {n} 个文件",
+        "{}/sources/{} 登记 {} 个文件",
         issue.rel(),
-        offsite::MANIFEST
+        offsite::MANIFEST,
+        entries.len()
     )])
 }
 
