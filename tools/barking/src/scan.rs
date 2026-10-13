@@ -258,8 +258,20 @@ fn apply_daily_scan(
     roundup.removed.reverse();
 
     let body = table_rows(&lines, H_ROUNDUP)?;
+    // An issue older than the newest row by the window is outside it: rerun
+    // for its README row, say, must not bring back what a newer issue pruned.
+    let latest = body
+        .clone()
+        .filter_map(|i| near(first_cell(&lines[i])))
+        .max();
+    let stale = latest.is_some_and(|l| date <= l.plus_days(-WINDOW_DAYS));
     let mut fresh: Vec<String> = Vec::new();
-    for row in &rows.roundup {
+    if stale {
+        roundup
+            .notes
+            .push("本期早于表中最新期次三天以上，不加速览行".into());
+    }
+    for row in rows.roundup.iter().filter(|_| !stale) {
         // Same issue and same text: a rerun, or a row Claude already reworded.
         let want = cells(row);
         let have = body.clone().any(|i| {
@@ -697,6 +709,79 @@ mod tests {
         assert!(out.contains(&format!(
             "| 0401 | 旧三 |\n| 0405 | 新：{PENDING} |\n\n## 后续"
         )));
+    }
+
+    #[test]
+    fn older_issue_does_not_revive_pruned_rows() {
+        // 1012 pruned the 1009 rows; rerunning 1009 (say, for its README
+        // row) must not add them back.
+        let (after_1012, ..) = apply_daily_scan(
+            SCAN_FIXTURE,
+            day("1012"),
+            &rows("1012", &[("X", "十二")], true),
+        )
+        .unwrap();
+        assert!(!after_1012.contains("| 1009 |"));
+        let (again, ru, _) = apply_daily_scan(
+            &after_1012,
+            day("1009"),
+            &rows("1009", &[("D", "九日条目")], true),
+        )
+        .unwrap();
+        assert!(ru.added.is_empty() && !ru.notes.is_empty(), "{ru:?}");
+        assert!(!again.contains("| 1009 | D |"));
+        // Two days behind the newest row is still inside the window.
+        let (_, ru, _) = apply_daily_scan(
+            &after_1012,
+            day("1010"),
+            &rows("1010", &[("Y", "十")], true),
+        )
+        .unwrap();
+        assert_eq!(ru.added.len(), 1);
+    }
+
+    #[test]
+    fn roundup_kind_and_main_entries() {
+        let spec: Spec = toml::from_str(
+            "kind = \"roundup\"
+[[roundup]]
+tag = \"A\"
+text = \"甲\"
+",
+        )
+        .unwrap();
+        let mut i = issue("2610", "1013");
+        i.dir = std::env::temp_dir().join(format!("barking-scan-test-k-{}", std::process::id()));
+        std::fs::create_dir_all(&i.dir).unwrap();
+        std::fs::write(
+            i.publish_txt(),
+            "AI 速览
+
+正文
+",
+        )
+        .unwrap();
+        let r = wanted_rows(&i, &spec).unwrap();
+        assert!(r.posted.is_none());
+        assert_eq!(r.roundup, ["| 1013 | A | 甲 |"]);
+        let spec: Spec = toml::from_str(
+            "[[tldr]]
+tag = \"A\"
+fact = \"f\"
+[[roundup]]
+tag = \"A\"
+main = true
+text = \"主\"
+[[roundup]]
+tag = \"B\"
+text = \"乙\"
+",
+        )
+        .unwrap();
+        let r = wanted_rows(&i, &spec).unwrap();
+        std::fs::remove_dir_all(&i.dir).ok();
+        assert!(r.posted.is_some());
+        assert_eq!(r.roundup, ["| 1013 | B | 乙 |"]);
     }
 
     #[test]

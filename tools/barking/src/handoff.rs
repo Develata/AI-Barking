@@ -25,11 +25,15 @@ use crate::repo::{self, Date, Issue};
 const TEMPLATE: &str = include_str!("../../../templates/handoff-evidence.md");
 const HANDOFF_DIR: &str = ".handoff";
 const INDEX_FILE: &str = "README.md";
-/// A group with exactly this topic gathers 速览 entries: no screenshots.
+/// A group whose topic starts with this gathers 速览 entries (`速览`,
+/// `速览候选（…）`): no screenshots.
 const ROUNDUP_TOPIC: &str = "速览";
-/// Screenshot numbers by position of the group in the brief (A 01–14, …).
-const IMAGE_RANGES: [(u32, u32); 4] = [(1, 14), (15, 24), (25, 34), (35, 44)];
-const ZH_COUNT: [&str; 5] = ["", "一", "两", "三", "四"];
+/// Screenshot numbers by position of the group in the brief (A 01–12, …).
+/// A 速览 group keeps its slot, so a shot group must sit in the first four.
+const IMAGE_RANGES: [(u32, u32); 4] = [(1, 12), (13, 24), (25, 36), (37, 48)];
+const ZH_COUNT: [&str; 11] = [
+    "", "一", "两", "三", "四", "五", "六", "七", "八", "九", "十",
+];
 const ZH_ORDINAL: [&str; 5] = ["", "一", "二", "三", "四"];
 /// Past this many uncommitted paths the warning only names the first few.
 const MAX_LISTED_CHANGES: usize = 10;
@@ -50,8 +54,9 @@ const USAGE: &str = "\
 用法：
   barking handoff <期次目录> --groups \"A=主题,B=主题,C=速览\" [--note \"要点\"]... [--force] [--out 文件]
   barking handoff --index
-    --groups  各组的组号与主题，组号为升序的单个大写字母，主题里不能有半角逗号；
-              主题恰为“速览”的组不截图；最多 4 组，截图编号区间按组序 01–14、15–24、25–34、35–44
+    --groups  各组的组号与主题，组号为升序的单个大写字母；组之间用半角逗号分隔，主题里不能有逗号；
+              主题以“速览”开头的组不截图、不计入上限，但仍占所在位置的编号区间；
+              截图组最多 4 个，且须在前 4 位，截图编号区间按组序 01–12、13–24、25–36、37–48
     --note    本期特有的隐私/风控要点，可重复；每条成为“通用规则”里的一项
     --force   覆盖已存在的派工单
     --out     预览：写到指定文件，不建目录、不动 .handoff（含索引）
@@ -65,7 +70,7 @@ struct Group {
 
 impl Group {
     fn is_roundup(&self) -> bool {
-        self.topic == ROUNDUP_TOPIC
+        self.topic.starts_with(ROUNDUP_TOPIC)
     }
 }
 
@@ -85,8 +90,12 @@ struct Ctx {
     mmdd: String,
     date: Date,
     groups: Vec<Group>,
+    /// The checkout the brief's paths are relative to (a worktree, maybe).
+    repo: String,
+    branch: String,
     baseline: String,
-    untracked: String,
+    /// Uncommitted paths the executor must leave alone, already phrased.
+    foreign: Vec<String>,
     dirs_note: String,
     prev_issues: String,
     unpublished: String,
@@ -169,6 +178,10 @@ fn take_value<'a>(it: &mut impl Iterator<Item = &'a String>, flag: &str) -> Resu
 /// `A=主题,B=主题`. Group letters ascend because the evidence files are
 /// prefixed with them (`a-`, `b-`, …) and the claim numbers follow.
 fn parse_groups(raw: &str) -> Result<Vec<Group>, String> {
+    // A full-width comma would silently glue two groups into one topic.
+    if raw.contains('，') {
+        return Err("组之间用半角逗号分隔（--groups 里不能有全角逗号“，”）".into());
+    }
     let mut out: Vec<Group> = Vec::new();
     for part in raw.split(',') {
         let part = part.trim();
@@ -193,16 +206,27 @@ fn parse_groups(raw: &str) -> Result<Vec<Group>, String> {
             topic: topic.to_string(),
         });
     }
-    if out.len() > IMAGE_RANGES.len() {
+    if out.len() >= ZH_COUNT.len() {
         return Err(format!(
-            "最多 {} 组（截图编号区间只划了这么多段），现有 {} 组",
-            IMAGE_RANGES.len(),
+            "最多 {} 组，现有 {} 组",
+            ZH_COUNT.len() - 1,
             out.len()
+        ));
+    }
+    // Ranges go by position, so this also caps the shot groups at four.
+    if let Some(i) = out.iter().rposition(|g| !g.is_roundup())
+        && i >= IMAGE_RANGES.len()
+    {
+        return Err(format!(
+            "截图组最多 {n} 个，且须排在前 {n} 位（截图编号区间按组序只划了 {n} 段，“{ROUNDUP_TOPIC}”组也占位）；组 {} 在第 {} 位",
+            out[i].letter,
+            i + 1,
+            n = IMAGE_RANGES.len(),
         ));
     }
     if out.iter().all(Group::is_roundup) {
         return Err(format!(
-            "至少要有一个需要截图的组（主题不是“{ROUNDUP_TOPIC}”）"
+            "至少要有一个需要截图的组（主题不以“{ROUNDUP_TOPIC}”开头）"
         ));
     }
     Ok(out)
@@ -260,12 +284,32 @@ fn context(o: &Opts, issue: &Issue, file_name: &str, missing: &[&str]) -> Result
     let date = issue.date()?;
     let rel = issue.rel();
     let baseline = repo::git(&issue.root, &["rev-parse", "--short", "HEAD"])?;
-    let status = repo::git(&issue.root, &["status", "--porcelain", "-z"])?;
-    // The brief and the index it updates are this command's own output.
-    let own_files = [
-        format!("{HANDOFF_DIR}/{file_name}"),
-        format!("{HANDOFF_DIR}/{INDEX_FILE}"),
-    ];
+    let branch = match repo::git(&issue.root, &["rev-parse", "--abbrev-ref", "HEAD"])? {
+        // Detached HEAD: the commit is the only name there is.
+        b if b == "HEAD" => baseline.clone(),
+        b => b,
+    };
+    let mut status = parse_status_z(&repo::git(&issue.root, &["status", "--porcelain", "-z"])?);
+    let parents: Vec<String> = status
+        .iter()
+        .filter(|(xy, p)| is_untracked_parent(xy, p, &rel))
+        .map(|(_, p)| p.clone())
+        .collect();
+    if !parents.is_empty() {
+        // git folds a new month into `docs/2611/`, which would hide another
+        // uncommitted issue of that month behind this one; list it file by file.
+        let mut args = vec!["status", "--porcelain", "-z", "--untracked-files=all", "--"];
+        args.extend(parents.iter().map(String::as_str));
+        let inside = parse_status_z(&repo::git(&issue.root, &args)?);
+        status = unfold_parents(&status, &rel, &inside);
+    }
+    // The brief is this command's own output; so is the index, unless it holds
+    // edits a rewrite would not produce.
+    let index_rel = format!("{HANDOFF_DIR}/{INDEX_FILE}");
+    let mut own_files = vec![format!("{HANDOFF_DIR}/{file_name}")];
+    if !status.iter().any(|(_, p)| *p == index_rel) || index_is_own(&issue.root)? {
+        own_files.push(index_rel);
+    }
     let all = Issue::all(&issue.root)?;
     let with_logs: Vec<String> = all
         .iter()
@@ -294,8 +338,10 @@ fn context(o: &Opts, issue: &Issue, file_name: &str, missing: &[&str]) -> Result
         mmdd: issue.mmdd.clone(),
         date,
         groups: o.groups.clone(),
+        repo: issue.root.display().to_string(),
+        branch,
         baseline,
-        untracked: untracked_phrase(&parse_status_z(&status), &rel, &own_files),
+        foreign: foreign_changes(&status, &rel, &own_files),
         dirs_note: dirs_note(&rel, missing),
         prev_issues: prev_phrase(&with_logs),
         unpublished,
@@ -381,6 +427,14 @@ fn render(c: &Ctx) -> Result<String, String> {
     Ok(text)
 }
 
+fn title_groups(groups: &[Group]) -> String {
+    groups
+        .iter()
+        .map(|g| format!("{} {}", g.letter, g.topic))
+        .collect::<Vec<_>>()
+        .join("｜")
+}
+
 fn body_vars(c: &Ctx, sections: &str) -> Result<Vec<(&'static str, String)>, String> {
     let letters_of = |roundup: bool| -> Vec<String> {
         c.groups
@@ -392,12 +446,6 @@ fn body_vars(c: &Ctx, sections: &str) -> Result<Vec<(&'static str, String)>, Str
     let shot = letters_of(false);
     let roundup = letters_of(true);
     let all_letters: Vec<String> = c.groups.iter().map(|g| g.letter.to_string()).collect();
-    let title_groups = c
-        .groups
-        .iter()
-        .map(|g| format!("{} {}", g.letter, g.topic))
-        .collect::<Vec<_>>()
-        .join("｜");
     let ranges = c
         .groups
         .iter()
@@ -409,15 +457,13 @@ fn body_vars(c: &Ctx, sections: &str) -> Result<Vec<(&'static str, String)>, Str
         })
         .collect::<Result<Vec<_>, &str>>()?
         .join("，");
-    let (first, last) = match (c.groups.first(), c.groups.last()) {
-        (Some(f), Some(l)) => (f.letter.to_ascii_lowercase(), l.letter.to_ascii_lowercase()),
-        _ => return Err("没有任何组".into()),
-    };
-    let prefix_range = if first == last {
-        format!("`{first}-`")
-    } else {
-        format!("`{first}-`…`{last}-`")
-    };
+    // Each prefix spelled out: `a-`…`d-` would claim a skipped letter's.
+    let prefixes = c
+        .groups
+        .iter()
+        .map(|g| format!("`{}-`", g.letter.to_ascii_lowercase()))
+        .collect::<Vec<_>>()
+        .join("、");
     let (tz, shift) = us_eastern(c.date);
     let notes = if c.notes.is_empty() {
         "- 本期无额外隐私/风控要点。".to_string()
@@ -437,18 +483,30 @@ fn body_vars(c: &Ctx, sections: &str) -> Result<Vec<(&'static str, String)>, Str
             format!("{l} 组只需“扫描说法勘误”和各条的一句事实。"),
         )
     };
-    let count = ZH_COUNT.get(c.groups.len()).copied().unwrap_or("");
+    let count = match ZH_COUNT.get(c.groups.len()) {
+        Some(n) if !n.is_empty() => n,
+        _ => return Err(format!("组数 {} 超出范围", c.groups.len())),
+    };
+    // The acceptance line points back at the list, so it goes when the list does.
+    let keep = if c.foreign.is_empty() {
+        String::new()
+    } else {
+        "，上面列出的既有未提交改动保持原样".into()
+    };
     Ok(vec![
         ("MMDD", c.mmdd.clone()),
         ("YYMM", c.yymm.clone()),
-        ("TITLE_GROUPS", title_groups),
+        ("TITLE_GROUPS", title_groups(&c.groups)),
         ("GROUP_COUNT_ZH", count.to_string()),
         ("GROUP_LETTERS", all_letters.join("/")),
+        ("REPO", c.repo.clone()),
+        ("BRANCH", c.branch.clone()),
         ("BASELINE", c.baseline.clone()),
-        ("UNTRACKED", c.untracked.clone()),
+        ("UNTRACKED", untracked_phrase(&c.foreign)),
+        ("KEEP_CHANGES", keep),
         ("DIRS_NOTE", c.dirs_note.clone()),
         ("PREV_ISSUES", c.prev_issues.clone()),
-        ("PREFIX_RANGE", prefix_range),
+        ("PREFIXES", prefixes),
         ("UNPUBLISHED", c.unpublished.clone()),
         ("LOCAL_TZ", tz.to_string()),
         ("BJ_SHIFT", shift.to_string()),
@@ -559,13 +617,64 @@ fn parse_status_z(text: &str) -> Vec<(String, String)> {
     rows
 }
 
-/// The "do not touch" sentence for everything uncommitted outside this issue's
-/// directory and the brief's own files.
-fn untracked_phrase(rows: &[(String, String)], issue_rel: &str, own_files: &[String]) -> String {
+/// A wholly untracked directory that contains the issue directory, such as
+/// `docs/2611/` for the month's first issue.
+fn is_untracked_parent(xy: &str, path: &str, issue_rel: &str) -> bool {
+    xy == "??" && path.ends_with('/') && format!("{issue_rel}/").starts_with(path)
+}
+
+/// `rows` with each untracked parent of the issue directory replaced by what
+/// it holds besides the issue: `inside` lists the parents' files one by one
+/// (`--untracked-files=all`), and each is folded to its shallowest directory
+/// that is not itself a parent, as git folds any wholly untracked directory.
+fn unfold_parents(
+    rows: &[(String, String)],
+    issue_rel: &str,
+    inside: &[(String, String)],
+) -> Vec<(String, String)> {
     let dir_prefix = format!("{issue_rel}/");
-    let items: Vec<String> = rows
-        .iter()
-        .filter(|(_, p)| !p.starts_with(&dir_prefix) && !own_files.contains(p))
+    let mut out: Vec<(String, String)> = Vec::new();
+    for (xy, p) in rows {
+        if !is_untracked_parent(xy, p, issue_rel) {
+            out.push((xy.clone(), p.clone()));
+            continue;
+        }
+        for (_, f) in inside {
+            if !f.starts_with(p.as_str()) || f.starts_with(&dir_prefix) {
+                continue;
+            }
+            // Shallowest `a/b/` under the parent that is not on the way to the
+            // issue directory; the file itself if there is none.
+            let entry = f
+                .match_indices('/')
+                .map(|(i, _)| &f[..=i])
+                .find(|d| d.len() > p.len() && !dir_prefix.starts_with(d))
+                .unwrap_or(f);
+            let row = ("??".to_string(), entry.to_string());
+            if !out.contains(&row) {
+                out.push(row);
+            }
+        }
+    }
+    out
+}
+
+/// Everything uncommitted outside this issue's directory and the brief's own
+/// files, each phrased for the "do not touch" sentence. An untracked parent
+/// of the issue directory is only there because of the issue itself (its
+/// other contents are listed by [`unfold_parents`]).
+fn foreign_changes(
+    rows: &[(String, String)],
+    issue_rel: &str,
+    own_files: &[String],
+) -> Vec<String> {
+    let dir_prefix = format!("{issue_rel}/");
+    rows.iter()
+        .filter(|(xy, p)| {
+            !p.starts_with(&dir_prefix)
+                && !own_files.contains(p)
+                && !is_untracked_parent(xy, p, issue_rel)
+        })
         .map(|(xy, p)| {
             if xy == "??" && p.ends_with('/') {
                 format!("整个 `{p}` 目录")
@@ -573,7 +682,11 @@ fn untracked_phrase(rows: &[(String, String)], issue_rel: &str, own_files: &[Str
                 format!("`{p}`")
             }
         })
-        .collect();
+        .collect()
+}
+
+/// The sentence for [`foreign_changes`].
+fn untracked_phrase(items: &[String]) -> String {
     if items.is_empty() {
         return "工作区干净".into();
     }
@@ -688,14 +801,16 @@ fn has_row(text: &str, heading: &str, mmdd: &str) -> bool {
 /// Earlier issues the scan prompt cannot know about yet. A main post is
 /// recorded in 已发过. A 速览专帖 has no such row, only its entries in 近 3 天
 /// 速览已收, which are pruned after three days; so it counts only while it is
-/// still inside that window, otherwise nothing can show it was recorded.
+/// still inside that window (the third day included: pruning happens when a
+/// later issue is published, not on the calendar), otherwise nothing can show
+/// it was recorded.
 fn unpublished_issues<'a>(priors: &'a [Prior], scan: &str, current: Date) -> Vec<&'a Prior> {
     priors
         .iter()
         .filter(|p| match p.kind {
             Kind::Main => !has_row(scan, "## 已发过", &p.mmdd),
             Kind::Roundup => {
-                p.date.days() > current.days() - 3 && !has_row(scan, "## 近 3 天速览已收", &p.mmdd)
+                p.date.days() >= current.days() - 3 && !has_row(scan, "## 近 3 天速览已收", &p.mmdd)
             }
         })
         .collect()
@@ -744,6 +859,17 @@ fn unpublished_phrase(list: &[&Prior]) -> String {
 /// Rewrite the index: keep what the file says before its first and after its
 /// last list item, and list every brief newest first.
 fn write_index(root: &Path) -> Result<(), String> {
+    let path = root.join(HANDOFF_DIR).join(INDEX_FILE);
+    let old = read_lf(&path).unwrap_or_default();
+    write_if_changed(
+        &path,
+        &index_text(&old, &index_entries(root)?),
+        "派工单索引",
+    )
+}
+
+/// `(file name, title)` of every brief in `.handoff/`, newest first.
+fn index_entries(root: &Path) -> Result<Vec<(String, String)>, String> {
     let dir = root.join(HANDOFF_DIR);
     let mut entries = Vec::new();
     for e in fs::read_dir(&dir).map_err(|e| format!("{}: {e}", dir.display()))? {
@@ -756,11 +882,28 @@ fn write_index(root: &Path) -> Result<(), String> {
         entries.push((name.clone(), index_title(&raw, &name)));
     }
     entries.sort_by(|a, b| b.0.cmp(&a.0));
-    let path = dir.join(INDEX_FILE);
-    let old = fs::read_to_string(&path)
-        .unwrap_or_default()
-        .replace("\r\n", "\n");
-    write_if_changed(&path, &index_text(&old, &entries), "派工单索引")
+    Ok(entries)
+}
+
+fn read_lf(path: &Path) -> std::io::Result<String> {
+    fs::read_to_string(path).map(|t| t.replace("\r\n", "\n"))
+}
+
+/// Whether the uncommitted `.handoff/README.md` is exactly what a rewrite of
+/// the committed one gives for the briefs now on disk: then its changes are
+/// this command's own (an uncommitted earlier brief's entry, say). The brief
+/// about to be written is not counted, since a run that has not written it
+/// yet cannot have listed it. A hand edit to the prose around the list would
+/// survive [`index_text`] untouched, so the committed file, not the working
+/// one, is the baseline.
+fn index_is_own(root: &Path) -> Result<bool, String> {
+    let Ok(working) = read_lf(&root.join(HANDOFF_DIR).join(INDEX_FILE)) else {
+        return Ok(false);
+    };
+    let committed = repo::git(root, &["show", &format!("HEAD:{HANDOFF_DIR}/{INDEX_FILE}")])
+        .map(|t| t.replace("\r\n", "\n"))
+        .unwrap_or_default();
+    Ok(working == index_text(&committed, &index_entries(root)?))
 }
 
 /// First line of the brief without its `# `; the file name if it has none.
@@ -820,8 +963,10 @@ mod tests {
             mmdd: "1009".into(),
             date: Date::new(2026, 10, 9).unwrap(),
             groups,
+            repo: r"E:\gitclone\AI-Barking".into(),
+            branch: "main".into(),
             baseline: "abc1234".into(),
-            untracked: "工作区干净".into(),
+            foreign: Vec::new(),
             dirs_note: dirs_note("docs/2610/1009", &["images", "sources"]),
             prev_issues: prev_phrase(&["docs/2610/1008".into(), "docs/2610/1007".into()]),
             unpublished: String::new(),
@@ -838,14 +983,28 @@ mod tests {
         ]
     }
 
-    /// No `{NAME}` left, apart from the two names the brief quotes verbatim
-    /// from `templates/codex-evidence.md`.
+    /// The first `{` followed by a capital letter, apart from the one pair
+    /// the brief quotes verbatim from `templates/codex-evidence.md`.
     fn leftover_placeholder(text: &str) -> Option<String> {
-        let text = text.replace("{YYMM}/{MMDD}", "");
-        let at = text.find('{')?;
-        let next = text[at + 1..].chars().next()?;
-        next.is_ascii_uppercase()
-            .then(|| text[at..].chars().take(20).collect())
+        let text = text.replacen("路径里的 `{YYMM}/{MMDD}` 即", "", 1);
+        text.match_indices('{')
+            .find(|(at, _)| {
+                text[at + 1..]
+                    .chars()
+                    .next()
+                    .is_some_and(|c| c.is_ascii_uppercase())
+            })
+            .map(|(at, _)| text[at..].chars().take(20).collect())
+    }
+
+    #[test]
+    fn leftover_placeholder_scans_every_brace() {
+        assert_eq!(leftover_placeholder("a {x} b {Y}"), Some("{Y}".into()));
+        assert_eq!(leftover_placeholder("{姓名} {} {"), None);
+        let quoted = "路径里的 `{YYMM}/{MMDD}` 即 `2610/1009`";
+        assert_eq!(leftover_placeholder(quoted), None);
+        // Only that one sentence is exempt.
+        assert!(leftover_placeholder(&format!("{quoted} `{{YYMM}}/x`")).is_some());
     }
 
     #[test]
@@ -869,11 +1028,33 @@ mod tests {
             "B=x,A=y",
             "A=x,A=y",
             "A=速览",
+            "A=速览候选（不截图）",
             "A=1,B=2,C=3,D=4,E=5",
+            // Four shot groups, but a 速览 group pushes the last out of range.
+            "A=1,B=速览,C=3,D=4,E=5",
         ] {
             assert!(parse_groups(bad).is_err(), "{bad:?} should be rejected");
         }
         assert!(parse_groups("A=1,B=2,C=3,D=4").is_ok());
+        // 速览 groups do not count towards the four: the 1007 layout.
+        let g = parse_groups("A=1,B=2,C=3,D=速览,E=速览候选（二）").unwrap();
+        assert_eq!(g.iter().filter(|g| g.is_roundup()).count(), 2);
+        assert!(parse_groups("A=1,B=2,C=3,D=4,E=速览").is_ok());
+        let e = parse_groups("A=1,B=2,C=3,D=4,E=5").unwrap_err();
+        assert!(e.contains("截图组最多 4 个"), "{e}");
+    }
+
+    #[test]
+    fn rejects_full_width_comma() {
+        let e = parse_groups("A=甲，B=乙").unwrap_err();
+        assert!(e.contains("半角逗号"), "{e}");
+        assert!(parse_groups("A=甲,B=乙（丙，丁）").is_err());
+        // A usage error, so `run` exits 2.
+        let args: Vec<String> = ["docs/2610/1009", "--groups", "A=甲，B=乙"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        assert!(parse_args(&args).unwrap_err().contains("半角逗号"));
     }
 
     #[test]
@@ -958,13 +1139,13 @@ mod tests {
     fn assigns_image_ranges_by_group_position() {
         let text = render(&ctx(four_groups())).unwrap();
         assert!(text.contains("（仅 A/B/C 组）"));
-        assert!(text.contains("（A 组 01–14，B 组 15–24，C 组 25–34）"));
-        assert!(text.contains("候选配图（A 组 01–14）"));
-        assert!(text.contains("候选配图（C 组 25–34）"));
+        assert!(text.contains("（A 组 01–12，B 组 13–24，C 组 25–36）"));
+        assert!(text.contains("候选配图（A 组 01–12）"));
+        assert!(text.contains("候选配图（C 组 25–36）"));
         assert!(text.contains("D 组不需要截图，只存档与摘句。"));
         assert!(text.contains("D 组只需“扫描说法勘误”和各条的一句事实。"));
         assert!(text.contains("本文件分四组（A/B/C/D）"));
-        assert!(text.contains("文件名以组号开头（`a-`…`d-`）"));
+        assert!(text.contains("文件名以组号开头（`a-`、`b-`、`c-`、`d-`）"));
         assert!(text.contains("主帖第三条。"));
         assert!(text.contains("（待填）\n\n---\n\n# B 组："));
         assert!(text.contains("回报\n\n最终消息写："));
@@ -977,13 +1158,30 @@ mod tests {
             group('C', "丙"),
         ]))
         .unwrap();
-        assert!(mixed.contains("（A 组 01–14，C 组 25–34）"));
+        assert!(mixed.contains("（A 组 01–12，C 组 25–36）"));
         assert!(mixed.contains("主帖第二条。"));
         assert!(mixed.contains("本文件分三组（A/B/C）"));
 
+        // Skipped letters: prefixes are listed one by one; a 速览候选 group is
+        // a 速览 group; five groups are counted in words.
+        let skipped = render(&ctx(vec![
+            group('A', "甲"),
+            group('B', "乙"),
+            group('D', "速览候选（不截图）"),
+        ]))
+        .unwrap();
+        assert!(skipped.contains("（`a-`、`b-`、`d-`）"));
+        assert!(skipped.contains("（A 组 01–12，B 组 13–24）"));
+        assert!(skipped.contains("D 组不需要截图"));
+        assert!(skipped.contains("# D 组：速览候选（不截图）\n\n速览聚合图"));
+        let five = parse_groups("A=1,B=2,C=3,D=速览,E=速览").unwrap();
+        let five = render(&ctx(five)).unwrap();
+        assert!(five.contains("本文件分五组（A/B/C/D/E）"));
+        assert!(five.contains("D/E 组不需要截图"));
+
         // Without a 速览 group the two roundup sentences disappear whole.
         let plain = render(&ctx(vec![group('A', "甲"), group('B', "乙")])).unwrap();
-        assert!(plain.contains("不用转载图。\n"));
+        assert!(plain.contains("深色底页面也可以截，但在日志里注明。\n"));
         assert!(plain.contains("三节。\n"));
         assert!(plain.contains("本文件分两组（A/B）"));
         let single = render(&ctx(vec![group('A', "甲")])).unwrap();
@@ -1090,6 +1288,17 @@ mod tests {
             .collect();
         assert_eq!(missing, ["1008"]);
         assert!(unpublished_issues(&priors, "", current).len() == 3);
+
+        // Boundary: three days back still counts, four days back does not.
+        let edge = [
+            prior("1006", Kind::Roundup, 6),
+            prior("1007", Kind::Roundup, 7),
+        ];
+        let missing: Vec<&str> = unpublished_issues(&edge, SCAN, current)
+            .iter()
+            .map(|p| p.mmdd.as_str())
+            .collect();
+        assert_eq!(missing, ["1007"]);
     }
 
     #[test]
@@ -1123,21 +1332,81 @@ mod tests {
             ".handoff/2026-10-09-1009-evidence.md".to_string(),
             ".handoff/README.md".to_string(),
         ];
+        let phrase = |rows: &[(String, String)], rel: &str, own: &[String]| {
+            untracked_phrase(&foreign_changes(rows, rel, own))
+        };
         assert_eq!(
-            untracked_phrase(&rows, "docs/2610/1009", &own),
+            phrase(&rows, "docs/2610/1009", &own),
             "工作区已知的未提交改动，**一律不要碰**：整个 `docs/2610/1008/` 目录、`daily-scan.md`、`new.md`"
         );
-        assert_eq!(untracked_phrase(&[], "docs/2610/1009", &own), "工作区干净");
+        assert_eq!(phrase(&[], "docs/2610/1009", &own), "工作区干净");
+        assert_eq!(phrase(&rows[3..], "docs/2610/1009", &own), "工作区干净");
+        // When the index is not this command's own output it is named.
         assert_eq!(
-            untracked_phrase(&rows[3..], "docs/2610/1009", &own),
-            "工作区干净"
+            phrase(&rows[3..], "docs/2610/1009", &own[..1]),
+            "工作区已知的未提交改动，**一律不要碰**：`.handoff/README.md`"
         );
         let many: Vec<(String, String)> = (0..12)
             .map(|i| ("??".into(), format!("f{i}.txt")))
             .collect();
-        let phrase = untracked_phrase(&many, "docs/2610/1009", &[]);
-        assert!(phrase.contains("`f9.txt`等共 12 处"), "{phrase}");
-        assert!(!phrase.contains("f10.txt"));
+        let p = phrase(&many, "docs/2610/1009", &[]);
+        assert!(p.contains("`f9.txt`等共 12 处"), "{p}");
+        assert!(!p.contains("f10.txt"));
+    }
+
+    #[test]
+    fn untracked_parents_of_the_issue_are_not_foreign() {
+        // The month's first issue: git folds the new month into one entry.
+        let rows = parse_status_z("?? docs/2611/\0?? docs/26110/\0?? docs/2610/1031/\0");
+        assert_eq!(
+            foreign_changes(&rows, "docs/2611/1101", &[]),
+            ["整个 `docs/26110/` 目录", "整个 `docs/2610/1031/` 目录"]
+        );
+        assert!(foreign_changes(&parse_status_z("?? docs/\0"), "docs/2611/1101", &[]).is_empty());
+        // A tracked-but-modified file under the parent is still foreign.
+        let rows = parse_status_z(" M docs/2611/README.md\0");
+        assert_eq!(foreign_changes(&rows, "docs/2611/1101", &[]).len(), 1);
+    }
+
+    #[test]
+    fn unfolds_parents_to_show_other_issues() {
+        let rows = parse_status_z(" M daily-scan.md\0?? docs/2611/\0");
+        // An earlier uncommitted issue of the same month shares the parent.
+        let inside = parse_status_z(
+            "?? docs/2611/1101/sources/a.txt\0?? docs/2611/1101/sources/b.txt\0?? docs/2611/1102/sources/x.txt\0?? docs/2611/notes.md\0",
+        );
+        let rows = unfold_parents(&rows, "docs/2611/1102", &inside);
+        assert_eq!(
+            foreign_changes(&rows, "docs/2611/1102", &[]),
+            [
+                "`daily-scan.md`",
+                "整个 `docs/2611/1101/` 目录",
+                "`docs/2611/notes.md`"
+            ]
+        );
+        // Only the issue's own files inside: the parent just disappears.
+        let only = parse_status_z("?? docs/2611/1102/sources/x.txt\0");
+        let rows = unfold_parents(&parse_status_z("?? docs/\0"), "docs/2611/1102", &only);
+        assert!(rows.is_empty());
+        // Nested parents fold to the first directory off the issue's path.
+        let rows = unfold_parents(&parse_status_z("?? docs/\0"), "docs/2611/1102", &inside);
+        assert_eq!(rows[0].1, "docs/2611/1101/");
+    }
+
+    #[test]
+    fn keep_sentence_follows_foreign_changes() {
+        let mut c = ctx(four_groups());
+        let text = render(&c).unwrap();
+        assert!(text.contains(
+            "仓库 `E:\\gitclone\\AI-Barking`（分支 `main`，基线 commit `abc1234`）。工作区干净。"
+        ));
+        assert!(text.contains("下本组文件（及本派工单）。\n"));
+        assert!(!text.contains("保持原样"));
+        c.foreign = vec!["`daily-scan.md`".into()];
+        c.branch = "claude/x".into();
+        let text = render(&c).unwrap();
+        assert!(text.contains("（分支 `claude/x`，基线 commit `abc1234`）。工作区已知的未提交改动，**一律不要碰**：`daily-scan.md`。"));
+        assert!(text.contains("（及本派工单），上面列出的既有未提交改动保持原样。\n"));
     }
 
     #[test]

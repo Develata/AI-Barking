@@ -4,7 +4,6 @@
 //!
 //! Dates are plain civil arithmetic (no chrono): issue numbers are days, and
 //! the 三天 window of daily-scan.md is computed on them.
-#![allow(dead_code)] // consumers arrive with the next subcommands
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -181,11 +180,6 @@ impl Date {
         format!("{:02}{:02}", self.m, self.d)
     }
 
-    /// `YYMM`.
-    pub fn yymm(self) -> String {
-        format!("{:02}{:02}", self.y % 100, self.m)
-    }
-
     /// `YYYY-MM-DD`.
     pub fn iso(self) -> String {
         format!("{}-{:02}-{:02}", self.y, self.m, self.d)
@@ -195,30 +189,26 @@ impl Date {
 /// Beijing time (UTC+8) now, as `YYYY-MM-DDTHH:MM:SS+08:00`, the stamp the
 /// capture logs use.
 pub fn beijing_now() -> String {
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
-        + 8 * 3600;
+    beijing_stamp(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0),
+    )
+}
+
+/// Unix seconds in the `beijing_now` format, for timestamps that arrive from
+/// elsewhere (API responses) rather than from the clock.
+pub fn beijing_stamp(unix: i64) -> String {
+    let secs = unix + 8 * 3600;
     let (days, rem) = (secs.div_euclid(86_400), secs.rem_euclid(86_400));
-    let date = Date::from_days(days);
     format!(
         "{}T{:02}:{:02}:{:02}+08:00",
-        date.iso(),
+        Date::from_days(days).iso(),
         rem / 3600,
         rem % 3600 / 60,
         rem % 60
     )
-}
-
-/// Beijing calendar date today.
-pub fn beijing_today() -> Date {
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
-        + 8 * 3600;
-    Date::from_days(secs.div_euclid(86_400))
 }
 
 /// `git <args>` in `root`; stdout as text, trailing newline trimmed.
@@ -309,7 +299,6 @@ mod tests {
             "2025-12-31"
         );
         assert_eq!(Date::from_mmdd(2026, "1301"), None);
-        assert_eq!(d.yymm(), "2611");
     }
 
     #[test]

@@ -193,14 +193,16 @@ fn marker_problems(
         None => out.push("daily-scan.md 缺少“## 已发过”一节".to_string()),
         Some(lines) => {
             let row = format!("| {mmdd} |");
-            match lines.iter().find(|l| l.starts_with(&row)) {
-                None if kind == Kind::Main => {
-                    out.push(format!("daily-scan.md“已发过”没有 `{row}` 行"));
-                }
-                Some(l) if l.contains(PLACEHOLDER) => out.push(format!(
-                    "daily-scan.md“已发过”的 `{row}` 行仍含“{PLACEHOLDER}”，须按最终发布版填写"
-                )),
-                _ => {}
+            if kind == Kind::Main && !lines.iter().any(|l| l.starts_with(&row)) {
+                out.push(format!("daily-scan.md“已发过”没有 `{row}` 行"));
+            }
+            // Whichever issue left it, a placeholder pushed to origin poisons
+            // the scheduled scan; `stage --batch 1` refuses on the same text.
+            for l in lines.iter().filter(|l| l.contains(PLACEHOLDER)) {
+                let head: String = l.chars().take(24).collect();
+                out.push(format!(
+                    "daily-scan.md“已发过”仍含“{PLACEHOLDER}”占位：`{head}…`，须按最终发布版填写"
+                ));
             }
         }
     }
@@ -322,9 +324,19 @@ fn compress_pngs(issue: &Issue) -> Result<Step, String> {
         return Ok(Step::pass(vec!["images/ 下没有 PNG，跳过".to_string()]));
     }
     let manifest_path = issue.sources().join(offsite::MANIFEST);
-    let manifest = fs::read_to_string(&manifest_path)
-        .map(|t| offsite::parse_manifest(&t))
-        .unwrap_or_default();
+    // A missing manifest means nothing is registered yet; any other error
+    // must not be mistaken for that, or registered (maybe uploaded) files
+    // would be recompressed and the committed hashes stop matching OpenList.
+    let manifest = match fs::read_to_string(&manifest_path) {
+        Ok(t) => offsite::parse_manifest(&t),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        Err(e) => {
+            return Ok(Step::fail(vec![format!(
+                "{}: {e}",
+                manifest_path.display()
+            )]));
+        }
+    };
 
     let (mut todo, mut skipped, mut before) = (Vec::new(), 0usize, 0u64);
     for p in &pngs {
@@ -390,6 +402,24 @@ fn compress_pngs(issue: &Issue) -> Result<Step, String> {
 }
 
 fn step_offsite(issue: &Issue) -> Step {
+    // Checked before the manifest is written: a cookies.json under sources/
+    // would otherwise get its size and hash committed before step 7 objects.
+    match offsite::ignored_files(&issue.root, &issue.yymm, &issue.mmdd) {
+        Ok(entries) => {
+            let secrets: Vec<&str> = entries
+                .iter()
+                .map(|e| e.rel.as_str())
+                .filter(|p| is_secret_name(p))
+                .collect();
+            if !secrets.is_empty() {
+                return Step::fail(vec![format!(
+                    "不入库原件里有凭据或会话状态类文件，不登记、不上传：{}",
+                    secrets.join("、")
+                )]);
+            }
+        }
+        Err(e) => return Step::fail(vec![e]),
+    }
     if let Err(e) = offsite::process(&issue.root, &issue.dir, false, &mut None) {
         return Step::fail(vec![e]);
     }
@@ -494,6 +524,7 @@ fn identity_hits(rel: &str, content: &str, patterns: &[String]) -> Vec<Hit> {
 fn step_identity(issue: &Issue) -> Step {
     let raw = std::env::var("BARKING_IDENTITY_PATTERNS")
         .ok()
+        .filter(|v| !v.trim().is_empty())
         .or_else(|| {
             offsite::load_env(&issue.root)
                 .get("BARKING_IDENTITY_PATTERNS")
@@ -706,36 +737,42 @@ fn product_files(mmdd: &str) -> [String; 7] {
     ]
 }
 
-/// `.handoff/<date>-<MMDD>-<slug>.md` of this issue. `.handoff/README.md`
-/// (the index, rewritten with every new sheet) travels with them.
+/// `.handoff/<date>-<MMDD>-<slug>.md` of this issue.
 fn is_handoff(path: &str, mmdd: &str) -> bool {
     let Some(name) = path.strip_prefix(".handoff/") else {
         return false;
     };
-    !name.contains('/')
-        && name.ends_with(".md")
-        && (name == "README.md" || name.contains(&format!("-{mmdd}-")))
+    !name.contains('/') && name.ends_with(".md") && name.contains(&format!("-{mmdd}-"))
 }
+
+/// The sheet index, rewritten by `barking handoff` with every new sheet.
+const HANDOFF_INDEX: &str = ".handoff/README.md";
 
 fn partition(issue: &Issue, rows: &[(String, String)]) -> Plan {
     let dir = format!("{}/", issue.rel());
     let product = product_files(&issue.mmdd);
     let mut plan = Plan::default();
+    // The index belongs to ① only alongside this issue's own sheet; a pending
+    // index rewrite from some other change is not this issue's.
+    let has_sheet = rows.iter().any(|(_, p)| is_handoff(p, &issue.mmdd));
     for (_, path) in rows {
-        let bucket =
-            if path == "README.md" || path == "daily-scan.md" || is_handoff(path, &issue.mmdd) {
-                &mut plan.repo
-            } else if let Some(rest) = path.strip_prefix(&dir) {
-                if rest == "CORRECTION.md" {
-                    &mut plan.corrections
-                } else if product.iter().any(|f| f == rest) {
-                    &mut plan.product
-                } else {
-                    &mut plan.archive
-                }
+        let bucket = if path == "README.md"
+            || path == "daily-scan.md"
+            || is_handoff(path, &issue.mmdd)
+            || (path == HANDOFF_INDEX && has_sheet)
+        {
+            &mut plan.repo
+        } else if let Some(rest) = path.strip_prefix(&dir) {
+            if rest == "CORRECTION.md" {
+                &mut plan.corrections
+            } else if product.iter().any(|f| f == rest) {
+                &mut plan.product
             } else {
-                &mut plan.others
-            };
+                &mut plan.archive
+            }
+        } else {
+            &mut plan.others
+        };
         bucket.push(path.clone());
     }
     for v in [
@@ -973,6 +1010,12 @@ fn stage(issue: &Issue, opts: &StageOpts) -> Result<(), String> {
     };
     let batch = &batches[usize::from(n) - 1];
     print_batch(&issue.root, batch);
+    if n == 3 && !plan.archive.is_empty() {
+        println!(
+            "warn: 取证存档先于成品提交（第②批还有 {} 个未提交文件）",
+            plan.archive.len()
+        );
+    }
     if !opts.add {
         return Ok(());
     }
@@ -1003,18 +1046,12 @@ fn stage(issue: &Issue, opts: &StageOpts) -> Result<(), String> {
     if want != got {
         let diff: Vec<&str> = want.symmetric_difference(&got).copied().collect();
         return Err(format!(
-            "暂存结果与第{}批不一致：{}",
+            "暂存结果与第{}批不一致：{}（已暂存的未回滚，可 git restore --staged 后重试）",
             circled(n),
             diff.join("、")
         ));
     }
     println!("已暂存第{}批 {} 个文件。", circled(n), after.len());
-    if n == 3 && !plan.archive.is_empty() {
-        println!(
-            "warn: 取证存档先于成品提交（第②批还有 {} 个未提交文件）",
-            plan.archive.len()
-        );
-    }
     println!("建议提交信息：{}", batch.message);
     println!("提交由 Claude 按实际内容改写后执行；本命令不 commit、不 push。");
     Ok(())
@@ -1370,7 +1407,7 @@ mod tests {
     fn handoff_matching() {
         assert!(is_handoff(".handoff/2026-10-09-1009-evidence.md", "1009"));
         assert!(is_handoff(".handoff/2026-09-30-0930-scan.md", "0930"));
-        assert!(is_handoff(".handoff/README.md", "1009"));
+        assert!(!is_handoff(".handoff/README.md", "1009"));
         assert!(!is_handoff(".handoff/2026-10-08-1008-evidence.md", "1009"));
         assert!(!is_handoff(".handoff/2026-10-09-1009-evidence.txt", "1009"));
         assert!(!is_handoff(".handoff/sub/2026-10-09-1009-x.md", "1009"));

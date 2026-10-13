@@ -22,7 +22,7 @@ use std::str::FromStr;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use png::{BitDepth, ColorType};
+use png::{BitDepth, ColorType, ScaledFloat, SourceChromaticities, SrgbRenderingIntent, Unit};
 use serde_json::{Value, json};
 
 use crate::card;
@@ -38,10 +38,12 @@ const USAGE: &str = "\
   barking shot <期次目录> <组前缀> stack   <out.png> --part <png>:<x0>,<y0>,<x1>,<y1> [--part ...]... [--gap 24] [--bg auto|#rrggbb] [--url <url>]
 
 说明：
-  <组前缀>、<name> 只许小写字母、数字与 -。render / pdf 只产生中间图，放在 <临时目录>/barking-shot/<MMDD>-<组>/<name>.png；
+  <组前缀>、<name> 只许小写字母、数字与 -。render / pdf 只产生中间图，放在 <临时目录>/barking-shot/<YYMM><MMDD>-<组>/<name>.png；
   先用 lines 找锚点行，再用 crop / cropbox / stack 裁成 <期次目录>/images/<out.png>（已存在则拒绝覆盖）。
   --part 的 <png> 可写文件路径，或 render / pdf 的 <name>；像素框取 [x0,x1) × [y0,y1)，单位是该图的像素。
-  每次出图在 sources/<组>-shots-log.jsonl 追加一行记录。只裁切、拼接，不改像素。
+  选项可写 --key value 或 --key=value；--help 打印本说明。
+  每次出图在 sources/<组>-shots-log.jsonl 追加一行记录（路径记仓库内相对路径，库外文件只记文件名）。
+  只裁切、拼接，不改像素；iCCP / sRGB / gAMA / cHRM / pHYs 原样带到输出。
   pdf 需要 poppler：先找环境变量 BARKING_POPPLER 指定的目录，再找 ~/scoop/apps/poppler/current/bin，最后 PATH。";
 
 /// A hung Chrome must not hang the session; the page timeout flag alone does
@@ -152,9 +154,10 @@ struct Parsed {
     action: Action,
 }
 
-/// `--key value` options plus positionals, split before any action looks at
-/// them. Every option takes a value, so `--chrome-arg --no-sandbox` is one
-/// option, not two.
+/// `--key value` / `--key=value` options plus positionals, split before any
+/// action looks at them. Every option takes a value, so `--chrome-arg
+/// --no-sandbox` is one option, not two (`--chrome-arg=--no-sandbox` also
+/// works).
 struct Args {
     pos: Vec<String>,
     opts: Vec<(String, String)>,
@@ -167,14 +170,46 @@ fn split_args(rest: &[String]) -> Result<Args, String> {
     };
     let mut it = rest.iter();
     while let Some(t) = it.next() {
-        if let Some(key) = t.strip_prefix("--") {
-            let value = it.next().ok_or_else(|| format!("--{key} 缺少参数"))?;
-            args.opts.push((key.to_string(), value.clone()));
+        if let Some(opt) = t.strip_prefix("--") {
+            let (key, value) = match opt.split_once('=') {
+                Some((k, v)) => (k, v.to_string()),
+                None => (
+                    opt,
+                    it.next()
+                        .ok_or_else(|| format!("--{opt} 缺少参数"))?
+                        .clone(),
+                ),
+            };
+            if key.is_empty() {
+                return Err(format!("选项「{t}」缺少名字"));
+            }
+            args.opts.push((key.to_string(), value));
         } else {
             args.pos.push(t.clone());
         }
     }
     Ok(args)
+}
+
+/// `--help` / `-h` where an option name may stand, read the way `split_args`
+/// reads options: the token after `--key` is that option's value, so
+/// `--chrome-arg=--help` is not a help request (the spaced form
+/// `--chrome-arg --help` is not either).
+fn wants_help(args: &[String]) -> bool {
+    let mut it = args.iter();
+    while let Some(t) = it.next() {
+        match t.as_str() {
+            "--help" | "-h" => return true,
+            _ => {
+                if let Some(opt) = t.strip_prefix("--")
+                    && !opt.contains('=')
+                {
+                    it.next();
+                }
+            }
+        }
+    }
+    false
 }
 
 impl Args {
@@ -472,6 +507,10 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
 }
 
 pub fn run(args: &[String]) -> ExitCode {
+    if wants_help(args) {
+        println!("{USAGE}");
+        return ExitCode::SUCCESS;
+    }
     let parsed = match parse(args) {
         Ok(p) => p,
         Err(e) => {
@@ -493,6 +532,56 @@ pub fn run(args: &[String]) -> ExitCode {
 // ---------------------------------------------------------------------------
 // Pixels
 
+/// The ancillary chunks that say how the samples are to be shown. A crop that
+/// keeps the pixels but drops these changes the colours a viewer renders (an
+/// iCCP Display P3 screenshot shown as sRGB looks washed out), so they travel
+/// with the pixels. Own types, not `png::Info`: `PixelDimensions` has no
+/// `PartialEq`, and `Info` would carry chunks this tool does not vouch for.
+#[derive(Clone, Debug, Default, PartialEq)]
+struct Meta {
+    /// Decompressed iCCP profile (the profile name is not kept by the decoder).
+    icc: Option<Vec<u8>>,
+    srgb: Option<SrgbRenderingIntent>,
+    /// The gAMA chunk as stored, not the value sRGB implies.
+    gamma: Option<ScaledFloat>,
+    /// The cHRM chunk as stored.
+    chrm: Option<SourceChromaticities>,
+    /// pHYs: pixels per unit x, y and the unit.
+    phys: Option<(u32, u32, Unit)>,
+}
+
+impl Meta {
+    /// Equal colour chunks; pHYs is physical size, not colour.
+    fn same_colour(&self, other: &Meta) -> bool {
+        self.icc == other.icc
+            && self.srgb == other.srgb
+            && self.gamma == other.gamma
+            && self.chrm == other.chrm
+    }
+
+    /// Short Chinese description for error messages.
+    fn describe(&self) -> String {
+        let mut parts = Vec::new();
+        if let Some(icc) = &self.icc {
+            parts.push(format!("iCCP {} 字节", icc.len()));
+        }
+        if let Some(i) = self.srgb {
+            parts.push(format!("sRGB {i:?}"));
+        }
+        if let Some(g) = self.gamma {
+            parts.push(format!("gAMA {}", g.into_scaled()));
+        }
+        if self.chrm.is_some() {
+            parts.push("cHRM".to_string());
+        }
+        if parts.is_empty() {
+            "无色彩块".to_string()
+        } else {
+            parts.join("、")
+        }
+    }
+}
+
 /// 8-bit image in one of the four PNG layouts that carry samples directly;
 /// indexed and low-bit-depth input is expanded on load.
 #[derive(Clone, Debug, PartialEq)]
@@ -501,6 +590,11 @@ struct Img {
     h: u32,
     ct: ColorType,
     data: Vec<u8>,
+    /// tRNS colour key of an 8-bit gray / RGB image, as decoded samples (1 or
+    /// 3 bytes). Kept as a key instead of an alpha channel so a crop is
+    /// written in the source's own layout.
+    key: Option<Vec<u8>>,
+    meta: Meta,
 }
 
 /// (has colour, has alpha) of a decoded colour type.
@@ -537,8 +631,11 @@ impl Img {
     }
 
     /// Decodes with `EXPAND` only: palette and sub-byte gray become 8-bit
-    /// samples (a `tRNS` chunk becomes an alpha channel) and 16-bit stays 16-bit
-    /// so it can be refused. Nothing is scaled or gamma-corrected.
+    /// samples (a palette `tRNS` becomes an alpha channel) and 16-bit stays
+    /// 16-bit so it can be refused. Nothing is scaled or gamma-corrected. An
+    /// 8-bit gray / RGB image with a `tRNS` colour key keeps its layout: the
+    /// alpha `EXPAND` derives from the key is dropped again and the key kept,
+    /// so its crop is written back exactly as the source stored it.
     fn decode(bytes: &[u8]) -> Result<Img, String> {
         let limits = png::Limits { bytes: MAX_BYTES };
         let mut dec = png::Decoder::new_with_limits(io::Cursor::new(bytes), limits);
@@ -546,6 +643,18 @@ impl Img {
         let mut reader = dec
             .read_info()
             .map_err(|e| format!("不是可读的 PNG：{e}"))?;
+        let src = reader.info();
+        let meta = Meta {
+            icc: src.icc_profile.as_ref().map(|p| p.to_vec()),
+            srgb: src.srgb,
+            gamma: src.gama_chunk,
+            chrm: src.chrm_chunk,
+            phys: src.pixel_dims.map(|d| (d.xppu, d.yppu, d.unit)),
+        };
+        let key = match (src.color_type, src.bit_depth, &src.trns) {
+            (ColorType::Grayscale | ColorType::Rgb, BitDepth::Eight, Some(t)) => Some(t.to_vec()),
+            _ => None,
+        };
         let (ct, depth) = reader.output_color_type();
         match depth {
             BitDepth::Eight => {}
@@ -564,21 +673,66 @@ impl Img {
             .next_frame(&mut data)
             .map_err(|e| format!("PNG 解码失败：{e}"))?;
         data.truncate(info.buffer_size());
-        Ok(Img {
+        let mut img = Img {
             w: info.width,
             h: info.height,
             ct: info.color_type,
             data,
-        })
+            key: None,
+            meta,
+        };
+        if let Some(k) = key {
+            // EXPAND appended an alpha sample computed from the key and left
+            // the colour samples alone (png `expand_trns_line`).
+            let (bare, samples) = match img.ct {
+                ColorType::GrayscaleAlpha => (ColorType::Grayscale, 1),
+                ColorType::Rgba => (ColorType::Rgb, 3),
+                other => return Err(format!("内部错误：带 tRNS 的图解码成了 {other:?}")),
+            };
+            if k.len() != samples {
+                return Err(format!("tRNS 长度 {} 与色彩类型不符", k.len()));
+            }
+            img.data = img
+                .data
+                .chunks_exact(samples + 1)
+                .flat_map(|px| px[..samples].iter().copied())
+                .collect();
+            img.ct = bare;
+            img.key = Some(k);
+        }
+        Ok(img)
     }
 
+    /// 8-bit samples in `ct`, plus the colour chunks the source carried. The
+    /// encoder only writes iCCP when no sRGB is set and only writes a gAMA /
+    /// cHRM that equals the sRGB values when one is, so sRGB is left out of
+    /// the `Info` and written as a raw chunk instead: every chunk the source
+    /// had comes back, even the (non-conforming) sRGB + iCCP pair.
     fn encode(&self) -> Result<Vec<u8>, String> {
         let fail = |e: png::EncodingError| format!("无法编码 PNG：{e}");
+        let mut info = png::Info::with_size(self.w, self.h);
+        info.color_type = self.ct;
+        info.bit_depth = BitDepth::Eight;
+        info.icc_profile = self.meta.icc.as_deref().map(Into::into);
+        info.source_gamma = self.meta.gamma;
+        info.source_chromaticities = self.meta.chrm;
+        info.pixel_dims = self
+            .meta
+            .phys
+            .map(|(xppu, yppu, unit)| png::PixelDimensions { xppu, yppu, unit });
+        // tRNS stores 16-bit samples; the decoder hands back their low bytes.
+        info.trns = self
+            .key
+            .as_ref()
+            .map(|k| k.iter().flat_map(|&b| [0, b]).collect::<Vec<u8>>().into());
         let mut buf = Vec::new();
-        let mut enc = png::Encoder::new(&mut buf, self.w, self.h);
-        enc.set_color(self.ct);
-        enc.set_depth(BitDepth::Eight);
+        let enc = png::Encoder::with_info(&mut buf, info).map_err(fail)?;
         let mut writer = enc.write_header().map_err(fail)?;
+        if let Some(intent) = self.meta.srgb {
+            writer
+                .write_chunk(png::chunk::sRGB, &[intent as u8])
+                .map_err(fail)?;
+        }
         writer.write_image_data(&self.data).map_err(fail)?;
         writer.finish().map_err(fail)?;
         Ok(buf)
@@ -605,7 +759,13 @@ impl Img {
             h: r.y1 - r.y0,
             ct: self.ct,
             data,
+            key: self.key.clone(),
+            meta: self.meta.clone(),
         })
+    }
+
+    fn keyed(&self, px: &[u8]) -> bool {
+        self.key.as_deref() == Some(px)
     }
 
     fn rgba_at(&self, x: u32, y: u32) -> Option<[u8; 4]> {
@@ -615,18 +775,47 @@ impl Img {
         let bpp = self.ct.samples();
         let i = (y as usize * self.w as usize + x as usize) * bpp;
         let px = self.data.get(i..i + bpp)?;
+        let opaque = if self.keyed(px) { 0 } else { 255 };
         Some(match self.ct {
-            ColorType::Grayscale => [px[0], px[0], px[0], 255],
+            ColorType::Grayscale => [px[0], px[0], px[0], opaque],
             ColorType::GrayscaleAlpha => [px[0], px[0], px[0], px[1]],
-            ColorType::Rgb => [px[0], px[1], px[2], 255],
+            ColorType::Rgb => [px[0], px[1], px[2], opaque],
             _ => [px[0], px[1], px[2], px[3]],
         })
+    }
+
+    /// Turns a tRNS colour key into the alpha channel it stands for (0 on the
+    /// key colour, 255 elsewhere), the way a PNG viewer reads it. Lossless, and
+    /// needed before parts are joined: one key cannot describe a canvas whose
+    /// parts came from different images or whose gaps are filled with `bg`.
+    fn unkey(self) -> Img {
+        let Some(key) = &self.key else {
+            return self;
+        };
+        let (ct, n) = match self.ct {
+            ColorType::Grayscale => (ColorType::GrayscaleAlpha, 1),
+            _ => (ColorType::Rgba, 3),
+        };
+        let mut data = Vec::with_capacity(self.data.len() / n * (n + 1));
+        for px in self.data.chunks_exact(n) {
+            data.extend_from_slice(px);
+            data.push(if px == &key[..] { 0 } else { 255 });
+        }
+        Img {
+            ct,
+            data,
+            key: None,
+            ..self
+        }
     }
 
     /// Widens to a layout with at least the same channels: gray repeats into
     /// R=G=B and a missing alpha is opaque. Narrowing would drop information,
     /// so it is an error rather than a silent loss.
     fn promote(self, to: ColorType) -> Result<Img, String> {
+        if self.key.is_some() {
+            return Err("内部错误：带 tRNS 的图须先 unkey 再转换".into());
+        }
         if self.ct == to {
             return Ok(self);
         }
@@ -687,10 +876,39 @@ fn bg_pixel(ct: ColorType, bg: [u8; 4]) -> Vec<u8> {
     }
 }
 
+/// The canvas's chunks: the parts' colour chunks, which must agree, since one
+/// PNG has one colour space and re-tagging a part would change how it looks;
+/// pHYs only when every part has the same one (a Chrome render and a pdftoppm
+/// page differ there, and that must not block the stack).
+fn stack_meta(parts: &[Img]) -> Result<Meta, String> {
+    let first = &parts.first().ok_or("没有可拼接的片段")?.meta;
+    if let Some((i, odd)) = parts
+        .iter()
+        .enumerate()
+        .find(|(_, p)| !p.meta.same_colour(first))
+    {
+        return Err(format!(
+            "各段色彩元数据不一致：第 1 段为「{}」，第 {} 段为「{}」。拼在一张图里会让其中一段按错误的色彩空间显示；             请把不同来源分别裁切出图，或从同一来源（同一次 render / pdf）取各段",
+            first.describe(),
+            i + 1,
+            odd.meta.describe()
+        ));
+    }
+    let phys = first
+        .phys
+        .filter(|ph| parts.iter().all(|p| p.meta.phys == Some(*ph)));
+    Ok(Meta {
+        phys,
+        ..first.clone()
+    })
+}
+
 /// Parts joined top to bottom with `gap` rows of `bg` between them; the canvas
 /// is as wide as the widest part and the short ones are padded on the right
-/// with `bg`.
+/// with `bg`. Colour keys become alpha first (see `Img::unkey`).
 fn stack(parts: Vec<Img>, gap: u32, bg: [u8; 4]) -> Result<Img, String> {
+    let meta = stack_meta(&parts)?;
+    let parts: Vec<Img> = parts.into_iter().map(Img::unkey).collect();
     let types: Vec<ColorType> = parts.iter().map(|p| p.ct).collect();
     let ct = stack_type(&types, bg);
     let bpp = ct.samples();
@@ -720,7 +938,14 @@ fn stack(parts: Vec<Img>, gap: u32, bg: [u8; 4]) -> Result<Img, String> {
             data.extend_from_slice(&fill[..row_len - stride]);
         }
     }
-    Ok(Img { w, h, ct, data })
+    Ok(Img {
+        w,
+        h,
+        ct,
+        data,
+        key: None,
+        meta,
+    })
 }
 
 /// `--bg auto`: the page colour, read where no content sits.
@@ -1136,12 +1361,67 @@ fn clear_sidecars(png: &Path) {
     }
 }
 
-/// How the scratch image was made, recorded by `render` / `pdf` so that later
-/// crops can name their source in the log.
-fn read_tool(png: &Path) -> Option<String> {
-    let text = fs::read_to_string(png.with_extension(SIDECAR_TOOL)).ok()?;
-    let text = text.trim();
-    (!text.is_empty()).then(|| text.to_string())
+/// What a scratch image was made from, written by `render` / `pdf` into its
+/// `.tool.txt` sidecar so that later crops can name their source in the log:
+/// the tool string on the first line, then `url<TAB>…` or `pdf<TAB>…` and
+/// `page<TAB>…`. A one-line file (older scratch) still reads as the tool.
+#[derive(Debug, Default, PartialEq)]
+struct Prov {
+    tool: String,
+    url: Option<String>,
+    /// Repository-relative path, or the file name of a PDF outside it.
+    pdf: Option<String>,
+    page: Option<u32>,
+}
+
+impl Prov {
+    fn text(&self) -> String {
+        let mut out = format!("{}\n", self.tool);
+        let clean = |s: &str| s.replace(['\t', '\n', '\r'], " ");
+        if let Some(u) = &self.url {
+            out.push_str(&format!("url\t{}\n", clean(u)));
+        }
+        if let Some(p) = &self.pdf {
+            out.push_str(&format!("pdf\t{}\n", clean(p)));
+        }
+        if let Some(n) = self.page {
+            out.push_str(&format!("page\t{n}\n"));
+        }
+        out
+    }
+
+    fn parse(text: &str) -> Option<Prov> {
+        let mut rows = text.lines().map(str::trim).filter(|l| !l.is_empty());
+        let mut prov = Prov {
+            tool: rows.next()?.to_string(),
+            ..Prov::default()
+        };
+        for row in rows {
+            match row.split_once('\t') {
+                Some(("url", v)) => prov.url = Some(v.to_string()),
+                Some(("pdf", v)) => prov.pdf = Some(v.to_string()),
+                Some(("page", v)) => prov.page = v.parse().ok(),
+                _ => {}
+            }
+        }
+        Some(prov)
+    }
+
+    /// Where the scratch image came from, for a log record.
+    fn fields(&self) -> Vec<(&'static str, Value)> {
+        let mut out = Vec::new();
+        if let Some(p) = &self.pdf {
+            out.push(("pdf", json!(p)));
+        }
+        if let Some(n) = self.page {
+            out.push(("page", json!(n)));
+        }
+        out
+    }
+}
+
+fn read_prov(png: &Path) -> Option<Prov> {
+    Prov::parse(&fs::read_to_string(png.with_extension(SIDECAR_TOOL)).ok()?)
 }
 
 fn tool_chrome(r: &Render) -> String {
@@ -1160,10 +1440,50 @@ fn tool_label(source: Option<&str>, step: &str) -> String {
     }
 }
 
+/// `p` as a `/` path relative to `root`, if it lies inside. Canonical forms
+/// first (they agree on drive-letter case and resolve `..`), then the plain
+/// absolute forms, for paths canonicalize cannot reach.
+fn repo_rel(root: &Path, p: &Path) -> Option<String> {
+    let strip = |a: &Path, b: &Path| a.strip_prefix(b).ok().map(slash);
+    if let (Ok(a), Ok(b)) = (fs::canonicalize(p), fs::canonicalize(root))
+        && let Some(rel) = strip(&a, &b)
+    {
+        return Some(rel);
+    }
+    strip(&std::path::absolute(p).ok()?, root)
+}
+
+/// How a file is named in the committed log: its repository-relative path, or
+/// for a file outside the repository only its file name (`outside` = true).
+/// Never an absolute local path.
+struct LogPath {
+    path: String,
+    outside: bool,
+}
+
+impl LogPath {
+    fn of(root: &Path, p: &Path) -> LogPath {
+        match repo_rel(root, p) {
+            Some(path) => LogPath {
+                path,
+                outside: false,
+            },
+            None => LogPath {
+                path: p
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default(),
+                outside: true,
+            },
+        }
+    }
+}
+
 struct Ctx {
     issue: Issue,
     group: String,
-    /// `<temp>/barking-shot/<MMDD>-<group>`
+    /// `<temp>/barking-shot/<YYMM><MMDD>-<group>`: the year is in the key so
+    /// that the same day a year later does not pick up old renders.
     scratch: PathBuf,
 }
 
@@ -1171,15 +1491,54 @@ struct Resolved {
     png: PathBuf,
     /// Scratch name, or the file stem for `--from`.
     name: String,
-    /// The `--from` path, for the log.
-    from: Option<String>,
+    /// For the log: the scratch name, or the `--from` file as `LogPath`.
+    from: LogPath,
+    /// The scratch image's `tool.txt`, if any.
+    prov: Option<Prov>,
+}
+
+impl Resolved {
+    /// `from` (plus `outside_repo` and the scratch image's PDF / page) for a
+    /// log record.
+    fn source_fields(&self) -> Vec<(&'static str, Value)> {
+        let mut out = vec![("from", json!(self.from.path))];
+        out.extend(self.origin_fields());
+        out
+    }
+
+    /// `outside_repo` and the scratch image's PDF / page, without `from`.
+    fn origin_fields(&self) -> Vec<(&'static str, Value)> {
+        let mut out = Vec::new();
+        if self.from.outside {
+            out.push(("outside_repo", json!(true)));
+        }
+        if let Some(p) = &self.prov {
+            out.extend(p.fields());
+        }
+        out
+    }
+
+    /// The `--url` given, else the page the scratch image was rendered from.
+    fn url(&self, given: &str) -> String {
+        if !given.is_empty() {
+            return given.to_string();
+        }
+        self.prov
+            .as_ref()
+            .and_then(|p| p.url.clone())
+            .unwrap_or_default()
+    }
+
+    fn tool(&self) -> Option<&str> {
+        self.prov.as_ref().map(|p| p.tool.as_str())
+    }
 }
 
 impl Ctx {
     fn new(issue: Issue, group: &str) -> Ctx {
         let scratch = std::env::temp_dir()
             .join("barking-shot")
-            .join(format!("{}-{group}", issue.mmdd));
+            .join(format!("{}{}-{group}", issue.yymm, issue.mmdd));
         Ctx {
             issue,
             group: group.to_string(),
@@ -1189,6 +1548,10 @@ impl Ctx {
 
     fn scratch_png(&self, name: &str) -> PathBuf {
         self.scratch.join(format!("{name}.png"))
+    }
+
+    fn log_path(&self, p: &Path) -> LogPath {
+        LogPath::of(&self.issue.root, p)
     }
 
     fn resolve(&self, src: &Source) -> Result<Resolved, String> {
@@ -1201,10 +1564,15 @@ impl Ctx {
                         png.display()
                     ));
                 }
+                let prov = read_prov(&png);
                 Ok(Resolved {
                     png,
                     name: n.clone(),
-                    from: None,
+                    from: LogPath {
+                        path: n.clone(),
+                        outside: false,
+                    },
+                    prov,
                 })
             }
             Source::File(p) => {
@@ -1219,7 +1587,8 @@ impl Ctx {
                 Ok(Resolved {
                     png: p.clone(),
                     name,
-                    from: Some(slash(p)),
+                    from: self.log_path(p),
+                    prov: read_prov(p),
                 })
             }
         }
@@ -1315,30 +1684,75 @@ fn execute(ctx: &Ctx, action: &Action) -> Result<(), String> {
     }
 }
 
+/// Replaces scratch image `out` (and its sidecars) with the finished file
+/// `made`, then writes the new sidecars. Called only once the new image and
+/// everything derived from it exist, so a failed re-render or re-extraction
+/// leaves the previous scratch image intact; if this last step itself fails,
+/// the half-replaced image is removed rather than left without its sidecars.
+fn install_scratch(
+    made: &Path,
+    out: &Path,
+    prov: &Prov,
+    lines: Option<&[Line]>,
+) -> Result<(), String> {
+    let _ = fs::remove_file(out);
+    clear_sidecars(out);
+    let tool_file = out.with_extension(SIDECAR_TOOL);
+    let side = out.with_extension(SIDECAR_LINES);
+    let done = fs::rename(made, out)
+        .map_err(io_err(out))
+        .and_then(|()| fs::write(&tool_file, prov.text()).map_err(io_err(&tool_file)))
+        .and_then(|()| match lines {
+            Some(l) => fs::write(&side, lines_tsv(l)).map_err(io_err(&side)),
+            None => Ok(()),
+        });
+    if done.is_err() {
+        let _ = fs::remove_file(out);
+        clear_sidecars(out);
+    }
+    done
+}
+
 fn do_render(ctx: &Ctx, r: &Render) -> Result<(), String> {
     let chrome = card::find_chrome()?;
     fs::create_dir_all(&ctx.scratch).map_err(io_err(&ctx.scratch))?;
     let out = ctx.scratch_png(&r.name);
-    // A re-render replaces its own scratch file; deleting first means a file
-    // that exists afterwards is Chrome's, and sidecars of the old image go too.
-    let _ = fs::remove_file(&out);
-    clear_sidecars(&out);
+    // Chrome writes beside the old image under a temporary name (the `.` keeps
+    // it out of the `[a-z0-9-]` name space); the old image is replaced only
+    // once the new one exists.
+    let fresh = ctx
+        .scratch
+        .join(format!("{}.rendering-{}.png", r.name, std::process::id()));
+    let _ = fs::remove_file(&fresh);
     let profile = ctx.scratch.join(format!("profile-{}", std::process::id()));
     let chrome_log = ctx.scratch.join(format!("{}-chrome.log", r.name));
-    let ran = run_chrome(&chrome, &chrome_args(&profile, r, &out), &chrome_log);
+    let ran = run_chrome(&chrome, &chrome_args(&profile, r, &fresh), &chrome_log);
     let _ = fs::remove_dir_all(&profile);
-    ran?;
-    if !out.is_file() {
-        return Err(format!(
-            "Chrome 正常退出但没有写出 {}（日志 {}）",
-            out.display(),
-            chrome_log.display()
-        ));
-    }
-    let (w, h) = card::png_size(&out)?;
+    let size = ran.and_then(|()| {
+        if fresh.is_file() {
+            card::png_size(&fresh)
+        } else {
+            Err(format!(
+                "Chrome 正常退出但没有写出 {}（日志 {}）",
+                fresh.display(),
+                chrome_log.display()
+            ))
+        }
+    });
+    let (w, h) = match size {
+        Ok(s) => s,
+        Err(e) => {
+            let _ = fs::remove_file(&fresh);
+            return Err(e);
+        }
+    };
     let tool = tool_chrome(r);
-    fs::write(out.with_extension(SIDECAR_TOOL), format!("{tool}\n"))
-        .map_err(io_err(&out.with_extension(SIDECAR_TOOL)))?;
+    let prov = Prov {
+        tool: tool.clone(),
+        url: Some(r.url.clone()),
+        ..Prov::default()
+    };
+    install_scratch(&fresh, &out, &prov, None)?;
 
     println!(
         "{}  {w}×{h} px（{} CSS px 宽，DPR {}）",
@@ -1390,35 +1804,19 @@ fn find_page_png(dir: &Path) -> Result<PathBuf, String> {
     }
 }
 
-fn do_pdf(ctx: &Ctx, p: &PdfPage) -> Result<(), String> {
-    if !p.pdf.is_file() {
-        return Err(format!("{}: 不是文件", p.pdf.display()));
-    }
-    fs::create_dir_all(&ctx.scratch).map_err(io_err(&ctx.scratch))?;
-    let work = ctx.scratch.join(format!("pdf-{}", p.name));
-    let _ = fs::remove_dir_all(&work);
-    fs::create_dir_all(&work).map_err(io_err(&work))?;
+/// A rendered PDF page still in the work directory, with its text lines.
+struct PageRender {
+    png: PathBuf,
+    size: (u32, u32),
+    lines: Vec<Line>,
+}
+
+/// pdftotext first (it fails fast when only xpdf's is found), then pdftoppm
+/// into `work`; nothing outside `work` is touched, so the caller can discard a
+/// failure by removing it.
+fn render_page(p: &PdfPage, work: &Path) -> Result<PageRender, String> {
     let dirs = poppler_dirs();
     let (page, dpi) = (p.page.to_string(), p.dpi.to_string());
-
-    let ppm = pick_tool(&dirs, "pdftoppm");
-    run_capture(
-        Command::new(&ppm)
-            .args(["-r", &dpi, "-f", &page, "-l", &page, "-png"])
-            .arg(&p.pdf)
-            .arg(work.join("pg")),
-        "pdftoppm",
-    )?;
-    let made = find_page_png(&work)?;
-    let out = ctx.scratch_png(&p.name);
-    let _ = fs::remove_file(&out);
-    clear_sidecars(&out);
-    fs::rename(&made, &out)
-        .or_else(|_| fs::copy(&made, &out).map(|_| ()))
-        .map_err(io_err(&out))?;
-    let _ = fs::remove_dir_all(&work);
-    let (w, h) = card::png_size(&out)?;
-
     let txt = pick_tool(&dirs, "pdftotext");
     let text = run_capture(
         Command::new(&txt)
@@ -1428,23 +1826,60 @@ fn do_pdf(ctx: &Ctx, p: &PdfPage) -> Result<(), String> {
         "pdftotext",
     )
     .map_err(|e| {
-        format!("{e}\n（需要 poppler 的 pdftotext；PATH 上的 xpdf 旧版没有 -bbox-layout，用 BARKING_POPPLER 指向 poppler 的 bin 目录）")
+        format!("{e}\n（若是不认识 -bbox-layout：需要 poppler 的 pdftotext，PATH 上的 xpdf 旧版没有这个选项，用 BARKING_POPPLER 指向 poppler 的 bin 目录）")
     })?;
     let lines = parse_bbox_lines(&String::from_utf8_lossy(&text.stdout), p.dpi);
 
+    let ppm = pick_tool(&dirs, "pdftoppm");
+    run_capture(
+        Command::new(&ppm)
+            .args(["-r", &dpi, "-f", &page, "-l", &page, "-png"])
+            .arg(&p.pdf)
+            .arg(work.join("pg")),
+        "pdftoppm",
+    )?;
+    let png = find_page_png(work)?;
+    let size = card::png_size(&png)?;
+    Ok(PageRender { png, size, lines })
+}
+
+fn do_pdf(ctx: &Ctx, p: &PdfPage) -> Result<(), String> {
+    if !p.pdf.is_file() {
+        return Err(format!("{}: 不是文件", p.pdf.display()));
+    }
+    fs::create_dir_all(&ctx.scratch).map_err(io_err(&ctx.scratch))?;
+    let work = ctx.scratch.join(format!("pdf-{}", p.name));
+    let _ = fs::remove_dir_all(&work);
+    fs::create_dir_all(&work).map_err(io_err(&work))?;
+    let out = ctx.scratch_png(&p.name);
+    let pdf = ctx.log_path(&p.pdf);
     let tool = tool_pdf(p.dpi);
-    let tool_file = out.with_extension(SIDECAR_TOOL);
-    fs::write(&tool_file, format!("{tool}\n")).map_err(io_err(&tool_file))?;
-    // No text layer (a scanned PDF): leave no sidecar, so `lines` / `crop` fall
-    // back to OCR instead of searching an empty list.
+    // Both poppler steps must succeed before the old scratch image is
+    // replaced; the work directory goes either way.
+    let made = render_page(p, &work).and_then(|page| {
+        let prov = Prov {
+            tool: tool.clone(),
+            pdf: Some(pdf.path.clone()),
+            page: Some(p.page),
+            ..Prov::default()
+        };
+        // No text layer (a scanned PDF): leave no sidecar, so `lines` / `crop`
+        // fall back to OCR instead of searching an empty list.
+        let lines = (!page.lines.is_empty()).then_some(&page.lines[..]);
+        install_scratch(&page.png, &out, &prov, lines)?;
+        Ok(page)
+    });
+    let _ = fs::remove_dir_all(&work);
+    let PageRender {
+        size: (w, h),
+        lines,
+        ..
+    } = made?;
+
     if lines.is_empty() {
         println!("注意：这一页没有文字层，lines / crop 将改用 Tesseract OCR");
-    } else {
-        let side = out.with_extension(SIDECAR_LINES);
-        fs::write(&side, lines_tsv(&lines)).map_err(io_err(&side))?;
-        if lines.iter().any(|l| l.y1 > h + 2) {
-            println!("注意：有文字行超出渲染图高度 {h}（页面带旋转或裁切框？），锚点坐标可能偏移");
-        }
+    } else if lines.iter().any(|l| l.y1 > h + 2) {
+        println!("注意：有文字行超出渲染图高度 {h}（页面带旋转或裁切框？），锚点坐标可能偏移");
     }
     println!(
         "{}  {w}×{h} px（第 {} 页，{} dpi，{} 行文字）",
@@ -1453,18 +1888,21 @@ fn do_pdf(ctx: &Ctx, p: &PdfPage) -> Result<(), String> {
         p.dpi,
         lines.len()
     );
-    ctx.log(vec![
+    let mut rec = vec![
         ("action", json!("pdf")),
-        ("pdf", json!(slash(&p.pdf))),
+        ("pdf", json!(pdf.path)),
         ("page", json!(p.page)),
         ("name", json!(p.name)),
         ("tool", json!(tool)),
         ("dpi", json!(p.dpi)),
         ("size", json!([w, h])),
         ("lines", json!(lines.len())),
-    ])
+    ];
+    if pdf.outside {
+        rec.push(("outside_repo", json!(true)));
+    }
+    ctx.log(rec)
 }
-
 enum LineSource {
     /// Exact lines from the PDF text layer.
     Sidecar,
@@ -1526,13 +1964,12 @@ fn do_crop(ctx: &Ctx, c: &AnchorCrop) -> Result<(), String> {
         (img.w, img.h),
     )?;
     let cropped = img.crop(span.rect)?;
-    let prov = read_tool(&r.png);
     let tool = match how {
-        LineSource::Sidecar => match &prov {
+        LineSource::Sidecar => match r.tool() {
             Some(p) => format!("{p} crop"),
             None => "text-layer line crop".to_string(),
         },
-        LineSource::Ocr => tool_label(prov.as_deref(), "Tesseract anchor crop"),
+        LineSource::Ocr => tool_label(r.tool(), "Tesseract anchor crop"),
     };
     let path = ctx.emit(&c.out, &cropped)?;
 
@@ -1561,7 +1998,7 @@ fn do_crop(ctx: &Ctx, c: &AnchorCrop) -> Result<(), String> {
     }
     let mut rec = vec![
         ("action", json!("crop")),
-        ("url", json!(c.url)),
+        ("url", json!(r.url(&c.url))),
         ("name", json!(r.name)),
         ("file", json!(c.out)),
         ("box", span.rect.json()),
@@ -1570,9 +2007,7 @@ fn do_crop(ctx: &Ctx, c: &AnchorCrop) -> Result<(), String> {
         ("pads", json!([c.pad_top, c.pad_bottom])),
         ("tool", json!(tool)),
     ];
-    if let Some(from) = r.from {
-        rec.push(("from", json!(from)));
-    }
+    rec.extend(r.source_fields());
     ctx.log(rec)
 }
 
@@ -1581,7 +2016,7 @@ fn do_cropbox(ctx: &Ctx, src: &Source, out: &str, rect: Rect, url: &str) -> Resu
     ctx.check_free(out)?;
     let img = Img::load(&r.png)?;
     let cropped = img.crop(rect)?;
-    let tool = tool_label(read_tool(&r.png).as_deref(), "pixel-box crop");
+    let tool = tool_label(r.tool(), "pixel-box crop");
     let path = ctx.emit(out, &cropped)?;
     println!(
         "{}  {}×{} px  来自 {}（{}×{}），框 {}",
@@ -1595,16 +2030,14 @@ fn do_cropbox(ctx: &Ctx, src: &Source, out: &str, rect: Rect, url: &str) -> Resu
     );
     let mut rec = vec![
         ("action", json!("cropbox")),
-        ("url", json!(url)),
+        ("url", json!(r.url(url))),
         ("name", json!(r.name)),
         ("file", json!(out)),
         ("box", rect.json()),
         ("full_size", json!([img.w, img.h])),
         ("tool", json!(tool)),
     ];
-    if let Some(from) = r.from {
-        rec.push(("from", json!(from)));
-    }
+    rec.extend(r.source_fields());
     ctx.log(rec)
 }
 
@@ -1633,15 +2066,22 @@ fn do_stack(
             img.crop(part.rect)
                 .map_err(|e| format!("--part {}（{}）：{e}", i + 1, r.png.display()))?,
         );
-        records.push(json!({
-            "src": slash(&r.png),
-            "box": part.rect.json(),
-            "full_size": [img.w, img.h],
-        }));
-        if let Some(t) = read_tool(&r.png)
-            && !provenance.contains(&t)
+        let mut rec = serde_json::Map::new();
+        rec.insert("src".into(), json!(r.from.path));
+        rec.insert("box".into(), part.rect.json());
+        rec.insert("full_size".into(), json!([img.w, img.h]));
+        let part_url = r.url("");
+        if !part_url.is_empty() {
+            rec.insert("url".into(), json!(part_url));
+        }
+        for (k, v) in r.origin_fields() {
+            rec.insert(k.into(), v);
+        }
+        records.push(Value::Object(rec));
+        if let Some(t) = r.tool()
+            && !provenance.iter().any(|p| p == t)
         {
-            provenance.push(t);
+            provenance.push(t.to_string());
         }
         first_src.get_or_insert(r.png);
     }
@@ -1652,6 +2092,7 @@ fn do_stack(
             auto_bg(first.ok_or("没有来源图")?)?
         }
     };
+    let phys_differ = crops.iter().any(|c| c.meta.phys != crops[0].meta.phys);
     let canvas = stack(crops, gap, bg_rgba)?;
     let tool = if provenance.is_empty() {
         "vertical stack".to_string()
@@ -1668,6 +2109,9 @@ fn do_stack(
         bg_hex(bg_rgba),
         if *bg == Bg::Auto { "（auto）" } else { "" }
     );
+    if phys_differ {
+        println!("注意：各段的 pHYs（物理分辨率）不同，输出不带 pHYs；像素与色彩块不受影响");
+    }
     ctx.log(vec![
         ("action", json!("stack")),
         ("url", json!(url)),
@@ -1705,6 +2149,19 @@ mod tests {
             h,
             ct,
             data: (0..n).map(|i| (i * 7 % 251) as u8).collect(),
+            key: None,
+            meta: Meta::default(),
+        }
+    }
+
+    fn plain(w: u32, h: u32, ct: ColorType, data: Vec<u8>) -> Img {
+        Img {
+            w,
+            h,
+            ct,
+            data,
+            key: None,
+            meta: Meta::default(),
         }
     }
 
@@ -2211,14 +2668,242 @@ mod tests {
         assert!(Img::decode(b"not a png").unwrap_err().contains("PNG"));
     }
 
+    // --- metadata, colour keys ----------------------------------------------
+
+    /// Chunk names in file order, IDAT collapsed to one entry.
+    fn chunk_names(png: &[u8]) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        let mut i = 8;
+        while i + 8 <= png.len() {
+            let n = u32::from_be_bytes(png[i..i + 4].try_into().unwrap()) as usize;
+            let name = String::from_utf8_lossy(&png[i + 4..i + 8]).into_owned();
+            if name != "IDAT" || out.last().is_none_or(|l| l != "IDAT") {
+                out.push(name);
+            }
+            i += 12 + n;
+        }
+        out
+    }
+
+    /// The data of chunk `name`, if present.
+    fn chunk_data<'a>(png: &'a [u8], name: &str) -> Option<&'a [u8]> {
+        let mut i = 8;
+        while i + 8 <= png.len() {
+            let n = u32::from_be_bytes(png[i..i + 4].try_into().unwrap()) as usize;
+            if &png[i + 4..i + 8] == name.as_bytes() {
+                return Some(&png[i + 8..i + 8 + n]);
+            }
+            i += 12 + n;
+        }
+        None
+    }
+
+    /// A small RGB PNG written by the png crate itself, with an ICC profile,
+    /// gAMA, cHRM and pHYs, as a screenshot tool or browser might save it.
+    fn tagged_png(w: u32, h: u32, icc: &[u8], srgb: bool) -> (Vec<u8>, Vec<u8>) {
+        let data: Vec<u8> = (0..w as usize * h as usize * 3)
+            .map(|i| (i * 13 % 256) as u8)
+            .collect();
+        let mut info = png::Info::with_size(w, h);
+        info.color_type = ColorType::Rgb;
+        info.bit_depth = BitDepth::Eight;
+        info.icc_profile = Some(icc.to_vec().into());
+        info.source_gamma = Some(ScaledFloat::from_scaled(55_555));
+        info.source_chromaticities = Some(SourceChromaticities::new(
+            (0.3127, 0.329),
+            (0.68, 0.32),
+            (0.265, 0.69),
+            (0.15, 0.06),
+        ));
+        info.pixel_dims = Some(png::PixelDimensions {
+            xppu: 5669,
+            yppu: 5669,
+            unit: Unit::Meter,
+        });
+        let mut buf = Vec::new();
+        let mut writer = png::Encoder::with_info(&mut buf, info)
+            .unwrap()
+            .write_header()
+            .unwrap();
+        if srgb {
+            writer.write_chunk(png::chunk::sRGB, &[1]).unwrap();
+        }
+        writer.write_image_data(&data).unwrap();
+        writer.finish().unwrap();
+        (buf, data)
+    }
+
+    #[test]
+    fn crop_keeps_colour_chunks() {
+        let icc: Vec<u8> = (0..300).map(|i| (i % 97) as u8).collect();
+        let (src, data) = tagged_png(6, 5, &icc, false);
+        assert!(chunk_names(&src).contains(&"iCCP".to_string()));
+        let img = Img::decode(&src).unwrap();
+        assert_eq!(img.meta.icc.as_deref(), Some(&icc[..]));
+        assert_eq!(img.meta.gamma, Some(ScaledFloat::from_scaled(55_555)));
+        assert!(img.meta.chrm.is_some() && img.meta.srgb.is_none());
+        assert_eq!(img.meta.phys, Some((5669, 5669, Unit::Meter)));
+
+        let r = Rect {
+            x0: 1,
+            y0: 2,
+            x1: 5,
+            y1: 4,
+        };
+        let out = img.crop(r).unwrap().encode().unwrap();
+        let names = chunk_names(&out);
+        for c in ["pHYs", "gAMA", "cHRM", "iCCP"] {
+            assert!(names.contains(&c.to_string()), "{c} missing: {names:?}");
+        }
+        assert!(!names.contains(&"sRGB".to_string()));
+        assert_eq!(chunk_data(&out, "gAMA"), chunk_data(&src, "gAMA"));
+        assert_eq!(chunk_data(&out, "cHRM"), chunk_data(&src, "cHRM"));
+        assert_eq!(chunk_data(&out, "pHYs"), chunk_data(&src, "pHYs"));
+        let back = Img::decode(&out).unwrap();
+        assert_eq!(back.meta, img.meta);
+        // Pixels: exactly the box of the source rows.
+        let mut want = Vec::new();
+        for y in r.y0..r.y1 {
+            let row = y as usize * 6 * 3;
+            want.extend_from_slice(&data[row + 3..row + 15]);
+        }
+        assert_eq!(back.data, want);
+    }
+
+    #[test]
+    fn srgb_and_iccp_both_survive() {
+        // Non-conforming but real: some tools write both. The crate's own
+        // encoder would drop the iCCP when sRGB is set.
+        let (src, _) = tagged_png(3, 3, b"profile", true);
+        let img = Img::decode(&src).unwrap();
+        assert!(img.meta.srgb.is_some() && img.meta.icc.is_some());
+        let out = img.encode().unwrap();
+        let names = chunk_names(&out);
+        assert!(
+            ["sRGB", "iCCP", "gAMA", "cHRM"]
+                .iter()
+                .all(|c| names.contains(&c.to_string())),
+            "{names:?}"
+        );
+        assert_eq!(chunk_data(&out, "sRGB"), Some(&[1u8][..]));
+        assert_eq!(Img::decode(&out).unwrap().meta, img.meta);
+        // An untagged image stays untagged.
+        let plain_png = test_img(2, 2, ColorType::Rgb).encode().unwrap();
+        assert_eq!(chunk_names(&plain_png), ["IHDR", "IDAT", "IEND"]);
+    }
+
+    #[test]
+    fn colour_key_is_kept_on_crop() {
+        // 3×1 RGB, the middle pixel is the key colour.
+        let key = vec![0, 10, 0, 20, 0, 30];
+        let src = raw_png(
+            (3, 1),
+            ColorType::Rgb,
+            BitDepth::Eight,
+            None,
+            Some(key.clone()),
+            &[1, 2, 3, 10, 20, 30, 4, 5, 6],
+        );
+        let img = Img::decode(&src).unwrap();
+        assert_eq!(img.ct, ColorType::Rgb);
+        assert_eq!(img.key.as_deref(), Some(&[10, 20, 30][..]));
+        assert_eq!(img.data, [1, 2, 3, 10, 20, 30, 4, 5, 6]);
+        assert_eq!(img.rgba_at(1, 0), Some([10, 20, 30, 0]));
+        assert_eq!(img.rgba_at(0, 0), Some([1, 2, 3, 255]));
+        let out = img
+            .crop(Rect {
+                x0: 1,
+                y0: 0,
+                x1: 3,
+                y1: 1,
+            })
+            .unwrap()
+            .encode()
+            .unwrap();
+        assert_eq!(out[25], 2, "IHDR colour type stays RGB");
+        assert_eq!(chunk_data(&out, "tRNS"), Some(&key[..]));
+        let back = Img::decode(&out).unwrap();
+        assert_eq!(
+            (back.ct, &back.data[..], back.key.as_deref()),
+            (
+                ColorType::Rgb,
+                &[10, 20, 30, 4, 5, 6][..],
+                Some(&[10, 20, 30][..])
+            )
+        );
+
+        // 8-bit gray with a key, same treatment.
+        let src = raw_png(
+            (2, 1),
+            ColorType::Grayscale,
+            BitDepth::Eight,
+            None,
+            Some(vec![0, 7]),
+            &[7, 8],
+        );
+        let img = Img::decode(&src).unwrap();
+        assert_eq!(
+            (img.ct, img.key.as_deref()),
+            (ColorType::Grayscale, Some(&[7u8][..]))
+        );
+        let out = img.encode().unwrap();
+        assert_eq!(chunk_data(&out, "tRNS"), Some(&[0u8, 7][..]));
+
+        // Joined with other parts, the key becomes the alpha it stands for.
+        let unkeyed = img.unkey();
+        assert_eq!(
+            (unkeyed.ct, &unkeyed.data[..], unkeyed.key),
+            (ColorType::GrayscaleAlpha, &[7, 0, 8, 255][..], None)
+        );
+    }
+
+    #[test]
+    fn stack_checks_colour_chunks() {
+        let tagged = |icc: Option<&[u8]>, phys: Option<(u32, u32, Unit)>| Img {
+            meta: Meta {
+                icc: icc.map(<[u8]>::to_vec),
+                phys,
+                ..Meta::default()
+            },
+            ..test_img(2, 2, ColorType::Rgb)
+        };
+        let bg = [0, 0, 0, 255];
+        let p1 = Some((100, 100, Unit::Meter));
+        let p2 = Some((200, 200, Unit::Meter));
+        let same = stack(vec![tagged(Some(b"a"), p1), tagged(Some(b"a"), p1)], 1, bg).unwrap();
+        assert_eq!(
+            (same.meta.icc.as_deref(), same.meta.phys),
+            (Some(&b"a"[..]), p1)
+        );
+        // pHYs disagreeing is dropped, colour is kept.
+        let mixed = stack(vec![tagged(Some(b"a"), p1), tagged(Some(b"a"), p2)], 1, bg).unwrap();
+        assert_eq!(
+            (mixed.meta.icc.as_deref(), mixed.meta.phys),
+            (Some(&b"a"[..]), None)
+        );
+        // Colour disagreeing is an error naming the part.
+        let e = stack(vec![tagged(Some(b"a"), None), tagged(None, None)], 1, bg).unwrap_err();
+        assert!(
+            e.contains("色彩元数据不一致") && e.contains("第 2 段"),
+            "{e}"
+        );
+        let e = stack(vec![tagged(None, None), tagged(Some(b"b"), None)], 1, bg).unwrap_err();
+        assert!(e.contains("iCCP 1 字节"), "{e}");
+
+        // A keyed part joins as RGBA with alpha from the key.
+        let keyed = Img {
+            key: Some(vec![0, 7, 14]),
+            ..test_img(1, 1, ColorType::Rgb)
+        };
+        let s = stack(vec![keyed, test_img(1, 1, ColorType::Rgb)], 0, bg).unwrap();
+        assert_eq!(s.ct, ColorType::Rgba);
+        assert_eq!(&s.data[..4], &[0, 7, 14, 0]);
+        assert_eq!(s.key, None);
+    }
+
     #[test]
     fn promote_never_loses_channels() {
-        let g = Img {
-            w: 2,
-            h: 1,
-            ct: ColorType::Grayscale,
-            data: vec![10, 20],
-        };
+        let g = plain(2, 1, ColorType::Grayscale, vec![10, 20]);
         assert_eq!(
             g.clone().promote(ColorType::Rgb).unwrap().data,
             [10, 10, 10, 20, 20, 20]
@@ -2231,22 +2916,12 @@ mod tests {
             g.promote(ColorType::GrayscaleAlpha).unwrap().data,
             [10, 255, 20, 255]
         );
-        let ga = Img {
-            w: 1,
-            h: 1,
-            ct: ColorType::GrayscaleAlpha,
-            data: vec![7, 99],
-        };
+        let ga = plain(1, 1, ColorType::GrayscaleAlpha, vec![7, 99]);
         assert_eq!(
             ga.clone().promote(ColorType::Rgba).unwrap().data,
             [7, 7, 7, 99]
         );
-        let rgba = Img {
-            w: 1,
-            h: 1,
-            ct: ColorType::Rgba,
-            data: vec![1, 2, 3, 4],
-        };
+        let rgba = plain(1, 1, ColorType::Rgba, vec![1, 2, 3, 4]);
         assert!(rgba.clone().promote(ColorType::Rgb).is_err());
         assert!(rgba.promote(ColorType::GrayscaleAlpha).is_err());
         assert!(ga.promote(ColorType::Grayscale).is_err());
@@ -2684,7 +3359,11 @@ mod tests {
             yymm: "2610".into(),
             mmdd: "1009".into(),
         };
-        (Ctx::new(issue, "t"), root)
+        let mut ctx = Ctx::new(issue, "t");
+        // Never the real `<temp>/barking-shot/…`: tests must not see or leave
+        // scratch files there.
+        ctx.scratch = root.join("scratch");
+        (ctx, root)
     }
 
     #[test]
@@ -2739,12 +3418,27 @@ mod tests {
         fs::create_dir_all(&ctx.scratch).unwrap();
         fs::write(ctx.scratch_png("pg"), b"").unwrap();
         let r = ctx.resolve(&Source::Name("pg".into())).unwrap();
-        assert_eq!((r.name.as_str(), r.from), ("pg", None));
+        assert_eq!((r.name.as_str(), r.from.path.as_str()), ("pg", "pg"));
+        assert!(!r.from.outside && r.prov.is_none());
         let file = root.join("my.shot.png");
         fs::write(&file, b"").unwrap();
         let r = ctx.resolve(&Source::File(file.clone())).unwrap();
         assert_eq!(r.name, "my.shot");
-        assert_eq!(r.from, Some(slash(&file)));
+        // Inside the repository: relative, `/`-separated, never absolute.
+        assert_eq!(r.from.path, "my.shot.png");
+        assert!(!r.from.outside);
+        let deep = ctx.issue.images().join("x.png");
+        fs::create_dir_all(ctx.issue.images()).unwrap();
+        fs::write(&deep, b"").unwrap();
+        let r = ctx.resolve(&Source::File(deep)).unwrap();
+        assert_eq!(r.from.path, "docs/2610/1009/images/x.png");
+        // Outside: the file name only.
+        let elsewhere = scratch_root("resolve-outside");
+        let out_file = elsewhere.join("far.png");
+        fs::write(&out_file, b"").unwrap();
+        let r = ctx.resolve(&Source::File(out_file)).unwrap();
+        assert_eq!((r.from.path.as_str(), r.from.outside), ("far.png", true));
+        let _ = fs::remove_dir_all(&elsewhere);
         assert!(ctx.resolve(&Source::File(root.join("none.png"))).is_err());
         // Sidecar names hang off the PNG's own name.
         assert_eq!(
@@ -2763,6 +3457,130 @@ mod tests {
         assert_eq!(find_page_png(&root).unwrap(), root.join("pg-07.png"));
         fs::write(root.join("pg-08.png"), b"").unwrap();
         assert!(find_page_png(&root).is_err());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn options_with_equals_and_help() {
+        let p = parse_ok(&[
+            "d",
+            "a",
+            "render",
+            "https://e.com",
+            "ex",
+            "--width=900",
+            "--chrome-arg=--no-sandbox",
+            "--chrome-arg",
+            "--mute-audio",
+        ]);
+        let Action::Render(r) = p.action else {
+            panic!("{p:?}")
+        };
+        assert_eq!(r.width, 900);
+        assert_eq!(r.chrome_args, ["--no-sandbox", "--mute-audio"]);
+        // `=` splits once; the rest belongs to the value.
+        let p = parse_ok(&["d", "a", "crop", "n", "o.png", "--start=a=b", "--end", "c"]);
+        let Action::Crop(c) = p.action else {
+            panic!("{p:?}")
+        };
+        assert_eq!((c.start.as_str(), c.end.as_str()), ("a=b", "c"));
+        assert!(parse_err(&["d", "a", "lines", "n", "--=x"]).contains("缺少名字"));
+
+        assert!(wants_help(&s(&["--help"])));
+        assert!(wants_help(&s(&["-h"])));
+        assert!(wants_help(&s(&["d", "a", "crop", "--help"])));
+        assert!(!wants_help(&s(&[
+            "d",
+            "a",
+            "render",
+            "u",
+            "n",
+            "--chrome-arg",
+            "--help"
+        ])));
+        assert!(!wants_help(&s(&[
+            "d",
+            "a",
+            "render",
+            "u",
+            "n",
+            "--chrome-arg=--help"
+        ])));
+        assert!(!wants_help(&s(&[
+            "d", "a", "crop", "n", "o.png", "--start", "-h"
+        ])));
+    }
+
+    #[test]
+    fn provenance_sidecar_round_trip() {
+        let p = Prov {
+            tool: tool_pdf(144),
+            pdf: Some("docs/2610/1012/sources/a.pdf".into()),
+            page: Some(3),
+            ..Prov::default()
+        };
+        assert_eq!(Prov::parse(&p.text()), Some(p));
+        let r = Prov {
+            tool: "headless Chrome 700 CSS px, DPR 2".into(),
+            url: Some("https://example.com/a\tb".into()),
+            ..Prov::default()
+        };
+        let back = Prov::parse(&r.text()).unwrap();
+        assert_eq!(back.url.as_deref(), Some("https://example.com/a b"));
+        // A scratch image from before this sidecar format: tool only.
+        assert_eq!(
+            Prov::parse("pdftoppm -r 144 + pdftotext -bbox-layout\n"),
+            Some(Prov {
+                tool: tool_pdf(144),
+                ..Prov::default()
+            })
+        );
+        assert_eq!(Prov::parse("\n"), None);
+    }
+
+    #[test]
+    fn scratch_key_has_the_year() {
+        let (ctx, root) = test_ctx("key");
+        let real = Ctx::new(ctx.issue, "z");
+        assert!(real.scratch.ends_with("barking-shot/26101009-z"));
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn install_replaces_image_and_sidecars() {
+        let (ctx, root) = test_ctx("install");
+        fs::create_dir_all(&ctx.scratch).unwrap();
+        let out = ctx.scratch_png("pg");
+        fs::write(&out, b"old").unwrap();
+        fs::write(out.with_extension(SIDECAR_LINES), b"0\t1\told\n").unwrap();
+        let made = ctx.scratch.join("new.png");
+        fs::write(&made, b"new").unwrap();
+        let prov = Prov {
+            tool: "t".into(),
+            url: Some("https://e.com".into()),
+            ..Prov::default()
+        };
+        install_scratch(&made, &out, &prov, None).unwrap();
+        assert_eq!(fs::read(&out).unwrap(), b"new");
+        assert!(!made.exists());
+        assert!(
+            !out.with_extension(SIDECAR_LINES).exists(),
+            "stale lines of the old image must go"
+        );
+        assert_eq!(read_prov(&out).as_ref(), Some(&prov));
+
+        let made = ctx.scratch.join("new2.png");
+        fs::write(&made, b"new2").unwrap();
+        let lines = [line(1, 2, "x")];
+        install_scratch(&made, &out, &Prov::default(), Some(&lines)).unwrap();
+        assert_eq!(
+            fs::read_to_string(out.with_extension(SIDECAR_LINES)).unwrap(),
+            "1\t2\tx\n"
+        );
+        // A failed install leaves neither a half image nor its sidecars.
+        let e = install_scratch(&ctx.scratch.join("missing.png"), &out, &prov, None);
+        assert!(e.is_err());
+        assert!(!out.exists() && !out.with_extension(SIDECAR_TOOL).exists());
         let _ = fs::remove_dir_all(&root);
     }
 }

@@ -17,7 +17,7 @@
 //! purpose; `main.rs` therefore routes the two names to the one `run` here,
 //! which dispatches on the first argument.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::fs;
 use std::io::{ErrorKind, Write as _};
 use std::path::{Path, PathBuf};
@@ -26,8 +26,10 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Serialize, Serializer};
 use serde_json::Value;
+use ureq::ResponseExt as _;
 
-use crate::repo::{self, Date, Issue};
+use crate::offsite::write_if_changed;
+use crate::repo::{self, Issue};
 
 const USAGE_HTML2TXT: &str = "用法：barking html2txt <in.html> <out.txt> [--force]";
 const USAGE_HEAT: &str = "用法：barking heat <期次目录> <组前缀> [--hn \"<查询>\"]... [--reddit \"<查询>\"]... [--item <HN id>]... [--since <unix 秒>]";
@@ -123,19 +125,20 @@ fn convert_file(input: &Path, output: &Path, force: bool) -> Result<(), String> 
     {
         return Err("输出与输入是同一个文件".into());
     }
-    if force {
-        fs::write(output, &text).map_err(|e| format!("{}: {e}", output.display()))?;
-    } else {
-        write_new(output, text.as_bytes()).map_err(|e| format!("{e}（要覆盖请加 --force）"))?;
-    }
-    println!(
-        "写入 {}（{} 行，{} 字节；来自 {}）",
-        output.display(),
+    let what = format!(
+        "{} 行，{} 字节；来自 {}",
         text.lines().count(),
         text.len(),
         input.display()
     );
-    Ok(())
+    if force {
+        // Prints its own 写入/未变 line.
+        write_if_changed(output, &text, &what)
+    } else {
+        write_new(output, text.as_bytes()).map_err(|e| format!("{e}（要覆盖请加 --force）"))?;
+        println!("写入 {}（{what}）", output.display());
+        Ok(())
+    }
 }
 
 /// Tags whose open or close becomes a line break. The set is deliberately
@@ -183,15 +186,72 @@ const MAX_ENTITY_BODY: usize = 10;
 /// into markup.
 pub(crate) fn html_to_text(html: &str) -> String {
     // Python's universal newlines did this when the old script read the file.
-    let s = html.replace("\r\n", "\n").replace('\r', "\n");
+    let s = fold_newlines(html);
     let s = strip_raw_text_elements(&s);
     let s = strip_comments(&s);
     let s = rewrite_links(&s);
     let s = replace_tags(&s);
-    let s = decode_entities(&s);
+    // `&#13;` decodes to a bare CR; fold again so `&#13;&#10;` is one line
+    // break, as the same bytes written raw would be.
+    let s = fold_newlines(&decode_entities(&s));
     let s = collapse_spaces(&s);
     let s = collapse_blank_lines(&s);
     format!("{}\n", s.trim())
+}
+
+fn fold_newlines(s: &str) -> String {
+    s.replace("\r\n", "\n").replace('\r', "\n")
+}
+
+/// Per-pass record of searches that came back empty. A pass only moves
+/// forward through one string, so "nothing from `p` on" answers every later
+/// search from `q >= p` for the same needle without scanning again. Without
+/// it a page that never closes a tag, an element or a comment costs one scan
+/// to the end per `<`, i.e. quadratic time.
+#[derive(Default)]
+struct Memo {
+    /// No `>` at or after this index.
+    no_gt: Option<usize>,
+    /// No `-->` at or after this index.
+    no_comment_end: Option<usize>,
+    /// Lower-cased element name → no `</name…>` at or after the index.
+    no_close: Vec<(String, usize)>,
+    /// `(index of a '<', open quote byte or 0)` states that a quote-aware
+    /// tag scan passed on its way to the end of the string with a quote still
+    /// open. The scan from there is a function of that state alone, so a
+    /// later scan reaching the same `<` in the same state runs off the end
+    /// too.
+    runs_off: HashSet<(usize, u8)>,
+}
+
+impl Memo {
+    fn find_gt(&mut self, b: &[u8], from: usize) -> Option<usize> {
+        if self.no_gt.is_some_and(|p| from >= p) {
+            return None;
+        }
+        let found = b
+            .get(from..)
+            .and_then(|t| t.iter().position(|&c| c == b'>'))
+            .map(|p| from + p);
+        if found.is_none() {
+            self.no_gt = Some(from);
+        }
+        found
+    }
+
+    /// Index just past the `-->` closing the comment that `s[at..]` opens
+    /// (it starts with `<!--`).
+    fn comment_end(&mut self, s: &str, at: usize) -> Option<usize> {
+        let from = at + 4;
+        if self.no_comment_end.is_some_and(|p| from >= p) {
+            return None;
+        }
+        let found = s[from..].find("-->").map(|p| from + p + 3);
+        if found.is_none() {
+            self.no_comment_end = Some(from);
+        }
+        found
+    }
 }
 
 /// A start or end tag found at a `<`.
@@ -208,7 +268,12 @@ struct Tag<'a> {
 /// Parse the tag at `s[at] == '<'`. Like a browser, only `<` followed by a
 /// letter (or `</` and a letter) starts a tag, so a bare `a < b` survives as
 /// text. `None` also when no `>` ever closes the tag.
-fn parse_tag(s: &str, at: usize) -> Option<Tag<'_>> {
+///
+/// Unlike a browser, the name stops at a `<`: `<p<b>` is a `p` whose
+/// attribute text is `<b`, where a browser sees one tag named `p<b`. That
+/// bounds the name scan by the next `<`, which keeps a run of `<a<a<a…`
+/// linear; the whole tag is dropped either way.
+fn parse_tag<'a>(s: &'a str, at: usize, memo: &mut Memo) -> Option<Tag<'a>> {
     let b = s.as_bytes();
     let mut i = at + 1;
     let closing = b.get(i) == Some(&b'/');
@@ -219,12 +284,12 @@ fn parse_tag(s: &str, at: usize) -> Option<Tag<'_>> {
         return None;
     }
     let name_start = i;
-    while i < b.len() && !matches!(b[i], b'>' | b'/') && !b[i].is_ascii_whitespace() {
+    while i < b.len() && !matches!(b[i], b'>' | b'/' | b'<') && !b[i].is_ascii_whitespace() {
         i += 1;
     }
     // The name ends at an ASCII byte or at the end, so both slices are on
     // char boundaries.
-    let gt = tag_end(b, i)?;
+    let gt = tag_end(b, i, memo)?;
     Some(Tag {
         name: &s[name_start..i],
         closing,
@@ -236,16 +301,34 @@ fn parse_tag(s: &str, at: usize) -> Option<Tag<'_>> {
 /// Index of the `>` that ends the tag whose attributes start at `from`. A `>`
 /// inside a quoted attribute value (`title="a > b"`, inline handlers, JSON in
 /// data attributes) does not end it; an unterminated quote must not swallow
-/// the page, so then the first `>` wins.
-fn tag_end(b: &[u8], from: usize) -> Option<usize> {
+/// the page, so then the first `>` wins. One pass: that first `>` is noted on
+/// the way, so the fallback needs no second scan.
+fn tag_end(b: &[u8], from: usize, memo: &mut Memo) -> Option<usize> {
+    if memo.no_gt.is_some_and(|p| from >= p) {
+        return None;
+    }
     let mut quote: Option<u8> = None;
     let mut prev = 0u8; // last non-space byte seen outside quotes
-    for (i, &c) in b.iter().enumerate().skip(from) {
+    let mut first_gt: Option<usize> = None; // necessarily inside quotes
+    let mut passed: Vec<(usize, u8)> = Vec::new();
+    let mut i = from;
+    // Stops at the end of the string, or where an earlier scan is known to
+    // have run off it; either way some quote never closes.
+    while let Some(&c) = b.get(i) {
+        if c == b'<' {
+            let state = (i, quote.unwrap_or(0));
+            if memo.runs_off.contains(&state) {
+                break;
+            }
+            passed.push(state);
+        }
         match quote {
             Some(q) => {
                 if c == q {
                     quote = None;
                     prev = c;
+                } else if c == b'>' && first_gt.is_none() {
+                    first_gt = Some(i);
                 }
             }
             None => match c {
@@ -255,8 +338,14 @@ fn tag_end(b: &[u8], from: usize) -> Option<usize> {
                 _ => prev = c,
             },
         }
+        i += 1;
     }
-    b[from..].iter().position(|&c| c == b'>').map(|p| from + p)
+    memo.runs_off.extend(passed);
+    let gt = first_gt.or_else(|| memo.find_gt(b, i));
+    if gt.is_none() {
+        memo.no_gt = Some(from);
+    }
+    gt
 }
 
 /// Value of attribute `want` (case-insensitive name; double-quoted,
@@ -330,77 +419,111 @@ fn rewrite(s: &str, mut f: impl FnMut(&str, usize, &mut String) -> Option<usize>
 
 /// `(start, end)` of the first `</name>` at or after `from` (name matched
 /// case-insensitively), `end` being just past its `>`.
-fn find_close(s: &str, from: usize, name: &str) -> Option<(usize, usize)> {
+fn find_close(s: &str, from: usize, name: &str, memo: &mut Memo) -> Option<(usize, usize)> {
+    let key = name.to_ascii_lowercase();
+    if memo.no_close.iter().any(|(n, p)| *n == key && from >= *p) {
+        return None;
+    }
     let b = s.as_bytes();
     let mut i = from;
-    while let Some(off) = s[i..].find("</") {
+    let found = loop {
+        let Some(off) = s[i..].find("</") else {
+            break None;
+        };
         let at = i + off;
         let after = at + 2 + name.len();
         if b.get(at + 2..after)
             .is_some_and(|n| n.eq_ignore_ascii_case(name.as_bytes()))
             && b.get(after)
                 .is_some_and(|&c| matches!(c, b'>' | b'/') || c.is_ascii_whitespace())
-            && let Some(gt) = s[after..].find('>')
         {
-            return Some((at, after + gt + 1));
+            // No `>` after this one means no end tag can follow it either.
+            break memo.find_gt(b, after).map(|gt| (at, gt + 1));
         }
         i = at + 2;
+    };
+    if found.is_none() {
+        memo.no_close.push((key, from));
     }
-    None
+    found
 }
 
 /// Drop `<script|style|noscript|svg>…</…>` with their content. An element
 /// that is never closed is left alone (its tags go in a later pass) rather
 /// than eating the rest of the page.
+///
+/// Every other tag, and every comment, is copied whole and stepped over, so a
+/// `<script>` that is only text inside an attribute value or a comment opens
+/// nothing. Comments are skipped here rather than stripped in an earlier pass
+/// because the reverse nesting occurs too: legacy scripts wrap their code in
+/// `<!-- … -->` and script strings contain `<!--`, which, stripped first,
+/// would run on to some later `-->` and leave script text behind.
 fn strip_raw_text_elements(s: &str) -> String {
-    rewrite(s, |s, at, _| {
-        let tag = parse_tag(s, at)?;
-        if tag.closing
-            || !RAW_TEXT_TAGS
+    let mut memo = Memo::default();
+    rewrite(s, |s, at, out| {
+        if s[at..].starts_with("<!--") {
+            let end = memo.comment_end(s, at)?;
+            out.push_str(&s[at..end]);
+            return Some(end);
+        }
+        let tag = parse_tag(s, at, &mut memo)?;
+        if !tag.closing
+            && RAW_TEXT_TAGS
                 .iter()
                 .any(|n| tag.name.eq_ignore_ascii_case(n))
+            && let Some((_, end)) = find_close(s, tag.end, tag.name, &mut memo)
         {
-            return None;
+            return Some(end);
         }
-        find_close(s, tag.end, tag.name).map(|(_, end)| end)
+        out.push_str(&s[at..tag.end]);
+        Some(tag.end)
     })
 }
 
 fn strip_comments(s: &str) -> String {
+    let mut memo = Memo::default();
     rewrite(s, |s, at, _| {
-        let body = s[at..].strip_prefix("<!--")?;
-        body.find("-->").map(|p| at + 4 + p + 3)
+        if !s[at..].starts_with("<!--") {
+            return None;
+        }
+        memo.comment_end(s, at)
     })
 }
 
 /// `<a href="URL">text</a>` → `text [URL]`. Anchors without an `href`, with
 /// an empty one, or never closed keep their text and lose the brackets.
+/// Every other tag is copied whole, as in `strip_raw_text_elements`.
 fn rewrite_links(s: &str) -> String {
+    let mut memo = Memo::default();
     rewrite(s, |s, at, out| {
-        let tag = parse_tag(s, at)?;
-        if tag.closing || !tag.name.eq_ignore_ascii_case("a") {
-            return None;
+        let tag = parse_tag(s, at, &mut memo)?;
+        if !tag.closing
+            && tag.name.eq_ignore_ascii_case("a")
+            && let Some(href) = attr_value(tag.attrs, "href")
+            && let Some((close, end)) = find_close(s, tag.end, tag.name, &mut memo)
+        {
+            out.push_str(&s[tag.end..close]);
+            if !href.trim().is_empty() {
+                out.push_str(" [");
+                out.push_str(href);
+                out.push(']');
+            }
+            return Some(end);
         }
-        let href = attr_value(tag.attrs, "href")?;
-        let (close, end) = find_close(s, tag.end, tag.name)?;
-        out.push_str(&s[tag.end..close]);
-        if !href.trim().is_empty() {
-            out.push_str(" [");
-            out.push_str(href);
-            out.push(']');
-        }
-        Some(end)
+        out.push_str(&s[at..tag.end]);
+        Some(tag.end)
     })
 }
 
 /// Block tags become a newline, every other tag, doctype and processing
 /// instruction disappears.
 fn replace_tags(s: &str) -> String {
+    let mut memo = Memo::default();
     rewrite(s, |s, at, out| {
         if matches!(s.as_bytes().get(at + 1)?, b'!' | b'?') {
-            return s[at..].find('>').map(|p| at + p + 1);
+            return memo.find_gt(s.as_bytes(), at).map(|p| p + 1);
         }
-        let tag = parse_tag(s, at)?;
+        let tag = parse_tag(s, at, &mut memo)?;
         if BLOCK_TAGS.iter().any(|n| tag.name.eq_ignore_ascii_case(n)) {
             out.push('\n');
         }
@@ -415,16 +538,40 @@ const CP1252_C1: [char; 32] = [
     '\u{90}', '‘', '’', '“', '”', '•', '–', '—', '˜', '™', 'š', '›', 'œ', '\u{9d}', 'ž', 'Ÿ',
 ];
 
-/// The common named references. Not the full HTML table: anything else stays
-/// as written, which is visible and greppable rather than silently wrong.
+/// Names of U+00A0..=U+00FF in code-point order: the whole Latin-1 block
+/// (HTML 4's `HTMLlat1` set), so accented names in European press pages
+/// (`&eacute;`, `&ntilde;`) come out as letters.
+const LATIN1_ENTITIES: [&str; 96] = [
+    "nbsp", "iexcl", "cent", "pound", "curren", "yen", "brvbar", "sect", "uml", "copy", "ordf",
+    "laquo", "not", "shy", "reg", "macr", //
+    "deg", "plusmn", "sup2", "sup3", "acute", "micro", "para", "middot", "cedil", "sup1", "ordm",
+    "raquo", "frac14", "frac12", "frac34", "iquest", //
+    "Agrave", "Aacute", "Acirc", "Atilde", "Auml", "Aring", "AElig", "Ccedil", "Egrave", "Eacute",
+    "Ecirc", "Euml", "Igrave", "Iacute", "Icirc", "Iuml", //
+    "ETH", "Ntilde", "Ograve", "Oacute", "Ocirc", "Otilde", "Ouml", "times", "Oslash", "Ugrave",
+    "Uacute", "Ucirc", "Uuml", "Yacute", "THORN", "szlig", //
+    "agrave", "aacute", "acirc", "atilde", "auml", "aring", "aelig", "ccedil", "egrave", "eacute",
+    "ecirc", "euml", "igrave", "iacute", "icirc", "iuml", //
+    "eth", "ntilde", "ograve", "oacute", "ocirc", "otilde", "ouml", "divide", "oslash", "ugrave",
+    "uacute", "ucirc", "uuml", "yacute", "thorn", "yuml",
+];
+
+/// The Latin-1 block plus the common names outside it. Not the full HTML
+/// table: anything else stays as written, which is visible and greppable
+/// rather than silently wrong. Names are case-sensitive (`&Eacute;` ≠
+/// `&eacute;`); the upper-case aliases below are the ones HTML defines.
 fn named_entity(name: &str) -> Option<char> {
+    if let Some(i) = LATIN1_ENTITIES.iter().position(|&n| n == name) {
+        return char::from_u32(0xa0 + i as u32);
+    }
     Some(match name {
         "amp" | "AMP" => '&',
         "lt" | "LT" => '<',
         "gt" | "GT" => '>',
         "quot" | "QUOT" => '"',
         "apos" => '\'',
-        "nbsp" => '\u{a0}',
+        "COPY" => '©',
+        "REG" => '®',
         "mdash" => '—',
         "ndash" => '–',
         "hellip" => '…',
@@ -432,32 +579,20 @@ fn named_entity(name: &str) -> Option<char> {
         "rdquo" => '”',
         "lsquo" => '‘',
         "rsquo" => '’',
-        "copy" | "COPY" => '©',
-        "reg" | "REG" => '®',
         "trade" => '™',
         "bull" => '•',
-        "middot" => '·',
-        "times" => '×',
-        "divide" => '÷',
-        "deg" => '°',
-        "plusmn" => '±',
-        "laquo" => '«',
-        "raquo" => '»',
         "euro" => '€',
-        "pound" => '£',
-        "yen" => '¥',
-        "cent" => '¢',
-        "sect" => '§',
-        "para" => '¶',
+        "dagger" => '†',
+        "Dagger" => '‡',
         "larr" => '←',
         "rarr" => '→',
         "uarr" => '↑',
         "darr" => '↓',
         "minus" => '−',
+        "equiv" => '≡',
         _ => return None,
     })
 }
-
 /// `body` is what follows `&#`, without the `;`: decimal digits, or `x`/`X`
 /// and hex digits.
 fn numeric_entity(body: &str) -> Option<char> {
@@ -669,12 +804,14 @@ impl<T: Serialize> Serialize for Ordered<T> {
     }
 }
 
+/// A field the API left out stays `None` (JSON `null`): a made-up `0` or
+/// 1970 date would read as a measurement.
 #[derive(Serialize, Debug, PartialEq)]
 struct HnHit {
     id: String,
     points: Option<i64>,
     comments: Option<i64>,
-    time_bj: String,
+    time_bj: Option<String>,
     title: String,
     url: Option<String>,
 }
@@ -682,9 +819,9 @@ struct HnHit {
 #[derive(Serialize, Debug, PartialEq)]
 struct RedditHit {
     sub: String,
-    score: i64,
-    comments: i64,
-    time_bj: String,
+    score: Option<i64>,
+    comments: Option<i64>,
+    time_bj: Option<String>,
     title: String,
     permalink: String,
     url: String,
@@ -711,23 +848,18 @@ fn default_since(now: i64) -> i64 {
     now - SINCE_DEFAULT_DAYS * 86_400
 }
 
-/// Unix seconds as Beijing time in the stamp format of `repo::beijing_now`.
-/// (That function only reads the clock, so it cannot format an API timestamp.)
-fn bj_stamp(unix: i64) -> String {
-    let secs = unix + 8 * 3600;
-    let (days, rem) = (secs.div_euclid(86_400), secs.rem_euclid(86_400));
-    format!(
-        "{}T{:02}:{:02}:{:02}+08:00",
-        Date::from_days(days).iso(),
-        rem / 3600,
-        rem % 3600 / 60,
-        rem % 60
-    )
+/// `MM-DD HH:MM` out of a `repo::beijing_stamp`, for the one-line terminal
+/// summary; `-` when the time is unknown.
+fn short_time(stamp: Option<&str>) -> String {
+    match stamp {
+        Some(t) => t.get(5..16).unwrap_or(t).replace('T', " "),
+        None => "-".into(),
+    }
 }
 
-/// `MM-DD HH:MM` out of a `bj_stamp`, for the one-line terminal summary.
-fn short_time(stamp: &str) -> String {
-    stamp.get(5..16).unwrap_or(stamp).replace('T', " ")
+/// A count for the terminal summary; `-` when the API gave none.
+fn count(n: Option<i64>) -> String {
+    n.map_or_else(|| "-".into(), |n| n.to_string())
 }
 
 fn truncate_chars(s: &str, max: usize) -> String {
@@ -748,7 +880,7 @@ fn parse_hn_hits(v: &Value) -> Result<(u64, Vec<HnHit>), String> {
                 id: h["objectID"].as_str()?.to_string(),
                 points: h["points"].as_i64(),
                 comments: h["num_comments"].as_i64(),
-                time_bj: bj_stamp(h["created_at_i"].as_i64().unwrap_or(0)),
+                time_bj: h["created_at_i"].as_i64().map(repo::beijing_stamp),
                 title: h["title"].as_str().unwrap_or_default().to_string(),
                 url: h["url"].as_str().map(str::to_string),
             })
@@ -767,9 +899,11 @@ fn parse_reddit_hits(v: &Value) -> Result<Vec<RedditHit>, String> {
         .map(|c| &c["data"])
         .map(|d| RedditHit {
             sub: d["subreddit"].as_str().unwrap_or_default().to_string(),
-            score: d["score"].as_i64().unwrap_or(0),
-            comments: d["num_comments"].as_i64().unwrap_or(0),
-            time_bj: bj_stamp(d["created_utc"].as_f64().unwrap_or(0.0) as i64),
+            score: d["score"].as_i64(),
+            comments: d["num_comments"].as_i64(),
+            time_bj: d["created_utc"]
+                .as_f64()
+                .map(|t| repo::beijing_stamp(t as i64)),
             title: d["title"].as_str().unwrap_or_default().to_string(),
             permalink: format!(
                 "https://www.reddit.com{}",
@@ -804,10 +938,35 @@ fn http_agent() -> ureq::Agent {
         .into()
 }
 
-/// GET `url` with `query` and return the body. Transport errors and 5xx are
-/// retried; a 4xx (rate limit, block) is final, since asking again at once
-/// only digs the hole deeper.
-fn http_get(agent: &ureq::Agent, url: &str, query: &[(&str, &str)]) -> Result<Vec<u8>, String> {
+/// A 2xx response body and where it really came from. Redirects are
+/// followed, so when Reddit answers a blocked search with a login or block
+/// page, the final URL and type are what explain the failure.
+struct Fetched {
+    body: Vec<u8>,
+    final_url: String,
+    content_type: String,
+}
+
+impl Fetched {
+    fn describe(&self) -> String {
+        format!(
+            "最终 URL {}，Content-Type {}，{} 字节",
+            self.final_url,
+            self.content_type,
+            self.body.len()
+        )
+    }
+
+    fn json(&self) -> Result<Value, String> {
+        serde_json::from_slice(&self.body)
+            .map_err(|e| format!("响应不是 JSON（{}）：{e}", self.describe()))
+    }
+}
+
+/// GET `url` with `query`. Transport errors and 5xx are retried; a 4xx (rate
+/// limit, block) is final, since asking again at once only digs the hole
+/// deeper.
+fn http_get(agent: &ureq::Agent, url: &str, query: &[(&str, &str)]) -> Result<Fetched, String> {
     let mut last = String::new();
     for attempt in 0..ATTEMPTS {
         if attempt > 0 {
@@ -820,15 +979,27 @@ fn http_get(agent: &ureq::Agent, url: &str, query: &[(&str, &str)]) -> Result<Ve
         match req.call() {
             Ok(mut resp) => {
                 let status = resp.status();
+                let final_url = resp.get_uri().to_string();
                 if status.is_success() {
-                    return resp
+                    let content_type = resp
+                        .headers()
+                        .get("content-type")
+                        .and_then(|v| v.to_str().ok())
+                        .unwrap_or("（无）")
+                        .to_string();
+                    let body = resp
                         .body_mut()
                         .with_config()
                         .limit(MAX_BODY)
                         .read_to_vec()
-                        .map_err(|e| format!("读取响应失败：{e}"));
+                        .map_err(|e| format!("读取响应失败：{e}"))?;
+                    return Ok(Fetched {
+                        body,
+                        final_url,
+                        content_type,
+                    });
                 }
-                last = format!("HTTP {status}");
+                last = format!("HTTP {status}（最终 URL {final_url}）");
                 if status.is_client_error() {
                     break;
                 }
@@ -840,14 +1011,52 @@ fn http_get(agent: &ureq::Agent, url: &str, query: &[(&str, &str)]) -> Result<Ve
 }
 
 fn get_json(agent: &ureq::Agent, url: &str, query: &[(&str, &str)]) -> Result<Value, String> {
-    let body = http_get(agent, url, query)?;
-    serde_json::from_slice(&body).map_err(|e| format!("响应不是 JSON：{e}"))
+    http_get(agent, url, query)?.json()
 }
 
 /// A failed request is not fatal: it is shown now and kept in the record.
 fn record_error(errors: &mut Vec<String>, msg: String) {
     println!("warn: {msg}");
     errors.push(msg);
+}
+
+/// Whether an item response is worth archiving: the body of a JSON object.
+/// Deliberately not "serde accepts it" — the file is the evidence, and a
+/// response this parser happens to reject is still the response.
+fn looks_like_json_object(body: &[u8]) -> bool {
+    body.iter()
+        .find(|b| !b.is_ascii_whitespace())
+        .is_some_and(|&b| b == b'{')
+}
+
+/// Fetch one HN item and save the body byte-for-byte. Parsing only feeds the
+/// summary line; if it fails the file stays and a warning says why.
+/// `shown` is the path as printed (repo-relative, like the other lines).
+fn fetch_item(
+    agent: &ureq::Agent,
+    id: &str,
+    sources: &Path,
+    file: &str,
+    shown: &str,
+) -> Result<(), String> {
+    let resp = http_get(agent, &format!("{HN_ITEM}/{id}"), &[])?;
+    if !looks_like_json_object(&resp.body) {
+        return Err(format!("响应不是 JSON 对象，未保存（{}）", resp.describe()));
+    }
+    fs::create_dir_all(sources).map_err(|e| format!("{}: {e}", sources.display()))?;
+    let path = sources.join(file);
+    write_new(&path, &resp.body)?;
+    match resp.json() {
+        Ok(v) => println!(
+            "== HN 条目 {id}：{}（{} 分；含嵌套评论 {} 条）→ {}",
+            truncate_chars(v["title"].as_str().unwrap_or("无标题"), 90),
+            count(v["points"].as_i64()),
+            count_descendants(&v),
+            shown
+        ),
+        Err(e) => println!("warn: HN 条目 {id} 已原样保存到 {shown}，但无法解析摘要：{e}"),
+    }
+    Ok(())
 }
 
 fn heat(issue: &Issue, a: &HeatArgs) -> Result<(), String> {
@@ -879,11 +1088,15 @@ fn heat(issue: &Issue, a: &HeatArgs) -> Result<(), String> {
     };
     let requests = a.hn.len() + a.reddit.len() + a.items.len();
     let mut ok = 0usize;
-    println!(
-        "取得时刻 {}；HN 搜索自 {} 起",
-        heat.fetched_bj,
-        bj_stamp(since)
-    );
+    if a.hn.is_empty() {
+        println!("取得时刻 {}", heat.fetched_bj);
+    } else {
+        println!(
+            "取得时刻 {}；HN 搜索自 {} 起",
+            heat.fetched_bj,
+            repo::beijing_stamp(since)
+        );
+    }
 
     for q in &a.hn {
         let numeric = format!("created_at_i>{since}");
@@ -900,9 +1113,9 @@ fn heat(issue: &Issue, a: &HeatArgs) -> Result<(), String> {
                     println!(
                         "  {} {:>4} 分 {:>4} 评 {}  {}  {}",
                         h.id,
-                        h.points.unwrap_or(0),
-                        h.comments.unwrap_or(0),
-                        short_time(&h.time_bj),
+                        count(h.points),
+                        count(h.comments),
+                        short_time(h.time_bj.as_deref()),
                         truncate_chars(&h.title, 90),
                         h.url.as_deref().unwrap_or("-")
                     );
@@ -928,9 +1141,9 @@ fn heat(issue: &Issue, a: &HeatArgs) -> Result<(), String> {
                     println!(
                         "  r/{} {:>4} 分 {:>4} 评 {}  {}  {}",
                         h.sub,
-                        h.score,
-                        h.comments,
-                        short_time(&h.time_bj),
+                        count(h.score),
+                        count(h.comments),
+                        short_time(h.time_bj.as_deref()),
                         truncate_chars(&h.title, 80),
                         h.permalink
                     );
@@ -943,26 +1156,10 @@ fn heat(issue: &Issue, a: &HeatArgs) -> Result<(), String> {
     }
 
     for id in &a.items {
-        let url = format!("{HN_ITEM}/{id}");
-        let saved = http_get(&agent, &url, &[]).and_then(|body| {
-            // The file must be the response itself, but a body that is not
-            // JSON (an error page behind a 200) is not worth keeping.
-            let v: Value =
-                serde_json::from_slice(&body).map_err(|e| format!("响应不是 JSON：{e}"))?;
-            fs::create_dir_all(&sources).map_err(|e| format!("{}: {e}", sources.display()))?;
-            write_new(&sources.join(item_name(id)), &body)?;
-            Ok(v)
-        });
-        match saved {
-            Ok(v) => {
-                println!(
-                    "== HN 条目 {id}：{}（{} 分；含嵌套评论 {} 条）→ {}/sources/{}",
-                    truncate_chars(v["title"].as_str().unwrap_or("无标题"), 90),
-                    v["points"].as_i64().unwrap_or(0),
-                    count_descendants(&v),
-                    issue.rel(),
-                    item_name(id)
-                );
+        let file = item_name(id);
+        let shown = format!("{}/sources/{file}", issue.rel());
+        match fetch_item(&agent, id, &sources, &file, &shown) {
+            Ok(()) => {
                 heat.items.push(id.clone());
                 ok += 1;
             }
@@ -970,16 +1167,15 @@ fn heat(issue: &Issue, a: &HeatArgs) -> Result<(), String> {
         }
     }
 
+    write_heat(&sources, &heat_name, &heat)?;
+    let written = format!("{}/sources/{heat_name}", issue.rel());
     if ok == 0 {
-        return Err(format!("{requests} 个请求全部失败，未写入 {heat_name}"));
+        return Err(format!(
+            "{requests} 个请求全部失败；失败原因已写入 {written} 的 errors（重跑须换组前缀或先删除该文件）"
+        ));
     }
-    fs::create_dir_all(&sources).map_err(|e| format!("{}: {e}", sources.display()))?;
-    let mut json = serde_json::to_string_pretty(&heat).map_err(|e| e.to_string())?;
-    json.push('\n');
-    write_new(&sources.join(&heat_name), json.as_bytes())?;
     println!(
-        "-- 写入 {}/sources/{heat_name}（HN {} 组、Reddit {} 组、条目 {} 个；{} 个请求失败，已记入 errors）",
-        issue.rel(),
+        "-- 写入 {written}（HN {} 组、Reddit {} 组、条目 {} 个；{} 个请求失败，已记入 errors）",
         heat.hn.0.len(),
         heat.reddit.0.len(),
         heat.items.len(),
@@ -988,6 +1184,15 @@ fn heat(issue: &Issue, a: &HeatArgs) -> Result<(), String> {
     Ok(())
 }
 
+/// The record is written even when every request failed: "asked at this
+/// time and got these errors" is itself the evidence (of a block, a rate
+/// limit, an id that does not exist).
+fn write_heat(sources: &Path, name: &str, heat: &Heat) -> Result<(), String> {
+    fs::create_dir_all(sources).map_err(|e| format!("{}: {e}", sources.display()))?;
+    let mut json = serde_json::to_string_pretty(heat).map_err(|e| e.to_string())?;
+    json.push('\n');
+    write_new(&sources.join(name), json.as_bytes())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1089,6 +1294,12 @@ mod tests {
             "figure",
             "figcaption",
             "PRE",
+            "hr",
+            "nav",
+            "aside",
+            "dt",
+            "dd",
+            "title",
         ] {
             assert_eq!(replace_tags(&format!("a<{tag}>b")), "a\nb", "<{tag}>");
             assert_eq!(replace_tags(&format!("a</{tag}>b")), "a\nb", "</{tag}>");
@@ -1255,10 +1466,15 @@ mod tests {
 
     #[test]
     fn beijing_stamps() {
-        assert_eq!(bj_stamp(0), "1970-01-01T08:00:00+08:00");
+        assert_eq!(repo::beijing_stamp(0), "1970-01-01T08:00:00+08:00");
         // 2026-10-09T23:39:23Z, the created_at_i of an HN comment in 1009.
-        assert_eq!(bj_stamp(1_791_589_163), "2026-10-10T07:39:23+08:00");
-        assert_eq!(short_time("2026-10-10T07:39:23+08:00"), "10-10 07:39");
+        assert_eq!(
+            repo::beijing_stamp(1_791_589_163),
+            "2026-10-10T07:39:23+08:00"
+        );
+        assert_eq!(short_time(Some("2026-10-10T07:39:23+08:00")), "10-10 07:39");
+        assert_eq!(short_time(None), "-");
+        assert_eq!((count(Some(0)), count(None)), ("0".into(), "-".into()));
     }
 
     #[test]
@@ -1294,7 +1510,7 @@ mod tests {
                 id: "50025713".into(),
                 points: Some(327),
                 comments: Some(367),
-                time_bj: "2026-10-10T07:39:23+08:00".into(),
+                time_bj: Some("2026-10-10T07:39:23+08:00".into()),
                 title: "T".into(),
                 url: Some("https://x.example/a".into()),
             }
@@ -1315,9 +1531,9 @@ mod tests {
             hits,
             vec![RedditHit {
                 sub: "ClaudeAI".into(),
-                score: 12,
-                comments: 3,
-                time_bj: "2026-10-10T07:39:23+08:00".into(),
+                score: Some(12),
+                comments: Some(3),
+                time_bj: Some("2026-10-10T07:39:23+08:00".into()),
                 title: "T".into(),
                 permalink: "https://www.reddit.com/r/ClaudeAI/comments/x/t/".into(),
                 url: "https://x.example".into(),
@@ -1350,5 +1566,252 @@ mod tests {
             text,
             r#"{"fetched_bj":"t","hn":{"zeta":[],"alpha":[]},"reddit":{},"items":["1"],"errors":[]}"#
         );
+    }
+
+    // ---- review fixes (2026-10-13) ----
+
+    #[test]
+    fn decodes_the_whole_latin1_block() {
+        let mut seen = HashSet::new();
+        for (i, name) in LATIN1_ENTITIES.iter().enumerate() {
+            assert!(seen.insert(*name), "duplicate {name}");
+            let want = char::from_u32(0xa0 + i as u32).unwrap();
+            assert_eq!(
+                decode_entities(&format!("&{name};")),
+                want.to_string(),
+                "&{name};"
+            );
+        }
+        assert_eq!(
+            decode_entities("&Agrave;&eacute;&euml;&ntilde;&AElig;&szlig;&times;&divide;&yuml;"),
+            "ÀéëñÆß×÷ÿ"
+        );
+        assert_eq!(decode_entities("&dagger;&Dagger;&equiv;"), "†‡≡");
+        // Case matters: there is no `&EACUTE;`.
+        assert_eq!(decode_entities("&EACUTE;"), "&EACUTE;");
+    }
+
+    #[test]
+    fn decoded_carriage_returns_become_newlines() {
+        assert_eq!(html_to_text("a&#13;&#10;b&#13;c&#x0D;d"), "a\nb\nc\nd\n");
+    }
+
+    #[test]
+    fn script_inside_a_comment_opens_nothing() {
+        assert_eq!(
+            strip_raw_text_elements("a<!-- <script> -->b<script>c</script>d"),
+            "a<!-- <script> -->bd"
+        );
+        // Before the fix the commented `<script>` paired with the real end
+        // tag and ate ` -->b`.
+        assert_eq!(html_to_text("a<!-- <script> -->b</script>c"), "abc\n");
+        assert_eq!(
+            html_to_text("x<!--[if IE]><script>s()</script><![endif]-->y"),
+            "xy\n"
+        );
+        // An unterminated comment is not skipped (strip_comments keeps it too).
+        assert_eq!(
+            strip_raw_text_elements("<!-- a<script>b</script>"),
+            "<!-- a"
+        );
+    }
+
+    #[test]
+    fn tags_are_stepped_over_whole() {
+        // A `<script>` inside an attribute value is text, not an element.
+        assert_eq!(
+            html_to_text("<div title=\"<script>\">x</div>y</script>z"),
+            "x\nyz\n"
+        );
+        assert_eq!(
+            rewrite_links("<b data-x=\"<a href='h'>\">t</b>"),
+            "<b data-x=\"<a href='h'>\">t</b>"
+        );
+    }
+
+    #[test]
+    fn unterminated_input_is_kept_as_text() {
+        assert_eq!(html_to_text(&"<script>a".repeat(3)), "aaa\n");
+        assert_eq!(html_to_text(&"<a".repeat(3)), "<a<a<a\n");
+        assert_eq!(html_to_text(&"<a href=x>t".repeat(3)), "ttt\n");
+        assert_eq!(
+            html_to_text(&format!("<script>{}", "</script ".repeat(3))),
+            "</script </script </script\n"
+        );
+        // A quote that never closes: each tag ends at its first `>`.
+        assert_eq!(
+            html_to_text(&format!("{} z=\"", "<i a='>'=".repeat(3))),
+            "'='='= z=\"\n"
+        );
+    }
+
+    #[test]
+    fn markup_declaration_without_gt_is_text() {
+        assert_eq!(replace_tags("a<!b"), "a<!b");
+        assert_eq!(html_to_text("x<!-- y"), "x<!-- y\n");
+        assert_eq!(html_to_text("x<?php"), "x<?php\n");
+    }
+
+    /// The pre-memo `tag_end`: quote-aware scan, else the first `>`.
+    fn naive_tag_end(b: &[u8], from: usize) -> Option<usize> {
+        let mut quote: Option<u8> = None;
+        let mut prev = 0u8;
+        for (i, &c) in b.iter().enumerate().skip(from) {
+            match quote {
+                Some(q) => {
+                    if c == q {
+                        quote = None;
+                        prev = c;
+                    }
+                }
+                None => match c {
+                    b'>' => return Some(i),
+                    b'"' | b'\'' if prev == b'=' => quote = Some(c),
+                    c if c.is_ascii_whitespace() => {}
+                    _ => prev = c,
+                },
+            }
+        }
+        b[from..].iter().position(|&c| c == b'>').map(|p| from + p)
+    }
+
+    /// The pre-memo `find_close`.
+    fn naive_find_close(s: &str, from: usize, name: &str) -> Option<(usize, usize)> {
+        let b = s.as_bytes();
+        let mut i = from;
+        while let Some(off) = s[i..].find("</") {
+            let at = i + off;
+            let after = at + 2 + name.len();
+            if b.get(at + 2..after)
+                .is_some_and(|n| n.eq_ignore_ascii_case(name.as_bytes()))
+                && b.get(after)
+                    .is_some_and(|&c| matches!(c, b'>' | b'/') || c.is_ascii_whitespace())
+                && let Some(gt) = s[after..].find('>')
+            {
+                return Some((at, after + gt + 1));
+            }
+            i = at + 2;
+        }
+        None
+    }
+
+    /// The memos only skip work: on random markup soup every lookup, made in
+    /// a pass's forward order, agrees with the plain scans.
+    #[test]
+    fn memoised_scans_agree_with_plain_scans() {
+        const ALPHABET: &[u8] = b"<<>>/=\"' ai";
+        let mut seed = 0x9e37_79b9_7f4a_7c15_u64; // fixed: reproducible
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        for _ in 0..3000 {
+            let len = (next() % 60) as usize;
+            let s: String = (0..len)
+                .map(|_| ALPHABET[(next() % ALPHABET.len() as u64) as usize] as char)
+                .collect();
+            let b = s.as_bytes();
+            let mut memo = Memo::default();
+            let mut close_memo = Memo::default();
+            for from in 0..=b.len() {
+                assert_eq!(
+                    tag_end(b, from, &mut memo),
+                    naive_tag_end(b, from),
+                    "tag_end({s:?}, {from})"
+                );
+                assert_eq!(
+                    find_close(&s, from, "a", &mut close_memo),
+                    naive_find_close(&s, from, "a"),
+                    "find_close({s:?}, {from})"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn convert_file_strips_bom_and_replaces_invalid_utf8() {
+        let dir = std::env::temp_dir().join(format!("barking-fetch-bom-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let (input, output) = (dir.join("in.html"), dir.join("out.txt"));
+        // UTF-8 BOM, then Latin-1 `é` (0xE9), which is not UTF-8.
+        fs::write(&input, b"\xEF\xBB\xBF<p>caf\xE9 &eacute;</p>").unwrap();
+        convert_file(&input, &output, false).unwrap();
+        assert_eq!(fs::read_to_string(&output).unwrap(), "caf\u{fffd} é\n");
+        // --force with the same text leaves the file as it is.
+        convert_file(&input, &output, true).unwrap();
+        assert_eq!(fs::read_to_string(&output).unwrap(), "caf\u{fffd} é\n");
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    fn temp_issue(tag: &str) -> Issue {
+        let root = std::env::temp_dir().join(format!("barking-fetch-{tag}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let dir = root.join("docs").join("2610").join("1012");
+        fs::create_dir_all(dir.join("sources")).unwrap();
+        Issue {
+            root,
+            dir,
+            yymm: "2610".into(),
+            mmdd: "1012".into(),
+        }
+    }
+
+    #[test]
+    fn heat_refuses_existing_files_before_any_request() {
+        let issue = temp_issue("refuse");
+        fs::write(issue.sources().join("a-heat.json"), "{}").unwrap();
+        fs::write(issue.sources().join("a-hn-5.json"), "{}").unwrap();
+        let args = parse_heat_args(&s(&["x", "a", "--item", "5", "--item", "6"])).unwrap();
+        let err = heat(&issue, &args).unwrap_err();
+        assert!(err.contains("拒绝覆盖"), "{err}");
+        assert!(err.contains("a-heat.json、a-hn-5.json"), "{err}");
+        assert!(!err.contains("a-hn-6.json"), "{err}");
+        fs::remove_dir_all(&issue.root).unwrap();
+    }
+
+    #[test]
+    fn heat_record_with_only_errors_is_still_written() {
+        let issue = temp_issue("errors");
+        let heat = Heat {
+            fetched_bj: "t".into(),
+            hn: Ordered(vec![]),
+            reddit: Ordered(vec![]),
+            items: vec![],
+            errors: vec!["HN 条目 0：HTTP 404 Not Found".into()],
+        };
+        write_heat(&issue.sources(), "a-heat.json", &heat).unwrap();
+        let v: Value =
+            serde_json::from_slice(&fs::read(issue.sources().join("a-heat.json")).unwrap())
+                .unwrap();
+        assert_eq!(v["hn"], json!({}));
+        assert_eq!(v["errors"][0], "HN 条目 0：HTTP 404 Not Found");
+        let err = write_heat(&issue.sources(), "a-heat.json", &heat).unwrap_err();
+        assert!(err.contains("拒绝覆盖"), "{err}");
+        fs::remove_dir_all(&issue.root).unwrap();
+    }
+
+    #[test]
+    fn missing_counts_and_times_serialise_as_null() {
+        let (_, hn) = parse_hn_hits(&json!({"hits": [{"objectID": "1", "title": "T"}]})).unwrap();
+        let v = serde_json::to_value(&hn[0]).unwrap();
+        for k in ["points", "comments", "time_bj", "url"] {
+            assert_eq!(v[k], Value::Null, "hn {k}");
+        }
+        let reddit =
+            parse_reddit_hits(&json!({"data": {"children": [{"data": {"title": "T"}}]}})).unwrap();
+        let v = serde_json::to_value(&reddit[0]).unwrap();
+        for k in ["score", "comments", "time_bj"] {
+            assert_eq!(v[k], Value::Null, "reddit {k}");
+        }
+    }
+
+    #[test]
+    fn item_bodies_are_kept_when_they_look_like_an_object() {
+        assert!(looks_like_json_object(b" \n{\"id\": 1"));
+        assert!(!looks_like_json_object(b"<html>"));
+        assert!(!looks_like_json_object(b"[1]"));
+        assert!(!looks_like_json_object(b""));
     }
 }

@@ -222,7 +222,6 @@ pub(crate) fn write_if_changed(path: &Path, text: &str, what: &str) -> Result<()
 
 /// Rows of an `offsite.tsv`: `(issue-relative path, bytes, sha256)`.
 /// Comment lines and malformed rows are skipped.
-#[allow(dead_code)] // used by the publish-check subcommand
 pub(crate) fn parse_manifest(text: &str) -> Vec<(String, u64, String)> {
     text.lines()
         .filter(|l| !l.starts_with('#'))

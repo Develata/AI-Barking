@@ -1,13 +1,13 @@
 mod card;
-mod handoff;
 mod fetch;
+mod handoff;
 mod lint;
 mod offsite;
 mod publish;
 mod repo;
+mod review;
 mod scan;
 mod shot;
-mod review;
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -23,7 +23,7 @@ const USAGE: &str = "\
   barking publish-check <期次目录>          发布后检查七步：lint、标记行、oxipng、offsite 清单、大文件、身份、凭据（docs/workflow/publish.md）
   barking stage <期次目录> [--batch 1|2|3] [--add]  按提交约定分三批列出待提交文件与建议提交信息；--add 暂存该批（不 commit）
   barking scan-rows <期次目录> [--dry-run]  发布后补 README 期次索引与 daily-scan 的速览已收/已发过行；只在 Develata 说“已发布”后运行
-  barking handoff <期次目录> --groups \"A=主题,B=速览\" [--note 要点]... [--force] | --index  生成取证派工单（.handoff/）并重写其索引
+  barking handoff <期次目录> --groups \"A=主题,B=速览\" [--note 要点]... [--force] [--out 文件] | --index  生成取证派工单（.handoff/）并重写其索引
   barking shot <期次目录> <组前缀> <动作>   网页或 PDF 渲染截图，按锚点或像素框裁切、拼接（render|pdf|lines|crop|cropbox|stack；不带动作看用法）
   barking html2txt <in> <out> [--force]     把保存的网页转成纯文本：去 script/style，保留链接目标
   barking heat <期次目录> <组前缀> [选项]   取 HN / Reddit 热度存入 sources/<组前缀>-heat.json（--hn --reddit --item --since）

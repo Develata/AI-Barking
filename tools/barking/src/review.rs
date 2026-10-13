@@ -35,10 +35,12 @@ const DEFAULT_CODEX: &str = "/home/deve/.bun/bin/codex";
 const REPORT_PREVIEW_LINES: usize = 40;
 /// EDITORIAL.md sections the visual reviewer needs as its rule book.
 const VISUAL_RULE_SECTIONS: [&str; 2] = ["省流卡与批注截图", "速览"];
-/// Tracked files with these extensions are text archives the reverse
-/// reviewer may read; everything else under an issue is binary or offsite.
-const TEXT_EXTS: [&str; 13] = [
-    "md", "txt", "json", "jsonl", "toml", "tsv", "csv", "py", "mjs", "js", "ps1", "sh", "yaml",
+/// Only text goes into git (AGENTS.md), so every tracked file is a text
+/// archive the reverse reviewer may read, except the few binary kinds that
+/// predate the rule or slip through; those are listed here, not the text ones.
+const BINARY_EXTS: [&str; 18] = [
+    "png", "jpg", "jpeg", "gif", "webp", "pdf", "mp4", "webm", "mov", "mp3", "m4a", "wav", "zip",
+    "gz", "woff", "woff2", "ttf", "ico",
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -179,8 +181,27 @@ fn execute(opts: &Opts) -> Result<ExitCode, String> {
     fs::write(&prompt_path, &review.prompt)
         .map_err(|e| format!("{}: {e}", prompt_path.display()))?;
 
+    // Shown before the WSL hop: when WSL is unavailable the prompt still goes
+    // to the fallback reviewer (templates/cards/README.md step 5).
+    println!("== {}：{}", opts.mode.heading(), issue.rel());
+    for w in &review.warnings {
+        println!("warn: {w}");
+    }
+    println!(
+        "提示词：{}（{} 字符）",
+        prompt_path.display(),
+        review.prompt.chars().count()
+    );
+    println!("报告：{}", report_path.display());
+    println!("{}", review.scope);
+
     let distro = std::env::var("BARKING_WSL_DISTRO").unwrap_or_else(|_| DEFAULT_DISTRO.into());
     let codex = std::env::var("BARKING_WSL_CODEX").unwrap_or_else(|_| DEFAULT_CODEX.into());
+    if !codex.starts_with('/') {
+        return Err(format!(
+            "BARKING_WSL_CODEX 应为 WSL 内的绝对路径，现在是「{codex}」（Git Bash 会改写以 / 开头的变量值，设置时加 MSYS_NO_PATHCONV=1）"
+        ));
+    }
     let invocation = Invocation {
         distro: distro.clone(),
         codex,
@@ -193,17 +214,6 @@ fn execute(opts: &Opts) -> Result<ExitCode, String> {
         search: review.search,
     };
 
-    println!("== {}：{}", opts.mode.heading(), issue.rel());
-    for w in &review.warnings {
-        println!("warn: {w}");
-    }
-    println!(
-        "提示词：{}（{} 字符）",
-        prompt_path.display(),
-        review.prompt.chars().count()
-    );
-    println!("报告：{}", report_path.display());
-    println!("{}", review.scope);
     println!(
         "模型 {MODEL}，effort {}，{}",
         opts.effort,
@@ -363,8 +373,16 @@ fn template_body(template: &str) -> Result<String, String> {
 const PLACEHOLDERS: [&str; 4] = ["{期次目录}", "{附图清单", "{MMDD}", "{文件清单}"];
 
 fn check_filled(body: &str) -> Result<(), String> {
-    match PLACEHOLDERS.iter().find(|p| body.contains(*p)) {
-        Some(p) => Err(format!("提示词里还剩占位符 {p}")),
+    if let Some(p) = PLACEHOLDERS.iter().find(|p| body.contains(*p)) {
+        return Err(format!("提示词里还剩占位符 {p}"));
+    }
+    // The templates use braces for placeholders only, so any brace left after
+    // filling is a placeholder this code does not know.
+    match body.find('{') {
+        Some(i) => Err(format!(
+            "提示词里还剩占位符 {}…",
+            body[i..].chars().take(12).collect::<String>()
+        )),
         None => Ok(()),
     }
 }
@@ -527,17 +545,21 @@ fn is_text_file(rel: &str) -> bool {
     Path::new(rel)
         .extension()
         .and_then(|e| e.to_str())
-        .is_some_and(|e| TEXT_EXTS.contains(&e.to_ascii_lowercase().as_str()))
+        .is_none_or(|e| !BINARY_EXTS.contains(&e.to_ascii_lowercase().as_str()))
 }
 
 // ---- prompt and report files ------------------------------------------
 
-/// Smallest `n >= 1` whose report does not exist yet. The report is the
-/// output of a run that may have taken an hour, so it is never overwritten;
-/// the prompt of the same serial is regenerated freely.
+/// Smallest `n >= 1` whose prompt and report both do not exist yet. The
+/// report is the output of a run that may take an hour, so it is never
+/// overwritten; a prompt claims its serial too, because its run may still be
+/// in flight and about to write that report.
 fn pick_serial(dir: &Path, mode: Mode) -> u32 {
     (1..)
-        .find(|&n| !dir.join(artifact_names(mode, n).1).exists())
+        .find(|&n| {
+            let (p, r) = artifact_names(mode, n);
+            !dir.join(p).exists() && !dir.join(r).exists()
+        })
         .unwrap_or(1)
 }
 
@@ -924,7 +946,8 @@ text = "a"
         assert!(p.contains("PASS / no blocker"));
         assert!(p.ends_with('\n') && !p.ends_with("\n\n"));
         // No generic `{Xxx}` placeholder is left either.
-        assert!(!p.contains("{MMDD"), "{p}");
+        assert!(!p.contains('{'), "{p}");
+        assert!(check_filled("好 {新占位符} 坏").is_err());
     }
 
     fn invocation(images: &[&str], search: bool, effort: &str) -> Invocation {
@@ -1028,10 +1051,9 @@ text = "a"
             .join(std::process::id().to_string());
         fs::create_dir_all(&dir).unwrap();
         assert_eq!(pick_serial(&dir, Mode::Visual), 1);
-        // A prompt alone does not claim the serial; a report does.
+        // A prompt claims its serial (its run may still be writing the
+        // report); so does a report on its own.
         fs::write(dir.join("visual-prompt.md"), "p").unwrap();
-        assert_eq!(pick_serial(&dir, Mode::Visual), 1);
-        fs::write(dir.join("visual-report.md"), "r").unwrap();
         assert_eq!(pick_serial(&dir, Mode::Visual), 2);
         fs::write(dir.join("visual-report-2.md"), "r").unwrap();
         assert_eq!(pick_serial(&dir, Mode::Visual), 3);
@@ -1048,14 +1070,16 @@ text = "a"
             "sources/x.JSONL",
             "sources/offsite.tsv",
             "sources/a-shot.py",
+            "sources/d-d1-tao-feed.xml",
+            "sources/c-techradar.headers",
+            "sources/LICENSE",
         ] {
             assert!(is_text_file(ok), "{ok}");
         }
         for no in [
             "images/00-tldr.png",
             "sources/a.pdf",
-            "sources/a.html",
-            "sources/noext",
+            "sources/a.WEBP",
             "sources/a.mp4",
         ] {
             assert!(!is_text_file(no), "{no}");
