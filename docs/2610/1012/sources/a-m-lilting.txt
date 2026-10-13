@@ -1,0 +1,250 @@
+Startup Error in Codex Caused by Daemon and CLI Version Mismatch | lilting channel
+
+ [/en]
+Tech [/en/tech]Doujin & Games [/en/doujin]Tags [/en/tags]about [/en/about] [/en/search]JA [/]
+
+Tech [/en/tech]Doujin & Games [/en/doujin]Tags [/en/tags]about [/en/about]Search [/en/search]JA [/]
+
+Translated from the original Japanese article [/articles/codex-daemon-cli-version-mismatch]
+
+Home [/en]
+
+Tech [/en/tech]
+
+Startup Error in Codex Caused by Daemon and CLI Version Mismatch
+
+TechOct 11, 2026Oct 12, 20265 min read
+
+Startup Error in Codex Caused by Daemon and CLI Version Mismatch
+
+Codex [/en/tags/Codex]OpenAI [/en/tags/OpenAI]macOS [/en/tags/macOS]Terminal [/en/tags/Terminal]
+
+Contents
+
+Warning Prompt Displayed at Startup [#warning-prompt-displayed-at-startup]
+
+How CLI and Daemon Update Independently [#how-cli-and-daemon-update-independently]
+
+Compatibility Check Changes in 0.162.1 [#compatibility-check-changes-in-01621]
+
+Local Versions and Auto-Update Logs [#local-versions-and-auto-update-logs]
+
+Other Reports of Failed Daemon Updates [#other-reports-of-failed-daemon-updates]
+
+When launching Codex CLI on an M4 Mac mini, a warning prompt occasionally appeared stating Background server has incompatible feature settings.
+
+The prompt requested disabling api_key_model_discovery and offered choices to run without the daemon or restart it with modified settings.
+
+A similar issue was reported in GitHub Issue #51758 [https://github.com/openai/codex/issues/51758].
+
+The CLI and the background server updated independently, and default feature flags diverged. The warning on standard startup was fixed in Codex CLI 0.162.1 [https://github.com/openai/codex/releases/tag/rust-v0.162.1].
+
+Warning Prompt Displayed at Startup
+
+The error message consisted of two lines:
+
+Background server has incompatible feature settings
+This session requires api_key_model_discovery to be disabled
+
+api_key_model_discovery is an internal feature flag in Codex, which this session required to be disabled.
+
+The background server referenced here is not a remote endpoint, but the local background process (app-server) running on the machine.
+
+Three options appeared at the bottom of the screen, each with different implications for the shared server.
+
+OptionBehavior
+
+Run without daemon this timeLaunch this session without using the shared daemon
+
+Restart with these settingsSave displayed feature flags and restart the shared daemon
+
+CancelAbort startup
+
+The prompt notes that selecting the second option saves settings and may disable features for other clients or interrupt ongoing tasks.
+
+To start work immediately without altering shared configurations, selecting the first option bypasses the issue.
+
+How CLI and Daemon Update Independently
+
+The CLI is the terminal interface, while app-server is Codex’s interface [https://developers.openai.com/codex/app-server] handling conversation history, approvals, and agent execution events.
+
+Locally, this app-server runs in the background as a resident daemon process.
+
+Updating the CLI does not automatically synchronize running servers or the package versions selected for the daemon.
+
+Issue #51758 contains reports where the daemon updated first, as well as cases where the CLI updated first.
+
+ReportCLIRunning app-serverStartup Requirement
+
+Issue Description [https://github.com/openai/codex/issues/51758]0.160.10.161.0Disable api_key_model_discovery
+
+Linux Follow-up [https://github.com/openai/codex/issues/51758#issuecomment-6045159927]0.160.10.161.0Disable api_key_model_discovery
+
+macOS Follow-up [https://github.com/openai/codex/issues/51758#issuecomment-6100517808]0.162.00.160.1Enable api_key_model_discovery
+
+In the Linux report, without explicit settings in configuration files, the flag defaulted to disabled in CLI 0.160.1 and enabled in daemon 0.161.0.
+
+The daemon update log showed 0.161.0 being selected via scheduled updates.
+
+The macOS follow-up described the reverse scenario, where a newer CLI connected to an older daemon; settings mismatches resulted in startup errors.
+
+Compatibility Check Changes in 0.162.1
+
+The 0.162.1 release notes [https://github.com/openai/codex/releases/tag/rust-v0.162.1] include a fix for startup failures caused by mismatched default feature flags between the background server and CLI.
+
+This release was published on October 10, 2026, at 04:44 JST.
+
+In the resolving pull request, PR #52648 [https://github.com/openai/codex/pull/52648], shared server feature settings are treated as retained by the server until explicitly restarted.
+
+Instead of demanding restarts for differences in configuration files or CLI defaults, the check now evaluates only feature settings explicitly overridden via command-line flags.
+
+On October 11, 2026 (JST), maintainers referenced the 0.162.1 fix in Issue #51758 [https://github.com/openai/codex/issues/51758#issuecomment-6101790472] and closed the issue.
+
+They clarified that pairings of newer CLIs with older daemons were also addressed.
+
+When this screen appears during normal startup, updating the CLI to 0.162.1 or newer and restarting resolves the issue.
+
+Because checks remain active for explicit overrides, inspecting launch arguments and versions on both sides helps identify persistent issues.
+
+Local Versions and Auto-Update Logs
+
+Versions can be checked from the terminal:
+
+codex --version
+codex app-server daemon version
+
+The first command outputs the CLI version executing the command, while the second returns the managed daemon package version along with the running app-server version.
+
+Items evaluated in the 0.162.1 implementation [https://github.com/openai/codex/blob/rust-v0.162.1/codex-rs/app-server-daemon/src/lib.rs] include the following:
+
+FieldTarget Inspected
+
+cliVersionCLI binary executing this check
+
+managedCodexVersionPackage version selected for the daemon
+
+appServerVersionRunning app-server instance connected to
+
+On the local M4 Mac mini on October 12, 2026, all versions matched at 0.162.1.
+
+With paths omitted, the output format appears as follows:
+
+{
+ "status": "running",
+ "backend": "pid",
+ "managedCodexVersion": "0.162.1",
+ "cliVersion": "0.162.1",
+ "appServerVersion": "0.162.1"
+}
+
+The CLI was launched via /opt/homebrew/bin/codex, symlinked to the npm package @openai/codex/bin/codex.js.
+
+The daemon ran from an independent package located in ~/.codex/packages/app-server-daemon/releases/.
+
+In the local ~/.codex/app-server-daemon/daemon-updater.stderr.log, scheduled updates and restarts were recorded:
+
+Timestamp (JST)Update Log Entry
+
+October 9, 2026, 04:44Scheduled update selected 0.162.0, server restarted
+
+October 10, 2026, 05:49Scheduled update selected 0.162.1, server restarted
+
+This confirmed that the daemon updates independently in this environment as well.
+
+Other Reports of Failed Daemon Updates
+
+The 0.162.1 fix suppresses startup warnings caused by mismatched default settings.
+
+However, separate reports describe scenarios where older servers linger after CLI updates and guided daemon update commands fail.
+
+IssueReported CombinationError Encountered on Update / Restart
+
+#46468 [https://github.com/openai/codex/issues/46468]npm CLI 0.155.0, server 0.154.0Update unsupported, restart rejected as unmanaged server
+
+#47482 [https://github.com/openai/codex/issues/47482]Standalone CLI 0.156.0, server 0.155.0Guided daemon update unsupported, warnings persist across CLI relaunches
+
+Both issues remained open as of October 12, 2026. These represent distinct failure modes from Issue #51758.
+
+To align the managed daemon package with the current CLI package, 0.162.1 provides the following command:
+
+codex app-server daemon update --from-cli
+
+The CLI source code [https://github.com/openai/codex/blob/rust-v0.162.1/codex-rs/cli/src/daemon_install.rs] indicates this pins the daemon to the copied version and warns that restarts may interrupt ongoing work.
+
+To return from a pinned version to standard auto-updates, run codex app-server daemon update.
+
+Following updates, running codex app-server daemon version verifies both the selected package and the active server instance.
+
+Found this research useful?
+
+Your support funds the hardware, VPS time, and model access behind these deep dives.
+
+Support this research [https://ko-fi.com/hide3tu]
+
+Ikesan [/en/about]@hide3tu [https://x.com/hide3tu]
+
+Share
+ [https://twitter.com/intent/tweet?url=https%3A%2F%2Flilting.ch%2Fen%2Farticles%2Fcodex-daemon-cli-version-mismatch&text=Startup%20Error%20in%20Codex%20Caused%20by%20Daemon%20and%20CLI%20Version%20Mismatch] [https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Flilting.ch%2Fen%2Farticles%2Fcodex-daemon-cli-version-mismatch] [https://social-plugins.line.me/lineit/share?url=https%3A%2F%2Flilting.ch%2Fen%2Farticles%2Fcodex-daemon-cli-version-mismatch]
+
+Contents
+
+Warning Prompt Displayed at Startup [#warning-prompt-displayed-at-startup]
+
+How CLI and Daemon Update Independently [#how-cli-and-daemon-update-independently]
+
+Compatibility Check Changes in 0.162.1 [#compatibility-check-changes-in-01621]
+
+Local Versions and Auto-Update Logs [#local-versions-and-auto-update-logs]
+
+Other Reports of Failed Daemon Updates [#other-reports-of-failed-daemon-updates]
+
+✨ Latest Articles
+
+pnpm Store Loader on M4 Mac: virtual paths, native addons, and Vite resolution
+ [/en/articles/pnpm-store-loader]
+
+DeepSeek Harness with Qwen vs DeepSeek: Six Code-Fix Runs
+ [/en/articles/deepseek-harness-dsh]
+
+Execution Permissions Changed Mid-Session in a Stalled Codex Run
+ [/en/articles/codex-session-permissions-stall]
+
+⚗️ Experimental
+
+Codex 'suspended (tty input)' on macOS: stdio MCP servers keep the tty
+ [/en/articles/codex-suspended-tty-input-mcp]
+
+Building a Log Viewer for Codex and Claude Code Subagent Time and Tokens
+ [/en/articles/subagent-time-token-log-viewer]
+
+Released the Claude Code + Codex Auto-Dev Framework on GitHub
+ [/en/articles/tmux-claude-codex-framework-release]
+
+Related Articles
+
+Gemini 4 Argon vs GPT-6.1 Sol & Opus 5.5: Pricing & CLI Tests on M4 Mac
+ [/en/articles/gemini-4-argon-sol-6-1-opus-5-5-comparison]
+
+OpenAI Navier–Stokes: Proof Dispute
+ [/en/articles/navier-stokes-openai-blowup-dispute]
+
+Codex "Selected model is at capacity" September 2026 update and how to continue
+ [/en/articles/codex-selected-model-at-capacity-continue]
+
+Codex on Astra ate my weekly quota in half a day, so I rebuilt the orchestration
+ [/en/articles/codex-orchestration-usage]
+
+Codex wrote 37TB of SQLite logs to SSD in 21 days
+ [/en/articles/codex-sqlite-log-ssd-writes]
+
+iTerm2 CVE-2026-41253: SSH Conductor Protocol Confusion Lets `cat readme.txt` Run Arbitrary Code
+ [/en/articles/iterm2-cve-2026-41253-ssh-conductor-pty-confusion]
+
+Back
+
+ [/en]
+© 2026 Lilting Channel
+
+ [https://github.com/hide3tu] [https://twitter.com/hide3tu] [https://instagram.com/hide3tu] [https://note.com/hide3tu] [/en/rss.xml]
+
+Privacy Policy [/en/privacy]Fund the research [https://ko-fi.com/hide3tu]

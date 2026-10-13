@@ -1,0 +1,133 @@
+##### 653e5fbb9d648a8b99cda14dc164290d6bf34007 2026-09-15T00:33:41Z
+Seed missing daemon installs from complete local CLI packages (#45558)
+
+## Why
+
+Daemon lifecycle commands previously required a standalone managed installation. A complete CLI package can supply the daemon executable and helpers without requiring a separate installer run.
+
+## What changed
+
+- Let `codex app-server daemon start`, `restart`, and `bootstrap` copy the invoking package into `CODEX_HOME/packages/app-server-daemon` when no daemon installation exists.
+- Validate the package's platform, required helpers, executable identity, and copied contents before selecting the staged release.
+- Preserve existing dedicated and legacy daemon selections, reject broken selections instead of replacing them, and leave the CLI package and selection unchanged.
+- Preserve standalone release pins and latest-channel eligibility, and select dedicated releases using Unix symlinks or Windows junctions.
+
+## Testing
+
+Add package preparation tests for complete copies, incomplete packages, broken selections, legacy preservation, and update-channel handling. Add Windows junction creation and retargeting coverage, plus CLI integration tests that launch the copied package through `start`, `restart`, and `bootstrap`.
+
+GitOrigin-RevId: abd2f4f82eae0885434ea30603c2c1c0ca760bef
+##### 70e8fe1be3100fd2c1f1942a61f9ac70a0177e91 2026-09-17T04:53:51Z
+Add opt-in automatic background server startup (#46117)
+
+## What changed
+
+- Add `features.daemon_auto_start`, disabled by default and available through `/experimental`, to start the shared local server for eligible new, resumed, and forked sessions. Changes take effect on the next launch, and disabling the feature persists an explicit `false`.
+- Require successful daemon startup and connection when auto-start applies. On failure, show guidance to rerun the same command with `--no-daemon` instead of silently falling back to an embedded server.
+- Preserve embedded mode for excluded launches, including Bedrock sign-in, and carry exclusion warnings through resume and fork pickers. Honor `--no-daemon` without an exclusion warning.
+- Update `/import` guidance to recommend restarting with `codex --no-daemon`.
+
+## Testing
+
+Add CLI and TUI coverage for automatic daemon attachment, startup and connection failures, `--no-daemon`, picker warning persistence, and Bedrock onboarding with and without a running daemon. Add snapshots and configuration-write assertions for the experimental toggle.
+
+GitOrigin-RevId: 2e8eb163bc7ddd268a86c7546c05a85356c1e9ee
+##### b0659c53865dd48b0cd69c454368cea3980017cc 2026-09-17T05:26:45Z
+Record daemon startup and update telemetry with consent handling (#46126)
+
+## Why
+
+TUI startup metrics report the selected app-server mode before a connection succeeds, which can misrepresent embedded fallback or failed startup. Daemon startup and update actions also need distinct outcome observations.
+
+## What changed
+
+- Record `codex.tui.start` once after the first connection attempt, using the actual mode or `unconfirmed`, and include daemon selection and auto-start tags.
+- Add `codex.daemon.start` for TUI auto-start and `codex.daemon.update` for foreground CLI updates and TUI update handoffs, using existing analytics consent and identity handling.
+- Report TUI handoffs as `handoff_requested` and suppress duplicate child reporting. Remove the suppression flag when spawning long-lived daemon processes.
+- Tag daemon settings by enabled state and explicit presence, without exporting setting values or contents; report invalid or unreadable settings as `unknown`.
+
+## Testing
+
+Add coverage for analytics defaults and explicit consent overrides, unconfirmed CLI updates, settings presence, and exactly-once launch observations. Extend the worktree TUI test to check startup tags and a single update handoff observation.
+
+GitOrigin-RevId: 176d2ee594f930033fa1ece55d4c1c9603dbbc16
+##### 2cc65cdd4c7c167f0c7252fcb5165d649c16aca0 2026-09-30T01:35:21Z
+Enable analytics by default for daemon-launched app servers (#49426)
+
+## Why
+
+Daemon-launched app servers should use the same analytics default as first-party clients while honoring explicit user opt-outs.
+
+## What changed
+
+Pass `--analytics-default-enabled` when the PID backend launches an app server, with or without remote control. Users can still disable analytics with `analytics.enabled = false` in `config.toml`.
+
+## Testing
+
+Update argument assertions for both remote-control modes and the daemon start/restart test to expect the analytics flag alongside launch feature overrides.
+
+GitOrigin-RevId: 8a222a00fc56737f5fe2b0385abf59466d1a6671
+##### 6b43e6fe1fca7c03f0b0689074cbf51100a7f9d2 2026-10-03T07:05:36Z
+Skip daemon auto-start for Windows-mounted WSL homes (#50555)
+
+## Why
+
+The managed daemon writes an executable and Unix-style state beneath `CODEX_HOME`. Windows-mounted WSL filesystems (DrvFS/9p) do not reliably support the required permission semantics, which can cause startup to fail before the TUI opens.
+
+## What changed
+
+Detect WSL homes on 9p filesystems, checking an existing ancestor when `CODEX_HOME` does not yet exist. Keep the TUI in embedded mode instead of automatically starting the shared background server, and show a startup warning explaining the exclusion.
+
+## Testing
+
+Extend the daemon exclusion warning snapshot to cover the Windows-mounted WSL message.
+
+GitOrigin-RevId: 995e6236d79d8190b0ab1e6b4761eeef3c068467
+##### 27065a91ccbf5ba8532844be3777fcf83b77820d 2026-10-11T17:43:08Z
+Allow restarting managed background servers from the TUI (#53173)
+
+## Why
+
+Startup configuration warnings can reflect settings from when the background server started, even after those settings have been fixed. A restart lets users refresh the server without leaving the TUI.
+
+## What changed
+
+- Add a confirmed restart action to `/daemon`, warning that active or queued work in other chats may be interrupted. Reconnect automatically and let an in-progress restart finish if the TUI exits.
+- Verify that Codex manages a local server before enabling restart, including servers discovered with auto-start disabled and those started by `codex agents`.
+- Show a restart hint on the first startup configuration warning for managed servers, preserving the original diagnostic for copying and dismissal.
+- Repaint the full surface of centered dialogs to restore background colors over cached blank cells.
+
+## Testing
+
+Add CLI integration coverage for agents startup and restarting a discovered daemon with auto-start disabled. Extend TUI tests for confirmation, cancellation, unmanaged servers, warning hints and dismissal, and dialog background rendering.
+
+GitOrigin-RevId: 8e4319fab84f13bf6e7335deb93364fccaff14a7
+##### d6093d32287bdcfed2b7f2bbc866ad4b544f8dff 2026-09-22T16:07:38Z
+Offer explicit recovery for incompatible background servers (#47318)
+
+## Why
+
+Automatic daemon launches could silently fall back to embedded mode when shared feature settings differed from the session's requirements. Changing those settings affects other clients, and restarting the server may interrupt active or queued work.
+
+## What changed
+
+- Offer interactive choices to run without the daemon, restart with the required settings, or cancel. Default to cancel and require explicit confirmation for restart.
+- Allow restart only for managed daemons with a feature mismatch, then recheck compatibility once. Noninteractive required-daemon failures return an error with `--no-daemon` guidance; optional attachment retains its fallback behavior.
+- Preserve saved feature overrides on startup and require confirmation before applying requested shared-feature disables, including on fresh starts.
+- Merge confirmed settings under the lifecycle lock, persist changes after the old process stops, and avoid restarting when the saved overrides already match.
+
+## Testing
+
+Add recovery-menu snapshots and confirmation tests, compatibility tests for required and optional attachment, daemon ownership and settings-preservation tests, and CLI terminal tests for cancellation, embedded fallback, confirmed restart, and disabling shared features.
+
+GitOrigin-RevId: d50a6cf7e476b9647237431e8fc0fc6041ed17db
+##### 8f82b8a31cfdf690479067a179eba2c761102643 2026-10-04T06:28:20Z
+Use the managed daemon for eligible remote-control launches (#50803)
+
+## What changed
+
+Make plain `codex remote-control` start or reuse the managed daemon and enable remote control when daemon auto-start is enabled and the environment is eligible. Fall back to the foreground server when no managed backend is available or Windows restricts detached launch.
+
+Add `codex remote-control --no-daemon` to explicitly run the foreground server, and honor the top-level `--no-daemon` flag. Reject this flag with `start`, `stop`, or `pair`. Keep `--json` and launches with configuration overrides or unsupported environments on the foreground path.
+
+GitOrigin-RevId: cb28ae3f6074993b748660972c3cb7cbf6612c2f

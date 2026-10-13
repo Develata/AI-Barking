@@ -1,0 +1,487 @@
+Codex CLI Background Daemon: How to Turn It Off
+
+Skip to main content [#main-content]
+
+LatestWatch: Distribution Is the New Moat [/tutorials/kp1nnNqhM7g]
+
+DEVDIGEST [/]
+Watch [/tutorials]Read [/blog]Compare [/compare]Learn [/courses]
+
+⌘K [https://github.com/developersdigest] [https://youtube.com/@developersdigest]
+Dashboard [/dashboard]
+
+Subscribe [/newsletter]Sign in [/sign-in]Get started [/sign-up]Sign in [/sign-in]Get started [/sign-up]Subscribe [/newsletter]
+
+Dashboard [/dashboard]Sign in [/sign-in]Subscribe [/newsletter]
+
+Watch [/tutorials]Read [/blog]Compare [/compare]Learn [/courses]Search
+
+Subscribe [/newsletter]YouTube [https://youtube.com/@developersdigest]GitHub [https://github.com/developersdigest]
+
+Dashboard [/dashboard]
+
+Get started [/sign-up]Sign in [/sign-in]
+
+Home [/]
+
+/Blog [/blog]
+
+/Codex CLI Background Daemon: How to Turn It Off
+
+Codex CLI Background Daemon: How to Turn It Off
+
+Developers Digest [/about]•October 12, 2026•7 min read
+
+Codex [/tags/codex]AI Coding [/tags/ai-coding]Terminal Agents [/tags/terminal-agents]Developer Tools [/tags/developer-tools]OpenAI [/tags/openai]
+
+TL;DR
+
+Since 0.157.0, opening Codex CLI starts a persistent, self-updating background daemon. What it does, why the issue hit the Hacker News front page, and the reported workaround to turn it off.
+
+In this article (11)
+
+If you installed Codex CLI [/tools/codex-cli] with npm [/tools/npm], brew or a distro package and later found a 300 MB process tree you did not start, you are not imagining it. A GitHub issue asking OpenAI to make the background daemon opt-in reached the Hacker News front page on October 12, 2026, and it describes exactly what happens the moment you run codex.
+
+Last updated: October 12, 2026
+
+If you want the short version of how to turn off the Codex background daemon: disable the daemon_auto_start feature, stop the running daemon, and check that the updater process died with it. The details, and the reasons people are annoyed, are below.
+
+Subscribe
+
+What the primary source says# [#what-the-primary-source-says]
+
+The issue (openai/codex #48195) [https://github.com/openai/codex/issues/48195] was opened on September 25, 2026 by a user running Codex CLI [/tools/codex-cli] 0.157.0 on Linux under WSL2. Their account of what an interactive codex session now does:
+
+It starts a persistent background process, codex app-server --managed-daemon, in its own session with no terminal. It keeps running after every Codex window is closed until you stop it or reboot.
+
+It copies the whole platform package, about 374 MB by the author's measurement, into ~/.codex/packages/app-server-daemon/releases/<version>/ and runs the daemon from that copy. The backend version is then decoupled from whatever your package manager installed.
+
+It starts a detached updater, codex app-server daemon pid-update-loop, which checks for new releases five minutes after start and then hourly, downloads them and restarts the backend.
+
+The daemon keeps the environment of whichever session started it. The author launches Codex through a wrapper that sets HTTPS_PROXY per invocation, and later sessions still went out through the first session's proxy.
+
+I could not run the daemon myself, so treat those measurements as the reporter's. What I could verify is the origin: the 0.157.0 release notes [https://github.com/openai/codex/releases/tag/rust-v0.157.0] list "automatic background-server startup for eligible interactive sessions," and the changelog includes pull request #47179, "Enable automatic daemon startup by default." So this is a deliberate default, not a regression.
+
+The workaround, as reported# [#the-workaround-as-reported]
+
+The issue author gives this sequence for turning it off:
+
+Code
+Copy
+
+codex features disable daemon_auto_start
+codex app-server daemon stop
+pkill -f 'app-server daemon pid-update-loop'
+rm -rf ~/.codex/packages/app-server-daemon
+
+Two caveats. First, the pkill line exists because the author found that daemon stop stops the app-server but leaves the updater loop running. That was on 0.157.0; check ps on your version before assuming it is fixed. Second, a Windows commenter on the same issue reports that daemon_auto_start = false in config.toml resolves it for them, which is the persistent form of the same switch. Nothing here is a documented guarantee, so verify after you apply it: open a new codex session and confirm no app-server process appears.
+
+Why this is more than a disk-space complaint# [#why-this-is-more-than-a-disk-space-complaint]
+
+The size and clutter are the visible part. The more interesting part is the update model. An older issue, #40969 [https://github.com/openai/codex/issues/40969], describes the same updater on long-lived codex remote-control hosts. Its author traced the source and reports that when a new release lands, the daemon sends SIGTERM to the app-server, waits a 60 second grace period and then sends SIGKILL, even if assistant turns are still running. On their host that meant every attached client dropped at once and turns running 3 to 30 minute build and test suites were terminated. A second reporter in that thread saw the same thing on macOS across 0.152.0 to 0.152.1, with one session about 4 hours 45 minutes in.
+
+Note the layers: #40969 is titled "cannot be disabled" because it concerns the updater on a remote-control daemon, while daemon_auto_start controls whether a normal session starts the daemon at all. Turning off auto-start is what keeps the updater from being launched by plain codex sessions; if you run codex remote-control yourself, the updater concern still applies.
+
+Those reports are about the remote-control setup, and the issue is still open, so I would not claim an ordinary single-window session loses work every hour. But if you run unattended or long agent turns, the combination of an hourly update check and a 60 second drain budget is the thing to understand before leaving it on.
+
+What a builder does Monday# [#what-a-builder-does-monday]
+
+The decision turns on how you use Codex:
+
+One interactive window at a time: the daemon mostly costs you disk and a surprise process. Disabling it is a preference, not an emergency.
+
+Package-managed install (nix, Arch, brew, npm [/tools/npm]): the daemon copies and self-updates outside your package manager, which defeats pinning. The issue links reports from an Arch Linux user [https://github.com/openai/codex/issues/48050] and a request for externally managed executables [https://github.com/openai/codex/issues/41188]. Two commits referenced from the issue show nix users disabling it by default in their packaging.
+
+Long unattended runs or CI: do not rely on the daemon. Run the headless path instead, covered in our codex exec CI guide [/blog/codex-exec-ci-headless-guide], and pin the version you tested. Budget long runs with the limits in Codex CLI Resource Budgets [/blog/codex-cli-resource-budgets].
+
+Multiple worktrees with different proxy or environment settings: the pinned-environment behavior is the one that bites. Related, the 0.162.1 patch we covered in Codex CLI 0.162 [/blog/codex-cli-0-162-managed-worktrees-pinned-tasks-2026] fixed startup failures caused by a running background server's feature settings differing from the CLI defaults.
+
+The angle for the vendor is a trade-off, not a villain story. A shared daemon makes resuming sessions, remote control and fast startup possible, and the issue author concedes it "makes sense for Remote Control / the desktop app." The ask is narrower: enable it where it earns its keep, exit it when the last client disconnects, and do not self-update an install your package manager owns. That is the same gap anyone running agents as long-lived infrastructure runs into, which we cover in Long-Running Agents Need Harnesses [/blog/long-running-agents-need-harnesses].
+
+What people are actually saying# [#what-people-are-actually-saying]
+
+The Hacker News thread [https://news.ycombinator.com/item?id=50060694] had 93 points and 37 comments when I read it. Paraphrasing the main camps:
+
+Defaults for professional tools: several commenters argue that auto-update is not an acceptable default for a tool that edits your code, and that package managers already update software without each app installing itself its own way.
+
+Disk clutter: one commenter reports about 12 GB of old versions on their machine and another points to .codex/packages/standalone/releases keeping every previous version, with each binary around 300 MB. These are anecdotes, not measurements I reproduced.
+
+The counter-case: one commenter argues the space moves fast and harnesses should update automatically, like browsers. Replies pushed back that Firefox on their setup does not force a restart, so the analogy is shaky.
+
+Not just Codex: another commenter says Claude Code [/glossary#claude-code] works the same way, with prior binaries under ~/.local/share/claude/versions/ and background tasks running without a foreground session. I did not verify that, but it is a fair reminder to check any agent CLI you run.
+
+FAQ# [#faq]
+
+How do I turn off the Codex CLI background daemon?# [#how-do-i-turn-off-the-codex-cli-background-daemon]
+
+The issue author reports that codex features disable daemon_auto_start stops new sessions from spawning it and codex app-server daemon stop stops a running one. A commenter reports daemon_auto_start = false in config.toml also works. Verify with ps afterward.
+
+Since which version does it start automatically?# [#since-which-version-does-it-start-automatically]
+
+0.157.0, released September 25, 2026, per the release notes [https://github.com/openai/codex/releases/tag/rust-v0.157.0].
+
+Does stopping the daemon stop the updater?# [#does-stopping-the-daemon-stop-the-updater]
+
+Not on 0.157.0, according to the issue author. The pid-update-loop process survived and had to be killed by hand.
+
+Continue Reading# [#continue-reading]
+
+Codex CLI 0.162: Managed Worktrees and Pinned Tasks [/blog/codex-cli-0-162-managed-worktrees-pinned-tasks-2026] - the latest release and its background-server fix
+
+Codex CLI Resource Budgets [/blog/codex-cli-resource-budgets] - limits that apply to long runs
+
+Codex exec in CI [/blog/codex-exec-ci-headless-guide] - the headless path that avoids the daemon question
+
+Long-Running Agents Need Harnesses [/blog/long-running-agents-need-harnesses] - why agent infrastructure needs explicit lifecycle control
+
+Codex CLI Worktrees and Durable Sessions [/blog/codex-cli-worktrees-durable-agent-sessions] - how sessions persist across checkouts
+
+Sources# [#sources]
+
+openai/codex #48195: make daemon_auto_start opt-in [https://github.com/openai/codex/issues/48195] - opened September 25, 2026
+
+openai/codex #40969: app-server daemon auto-update force-kills active turns [https://github.com/openai/codex/issues/40969] - opened August 26, 2026
+
+Codex CLI 0.157.0 release notes [https://github.com/openai/codex/releases/tag/rust-v0.157.0] - OpenAI, September 25, 2026
+
+Hacker News discussion [https://news.ycombinator.com/item?id=50060694]
+
+Get the next deep dive like this in your inbox
+
+One email a week on Codex and the rest of the AI dev stack. Free.
+Subscribe
+
+Read next on AI coding tools
+
+Codex CLI 0.162: Managed Worktrees and Pinned Tasks
+
+Codex CLI 0.162.0 lets the agent create and list its own Git worktrees, adds provider capability overrides, and 0.162.1 patches a background-server startup bug. What to change this week.
+7 min read [/blog/codex-cli-0-162-managed-worktrees-pinned-tasks-2026]
+Codex CLI Needs Resource Budgets, Not Just Token Budgets
+
+A trending Codex SQLite WAL bug is a useful warning for every local coding agent: logs, disks, background processes, and telemetry paths need budgets too.
+8 min read [/blog/codex-cli-resource-budgets]
+Codex Exec in CI: Practical Guide to Headless OpenAI Agents
+
+codex exec is OpenAI's non-interactive mode to run Codex agents from scripts, CI and GitHub Actions. How to set it up safely with real flags and working YAML.
+9 min read [/blog/codex-exec-ci-headless-guide]
+
+New here? Start with
+
+Best AI coding tools [/best/ai-coding-tools]
+
+Every AI tool comparison [/compare]
+
+Claude Code permissions guide [/blog/claude-code-permissions-settings-guide]
+
+ShareTwitter/XLinkedInRedditHacker NewsEmailCopyCite
+
+Suggest an edit [https://github.com/developersdigest/developers-digest-site/edit/main/content/blog/codex-cli-background-daemon-auto-start-disable-2026.md]Save
+
+Discuss this article on Twitter/X [https://twitter.com/intent/tweet?text=Thoughts%20on%20%22Codex%20CLI%20Background%20Daemon%3A%20How%20to%20Turn%20It%20Off%22%20by%20%40devdigest&url=https%3A%2F%2Fwww.developersdigest.tech%2Fblog%2Fcodex-cli-background-daemon-auto-start-disable-2026]
+
+ [/about]
+Developers Digest [/about]
+Technical content at the intersection of AI and development. Building with AI agents, Claude Code, and modern dev tools - then showing you exactly how it works.
+
+300+ videos30K+ GitHub stars850+ articles
+
+Subscribe [/newsletter]YouTube [https://youtube.com/@developersdigest]GitHub [https://github.com/developersdigest]Twitter/X [https://x.com/devdigest]
+
+On this page
+
+What the primary source saysThe workaround, as reportedWhy this is more than a disk-space complaintWhat a builder does MondayWhat people are actually sayingFAQHow do I turn off the Codex CLI background daemon?Since which version does it start automatically?Does stopping the daemon stop the updater?Continue ReadingSources
+
+Read next
+
+Codex CLI 0.162: Managed Worktrees and Pinned Tasks
+7 min read [/blog/codex-cli-0-162-managed-worktrees-pinned-tasks-2026]
+Codex CLI Needs Resource Budgets, Not Just Token Budgets
+8 min read [/blog/codex-cli-resource-budgets]
+Codex Exec in CI: Practical Guide to Headless OpenAI Agents
+9 min read [/blog/codex-exec-ci-headless-guide]
+Long-Running Agents Need Harnesses, Not Hope
+9 min read [/blog/long-running-agents-need-harnesses]
+
+PreviousFreebuff Review: The Free Coding Agent Paid for by Ads, and What It Costs You [/blog/freebuff-free-coding-agent-ads-privacy-what-it-costs-2026]NextAgent Harness Lessons From a 500B-Token Decompile: Give Agents a PASS/FAIL Oracle [/blog/agent-harness-pass-fail-oracle-500b-token-decompile-2026]
+
+Related Tools
+
+AI CodingAgent
+
+OpenAI Codex
+
+OpenAI's coding agent for terminal, cloud, IDE, GitHub, Slack, and Linear workflows. Reads repos, edits files, runs comm...
+View Tool
+
+ [/tools/codex]
+
+AI Coding
+
+Codex CLI
+
+OpenAI's open-source (Apache-2.0) terminal coding agent, built in Rust. Included with ChatGPT Plus from $20/mo or usable...
+View Tool
+
+ [/tools/codex-cli]
+
+AI Models
+
+ChatGPT
+
+OpenAI's chat app. As of October 2026 Free and Go run GPT-6 Luna; Plus ($20/mo) adds GPT-6.1 Sol and GPT-6 Astra. Agent...
+View Tool
+
+ [/tools/chatgpt]
+
+AI Coding
+
+C
+
+Conductor
+
+Mac app for running parallel Claude Code, Codex, and Cursor agents in isolated workspaces. Watch every agent work at onc...
+View Tool
+
+ [/tools/conductor]
+
+Apps from Developers Digest
+
+Developer Tools
+
+Agent Hub
+
+Every coding agent in one window. Stop alt-tabbing between Claude, Codex, and Cursor.
+View App
+
+ [/apps/agent-hub]
+
+Developer ToolsIn Progress
+
+Skill Builder
+
+Turn a one-liner into a working Claude Code skill. From idea to installed in a minute.
+View App
+
+ [/apps/skill-builder]
+
+Developer ToolsIn Progress
+
+Migrate
+
+Beat the August 2026 Assistants API sunset. Paste old code, get Responses API.
+View App
+
+ [/apps/migrate]
+
+Related Guides
+
+Guide
+Chronicle Research Preview Setup Guide
+
+Set up Codex Chronicle on macOS, manage permissions, and understand privacy, security, and troubleshooting.
+Getting Started
+
+ [/guides/chronicle-research-preview]
+
+Guide
+Background Tasks - Claude Code
+
+Run Bash commands with Ctrl+B and retrieve output by task ID.
+Claude Code
+
+ [/guides/background-tasks]
+
+Guide
+Monitor Tool - Claude Code
+
+Background monitoring of logs, files, and long-running processes.
+Claude Code
+
+ [/guides/monitor-tool]
+
+Related Videos
+
+OpenAI Codex in 7 Minutes
+
+OpenAI Codex Desktop App: Plan/Goal Modes, Plugins, Multi-Agent Workflows & UI Annotation Demo
+
+The video showcases OpenAI’s Codex desktop app, which the creator calls OpenAI’s best product and a prem...
+
+Video·June 14, 2026
+
+ [/tutorials/2OnmwXm6N4U]
+
+OpenAI Codex in ChatGPT in 5 Minutes
+
+In this video, we delve into OpenAI's latest release, Codex, a cloud-based software engineering agent designed for various coding tasks. Unlike tools like Cursor or Windsurf, Codex integrates...
+
+Video·May 17, 2025
+
+ [/tutorials/Kd0QGZMy_tA]
+
+OpenAI Open Sources Codex: The CLI Coding Agent
+
+Exploring Codex: AI Coding in Terminal
+
+In this video, I explore Codex, a new lightweight CLI tool for AI coding that runs in the terminal. This tool, possibly a response to Anthropic's CLI,...
+
+Video·April 17, 2025
+
+ [/tutorials/euUgavBeUwE]
+
+Related Posts
+
+7 min read
+
+Codex
+Codex CLI 0.162: Managed Worktrees and Pinned Tasks
+
+Codex CLI 0.162.0 lets the agent create and list its own Git worktrees, adds provider capability overrides, and 0.162.1...
+October 10, 2026
+
+ [/blog/codex-cli-0-162-managed-worktrees-pinned-tasks-2026]
+
+8 min read
+
+Codex
+Codex CLI Needs Resource Budgets, Not Just Token Budgets
+
+A trending Codex SQLite WAL bug is a useful warning for every local coding agent: logs, disks, background processes, and...
+June 22, 2026
+
+ [/blog/codex-cli-resource-budgets]
+
+9 min read
+
+openai
+Codex Exec in CI: Practical Guide to Headless OpenAI Agents
+
+codex exec is OpenAI's non-interactive mode to run Codex agents from scripts, CI and GitHub Actions. How to set it up sa...
+June 10, 2026
+
+ [/blog/codex-exec-ci-headless-guide]
+
+9 min read
+
+AI Agents
+Long-Running Agents Need Harnesses, Not Hope
+
+A long-running coding agent is only useful if the environment around it can queue tasks, capture logs, checkpoint state,...
+May 2, 2026
+
+ [/blog/long-running-agents-need-harnesses]
+
+7 min read
+
+Codex
+Codex CLI Worktrees Turn Agent Runs Into Durable Sessions
+
+Codex CLI 0.154.0 adds experimental worktrees, inline answers, Windows daemon support, and approval hardening. The impor...
+September 10, 2026
+
+ [/blog/codex-cli-worktrees-durable-agent-sessions]
+
+6 min read
+
+Codex
+Codex CLI Vim Mode Is an Ergonomics Signal
+
+Codex CLI 0.129.0 added modal Vim editing to the composer. A small feature, but a signal: terminal agents are becoming n...
+May 14, 2026
+
+ [/blog/codex-cli-modal-vim-terminal-agents]
+
+Build with the member tools
+
+DEVDIGEST
+
+Videos and open-source projects at the intersection of AI and development.
+
+ [https://youtube.com/@developersdigest] [https://x.com/devdigest] [https://github.com/developersdigest]
+
+Newsletter
+
+Weekly AI dev insights. Free.
+
+Subscribe
+
+Platform
+
+App Builder [/dashboard/app-builder-v2]
+
+Chat [/dashboard/chat]
+
+AgentCanvas [/canvas]
+
+Multi-Media Studio [/dashboard/tools]
+
+Skill Studio [/dashboard/skills-studio]
+
+Artifacts [/dashboard/artifacts]
+
+Agents
+
+Agent tools [/dashboard/agent-tools]
+
+API Keys [/dashboard/keys]
+
+Content
+
+Blog [/blog]
+
+Essays [/essays]
+
+Tutorials [/tutorials]
+
+Guides [/guides]
+
+Courses [/courses]
+
+Daily Brief [/daily]
+
+Tools
+
+Tools Directory [/tools]
+
+Compare [/compare]
+
+Toolkit [/toolkit]
+
+Library [/library]
+
+Skills [/skills]
+
+Projects [/projects]
+
+Company
+
+About [/about]
+
+Connect [/connect]
+
+Newsletter [/newsletter]
+
+Write for us [/write-for-us]
+
+Sponsor [/sponsor]
+
+Pricing [/pricing]
+
+Changelog [/dashboard/whats-new]
+
+Legal
+
+Privacy Policy [/privacy]
+
+Terms of Service [/terms]
+
+Affiliate Disclosure [/affiliate-disclosure]
+
+Contact [/contact]
+
+© 2026 DEVELOPERS DIGEST
+
+Privacy [/privacy]Terms [/terms]
+
+DEVDIGEST

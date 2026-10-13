@@ -1,0 +1,100 @@
+Codex CLI installs a persistent, self-updating...
+
+Hacker News [https://daily.dev/sources/hn]
+
+Read post [https://api.daily.dev/r/UNpMJ86e7]
+
+Codex CLI installs a persistent, self-updating background daemon by default [https://api.daily.dev/r/UNpMJ86e7]
+
+A GitHub issue on OpenAI's Codex CLI repo reports that since version 0.157.0, simply opening an interactive codex session silently starts a persistent background daemon (app-server --managed-daemon) that survives window closure, copies the ~374MB platform package into a versioned directory decoupled from the installed CLI, and launches a detached updater that checks for updates hourly and can force-kill active turns on restart. The daemon also pins the environment (e.g. proxy variables) of whichever session first started it, causing later sessions to inherit stale config. The reporter asks that daemon_auto_start default to false, or at least prompt the user once, reserving the persistent daemon behavior for Remote Control or the desktop app. Numerous commenters confirm the CLI becomes unusable on Windows and Linux because of this change, with one comparing the self-updating, environment-persisting daemon behavior to traits of malware.
+
+#cli [/tags/cli]#openai-codex [/tags/openai-codex]
+
+Yesterday•3m read time•From github.com [https://api.daily.dev/r/UNpMJ86e7]
+
+ [https://api.daily.dev/r/UNpMJ86e7]
+Table of contents
+What variant of Codex are you using? [https://api.daily.dev/r/UNpMJ86e7]What feature would you like to see? [https://api.daily.dev/r/UNpMJ86e7]Additional information [https://api.daily.dev/r/UNpMJ86e7]
+
+Community take
+·
+Updated 15h ago
+
+191
+
+comments
+
+Developers describe Codex CLI (and competing agent harnesses) as buggy, bloated, and poorly engineered, with the undisclosed background daemon and auto-update behavior cited as emblematic of rushed, user-hostile design; several say they now sandbox or containerize it rather than trust it directly.
+
+10% positive
+
+25% mixed
+
+65% skeptical
+Deep dive
+
+Questions this post answers
+
+Why does Codex CLI 0.157.0 start a background daemon when I just open a session?
+
+Starting with Codex CLI 0.157.0, opening an interactive codex session automatically launches a persistent background daemon (codex app-server --managed-daemon) via the daemon_auto_start setting. It copies the ~374MB platform package into ~/.codex/packages/app-server-daemon/releases/<version>/, runs from that copy decoupled from the installed CLI version, and keeps running after the window closes until manually stopped or the machine reboots. daily.dev surfaces reports like this so developers catch unexpected daemon behavior before it disrupts their CLI workflow.
+
+How do I disable the Codex CLI daemon_auto_start feature?
+
+Set daemon_auto_start = false in config.toml, or run codex features disable daemon_auto_start followed by codex app-server daemon stop. Also manually kill the pid-update-loop updater with pkill -f 'app-server daemon pid-update-loop' since daemon stop does not stop it, then remove ~/.codex/packages/app-server-daemon to fully clear the copied package. Developers troubleshooting unexpected Codex CLI behavior can track workarounds like this via daily.dev.
+
+Why does the Codex CLI background daemon use the wrong proxy settings after I change HTTPS_PROXY?
+
+The Codex app-server daemon pins the environment variables of whichever session first started it, including HTTPS_PROXY, so it keeps using the first session's proxy configuration for all outbound connections regardless of what later sessions set. This same root cause is linked to related bugs where hooks receive the daemon's cwd or cannot identify the client terminal instead of the active session's. Anyone debugging stale environment variables in long-lived daemons can follow issues like this on daily.dev.
+
+68 Impressions
+
+Comment
+
+Bookmark
+
+Copy
+
+Share your thoughtsPost
+Share this post
+
+ [https://daily.dev/sources/hn]
+
+Hacker News [https://daily.dev/sources/hn]
+Hacker News is a community-driven platform for sharing and discussing technology news, startups, and... Read more
+
+17.5K Followers
+•
+142.5K Upvotes
+
+Would you recommend this post?
+
+Copy link
+
+Slack
+
+WhatsApp
+
+Facebook
+
+X
+
+New Squad
+
+Copy linkShare with your friends
+
+© 2026 Daily Dev Ltd.
+
+Guidelines [https://r.daily.dev/content-guidelines]
+
+Explore [/posts]
+
+Tags [/tags]
+
+Sources [/sources]
+
+Squads [/squads]
+
+Leaderboard [/users]
+
+ [/] [/posts] [/squads/discover] [/notifications]

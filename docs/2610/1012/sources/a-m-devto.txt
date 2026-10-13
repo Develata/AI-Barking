@@ -1,0 +1,280 @@
+Codex CLI now keeps running after you close it. Here's what that means and how to turn it off - DEV Community
+
+ Skip to content [#main-content]
+
+ [/]
+
+ Powered by Algolia
+
+ [https://www.algolia.com/developers/?utm_source=devto&utm_medium=referral]
+
+ Log in
+ [https://dev.to/enter?signup_subforem=1]
+
+ Create account
+ [https://dev.to/enter?signup_subforem=1&state=new-user]
+
+DEV Community
+
+ Add reaction
+
+ Like
+
+ Unicorn
+
+ Exploding Head
+
+ Raised Hands
+
+ Fire
+
+ Jump to Comments
+
+ Save
+
+ Boost
+
+Pick as gem
+
+ Copy link
+
+Copied to Clipboard
+
+ Share to X
+
+ Share to LinkedIn
+ [https://www.linkedin.com/shareArticle?mini=true&url=https%3A%2F%2Fdev.to%2Fthereleasedesk%2Fcodex-cli-now-keeps-running-after-you-close-it-heres-what-that-means-and-how-to-turn-it-off-2lm7&title=Codex%20CLI%20now%20keeps%20running%20after%20you%20close%20it.%20Here%27s%20what%20that%20means%20and%20how%20to%20turn%20it%20off&summary=Since%20version%200.157.0%2C%20opening%20OpenAI%27s%20Codex%20CLI%20starts%20a%20shared%20background%20server%20that%20outlives...&source=DEV%20Community]
+
+ Share to Facebook
+ [https://www.facebook.com/sharer.php?u=https%3A%2F%2Fdev.to%2Fthereleasedesk%2Fcodex-cli-now-keeps-running-after-you-close-it-heres-what-that-means-and-how-to-turn-it-off-2lm7]
+
+ Share to Mastodon
+ [https://s2f.kytta.dev/?text=https%3A%2F%2Fdev.to%2Fthereleasedesk%2Fcodex-cli-now-keeps-running-after-you-close-it-heres-what-that-means-and-how-to-turn-it-off-2lm7]
+
+ Share Post via... [#]
+
+ Report Abuse [/report-abuse]
+
+ [https://media2.dev.to/dynamic/image/width=1000,height=420,fit=cover,gravity=auto,format=auto/https%3A%2F%2Fdev-to-uploads.s3.us-east-2.amazonaws.com%2Fuploads%2Farticles%2Fddwy2md1nl3xbkhr8rf4.png]
+
+ [/thereleasedesk]
+
+ The Release Desk [/thereleasedesk]
+
+ Posted on Oct 13
+
+ •
+
+ AI-assisted
+
+ Codex CLI now keeps running after you close it. Here's what that means and how to turn it off
+
+ #openai [/t/openai]
+ #codex [/t/codex]
+ #cli [/t/cli]
+ #security [/t/security]
+
+Since version 0.157.0, opening OpenAI's Codex CLI starts a shared background server that outlives your terminal and updates itself. It's on by default. Here's what it does and the one command to switch it off.
+
+ [https://media2.dev.to/dynamic/image/width=800%2Cheight=%2Cfit=scale-down%2Cgravity=auto%2Cformat=auto/https%3A%2F%2Fdev-to-uploads.s3.us-east-2.amazonaws.com%2Fuploads%2Farticles%2Fi70s0nvn104g884h48tz.png]
+
+If you use OpenAI's Codex CLI, close every Codex window and check your running processes. There's a fair chance Codex is still there.
+
+Since version 0.157.0, released on September 25, opening an interactive Codex session also starts a daemon, a program that runs quietly in the background with no window of its own. It keeps running after your last terminal closes. On most setups, it also updates itself.
+
+OpenAI's release notes [https://github.com/openai/codex/releases/tag/rust-v0.157.0] gave this one line: "Enabled automatic background-server startup for eligible interactive sessions." Developers noticed what that sentence left out, and a GitHub issue [https://github.com/openai/codex/issues/48195] asking for it to be opt-in reached the top of Hacker News on October 12.
+
+Here's what actually changed, why it bothers people, and how to switch it off if you want to.
+
+ [#what-the-background-server-does]
+ What the background server does
+
+This part comes from OpenAI's own code and docs, not just user reports.
+
+It's on by default. In the Codex source code, the setting daemon_auto_start is marked stable and enabled by default (source [https://github.com/openai/codex/blob/main/codex-rs/features/src/lib.rs]). The pull request [https://github.com/openai/codex/pull/47179] that made the switch, merged on September 22, is titled simply "Enable automatic daemon startup by default."
+
+It updates itself. According to the daemon's README [https://github.com/openai/codex/blob/main/codex-rs/app-server-daemon/README.md], it checks for new releases five minutes after starting, then every hour. When it finds one, it restarts, and the README warns that "active or queued work may be interrupted."
+
+It runs its own copy of Codex. The daemon runs from a separate package inside your ~/.codex folder, not necessarily the version you installed with npm or Homebrew. The person who opened the issue measured that copy at about 374 MB.
+
+It remembers the first terminal's environment. The README says it plainly: shared clients use the environment the daemon started with, and "per-client environment isolation is not provided." Start Codex in a project with one GH_TOKEN or proxy setting, open another project later, and the daemon may still use the first one. Users in the issue thread report hitting exactly this.
+
+ [#why-developers-are-annoyed]
+ Why developers are annoyed
+
+None of this is hidden in a malicious way. The code is open source and the behaviour is written down in the repo. The problem is where it's written down.
+
+A CLI installed through a package manager usually follows a simple deal: it runs when you run it, stops when you close it, and stays on the version you installed. Codex quietly changed all three, behind one release-note sentence. As of today, the opt-out setting doesn't appear in Codex's official CLI docs; users found it in the source and the issue threads. The daemon's own README even still opens with "codex-app-server-daemon is experimental," while the flag that turns it on is marked stable.
+
+There's also the practical side. Windows and WSL users in the thread reported the CLI failing to start at all after the update. Later releases (0.158 through 0.162.1) include a run of fixes for exactly those cases.
+
+ [#the-case-for-it]
+ The case for it
+
+The daemon has a real job. The README says it backs remote clients "such as the desktop and mobile apps," so one shared backend can serve your terminal, the Codex desktop app and remote sessions at once. If you use those, a long-running shared server makes sense.
+
+The complaint isn't that the feature exists. It's that it's on by default for a terminal tool, without asking once. As of October 13, the issue is still open with no reply from OpenAI in the thread.
+
+ [#how-to-check-and-how-to-turn-it-off]
+ How to check, and how to turn it off
+
+We haven't installed Codex for this article. The commands below come from Codex's source code and README; the process check is a standard system command. Run them at your own judgement.
+
+1. Check whether it's running (macOS / Linux):
+
+ps aux | grep -i "codex app-server"
+
+2. Stop it from starting automatically. This writes the setting into your Codex config.toml:
+
+codex features disable daemon_auto_start
+
+Prefer to keep it but skip it for one session? Use codex --no-daemon.
+
+3. Stop the one that's already running:
+
+codex app-server daemon stop
+
+The issue's author reports that this left the hourly updater process running in their case, so run the step 1 check again afterwards.
+
+4. Want the daemon, but no surprise updates? The README documents an "autoUpdateEnabled": false option inside the daemon's settings file (~/.codex/app-server-daemon/settings.json).
+
+One more detail from the changelog: daemon-launched servers turn analytics on by default, matching OpenAI's other apps. The pull request [https://github.com/openai/codex/pull/49426] notes you can still opt out with analytics.enabled = false in config.toml.
+
+Desk verdict: If you use Codex only in the terminal, run codex features disable daemon_auto_start and move on. If you use the desktop or mobile app with it, leave it on, but check settings.json so you know when it updates.
+
+Sources: Codex 0.157.0 release notes [https://github.com/openai/codex/releases/tag/rust-v0.157.0] · Issue #48195 [https://github.com/openai/codex/issues/48195] · PR #47179 [https://github.com/openai/codex/pull/47179] · Daemon README [https://github.com/openai/codex/blob/main/codex-rs/app-server-daemon/README.md] · Feature flag source [https://github.com/openai/codex/blob/main/codex-rs/features/src/lib.rs] · PR #49426 (analytics) [https://github.com/openai/codex/pull/49426] · PR #50555 (WSL fix) [https://github.com/openai/codex/pull/50555]
+
+The Release Desk · by Shabbir Saifee. 
+
+Facts checked against the primary sources linked above on October 13, 2026.
+
+ Top comments (0)
+
+ Subscribe
+
+ Personal
+ Trusted User
+
+ Create template
+ [/settings/response-templates]
+
+Templates let you quickly answer FAQs or store snippets for re-use.
+
+ Submit
+ Preview
+ Dismiss [/404.html]
+
+ Code of Conduct [/code-of-conduct]
+ •
+ Report abuse [/report-abuse]
+
+ Are you sure you want to hide this comment? It will become hidden in your post, but will still be visible via the comment's permalink [#].
+
+Hide child comments as well
+
+ Confirm
+
+For further actions, you may consider blocking this person and/or reporting abuse [/report-abuse]
+
+ The Release Desk
+
+ [/thereleasedesk]
+
+ Follow
+
+ Joined
+
+ Oct 13, 2026
+
+ Trending on DEV Community [https://dev.to]
+
+ My $0 Coding Workflow: Free Tools That Replaced Paid Subscriptions
+
+ #ai
+ #productivity
+ #beginners
+ #programming
+
+ [/effessdev/my-0-coding-workflow-free-tools-that-replaced-paid-subscriptions-3pfc]
+
+ Meme Monday
+
+ #discuss
+ #watercooler
+ #jokes
+
+ [/ben/meme-monday-4e47]
+
+ I was chasing the job market. One comment on DEV.to made me rethink everything
+
+ #ai
+ #career
+ #programming
+ #discuss
+
+ [/effessdev/i-was-chasing-the-job-market-one-comment-on-devto-made-me-rethink-everything-4h20]
+
+ DEV Community [/] — A space to discuss and keep up software development and manage your software career
+
+ Home
+ [/]
+
+ DEV Challenges
+ [/challenges]
+
+ DEV++
+ [/++]
+
+ Videos
+ [/videos]
+
+ DEV Education Tracks
+ [/deved]
+
+ DEV Help
+ [/help]
+
+ Advertise on DEV
+ [/advertise]
+
+ Organization Accounts
+ [/organizations]
+
+ DEV Showcase
+ [/showcase]
+
+ About
+ [/about]
+
+ Contact
+ [/contact]
+
+ Free Postgres Database
+ [/free-postgres-database-tier]
+
+ DEV Shop
+ [https://shop.forem.com/]
+
+ MLH
+ [https://mlh.io/]
+
+ Code of Conduct
+ [/code-of-conduct]
+
+ Privacy Policy
+ [/privacy]
+
+ Terms of Use
+ [/terms]
+
+Built on Forem [https://www.forem.com] — the open source [https://dev.to/t/opensource] software that powers DEV [https://dev.to] and other inclusive communities.
+
+Made with love and Ruby on Rails [https://dev.to/t/rails]. DEV Community © 2016 - 2026.
+
+ We're a place where coders share, stay up-to-date and grow their careers.
+
+ Log in
+ [https://dev.to/enter?signup_subforem=1]
+
+ Create account
+ [https://dev.to/enter?signup_subforem=1&state=new-user]

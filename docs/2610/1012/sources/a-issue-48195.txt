@@ -1,0 +1,164 @@
+# CLI: make `daemon_auto_start` opt-in — a persistent, self-updating background daemon shouldn't be the default
+URL: https://github.com/openai/codex/issues/48195
+author: Yihua-Liu-1997 (NONE)
+createdAt: 2026-09-25T20:04:30Z
+updatedAt: 2026-10-13T04:02:00Z
+state: open
+labels: ['enhancement', 'CLI', 'app-server']
+comments: 16
+reactions: {'total_count': 178, '+1': 159, '-1': 0, 'laugh': 0, 'hooray': 8, 'confused': 0, 'heart': 9, 'rocket': 0, 'eyes': 2}
+
+--- BODY ---
+### What variant of Codex are you using?
+
+CLI — 0.157.0, installed via `npm install -g @openai/codex`, Linux (WSL2)
+
+### What feature would you like to see?
+
+Please make `daemon_auto_start` **opt-in (default `false`) for the CLI**, or at least ask once before turning it on.
+
+Since 0.157.0, just opening an interactive `codex` session:
+
+1. **Starts a persistent background daemon** (`codex app-server --managed-daemon`). It runs in its own session with no TTY and keeps running after every Codex window is closed (reparented to PID 1) until `codex app-server daemon stop` or a reboot.
+2. **Copies the whole platform package** (~374 MB: `codex`, `codex-code-mode-host`, bundled `bwrap`/`zsh`/`rg`) into `~/.codex/packages/app-server-daemon/releases/<version>/` — byte-identical to what npm had just installed — and runs the daemon from that copy. From then on the backend's version is decoupled from the CLI version I installed with my package manager.
+3. **Starts a detached updater** (`codex app-server daemon pid-update-loop`) that checks for updates 5 minutes after start and then hourly, downloads new releases and restarts the backend (which can kill active turns, see #40969).
+4. **Pins the environment of whichever session happened to start it.** I launch Codex through a wrapper that sets `HTTPS_PROXY` per invocation; the daemon keeps the first session's proxy variables and its outbound connections go through that proxy, whatever later sessions are launched with. #42457 and #37537 (daemon cwd / terminal instead of the session's) look like the same root cause.
+
+For a CLI, the least surprising default is that the backend lives and dies with the window, runs the binary I installed, and doesn't update itself in the background. A shared, self-updating daemon makes sense for Remote Control / the desktop app, so it would be fine to enable it there, or when the user explicitly runs `codex app-server daemon start` / `bootstrap`.
+
+If it stays on by default, please at least:
+- exit an auto-started daemon when its last client disconnects;
+- not copy/self-update when the CLI was installed by a package manager (npm/brew/pacman) — run the installed binary instead (#41188, #46468, #48050).
+
+### Additional information
+
+**Bug found while turning it off:** `codex app-server daemon stop` stops the app-server but leaves the `pid-update-loop` updater running (still alive 70 s later, had to kill it manually).
+
+Workaround I'm using:
+
+```sh
+codex features disable daemon_auto_start
+codex app-server daemon stop
+pkill -f 'app-server daemon pid-update-loop'   # not stopped by `daemon stop`
+rm -rf ~/.codex/packages/app-server-daemon
+```
+
+With the flag off, a new TUI session no longer spawns a daemon.
+
+Related: #40969, #41188, #46468, #48050, #42457, #37537
+
+
+
+=== comment 5839297868 by megahall (NONE) created 2026-09-25T20:41:57Z updated 2026-09-25T20:41:57Z reactions 20
+https://github.com/openai/codex/issues/48195#issuecomment-5839297868
+@Yihua-Liu-1997 thanks for reporting this, I hit it myself... stuff should not be creating mystery servers and processes all of a sudden on small version number bumps without giving people a heads-up...
+
+
+=== comment 5840246332 by kr8vka0z (NONE) created 2026-09-25T21:59:26Z updated 2026-09-25T21:59:26Z reactions 22
+https://github.com/openai/codex/issues/48195#issuecomment-5840246332
+agreed. the CLI is unusable until this is fixed.
+
+
+=== comment 5841071558 by tagorr (NONE) created 2026-09-25T23:31:23Z updated 2026-09-25T23:31:23Z reactions 2
+https://github.com/openai/codex/issues/48195#issuecomment-5841071558
+I can confirm this on Windows 10 LTSC with Codex CLI 0.157.0
+Setting `daemon_auto_start = false` in `config.toml` resolves the issue
+
+Two improvements would help:
+
+1. Automatically fall back to local mode when daemon startup is blocked by elevation, instead of requiring `--no-daemon`.
+2. Make daemon auto-start opt-in rather than the default.
+
+This would preserve the security restrictions without disrupting the normal CLI workflow.
+
+
+=== comment 5841872851 by Yihua-Liu-1997 (NONE) created 2026-09-26T01:17:30Z updated 2026-09-26T01:17:30Z reactions 1
+https://github.com/openai/codex/issues/48195#issuecomment-5841872851
+@tagorr Indeed — both 1 and 2 would work~
+
+
+=== comment 5899366619 by felipeelopes (NONE) created 2026-09-29T21:32:23Z updated 2026-09-29T21:32:23Z reactions 0
+https://github.com/openai/codex/issues/48195#issuecomment-5899366619
+The Codex CLI is unusable due to this bug on Windows.
+
+
+=== comment 5902442558 by zdd (NONE) created 2026-09-30T01:46:37Z updated 2026-09-30T01:46:37Z reactions 0
+https://github.com/openai/codex/issues/48195#issuecomment-5902442558
+This is terrible. I can't input anything on the CLI at all. You should fix this problem as soon as possible and give us 100 banked reset!
+
+
+=== comment 5968781597 by aetherxeg-source (NONE) created 2026-10-03T11:36:50Z updated 2026-10-03T11:36:50Z reactions 0
+https://github.com/openai/codex/issues/48195#issuecomment-5968781597
+There is a useful provenance boundary behind this request:
+
+`installed CLI identity != daemon execution identity`
+
+Once the CLI copies itself into a managed release directory and a background updater can replace that copy, the process that services a later turn is no longer necessarily the artifact the user explicitly installed or invoked.
+
+I would make the daemon expose a small execution receipt for each client attachment containing at least:
+
+`client_cli_version + daemon_binary_digest + daemon_generation + updater_state + inherited_environment_generation`
+
+Then a client can distinguish:
+
+- same installed artifact, same daemon generation;
+- same CLI but different daemon generation;
+- daemon binary changed independently of the package-manager state;
+- daemon inherited environment from an earlier session.
+
+A strong regression would start the daemon under environment A, attach from environment B, update the installed CLI, and verify that the client can see exactly which daemon generation/binary/environment is authoritative for the turn rather than inferring it from the foreground CLI version.
+
+Related runtime behavioral-integrity work: https://github.com/AETHERXGLOBAL/execsurface
+
+
+=== comment 6131026249 by laurynas-karvelis (NONE) created 2026-10-12T19:20:31Z updated 2026-10-12T19:20:59Z reactions 18
+https://github.com/openai/codex/issues/48195#issuecomment-6131026249
+Basically - a trait of malware. TBF I don't even think this was done by accident
+
+
+=== comment 6131142747 by skhaz (NONE) created 2026-10-12T19:27:39Z updated 2026-10-12T19:27:39Z reactions 0
+https://github.com/openai/codex/issues/48195#issuecomment-6131142747
++1 for disabling this
+
+
+=== comment 6131409422 by tagorr (NONE) created 2026-10-12T19:44:31Z updated 2026-10-12T19:44:31Z reactions 0
+https://github.com/openai/codex/issues/48195#issuecomment-6131409422
+> Basically - a trait of malware. TBF I don't even think this was done by accident
+
+Honestly, that's exactly what it feels like.
+
+
+=== comment 6131648809 by st396gt (NONE) created 2026-10-12T20:00:23Z updated 2026-10-12T20:00:23Z reactions 0
+https://github.com/openai/codex/issues/48195#issuecomment-6131648809
+The part in the docs about wanting full read/write access to the entire host filesystem is why I'm running codex-cli in a hardened Raspberry Pi and ssh'ing into it.
+
+No daemons running that I can see, v0.160.0 from last week.
+
+
+=== comment 6132424289 by Logarithmus (NONE) created 2026-10-12T20:53:21Z updated 2026-10-12T20:53:21Z reactions 2
+https://github.com/openai/codex/issues/48195#issuecomment-6132424289
+So codex is a virus at this point? Won't be surprised if they use it to create a botnet of those sweet residential IPs for web scrapping
+
+
+=== comment 6132552031 by mateolafalce (NONE) created 2026-10-12T21:02:21Z updated 2026-10-12T21:02:21Z reactions 1
+https://github.com/openai/codex/issues/48195#issuecomment-6132552031
+agree, good move 
+
+
+
+=== comment 6134034812 by alexklibisz (NONE) created 2026-10-12T22:43:17Z updated 2026-10-13T04:02:00Z reactions 0
+https://github.com/openai/codex/issues/48195#issuecomment-6134034812
+Edit: https://github.com/openai/codex/issues/53547
+
+
+=== comment 6134277084 by foma-agent (NONE) created 2026-10-12T23:02:25Z updated 2026-10-12T23:02:25Z reactions 1
+https://github.com/openai/codex/issues/48195#issuecomment-6134277084
+The supported opt-out is still invisible in the official config reference. I fetched the complete page today: it has zero `daemon_auto_start` rows while documenting the CLI's own `check_for_update_on_startup`. The 0.157.0 release note still gives the change one sentence — “Enabled automatic background-server startup for eligible interactive sessions, with recovery choices when server settings are incompatible” — without naming the persistent process, the managed package copy, or the hourly updater. #40969 is still open on the updater's 60-second drain followed by SIGKILL.
+
+@aetherxeg-source's execution-receipt proposal is the useful boundary here: client version, daemon binary digest/generation, updater state, and inherited-environment generation. @alexklibisz's fresh environment report makes the last field concrete. I traced those current docs and source threads rather than running the daemon; source trail: https://bokonon.ai/notes/2026-10-12-codex-omits-daemon-auto-start/
+
+
+
+=== comment 6137190188 by shakefu (NONE) created 2026-10-13T02:56:37Z updated 2026-10-13T02:56:37Z reactions 0
+https://github.com/openai/codex/issues/48195#issuecomment-6137190188
+Codex is malware, got it. Guess I’m rolling back all the Codex seat licenses at my company. 

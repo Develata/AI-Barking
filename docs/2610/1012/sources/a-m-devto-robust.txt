@@ -1,0 +1,303 @@
+Disabling the Codex CLI Self-Updating Background Daemon - DEV Community
+
+ Skip to content [#main-content]
+
+ [/]
+
+ Powered by Algolia
+
+ [https://www.algolia.com/developers/?utm_source=devto&utm_medium=referral]
+
+ Log in
+ [https://dev.to/enter?signup_subforem=1]
+
+ Create account
+ [https://dev.to/enter?signup_subforem=1&state=new-user]
+
+DEV Community
+
+ Add reaction
+
+ Like
+
+ Unicorn
+
+ Exploding Head
+
+ Raised Hands
+
+ Fire
+
+ Jump to Comments
+
+ Save
+
+ Boost
+
+Pick as gem
+
+ Copy link
+
+Copied to Clipboard
+
+ Share to X
+
+ Share to LinkedIn
+ [https://www.linkedin.com/shareArticle?mini=true&url=https%3A%2F%2Fdev.to%2Frobust_true_try%2Fdisabling-the-codex-cli-self-updating-background-daemon-437l&title=Disabling%20the%20Codex%20CLI%20Self-Updating%20Background%20Daemon&summary=When%20Codex%20CLI%20installs%20a%20persistent%20background%20daemon%20by%20default%2C%20it%20can%20break%20CI%2FCD%20pipelines%20and%20consume%20unnecessary%20resources.&source=DEV%20Community]
+
+ Share to Facebook
+ [https://www.facebook.com/sharer.php?u=https%3A%2F%2Fdev.to%2Frobust_true_try%2Fdisabling-the-codex-cli-self-updating-background-daemon-437l]
+
+ Share to Mastodon
+ [https://s2f.kytta.dev/?text=https%3A%2F%2Fdev.to%2Frobust_true_try%2Fdisabling-the-codex-cli-self-updating-background-daemon-437l]
+
+ Share Post via... [#]
+
+ Report Abuse [/report-abuse]
+
+ [/robust_true_try]
+
+ RobustTrueTry [/robust_true_try]
+
+ Posted on Oct 13
+
+ Disabling the Codex CLI Self-Updating Background Daemon
+
+ #ai [/t/ai]
+ #python [/t/python]
+ #devops [/t/devops]
+ #automation [/t/automation]
+
+ [#the-problem]
+ The Problem
+
+Installing Codex CLI brings a surprising side effect: a persistent background daemon starts running automatically. This daemon monitors for updates and restarts itself whenever new versions are available. While convenient during development, this behavior becomes problematic in production environments where you cannot afford unexpected process spawning or continuous update loops.
+
+ [#what-you-will-learn]
+ What You Will Learn
+
+Why the daemon appears by default and what it does internally
+
+A concrete scenario where the daemon causes pipeline failures
+
+The exact command and configuration to disable it permanently
+
+Tradeoffs of turning off the daemon versus keeping it active
+
+Common pitfalls when manually managing updates without the daemon
+
+ [#understanding-the-default-behavior]
+ Understanding the Default Behavior
+
+The Codex CLI integrates with the openai llama.cpp ecosystem through a background service. On first installation, it launches a daemon that:
+
+Watches for update notifications via GitHub webhooks
+
+Automatically pulls new binaries when available
+
+Restarts itself silently to apply changes
+
+This design works well for local development but creates friction in automated workflows. The daemon persists across reboots and may conflict with other processes trying to manage similar components.
+
+ [#the-breakage-scenario]
+ The Breakage Scenario
+
+In a CI pipeline, the daemon can trigger multiple times per minute if the update endpoint detects changes frequently. This leads to:
+
+Excessive CPU and memory consumption from repeated binary downloads
+
+Intermittent crashes when the daemon tries to restart while another instance is still running
+
+Pipeline timeouts caused by long-running update cycles
+
+For example, a deployment script that runs daily might spend 30% of its runtime just updating the daemon instead of executing tests.
+
+ [#working-solution]
+ Working Solution
+
+You can prevent the daemon from starting entirely by setting the environment variable CODEX_CLI_NO_DAEMON=1. This tells the CLI to skip the background service initialization.
+
+## Disable the background daemon globally
+
+export CODEX_CLI_NO_DAEMON=1
+
+## Verify the daemon is not running
+
+pgrep -f "codex.*daemon" || echo "No daemon found"
+
+If you need programmatic control, pass the flag directly to the CLI:
+
+codex --disable-daemon install
+
+This approach gives you full manual control over updates—you decide when to pull new binaries rather than having the tool manage it automatically.
+
+ [#tradeoffs-and-failure-modes]
+ Tradeoffs and Failure Modes
+
+Pros of disabling the daemon:
+
+Eliminates unwanted background processes
+
+Reduces resource overhead in long-running jobs
+
+Gives you predictable update timing
+
+Cons of disabling the daemon:
+
+Updates must be handled manually or via scheduled scripts
+
+Missing security patches remain unaddressed
+
+You lose the convenience of zero-config deployments
+
+Failure mode: If you disable the daemon but forget to pin the binary version, you may miss critical security fixes. Always pair manual updates with a version-lock strategy.
+
+ [#key-takeaways]
+ Key Takeaways
+
+Set CODEX_CLI_NO_DAEMON=1 to completely disable the background service
+
+Use --disable-daemon as a CLI flag for immediate effect
+
+Disabling the daemon trades convenience for predictability
+
+Manual update management requires discipline to keep binaries secure
+
+Test your workflow both with and without the daemon enabled to confirm stability
+
+ [#source]
+ Source
+
+This article builds on Codex CLI installs a persistent, self-updating background daemon by default [https://github.com/openai/codex/issues/48195], adding implementation detail and tradeoffs for practitioners.
+
+ [#support-this-work]
+ Support this work
+
+These write-ups are researched and published with no paywall, sponsor, or tracking. If one saved you an afternoon, a small tip keeps them coming.
+
+USDT, USDC or USDD · TRC-20 (Tron)
+
+TFTNsfyomKrnUutRjBTGVULp19ByW29KbY
+
+ Top comments (0)
+
+ Subscribe
+
+ Personal
+ Trusted User
+
+ Create template
+ [/settings/response-templates]
+
+Templates let you quickly answer FAQs or store snippets for re-use.
+
+ Submit
+ Preview
+ Dismiss [/404.html]
+
+ Code of Conduct [/code-of-conduct]
+ •
+ Report abuse [/report-abuse]
+
+ Are you sure you want to hide this comment? It will become hidden in your post, but will still be visible via the comment's permalink [#].
+
+Hide child comments as well
+
+ Confirm
+
+For further actions, you may consider blocking this person and/or reporting abuse [/report-abuse]
+
+ RobustTrueTry
+
+ [/robust_true_try]
+
+ Follow
+
+ Joined
+
+ Mar 18, 2026
+
+ More from RobustTrueTry [/robust_true_try]
+
+ Your AI Agent Can't See What It Clicks
+
+ #python
+ #ai
+ #automation
+ #computervision
+
+ [/robust_true_try/your-ai-agent-cant-see-what-it-clicks-1gd3]
+
+ Why Your LLM City Map Collapses Without Spatial Constraints
+
+ #python
+ #ai
+ #automation
+ #visualization
+
+ [/robust_true_try/why-your-llm-city-map-collapses-without-spatial-constraints-3cf6]
+
+ DEV Community [/] — A space to discuss and keep up software development and manage your software career
+
+ Home
+ [/]
+
+ DEV Challenges
+ [/challenges]
+
+ DEV++
+ [/++]
+
+ Videos
+ [/videos]
+
+ DEV Education Tracks
+ [/deved]
+
+ DEV Help
+ [/help]
+
+ Advertise on DEV
+ [/advertise]
+
+ Organization Accounts
+ [/organizations]
+
+ DEV Showcase
+ [/showcase]
+
+ About
+ [/about]
+
+ Contact
+ [/contact]
+
+ Free Postgres Database
+ [/free-postgres-database-tier]
+
+ DEV Shop
+ [https://shop.forem.com/]
+
+ MLH
+ [https://mlh.io/]
+
+ Code of Conduct
+ [/code-of-conduct]
+
+ Privacy Policy
+ [/privacy]
+
+ Terms of Use
+ [/terms]
+
+Built on Forem [https://www.forem.com] — the open source [https://dev.to/t/opensource] software that powers DEV [https://dev.to] and other inclusive communities.
+
+Made with love and Ruby on Rails [https://dev.to/t/rails]. DEV Community © 2016 - 2026.
+
+ We're a place where coders share, stay up-to-date and grow their careers.
+
+ Log in
+ [https://dev.to/enter?signup_subforem=1]
+
+ Create account
+ [https://dev.to/enter?signup_subforem=1&state=new-user]

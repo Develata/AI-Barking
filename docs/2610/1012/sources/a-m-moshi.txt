@@ -1,0 +1,468 @@
+Run Codex CLI from Your Phone
+
+ [/]Search⌘KDocs [/docs]Learn [/guides]Compare [/compare]Themes [/themes]Pricing [/pricing]Get Moshi [/]
+
+SearchDocs [/docs]Learn [/guides]Compare [/compare]Themes [/themes]Pricing [/pricing]
+Get Moshi [/]
+
+browseMoshi with Codex
+
+agent workflows
+
+Moshi with Claude Code [/guides/claude-code]
+
+Moshi with Codex [/guides/codex]
+
+Running a fleet of agents [/guides/fleet]
+
+workspace
+
+Moshi with tmux [/guides/tmux]
+
+Moshi with Herdr [/guides/herdr]
+
+tmux or Herdr? [/guides/tmux-or-herdr]
+
+hosts
+
+Moshi with an always-on Mac [/guides/remote-mac]
+
+networking
+
+Moshi with Tailscale [/guides/tailscale]
+
+input
+
+Hands-free with voice [/guides/voice]
+
+Guides [/guides]
+
+/Agent workflows
+
+/Moshi with Codex
+
+agent guide
+
+Moshi with Codex
+
+Run OpenAI's Codex CLI on your own machine and drive it from your phone — approval modes and the sandbox, AGENTS.md, reasoning effort, lock-screen escalations, /status rate limits, and resuming sessions days later.
+
+updated 2 weeks ago14 min readpage 2 / 9copy
+
+Codex — OpenAI's coding agent CLI — has a different temperament from other agents. It runs every command inside an OS-level sandbox and only interrupts you when something needs to escape that sandbox: network access, a write outside the workspace, a privileged command. That design is great for autonomy, and it maps beautifully onto a phone: the rare, meaningful escalation is exactly the kind of event worth a lock-screen notification.
+
+This guide is Codex-native. Instead of walking every Moshi feature (the Claude Code guide [/guides/claude-code] does the full tour, and almost all of it — connections, voice, the diff viewer — applies to any agent), it focuses on the decisions that are specific to Codex: which approval mode to run, how AGENTS.md changes what you can safely fire off from a phone, when to crank reasoning effort, and how to resume a session from anywhere.
+
+model
+
+Mental model. Moshi is the control surface, not the compute. Your repo, git credentials, ChatGPT plan, and the codex process all stay on your host. Moshi is the window — and the doorbell that rings when Codex needs out of its sandbox.
+
+What you'll learn [#what-you-ll-learn]
+
+Wire a host so Codex's approval requests and task events reach your phone
+
+Choose an approval mode — Read Only, Auto, or Full Access — that matches how often you want your phone to buzz
+
+Teach the repo with AGENTS.md so prompts can stay short enough to dictate
+
+Pick models and reasoning effort for the task, not the default
+
+Answer sandbox escalations from the lock screen, Dynamic Island, and Apple Watch
+
+Track your ChatGPT plan's rate-limit windows with /status and the Usages tab
+
+Keep sessions alive in tmux and resume them with codex resume
+
+Before you start [#before-you-start]
+
+You'll want three things on the host. Each unlocks a different part of the loop, and you can add them incrementally.
+
+Host tool
+
+What it gives you
+
+Required?
+
+Codex CLI
+
+The agent itself, signed in to your ChatGPT account on the host
+
+Yes
+
+tmux
+
+Codex keeps running when the app backgrounds or the network drops
+
+Recommended
+
+mosh
+
+Connections that survive sleep, IP changes, and flaky cell data
+
+Recommended
+
+moshi-hook
+
+Approvals, task events, usage, diff view, and browser preview on your phone
+
+For the full loop
+
+The bare minimum is SSH plus codex. Everything below layers on top of that.
+
+Set up the host [#set-up-the-host]
+
+Install the moshi-hook daemon [#install-the-moshi-hook-daemon]
+
+moshi-hook is a small Go daemon that wires Codex's hooks, serves a local gateway for diff and preview, and keeps a WebSocket open to Moshi so events reach your phone. Install it once per host — the pairing token comes from the Moshi app:
+
+macOS
+copy
+
+$brew tap rjyo/moshi
+
+$brew trust rjyo/moshi
+
+$brew install moshi-hook
+
+$moshi-hook pair --token <token from Moshi>
+
+$moshi-hook install
+
+$brew services start moshi-hook
+
+Linux / WSL
+copy
+
+$curl -fsSL https://getmoshi.app/install.sh | sh
+
+$moshi-hook pair --token <token from Moshi>
+
+$moshi-hook install
+
+$moshi-hook serve
+
+Then run moshi-hook doctor (moshi-hook 0.4.3 or newer; older versions show hook state in moshi-hook status). It checks the daemon, gateway, pairing, Codex's hooks, and tmux or Herdr, and prints which Moshi features work on this host with numbered fixes for anything missing. Moshi also shows a status dot on each saved connection — green when the daemon is healthy, with a tap-through fix-it dialog when it's outdated or not running. Full options live in the hooks doc [/docs/hooks].
+
+link
+
+For Codex specifically, moshi-hook install writes ~/.codex/hooks.json and sets the Codex config flag the hooks need — and keeps both current across updates. Your own configuration is left alone, and the same install covers Claude Code, OpenCode, and friends on the same host.
+
+Connect, land in a project, start Codex [#connect-land-in-a-project-start-codex]
+
+Add a connection in Moshi (the Easy Pair QR flow checks the host's prerequisites and saves it for you), preferring an SSH key and the mosh transport — the combination that shrugs off tunnels, dead zones, and an hour of phone sleep. The full connection walkthrough, including Tailscale [/docs/tailscale] for hosts behind NAT, is in the Claude Code guide [/guides/claude-code] and applies verbatim.
+
+On connect, the session picker's Recent tab lists the directories Codex recently worked in — scanned from its history on the host — so getting back to this morning's project is one tap. The moshi launcher gives each project a durable, named tmux session:
+
+moshi session
+copy
+
+$moshi ~/projects/app
+
+# attach-or-create a tmux session named after the project
+
+$codex
+
+That tmux session is what lets Codex keep working after your phone locks — the rationale is in the tmux guide [/guides/tmux].
+
+Approvals, the Codex way [#approvals-the-codex-way]
+
+Codex doesn't ask permission per tool the way some agents do. It runs commands inside a sandbox — write access limited to the workspace, no network by default — and asks only when a command needs to escalate. Your phone, then, isn't buzzing for routine file edits; it buzzes when Codex wants something that's genuinely worth a human glance: install a dependency, hit the network, touch a path outside the repo.
+
+Pick the approval mode first [#pick-the-approval-mode-first]
+
+The single biggest knob for remote work is /approvals. It decides how much Codex does silently and what becomes a push notification:
+
+Mode
+
+What Codex does alone
+
+What reaches your phone
+
+Read Only
+
+Reads files, plans, answers questions
+
+Almost everything — every edit or command is an ask
+
+Auto
+
+Reads, edits, and runs commands inside the workspace sandbox
+
+Escalations only: network access, writes outside the workspace, privileged commands
+
+Full Access
+
+Everything, no sandbox
+
+Nothing — use only on disposable machines
+
+Auto is the sweet spot for phone-driven work: enough autonomy that a refactor doesn't need babysitting, with the dangerous moments still routed to your lock screen. Read Only turns Moshi into a remote planning surface — useful for "investigate and report back" tasks on a host you don't want modified. Save Full Access for sandboxed VMs where the blast radius is already contained.
+
+Answer from wherever you are [#answer-from-wherever-you-are]
+
+With moshi-hook running, every escalation, question, and finished task lands in Moshi's inbox as a card, grouped under Needs you / Working / Done — a live kanban of everything in flight. Cards carry the model name, working directory, and a stamina ring showing how much context window remains. See Agents & Usages [/docs/agents-usages].
+
+All your agents, one boardEvery running task as a card, from Needs you to Done — Codex and Claude Code side by side.Tap to play full 
+
+You rarely need to open the app:
+
+Push notifications carry Approve/Deny action buttons. A long-press on the lock screen answers Codex in the background — the request resolves over the daemon's bridge and the codex process on the host unblocks instantly. See Notifications [/docs/notifications].
+
+Live Activity keeps the active task on the lock screen and in the Dynamic Island — status, model, context bar. See Live Activity [/docs/live-activity].
+
+Apple Watch shows the same approvals with Approve/Deny on your wrist, plus a complication for your usage gauge. See Apple Watch [/docs/apple-watch].
+
+Answer from the lock screenLive Activity and Dynamic Island show the running task; the approval notification resolves with a tap.Tap to play full 
+
+A typical flow: you kick off "migrate the config loader to the new schema and run the tests" in Auto mode, lock your phone, and nothing buzzes for ten minutes — the edits and test runs all fit inside the sandbox. Then one notification: Codex wants to run npm install ajv. Long-press, Approve, pocket the phone, and the next buzz is the task finishing green.
+
+When Codex asks an open-ended question instead, the card offers Open terminal — which jumps you into the exact tmux window the agent is waiting in, not just the right host.
+
+model
+
+Approvals carry an expiry. If you don't answer in time, nothing breaks — the request falls back to Codex's own prompt in the terminal, exactly as if Moshi weren't there. The inbox card shows who resolved it: you, or the host on timeout.
+
+Teach the repo with AGENTS.md [#teach-the-repo-with-agents-md]
+
+The leverage move for phone-driven Codex is a good AGENTS.md. Codex reads it from the repo root (and subdirectories) at the start of every session — build commands, test invocations, conventions, the things you'd otherwise thumb-type into every prompt. Bootstrap one from the host, or from your phone:
+
+moshi session
+copy
+
+$codex
+
+$/init
+
+# Codex scans the repo and drafts AGENTS.md — review and commit it
+
+Once the repo carries its own context, dictated prompts can be short: "bump the API client to v3 and fix what breaks" works because AGENTS.md already says how to run the tests.
+
+Two Moshi-specific lines are worth adding:
+
+Completion pushes. Moshi's notification settings include a ready-made snippet — paste it into AGENTS.md and Codex pings your phone when a long task completes, even in setups where hooks can't run. See Notifications [/docs/notifications].
+
+House rules for escalations. A line like "never install dependencies without being asked" shifts work from your lock screen back into the plan, which matters when every escalation is a buzz.
+
+Models and reasoning effort [#models-and-reasoning-effort]
+
+Codex exposes two dials in one place — /model picks the model and its reasoning effort. That second dial is the Codex-specific one: low effort answers fast and cheap; high effort thinks longer per step and shines on gnarly, multi-file refactors. From a phone, the heuristic is simple:
+
+Kicking off something big before a commute? High reasoning effort. You won't be watching, so latency is free — spend it on quality.
+
+Interactive back-and-forth at a café table? Medium or low. You're in the loop anyway, and snappier turns beat deeper ones.
+
+/status confirms what you're running — model, reasoning effort, approval mode, sandbox — and the panel button makes it a one-tap check.
+
+Prompting from your thumb [#prompting-from-your-thumb]
+
+Everything in Moshi's input arsenal — voice dictation [/guides/voice] with four speech engines, image and file paste [/docs/image-paste] over SCP, the terminal toolbar and D-pad, hardware-keyboard chords — works identically for Codex. Two pieces are tuned for it specifically.
+
+The Codex shortcut panel [#the-codex-shortcut-panel]
+
+Codex's slash commands sit as one-tap buttons above the keyboard, reorderable and extensible with your own:
+
+/new
+
+Start a fresh conversation.
+
+/compact
+
+Compact context when the stamina ring runs low.
+
+/model
+
+Switch models and reasoning effort mid-session.
+
+/permissions
+
+Review what Codex may do without asking.
+
+/plan
+
+Have Codex design before it edits.
+
+/resume
+
+Pick up a previous session.
+
+/diff
+
+Show what changed in this session.
+
+/status
+
+Session, account, and rate-limit status.
+
+More Codex commands — /review, /init, /mcp, /mention — ship disabled and are one toggle away, and long-pressing any button edits it. See Keyboard and shortcuts [/docs/keyboard].
+
+Built for thumbs, not just keyboardsThe Codex panel puts /new, /status, /diff, and friends one tap above the keyboard.Tap to play full 
+
+Plan first, approve the plan [#plan-first-approve-the-plan]
+
+/plan is underrated on a phone. Dictate the goal, let Codex produce a plan while you're walking, read it as prose — far easier on a small screen than reviewing code — and only then turn it loose. Combined with Auto mode, this front-loads your judgment into the one artifact that's pleasant to read on mobile.
+
+Reading what Codex did [#reading-what-codex-did]
+
+/diff in the terminal works, but Moshi's review surfaces are built for the screen in your hand — and all of them are served by the host's own daemon, so contents never leave your machine:
+
+The diff viewer [/docs/diff-viewer] renders the session's changes side-by-side or stacked, syntax highlighted, with staged/unstaged/untracked sections.
+
+The Browse tab walks the whole file tree at any commit — when Codex's summary references a file it didn't touch, you can go read it.
+
+Browser preview [/docs/browser-preview] opens the dev server Codex is running in an in-app browser over your own SSH session — no public tunnel.
+
+Read diffs without squintingSide-by-side or stacked, syntax highlighted, served by moshi-hook — diff contents stay on the host.Tap to play full 
+
+For everything else, Moshi's scrollback [/docs/scrolling] and clipboard [/docs/clipboard] handling are tuned for touch.
+
+Watch your rate limits [#watch-your-rate-limits]
+
+Codex meters usage against your ChatGPT plan in windows it reports itself — typically a short window and a weekly one. Moshi tracks whatever your account exposes, per account: the inbox's Usages tab shows each window with a pace marker, the home screen condenses every agent into activity-style rings, and a watch complication keeps the gauge on your wrist. Deciding whether tonight has room for one more big refactor is a glance, not a guess. See Agents & Usages [/docs/agents-usages].
+
+Inside the session, /status is the source of truth — it reports the same windows from Codex's side, along with token usage for the current context. The stamina ring on each inbox card covers that second budget continuously, so you know when a /compact is due before Codex starts forgetting things.
+
+Long runs, and picking sessions back up [#long-runs-and-picking-sessions-back-up]
+
+The durability stack is the same trio every agent guide on this site leans on: tmux keeps the codex process alive on the host, mosh lets the connection drop and silently return, and moshi-hook pings you the moment attention is needed. Run Codex inside moshi <dir> and "walk away mid-task" stops being a risk.
+
+Sessions that survive everythingThe agent runs inside tmux on the host — your phone connecting and disconnecting is irrelevant to it.Tap to play full 
+
+Where Codex stands out is resuming. Sessions are first-class objects with IDs, and the CLI can list and reopen them:
+
+moshi session
+copy
+
+$codex resume --last
+
+# reopen the most recent session, full history intact
+
+$codex resume
+
+# or pick from the session list — /resume on the panel does the same
+
+Moshi's inbox cards carry the session ID, copyable from the detail view, so "continue that thing from Tuesday" works even after the tmux window is long gone. This is also the recovery path if you ran Codex without tmux and lost the connection: the process died, the session didn't.
+
+Run Codex next to Claude [#run-codex-next-to-claude]
+
+Nothing about this loop is exclusive. A Codex session refactoring in one tmux window, Claude Code writing tests in another — the inbox kanban holds both, every event carries its origin, and the shortcut panel follows whichever agent's session you're in. When you're ready to scale past two, see Running a fleet of agents [/guides/fleet].
+
+Troubleshooting [#troubleshooting]
+
+Escalations never reach my phone [#escalations-never-reach-my-phone]
+
+Run moshi-hook doctor on the host — the Agent inbox & alerts row should read Ready, which needs the daemon running, the gateway answering, the host paired, and Codex's hooks current. The status dot on the connection row in Moshi tells you the same at a glance. If the daemon is up but events don't arrive, confirm notifications are enabled in Moshi's Settings and that the host can reach the internet. Re-running moshi-hook install refreshes ~/.codex/hooks.json and the Codex config flag if they drifted.
+
+My phone buzzes constantly [#my-phone-buzzes-constantly]
+
+That's an approval-mode mismatch, not a Moshi setting. If every file edit is an ask, you're in Read Only — switch to Auto with /approvals and the routine work goes quiet, leaving only real escalations.
+
+Codex dies when I lose signal [#codex-dies-when-i-lose-signal]
+
+That's the no-tmux failure mode. Start the agent inside moshi <dir> (or any tmux session) and the process survives the disconnect; Moshi just re-attaches — and codex resume --last brings the conversation back if the process did die.
+
+Codex works locally but Moshi can't find the session [#codex-works-locally-but-moshi-can-t-find-the-session]
+
+Moshi detects multiplexers over a non-interactive SSH shell, which often skips your rc files. If tmux lives in /opt/homebrew/bin or /usr/local/bin, make sure that's on the non-interactive PATH. The tmux doc [/docs/tmux#troubleshooting] walks through this.
+
+Codex 0.157+ background server [#codex-0-157-background-server]
+
+Codex 0.157 turned on features.daemon_auto_start by default, so interactive codex sessions run inside one shared background server (codex app-server --managed-daemon). That server runs the hooks, holds every session's transcript, and keeps the environment of whichever terminal started it — so Moshi attributes every Codex session to that first terminal. Chat View, replies, and inbox approvals follow the wrong pane.
+
+moshi-hook install and moshi-hook doctor detect this and, after asking, set daemon_auto_start = false under [features] in $CODEX_HOME/config.toml (default ~/.codex/config.toml) and stop the running server plus its updater. moshi-hook doctor --yes applies it without asking. Codex sessions attached to the server disconnect and need restarting; turning the feature off alone is not enough while a server is still running, because new sessions keep attaching to it. moshi-hook uninstall leaves the setting in place.
+
+To do it by hand:
+
+host
+copy
+
+$codex features disable daemon_auto_start
+
+$codex app-server daemon stop
+
+$pkill -f 'app-server daemon pid-update-loop'
+
+# `daemon stop` leaves the updater running
+
+Passing -c, --enable, or --disable on the codex command line also makes Codex skip the shared server for that launch.
+
+Diff or preview buttons are missing [#diff-or-preview-buttons-are-missing]
+
+Both ride on the daemon's local gateway. If they've gone quiet, walk through Debugging the gateway [/docs/debug-gateway] — it's almost always an outdated daemon or a port mismatch.
+
+Where to go next [#where-to-go-next]
+
+Moshi with Claude Code [/guides/claude-code] — the flagship walkthrough of every Moshi surface this guide condensed
+
+Running a fleet of agents [/guides/fleet] — Codex and Claude side by side
+
+Moshi with tmux [/guides/tmux] — the durable workspace this guide leans on
+
+Hands-free with voice [/guides/voice] — dictation-first workflows
+
+Hooks [/docs/hooks] and Agents & Usages [/docs/agents-usages] — the event pipeline in depth
+
+Next steps
+
+Claude Code walkthrough if you run both [/guides/claude-code]
+
+wire hooks for sandbox escalations [/docs/hooks]
+
+usage rings and rate-limit windows [/docs/agents-usages]
+
+Chat View over a live Codex session [/docs/chat-view]
+
+See Moshi pricing [/pricing]
+
+ previousMoshi with Claude Code [/guides/claude-code]next Running a fleet of agents [/guides/fleet]
+
+on this page
+
+read0%
+
+ [/]
+Every coding agent, in your pocket. Real SSH & Mosh to your own machine.
+
+App Store [https://apps.apple.com/app/id6757859949]Google Play [https://play.google.com/store/apps/details?id=app.getmoshi.android]
+
+Product
+
+Moshi [/]
+
+Moshi Desktop [/desktop]
+
+Mata [/mata]
+
+Pricing [/pricing]
+
+Resources
+
+Docs [/docs]
+
+Learn [/guides]
+
+Themes [/themes]
+
+GitHub [https://github.com/rjyo/homebrew-moshi]
+
+Compare
+
+T3 Code [/compare/t3-code]
+
+Orca [/compare/orca]
+
+Paseo [/compare/paseo]
+
+Termius [/compare/termius]
+
+Blink Shell [/compare/blink]
+
+Secure ShellFish [/compare/shellfish]
+
+Happy [/compare/happy]
+
+Kittylitter [/compare/kittylitter]
+
+Claude Code Remote Control [/compare/anthropic-remote-control]
+
+© 2026 Moshi. Made with love and cat hair.
+Support [/cdn-cgi/l/email-protection#ddaea8adadb2afa99dbab8a9b0b2aeb5b4f3bcadad]Report a bug [/docs/report-a-bug]Twitter / X [https://twitter.com/odd_joel]Brand [/brand]Privacy [/privacy]Terms [/terms]

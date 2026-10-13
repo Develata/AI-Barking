@@ -1,0 +1,309 @@
+Codex CLI Daemon: Why Users Want It Opt-In
+
+El Solitario
+ [https://elsolitario.org/en/]
+
+ Toggle Navigation
+
+Tech News [https://elsolitario.org/en/category/tech-news/]
+
+Artificial Intelligence [https://elsolitario.org/en/category/artificial-intelligence/]
+
+Programming [https://elsolitario.org/en/category/programming/]
+
+Tutorials [https://elsolitario.org/en/category/tutorials/]
+
+Security [https://elsolitario.org/en/category/security/]
+
+ Search for:
+
+Codex CLI Ships a Persistent Daemon Without Warning in 0.157.0
+
+Published by Andrés Morales [https://elsolitario.org/en/author/andres_morales/] on 12 October, 202612 October, 2026
+
+⏱️ Reading time: 10 min
+
+Since version 0.157.0, the Codex CLI daemon [https://elsolitario.org/2026/10/12/codex-cli-daemon-auto-start-opt-in/] starts on its own: every interactive session leaves a background process running that survives closing the terminal and auto-updates every hour. The change shipped without explicit notice in the changelog and sparked a direct complaint to OpenAI: issue #48195 [https://github.com/openai/codex/issues/48195], opened on September 25, 2026 in the Codex repository, asks for that behavior to be opt-in instead of enabled by default.
+
+📑 En este artículo
+
+TL;DR [#tldr]
+
+What Codex CLI Is [#what-codex-cli-is]
+
+What Happened With the Codex CLI Daemon [#what-happened-with-the-codex-cli-daemon]
+
+Context and History [#context-and-history]
+
+Technical Details: How the Daemon Works [#technical-details-how-the-daemon-works]
+
+Impact and Analysis [#impact-and-analysis]
+
+What’s Next [#whats-next]
+
+Frequently Asked Questions [#frequently-asked-questions]
+
+What exactly does the Codex CLI daemon do? [#what-exactly-does-the-codex-cli-daemon-do]
+
+How do I disable daemon_auto_start in Codex CLI? [#how-do-i-disable-daemon_auto_start-in-codex-cli]
+
+Why did Codex CLI start using a persistent backend in 0.157.0? [#why-did-codex-cli-start-using-a-persistent-backend-in-0-157-0]
+
+Does Codex’s background daemon only affect npm installations? [#does-codexs-background-daemon-only-affect-npm-installations]
+
+What is daemon_auto_start? [#what-is-daemon_auto_start]
+
+References [#references]
+
+TL;DR
+
+Since Codex CLI 0.157.0, opening an interactive session leaves a daemon alive after closing the terminal.
+
+Issue #48195, opened on September 25, 2026, asks for daemon_auto_start to be opt-in by default.
+
+That version copies ~374 MB of the package to ~/.codex/packages/, decoupled from the package manager.
+
+An updater checks for changes every hour and restarts the backend, which can kill active turns.
+
+Shutting down the daemon with app-server daemon stop doesn’t kill pid-update-loop, which keeps running afterward.
+
+What Codex CLI Is
+
+Codex CLI is OpenAI’s tool for coding with AI agents from the terminal: it reads files, runs commands, and holds multi-turn conversations with a model. It installs as the npm package @openai/codex, and since version 0.157.0, every interactive session activates a Codex CLI daemon in the background.
+
+The project is open source and ships as an npm package under @openai/codex, with native builds for different platforms. The CLI competes with tools like GitHub Copilot CLI or Claude Code, and OpenAI has been adding a Remote Control mode to manage sessions from a phone or the web, which requires a backend shared across devices.
+
+What Happened With the Codex CLI Daemon
+
+The reporter, a GitHub user identified as Yihua-Liu-1997, documented the behavior after updating to version 0.157.0, installed with npm install -g @openai/codex on Linux via WSL2. According to the report, opening an interactive codex session triggers three actions that didn’t happen before.
+
+First, it starts codex app-server --managed-daemon in its own session, with no associated terminal, and the process gets reparented to PID 1: it stays alive after closing each Codex window, until someone runs codex app-server daemon stop or the machine reboots. Second, it copies the complete platform package (about 374 MB, including the codex binary, codex-code-mode-host, and bundled versions of bwrap, zsh, and rg) to ~/.codex/packages/app-server-daemon/releases/<version>/, an identical copy of what npm had just installed, and runs the daemon from that copy. From that point on, the backend version is decoupled from whatever the user installed via their package manager. Third, it launches an independent updater (codex app-server daemon pid-update-loop) that checks for updates 5 minutes after starting and then every hour, downloads new versions, and restarts the backend.
+
+That automatic restart can kill an agent’s active turns mid-execution, a problem documented separately in issue #40969 [https://github.com/openai/codex/issues/40969], which details that the update forces a shutdown after a 60-second wait budget and that, on top of that, it can’t be disabled. The reporter also describes a subtle side effect: the daemon locks in the environment of the session that first started it. If that first session had set a variable like HTTPS_PROXY to route through a corporate proxy, the daemon keeps using that proxy for all outbound connections, regardless of what variables later sessions launch with. Issues #42457 [https://github.com/openai/codex/issues/42457] and #37537 [https://github.com/openai/codex/issues/], which document hooks that receive the daemon’s working directory or terminal instead of the actual session’s, might share the same root cause.
+
+A developer’s comment about the problem had gathered 9 reactions as of September 25, 2026. Foto de CDC [https://unsplash.com/@cdc?utm_source=elsolitario&utm_medium=referral] en Unsplash [https://unsplash.com/?utm_source=elsolitario&utm_medium=referral]
+
+Context and History
+
+The issue was opened on September 25, 2026, and within the first few hours other developers confirmed the same behavior in different environments. One user wrote that nothing should be spinning up mysterious servers and processes out of nowhere on a minor version bump without telling people, a comment that gathered 9 reactions. Another user was blunter, calling the CLI unusable until it’s fixed, a comment that drew 10 reactions. A third user confirmed the problem on Windows 10 LTSC with the same 0.157.0 version and found that setting daemon_auto_start = false in config.toml resolves the symptom, though they also asked that the CLI fall back to local mode when the daemon’s startup is blocked by permissions, instead of requiring the --no-daemon flag manually.
+
+The complaint isn’t isolated. Previous issues had already touched on pieces of the same problem: #41188 [https://github.com/openai/codex/issues/41188] asks for Codex to support externally managed daemon executables instead of always copying its own; #46468 [https://github.com/openai/codex/issues/46468] describes an npm update leaving app-server on an old version without the daemon recovering on its own; and #48050 [https://github.com/openai/codex/issues/48050] reports that on Arch Linux, the Codex 0.157.0 package won’t start unless --no-daemon is used. These are separate reports about the same design decision: turning a CLI that used to live and die with each invocation into a client that talks to a persistent backend.
+
+Technical Details: How the Daemon Works
+
+What distinguishes this process from a simple background job is the combination of three operating system mechanisms. The first is reparenting to PID 1, the standard Unix technique for daemonizing a process: by detaching from the session that created it, it stops receiving signals like SIGHUP when that session ends, so the Codex CLI daemon runs from its own directory and survives closing the terminal by design, not by accident.
+
+The second mechanism is the versioned local copy. Instead of running the binary the package manager left in the PATH, the daemon runs from ~/.codex/packages/app-server-daemon/releases/. This solves a real problem (being able to update the backend without reinstalling the entire CLI) but creates another: there are two copies of the same software on disk, and nothing guarantees they’re on the same version after the updater does its job.
+
+The third mechanism is the updater itself, a separate loop that polls for new versions and restarts the backend if it finds one. The reporter tried shutting everything down manually and found an additional bug along the way: codex app-server daemon stop stops the app-server process, but not the pid-update-loop, which was still alive 70 seconds later and had to be killed manually. The full sequence documented to leave the machine clean is this:
+
+codex features disable daemon_auto_start
+codex app-server daemon stop
+pkill -f 'app-server daemon pid-update-loop'
+rm -rf ~/.codex/packages/app-server-daemon
+
+With daemon_auto_start set to false, a new TUI session no longer triggers any daemon. There’s no documented way to confirm from the outside whether the process was fully shut down: the reporter had to check processes by hand with pkill instead of relying on an official verification command.
+
+⚠️ Heads up: stopping the process with codex app-server daemon stop isn’t enough: the pid-update-loop updater keeps running separately and has to be killed on its own.
+
+ModeWhat happens when opening codexRiskWhen it’s a good fit
+
+daemon_auto_start = true (default since 0.157.0)Starts a persistent daemon and a background updaterThe backend can end up on a different version than the installed CLI; restarts can kill active turnsRemote Control or the desktop app, where multiple sessions share a backend
+
+daemon_auto_start = falseEach session runs the installed binary directly, with no background processLoses the benefit of a backend shared across sessionsNormal CLI use in a single terminal, the case for most of the issue’s reporters
+
+flowchart TD
+A["User runs codex"] --> B["Starts app-server --managed-daemon"]
+B --> C["Copies ~374 MB to ~/.codex/packages/"]
+B --> D["Starts pid-update-loop"]
+D --> E["Checks for updates every hour"]
+C --> F["Backend becomes decoupled from installed CLI"]
+E --> G["Restarts the daemon and can kill active turns"]
+
+The local copy of the Codex CLI backend takes up about 374 MB per installed version. Foto de National Cancer Institute [https://unsplash.com/@nci?utm_source=elsolitario&utm_medium=referral] en Unsplash [https://unsplash.com/?utm_source=elsolitario&utm_medium=referral]
+
+Impact and Analysis
+
+The implicit contract of a command-line tool is simple: it runs when you invoke it and ends when you close the terminal. The Codex CLI daemon breaks that contract without asking for confirmation, and it does so in exactly the kind of environment (developer terminals, often with access to corporate proxies and credentials) where a persistent process with its own network connection generates the most friction.
+
+The pattern of having a shared backend isn’t new: Docker Desktop runs a virtual machine in the background, and VS Code keeps an extension host alive while the editor is open. The difference the reports point to is twofold. First, most of those tools explicitly warn during installation that they’ll run a persistent service; Codex CLI turned it on in a minor version bump with no visible change in the installation flow. Second, those tools don’t typically auto-update in the background without user control, and the combination of a persistent process plus automatic updates plus the possibility of killing work in progress is what drew the most complaints.
+
+Packaging fragmentation makes the problem worse. The same symptoms show up with different nuances depending on how Codex was installed: via npm on Linux and WSL2, via the Arch Linux package (#48050 [https://github.com/openai/codex/issues/48050]), and on Windows 10 LTSC. Every package manager expects to control which binary runs and at what version, and a daemon that copies and updates itself behind that manager’s back breaks that expectation for any packager other than OpenAI itself.
+
+What’s Next
+
+As of this writing, issue #48195 [https://github.com/openai/codex/issues/48195] is open and tagged enhancement, CLI, and app-server, with no public response from an OpenAI maintainer on whether daemon_auto_start will become opt-in. The reporter leaves three concrete requests if the default behavior doesn’t change: that the daemon shut itself down once its last client disconnects, that it not auto-update or copy itself when the installation came from a package manager (running the already-installed binary instead), and that it at least ask once before being activated.
+
+In the meantime, the only confirmed mitigation is manual: set daemon_auto_start = false in config.toml before opening a new session, or repeat the full cleanup sequence if the daemon is already running.
+
+Try it yourself: run grep daemon_auto_start ~/.codex/config.toml to see if your install already has the flag set, and if not, join the discussion on issue #48195 [https://github.com/openai/codex/issues/48195] to track whether OpenAI changes it.
+
+📬 Get new articles by email
+
+We only email about big articles (1-2 a month).
+
+ Subscribe
+
+Frequently Asked Questions
+
+What exactly does the Codex CLI daemon do?
+
+It starts with the first interactive session from version 0.157.0 onward, runs in the background with no associated terminal, copies the platform package to its own directory, and updates itself every hour until it’s stopped manually or the machine reboots.
+
+How do I disable daemon_auto_start in Codex CLI?
+
+Set daemon_auto_start = false in ~/.codex/config.toml, or run codex features disable daemon_auto_start before opening a new session; if the daemon is already running, you need to stop it and kill the pid-update-loop process separately.
+
+Why did Codex CLI start using a persistent backend in 0.157.0?
+
+There’s no official announcement explaining it, but the design matches the needs of Remote Control and OpenAI’s desktop app, which require a process shared across multiple sessions or devices; the complaint is that the same design got turned on for the terminal CLI too, where it isn’t needed.
+
+Does Codex’s background daemon only affect npm installations?
+
+No. Reports confirm the same problem on Windows 10 LTSC, on WSL2 over Linux, and on the Arch Linux package, each with a different variant of the symptom.
+
+What is daemon_auto_start?
+
+It’s the Codex CLI configuration flag that controls whether each interactive session starts the background backend; since 0.157.0 it comes enabled by default.
+
+References
+
+GitHub: issue #48195 [https://github.com/openai/codex/issues/48195]: original report asking to make daemon_auto_start opt-in in Codex CLI.
+
+GitHub: issue #40969 [https://github.com/openai/codex/issues/40969]: documents that the daemon’s auto-update forces active turns to close after 60 seconds.
+
+GitHub: issue #41188 [https://github.com/openai/codex/issues/41188]: asks for support for externally managed app-server daemon executables.
+
+GitHub: openai/codex [https://github.com/openai/codex]: official Codex CLI repository.
+
+npm: @openai/codex: the CLI’s installation package.
+
+📱 Enjoy this content? Follow @programacion [https://t.me/programacion] on Telegram for daily tech content in Spanish: quick summaries, fresh content every day.
+
+Featured image: Foto de Riku Lu [https://unsplash.com/@riku?utm_source=elsolitario&utm_medium=referral] en Unsplash [https://unsplash.com/?utm_source=elsolitario&utm_medium=referral]
+
+📚 Keep reading
+
+Browser Fingerprinting: What It Is and How It WorksBrowser fingerprinting identifies your device by combining GPU, audio, and installed font signals, without using cookies. Neither clearing… [https://elsolitario.org/en/2026/10/12/browser-fingerprinting-what-it-is-and-how-it-works/]
+
+Nanolathe: Clean-Room Reverse Engineering, ExplainedNanolathe revives Total Annihilation without touching the original code, using clean-room reverse engineering to document its formats and… [https://elsolitario.org/en/2026/10/11/clean-room-reverse-engineering-nanolathe/]
+
+Testing Your README With Real Users: A Step-by-Step GuideTerence Eden paid volunteers 25 euros an hour to follow his project's README and found errors he couldn't… [https://elsolitario.org/en/2026/10/11/testing-readme-real-users-author-bias/]
+
+Did it work for you? Got a different error? Say so below: questions get answered and help the next reader.
+Leave a comment [#respond]
+
+ [https://www.addtoany.com/add_to/telegram?linkurl=https%3A%2F%2Felsolitario.org%2Fen%2F2026%2F10%2F12%2Fcodex-cli-daemon-auto-start-opt-in-en%2F&linkname=Codex%20CLI%20Ships%20a%20Persistent%20Daemon%20Without%20Warning%20in%200.157.0] [https://www.addtoany.com/add_to/facebook?linkurl=https%3A%2F%2Felsolitario.org%2Fen%2F2026%2F10%2F12%2Fcodex-cli-daemon-auto-start-opt-in-en%2F&linkname=Codex%20CLI%20Ships%20a%20Persistent%20Daemon%20Without%20Warning%20in%200.157.0] [https://www.addtoany.com/add_to/twitter?linkurl=https%3A%2F%2Felsolitario.org%2Fen%2F2026%2F10%2F12%2Fcodex-cli-daemon-auto-start-opt-in-en%2F&linkname=Codex%20CLI%20Ships%20a%20Persistent%20Daemon%20Without%20Warning%20in%200.157.0] [https://www.addtoany.com/add_to/linkedin?linkurl=https%3A%2F%2Felsolitario.org%2Fen%2F2026%2F10%2F12%2Fcodex-cli-daemon-auto-start-opt-in-en%2F&linkname=Codex%20CLI%20Ships%20a%20Persistent%20Daemon%20Without%20Warning%20in%200.157.0] [https://www.addtoany.com/add_to/trello?linkurl=https%3A%2F%2Felsolitario.org%2Fen%2F2026%2F10%2F12%2Fcodex-cli-daemon-auto-start-opt-in-en%2F&linkname=Codex%20CLI%20Ships%20a%20Persistent%20Daemon%20Without%20Warning%20in%200.157.0] [https://www.addtoany.com/add_to/facebook_messenger?linkurl=https%3A%2F%2Felsolitario.org%2Fen%2F2026%2F10%2F12%2Fcodex-cli-daemon-auto-start-opt-in-en%2F&linkname=Codex%20CLI%20Ships%20a%20Persistent%20Daemon%20Without%20Warning%20in%200.157.0] [https://www.addtoany.com/add_to/whatsapp?linkurl=https%3A%2F%2Felsolitario.org%2Fen%2F2026%2F10%2F12%2Fcodex-cli-daemon-auto-start-opt-in-en%2F&linkname=Codex%20CLI%20Ships%20a%20Persistent%20Daemon%20Without%20Warning%20in%200.157.0]
+
+Categories: Tech News [https://elsolitario.org/en/category/tech-news/] 
+
+ [https://elsolitario.org/en/author/andres_morales/]
+
+Andrés Morales
+
+Developer and AI researcher. Writes about language models, frameworks, developer tooling, and open source releases. Covers ML papers, the tech startup ecosystem, and programming trends.
+
+ 0 Comments 
+
+Leave a Reply Cancel reply [/en/2026/10/12/codex-cli-daemon-auto-start-opt-in-en/#respond]
+
+Your email address will not be published. Required fields are marked *
+
+ Name * 
+
+ Email * 
+
+ What's on your mind? 
+
+You can include code inside <code>…</code> or, for several lines, <pre><code>…</code></pre>.
+
+Δ
+
+This site uses Akismet to reduce spam. Learn how your comment data is processed. [https://akismet.com/privacy/]
+
+Linux Courses
+
+Introducción a Linux: Instala Linux en tu PC
+
+Empezá seguro en Linux: instalación paso a paso.
+
+★ 4,6 en UdemyGratis
+
+ [https://www.udemy.com/course/instala-linux-en-tu-pc/?referralCode=E7069FED63731A65BF96]
+
+Aprendiendo Linux: uso, terminal y comandos
+
+Entorno de escritorio y comandos básicos de GNU/Linux.
+
+★ 4,4 en Udemy$19,99
+
+ [https://www.udemy.com/course/aprendiendo-linux-uso-terminal-y-comandos/?referralCode=8ADD616A099FF0A4DAE1]
+
+Enlaces de afiliado: si te inscribís, el blog recibe una comisión sin costo extra para vos.
+
+El Solitario [https://elsolitario.org] > Tech News [https://elsolitario.org/en/category/tech-news/] > Codex CLI Ships a Persistent Daemon Without Warning in 0.157.0
+
+Recent Posts
+
+ OT/IoT Security: What It Is and How to Shield Your Infrastructure [https://elsolitario.org/en/2026/10/13/ot-iot-security-what-it-is-and-how-to-shield-infrastructure/]
+
+ Codex CLI Ships a Persistent Daemon Without Warning in 0.157.0 [https://elsolitario.org/en/2026/10/12/codex-cli-daemon-auto-start-opt-in-en/]
+
+ Browser Fingerprinting: What It Is and How It Works [https://elsolitario.org/en/2026/10/12/browser-fingerprinting-what-it-is-and-how-it-works/]
+
+ Nanolathe: Clean-Room Reverse Engineering, Explained [https://elsolitario.org/en/2026/10/11/clean-room-reverse-engineering-nanolathe/]
+
+ OAuth 2.0: What It Is and How Access Delegation Works [https://elsolitario.org/en/2026/10/11/oauth-2-access-delegation-without-passwords/]
+
+Categories
+
+Artificial Intelligence [https://elsolitario.org/en/category/artificial-intelligence/]
+
+Microservices [https://elsolitario.org/en/category/microservices/]
+
+Networking [https://elsolitario.org/en/category/networking/]
+
+Programming [https://elsolitario.org/en/category/programming/]
+
+Security [https://elsolitario.org/en/category/security/]
+
+Tech News [https://elsolitario.org/en/category/tech-news/]
+
+Tutorials [https://elsolitario.org/en/category/tutorials/]
+
+Related Posts
+
+ [https://elsolitario.org/en/2026/10/12/browser-fingerprinting-what-it-is-and-how-it-works/]
+
+Tech News [https://elsolitario.org/en/category/tech-news/] 
+
+ Browser Fingerprinting: What It Is and How It Works [https://elsolitario.org/en/2026/10/12/browser-fingerprinting-what-it-is-and-how-it-works/]
+
+Browser fingerprinting identifies your device by combining GPU, audio, and installed font signals, without using cookies. Neither clearing your history nor connecting to a VPN disables it, because neither one touches your hardware. We show you how it works under the hood and what real settings actually reduce how much it gives you away.
+
+ [https://elsolitario.org/en/2026/10/11/clean-room-reverse-engineering-nanolathe/]
+
+Tech News [https://elsolitario.org/en/category/tech-news/] 
+
+ Nanolathe: Clean-Room Reverse Engineering, Explained [https://elsolitario.org/en/2026/10/11/clean-room-reverse-engineering-nanolathe/]
+
+Nanolathe revives Total Annihilation without touching the original code, using clean-room reverse engineering to document its formats and rebuild the engine from scratch. The technique is the same legal defense Phoenix Technologies used for the IBM BIOS in 1984, and it still underpins projects like ReactOS today.
+
+ [https://elsolitario.org/en/2026/10/11/testing-readme-real-users-author-bias/]
+
+Tech News [https://elsolitario.org/en/category/tech-news/] 
+
+ Testing Your README With Real Users: A Step-by-Step Guide [https://elsolitario.org/en/2026/10/11/testing-readme-real-users-author-bias/]
+
+Terence Eden paid volunteers 25 euros an hour to follow his project's README and found errors he couldn't see himself. Here's how to replicate that real-user documentation testing method, and the author biases that make it necessary.
+
+Privacy Policy [https://elsolitario.org/en/privacy-policy/]
+
+Hestia | Developed by ThemeIsle [https://themeisle.com]
+
+ ✕
+
+📑
+
+ 🌓
+ Cambiar tema

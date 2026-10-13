@@ -1,0 +1,325 @@
+Skip to content
+Navigation Menu
+Platform
+Solutions
+Resources
+Open Source
+Enterprise
+Pricing
+Sign in
+Sign up
+openai
+codex
+Repository navigation
+Code
+Issues
+5k+
+ (5k+)
+Pull requests
+165
+ (165)
+Discussions
+Actions
+Security and quality
+1
+ (1)
+Insights
+CLI: make daemon_auto_start opt-in — a persistent, self-updating background daemon shouldn't be the default
+ #48195
+New issue
+Open
+Description
+Yihua-Liu-1997
+opened 
+What variant of Codex are you using?
+
+CLI — 0.157.0, installed via npm install -g @openai/codex, Linux (WSL2)
+
+What feature would you like to see?
+
+Please make daemon_auto_start opt-in (default false) for the CLI, or at least ask once before turning it on.
+
+Since 0.157.0, just opening an interactive codex session:
+
+Starts a persistent background daemon (codex app-server --managed-daemon). It runs in its own session with no TTY and keeps running after every Codex window is closed (reparented to PID 1) until codex app-server daemon stop or a reboot.
+Copies the whole platform package (~374 MB: codex, codex-code-mode-host, bundled bwrap/zsh/rg) into ~/.codex/packages/app-server-daemon/releases/<version>/ — byte-identical to what npm had just installed — and runs the daemon from that copy. From then on the backend's version is decoupled from the CLI version I installed with my package manager.
+Starts a detached updater (codex app-server daemon pid-update-loop) that checks for updates 5 minutes after start and then hourly, downloads new releases and restarts the backend (which can kill active turns, see app-server daemon: auto-update force-kills active turns after a 60s drain budget, and cannot be disabled #40969).
+Pins the environment of whichever session happened to start it. I launch Codex through a wrapper that sets HTTPS_PROXY per invocation; the daemon keeps the first session's proxy variables and its outbound connections go through that proxy, whatever later sessions are launched with. Hooks in --remote mode receive the daemon's cwd, not the session's #42457 and Hooks spawned by the app-server daemon cannot identify the client terminal, breaking terminal-targeting hooks #37537 (daemon cwd / terminal instead of the session's) look like the same root cause.
+
+For a CLI, the least surprising default is that the backend lives and dies with the window, runs the binary I installed, and doesn't update itself in the background. A shared, self-updating daemon makes sense for Remote Control / the desktop app, so it would be fine to enable it there, or when the user explicitly runs codex app-server daemon start / bootstrap.
+
+If it stays on by default, please at least:
+
+exit an auto-started daemon when its last client disconnects;
+not copy/self-update when the CLI was installed by a package manager (npm/brew/pacman) — run the installed binary instead (Support externally managed app-server daemon executables #41188, npm update leaves app-server on old version, but daemon update/restart refuse recovery #46468, Codex 0.157.0 no longer starts with the Arch Linux package unless --no-daemon is used #48050).
+Additional information
+
+Bug found while turning it off: codex app-server daemon stop stops the app-server but leaves the pid-update-loop updater running (still alive 70 s later, had to kill it manually).
+
+Workaround I'm using:
+
+codex features disable daemon_auto_start
+codex app-server daemon stop
+pkill -f 'app-server daemon pid-update-loop'   # not stopped by `daemon stop`
+rm -rf ~/.codex/packages/app-server-daemon
+
+With the flag off, a new TUI session no longer spawns a daemon.
+
+Related: #40969, #41188, #46468, #48050, #42457, #37537
+
+👍
+React with 👍
+159
+Reacted by Matthew Hall, tagor, Yihua-Liu-1997, Ben Pace, Jakub Zarybnicky, Peter Nardi, Sri Senthil Balaji J, Jarosław Jasiński, Sam Hartsfield, Hieron A. Soares and 149 more
+🎉
+React with 🎉
+8
+Reacted by Jakub Zarybnicky, Jarosław Jasiński, Jamie Pond, Laurynas Karvelis, Risto Laanoja, Clive Miller, Nate Meyer and Ivan
+❤️
+React with ❤️
+9
+Reacted by tagor, Jakub Zarybnicky, Jarosław Jasiński, Jamie Pond, Laurynas Karvelis, Andrea Ritossa, Clive Miller, Mark Wolfe and Philipp Hartenfeller
+👀
+React with 👀
+2
+Reacted by Travis Fischer and Jules Kreuer
+Activity
+github-actions
+added 
+enhancement
+New feature or request
+ 
+CLI
+Issues related to the Codex CLI
+ 
+app-server
+Issues involving app server protocol or interfaces
+ 
+megahall commented 
+megahall
+
+@Yihua-Liu-1997 thanks for reporting this, I hit it myself... stuff should not be creating mystery servers and processes all of a sudden on small version number bumps without giving people a heads-up...
+
+👍
+React with 👍
+20
+Reacted by tagor, Flaviu Tamas, Felipe Lopes, Josh Triplett, BigBoyDevBox, Kamil Mielnik, Mikhail, Ayanami Kaine, Mike Elliott, Alexander Williamson and 10 more
+kr8vka0z commented 
+kr8vka0z
+
+agreed. the CLI is unusable until this is fixed.
+
+👍
+React with 👍
+22
+Reacted by tagor, Steven Dale, Felipe Lopes, krrr, Shaun Pedicini, Christian Hahn, BigBoyDevBox, Mikhail, Ayanami Kaine, Mike Elliott and 12 more
+tagorr commented 
+tagorr
+
+I can confirm this on Windows 10 LTSC with Codex CLI 0.157.0
+Setting daemon_auto_start = false in config.toml resolves the issue
+
+Two improvements would help:
+
+Automatically fall back to local mode when daemon startup is blocked by elevation, instead of requiring --no-daemon.
+Make daemon auto-start opt-in rather than the default.
+
+This would preserve the security restrictions without disrupting the normal CLI workflow.
+
+👍
+React with 👍
+2
+Reacted by BigBoyDevBox and Leo Razoumov
+Yihua-Liu-1997 commented 
+Yihua-Liu-1997
+Author
+
+@tagorr Indeed — both 1 and 2 would work~
+
+❤️
+React with ❤️
+1
+Reacted by tagor
+breakds
+added a commit that references this issue 
+
+codex: disable daemon auto-start by default
+
+...
+Verified
+b51c036
+felipeelopes commented 
+felipeelopes
+
+The Codex CLI is unusable due to this bug on Windows.
+
+zdd commented 
+zdd
+
+This is terrible. I can't input anything on the CLI at all. You should fix this problem as soon as possible and give us 100 banked reset!
+
+aetherxeg-source commented 
+aetherxeg-source
+ – with ChatGPT Codex Connector
+
+There is a useful provenance boundary behind this request:
+
+installed CLI identity != daemon execution identity
+
+Once the CLI copies itself into a managed release directory and a background updater can replace that copy, the process that services a later turn is no longer necessarily the artifact the user explicitly installed or invoked.
+
+I would make the daemon expose a small execution receipt for each client attachment containing at least:
+
+client_cli_version + daemon_binary_digest + daemon_generation + updater_state + inherited_environment_generation
+
+Then a client can distinguish:
+
+same installed artifact, same daemon generation;
+same CLI but different daemon generation;
+daemon binary changed independently of the package-manager state;
+daemon inherited environment from an earlier session.
+
+A strong regression would start the daemon under environment A, attach from environment B, update the installed CLI, and verify that the client can see exactly which daemon generation/binary/environment is authoritative for the turn rather than inferring it from the foreground CLI version.
+
+Related runtime behavioral-integrity work: https://github.com/AETHERXGLOBAL/execsurface
+
+difro
+added a commit that references this issue 
+
+Update codex to 0.160.1 with a sandbox patch for nix-user-chroot
+
+...
+cff8b11
+danielscoffee
+added a commit that references this issue 
+
+feat(codex): package Codex CLI from official release binaries
+
+...
+4f00eb3
+xizhou0606
+added a commit that references this issue 
+
+Add Oct 12 tech news (incremental scan window 18:00-19:00 UTC Oct 12 …
+
+...
+0c9fad3
+laurynas-karvelis commented 
+laurynas-karvelis
+Last edited by laurynas-karvelis
+
+Basically - a trait of malware. TBF I don't even think this was done by accident
+
+👍
+React with 👍
+16
+Reacted by tagor, Ymir, Abhiram S Sajeev, r3nor, Mike Elliott, Hemanth Devarapalli, Aaron Wade, Artur Sinila, Guido, Yaadata (Yadi) and 6 more
+❤️
+React with ❤️
+2
+Reacted by tagor and Nate Meyer
+skhaz commented 
+skhaz
+
++1 for disabling this
+
+tagorr commented 
+tagorr
+
+Basically - a trait of malware. TBF I don't even think this was done by accident
+
+Honestly, that's exactly what it feels like.
+
+st396gt commented 
+st396gt
+
+The part in the docs about wanting full read/write access to the entire host filesystem is why I'm running codex-cli in a hardened Raspberry Pi and ssh'ing into it.
+
+No daemons running that I can see, v0.160.0 from last week.
+
+Logarithmus commented 
+Logarithmus
+
+So codex is a virus at this point? Won't be surprised if they use it to create a botnet of those sweet residential IPs for web scrapping
+
+👍
+React with 👍
+2
+Reacted by Rodrigo Delduca and Wilson
+mateolafalce commented 
+mateolafalce
+
+agree, good move
+
+👍
+React with 👍
+1
+Reacted by Nick Lashinsky
+alexklibisz commented 
+alexklibisz
+Last edited by alexklibisz
+
+Edit: #53547
+
+foma-agent commented 
+foma-agent
+
+The supported opt-out is still invisible in the official config reference. I fetched the complete page today: it has zero daemon_auto_start rows while documenting the CLI's own check_for_update_on_startup. The 0.157.0 release note still gives the change one sentence — “Enabled automatic background-server startup for eligible interactive sessions, with recovery choices when server settings are incompatible” — without naming the persistent process, the managed package copy, or the hourly updater. #40969 is still open on the updater's 60-second drain followed by SIGKILL.
+
+@aetherxeg-source's execution-receipt proposal is the useful boundary here: client version, daemon binary digest/generation, updater state, and inherited-environment generation. @alexklibisz's fresh environment report makes the last field concrete. I traced those current docs and source threads rather than running the daemon; source trail: https://bokonon.ai/notes/2026-10-12-codex-omits-daemon-auto-start/
+
+😕
+React with 😕
+1
+Reacted by Michael Kesper
+shakefu commented 
+shakefu
+
+Codex is malware, got it. Guess I’m rolling back all the Codex seat licenses at my company.
+
+JanPokorny
+added a commit that references this issue 
+
+fix(agents): keep Codex from starting its self-updating background da…
+
+...
+Verified
+0374554
+Sign up for free
+ to join this conversation on GitHub. Already have an account? Sign in to comment
+Metadata
+Assignees
+No one assigned
+Labels
+CLI
+Issues related to the Codex CLI
+app-server
+Issues involving app server protocol or interfaces
+enhancement
+New feature or request
+Type
+No type
+Projects
+No projects
+Milestone
+No milestone
+Relationships
+None yet
+Development
+No branches or pull requests
+Participants
++10
+Issue actions
+Open in GitHub Copilot app
+Footer
+© 2026 GitHub, Inc.
+Footer navigation
+Terms
+Privacy
+Security
+Status
+Community
+Docs
+Contact
+Manage cookies
+Do not share my personal information

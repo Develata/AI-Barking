@@ -1,0 +1,94 @@
+# HN 50060694 选摘评论（取自 a-hn-50060694.json，Algolia 快照 2026-10-13 11:41Z；HN 评论不公开得分，下列“回复数”=该评论下全部后代数，仅作热度参考）
+
+https://news.ycombinator.com/item?id=50060925  dingaling911  2026-10-12T18:44:52.000Z  后代数=43
+This stuff is moving fast, should update automatically. This is kind of standard now. Browsers do it. No reason for harnesses not to do it as well.
+
+https://news.ycombinator.com/item?id=50060975  icantevenhold  2026-10-12T18:48:02.000Z  后代数=20
+My browser doesnt update automatically, i have to approve it.
+Maybe this kind of stuff is standard for some people but I absolutely loathe auto updating software for many reasons
+
+https://news.ycombinator.com/item?id=50061258  timdorr  2026-10-12T19:06:58.000Z  后代数=4
+This is the same operational model as Claude Code.
+  ls ~/.local/share/claude/versions/
+  ps auxww | grep "claude bg"
+
+I see a few prior versions of the Claude Code binary and several running background tasks, without any copy of Claude Code in the foreground. I regularly get a "Update available" message in my Claude Code UI too.
+
+https://news.ycombinator.com/item?id=50061569  whimblepop  2026-10-12T19:23:03.000Z  后代数=0
+This kind of stuff often breaks for applications packaged with Nix, so it's often removed from Nix packages for compatibility reasons. Both behaviors you mention are helpfully patched out of the Claude Code package I use: https://github.com/numtide/llm-agents.nix/blob/dc285bfd94ec7a89118d17eb288728439876558c/packages/claude-code/package.nix#L45
+As a result, I never knew that Claude Code does a nasty thing like this, either. :-\
+Fwiw, packages in that repo get version bumped each day, so if that's a fast enough pace for you it may be a good alternative.
+
+https://news.ycombinator.com/item?id=50061772  javcasas  2026-10-12T19:34:58.000Z  后代数=1
+And here is the issue raised in github: https://github.com/anthropics/claude-code/issues/14980
+TLDR: They don't care.
+
+https://news.ycombinator.com/item?id=50060934  icantevenhold  2026-10-12T18:45:47.000Z  后代数=78
+It also fills up my HD with old versions.
+I investigated and it took up something like 12 gigabytes in total on my system; which seems insane to me, it’s just a harness?
+People moan about how badly made Claude code is but Codex seems much worse on every metric
+
+https://news.ycombinator.com/item?id=50061501  whimblepop  2026-10-12T19:18:55.000Z  后代数=5
+There aren't any documented settings to disable this, but there is a feature flag it currently sits behind. You can flip it in your ~/.codex/config.toml[1]:
+  [features]
+  daemon_auto_start = false
+
+
+There are also some files that it writes to in ~/.codex at startup: pid files, lock files, things like that. You can delete them and replace them with symlinks to /dev/null, then mark those unwritable with `chattr +i` or similar. Presumably then the background daemon will crash on startup, if the feature flag ever goes away.
+--
+1: https://github.com/openai/codex/blob/0c329ad2c9d5a2592128a1d536c66e16f9397e46/codex-rs/core/config.schema.json#L869
+
+https://news.ycombinator.com/item?id=50061573  pilooch  2026-10-12T19:23:25.000Z  后代数=1
+Yes this should be turned off by default. The daemon is useful when building apps on top of the daemon server, e.g. pi or pi-durable custom harnesses.
+
+https://news.ycombinator.com/item?id=50061735  vunderba  2026-10-12T19:32:33.000Z  后代数=0
+Yep, the real issue is that it was something they didn’t have before, and then with Codex 0.157.0 enabled, they installed this persistent nonsense [1] that survives after the last instance of Codex has exited on your machine, which is just gross.
+  codex features disable daemon_auto_start
+  codex app-server daemon stop
+  pkill -f 'app-server daemon pid-update-loop'
+
+
+[1] - https://github.com/openai/codex/issues/48195
+
+https://news.ycombinator.com/item?id=50061252  wtallis  2026-10-12T19:06:36.000Z  后代数=3
+Serious tools shouldn't do this. Sure, you can offer an opt-in rapid release beta update option, but if you can't go more than a month without forcing me into a "stable" update that changes the UI and behavior I'm getting used to, then I'm not going to consider your software stable and reliable enough to be worth developing expertise in using.
+
+https://news.ycombinator.com/item?id=50061239  isityettime  2026-10-12T19:05:31.000Z  后代数=0
+Ordinary package managers are totally capable of updating thousands of programs without manual effort, including automatically and in the background if that's a thing you want. But they do it without violating users' sovereignty over their own computers or turning every app into a special snowflake that gets to install software (namely itself) in its own bespoke way.
+
+https://news.ycombinator.com/item?id=50061120  swatcoder  2026-10-12T18:58:01.000Z  后代数=0
+Products moving fast doesn't mean that they're moving in the direction I want, or that I want them to move underneath me while I'm in the middle of a project.
+Auto-update systems have value but are not a suitable default for professional tools.
+
+https://news.ycombinator.com/item?id=50061260  jstummbillig  2026-10-12T19:07:08.000Z  后代数=0
+Being able to turn auto-updates off is okay, but that being the default would certainly not be okay in Codex, giving the reach, what it can do and how immature it is.
+
+https://news.ycombinator.com/item?id=50062169  ranger_danger  2026-10-12T20:02:20.000Z  后代数=0
+In some circles this is called a backdoor.
+
+https://news.ycombinator.com/item?id=50062278  kristjansson  2026-10-12T20:10:37.000Z  后代数=0
+not to mention the daemon mode breaks a bunch of assumptions one might have about about codex CLI e.g. that codex CLI inherits the env vars of the shell that invokes it.
+—no-daemon is the way, but still feels like the noose is tightening …
+
+https://news.ycombinator.com/item?id=50062569  AndreasBackx  2026-10-12T20:29:09.000Z  后代数=1
+I feel like so many of the new AI tooling is reinventing the wheel. We've figured out how to update software via package managers. Do we need a daemon to continually check for updates and do we need shell scripts to circumvent package managers?
+Have a look at https://chatgpt.com/codex/install.sh. It's managing the installation by itself not using existing package managers. There's a good point to making it easy to install, but it leads to managing an installation when you shouldn't need to. Time would be better spent elsewhere and better solutions exist.
+Am I the only one thinking this?
+
+https://news.ycombinator.com/item?id=50061646  piker  2026-10-12T19:28:01.000Z  后代数=2
+It's not necessarily hostility. We considered different updating approaches with our legal IDE where security, stability, etc. are paramount, and having a buggy application out in the wild is user-hostile. Sure, in a dream world we'd say "don't ship until it's perfect", but that's just not realistic.
+We considered the daemon thing, but ended up with a hard-update check on every boot. It's thus a user choice: if you don't like the automatic updating, you can just not run the application anymore.
+And even with all that, it's hard to stay on the right side of AV algorithms, etc.
+We wrote about it here: https://tritium.legal/blog/update
+
+https://news.ycombinator.com/item?id=50062790  elAhmo  2026-10-12T20:43:58.000Z  后代数=0
+So, similar as Google and Microsoft have been doing with all their tools?
+
+https://news.ycombinator.com/item?id=50062666  hackerbrother  2026-10-12T20:34:46.000Z  后代数=0
+Claude has been doing this already.
+
+https://news.ycombinator.com/item?id=50061310  thebeardisred  2026-10-12T19:10:17.000Z  后代数=2
+It's right about now that having a operating system distro model is great - you get folks who will package the software & test it out, make generally sensible defaults, and generally keep shenanigans like this from going on
+
+https://news.ycombinator.com/item?id=50061472  quotemstr  2026-10-12T19:17:23.000Z  后代数=2
+Refusal to adhere to the XDG specification is a big signal that the app is going to be a general bull in a china shop. It's not that hard to do OS- and distribution-appropriate package management.

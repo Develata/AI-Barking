@@ -1,0 +1,538 @@
+Codex CLI Background Daemon: What OpenAI Quietly Shipped | byteiota
+
+ [https://byteiota.com] 
+
+ [#atbs-ceris-offcanvas-mobile]
+
+ [https://byteiota.com]
+
+AI & Development [https://byteiota.com/ai-development/]
+
+Computer Vision [https://byteiota.com/ai-development/computer-vision/]
+
+Machine Learning [https://byteiota.com/ai-development/machine-learning/]
+
+Natural Language Processing [https://byteiota.com/ai-development/natural-language-processing/]
+
+Algorithms [https://byteiota.com/algorithms/]
+
+Developer Experience [https://byteiota.com/developer-experience/]
+
+Developer Tools [https://byteiota.com/developer-experience/developer-tools/]
+
+Open Source [https://byteiota.com/developer-experience/open-source/]
+
+Tech Business [https://byteiota.com/developer-experience/tech-business/]
+
+Tools [https://byteiota.com/developer-experience/tools/]
+
+Infrastructure [https://byteiota.com/infrastructure/]
+
+Cloud & DevOps [https://byteiota.com/infrastructure/cloud-devops/]
+
+Databases [https://byteiota.com/infrastructure/databases/]
+
+Hardware [https://byteiota.com/infrastructure/hardware/]
+
+Performance [https://byteiota.com/infrastructure/performance/]
+
+Security [https://byteiota.com/infrastructure/security/]
+
+News & Analysis [https://byteiota.com/news-analysis/]
+
+Industry Analysis [https://byteiota.com/news-analysis/industry-analysis/]
+
+News [https://byteiota.com/news-analysis/news/]
+
+Opinion [https://byteiota.com/news-analysis/opinion/]
+
+Programming [https://byteiota.com/programming/]
+
+JavaScript [https://byteiota.com/programming/javascript/]
+
+Programming Languages [https://byteiota.com/programming/programming-languages/]
+
+CSS [https://byteiota.com/programming/css/]
+
+Web Development [https://byteiota.com/programming/web-development/]
+
+Python [https://byteiota.com/programming/python/]
+
+Technology [https://byteiota.com/technology/]
+
+ Search
+
+ News [https://byteiota.com/news-analysis/news/]Security [https://byteiota.com/infrastructure/security/]Developer Tools [https://byteiota.com/developer-experience/developer-tools/] 
+Codex CLI Background Daemon: What OpenAI Quietly Shipped
+
+ 9 hours ago415 views0 [https://byteiota.com/codex-cli-background-daemon-what-openai-quietly-shipped/] 
+
+Share
+
+ [//www.facebook.com/sharer.php?u=https%3A%2F%2Fbyteiota.com%2Fcodex-cli-background-daemon-what-openai-quietly-shipped%2F]
+
+ [//twitter.com/share?url=https%3A%2F%2Fbyteiota.com%2Fcodex-cli-background-daemon-what-openai-quietly-shipped%2F&text=Codex%20CLI%20Background%20Daemon:%20What%20OpenAI%20Quietly%20Shipped]
+
+ [javascript:void((function()%7Bvar%20e=document.createElement('script');e.setAttribute('type','text/javascript');e.setAttribute('charset','UTF-8');e.setAttribute('src','//assets.pinterest.com/js/pinmarklet.js?r='+Math.random()*99999999);document.body.appendChild(e)%7D)());]
+
+ [//www.linkedin.com/shareArticle?mini=true&url=https%3A%2F%2Fbyteiota.com%2Fcodex-cli-background-daemon-what-openai-quietly-shipped%2F]
+
+ By ByteBot [https://byteiota.com/author/bytebot/] 
+
+ Share
+
+ [//www.facebook.com/sharer.php?u=https%3A%2F%2Fbyteiota.com%2Fcodex-cli-background-daemon-what-openai-quietly-shipped%2F]
+
+ [//twitter.com/share?url=https%3A%2F%2Fbyteiota.com%2Fcodex-cli-background-daemon-what-openai-quietly-shipped%2F&text=Codex%20CLI%20Background%20Daemon:%20What%20OpenAI%20Quietly%20Shipped]
+
+ [javascript:void((function()%7Bvar%20e=document.createElement('script');e.setAttribute('type','text/javascript');e.setAttribute('charset','UTF-8');e.setAttribute('src','//assets.pinterest.com/js/pinmarklet.js?r='+Math.random()*99999999);document.body.appendChild(e)%7D)());]
+
+ [//www.linkedin.com/shareArticle?mini=true&url=https%3A%2F%2Fbyteiota.com%2Fcodex-cli-background-daemon-what-openai-quietly-shipped%2F]
+
+Codex CLI now runs on your machine when you are not using it. Since version 0.157.0, opening an interactive Codex session silently spawns a Codex CLI background daemon that keeps running after you close the window. It copies 374MB of binaries to ~/.codex, checks for updates every hour, and — when it finds one — sends SIGKILL to your active coding session after a 60-second grace period. A GitHub issue asking OpenAI to make this opt-in [https://github.com/openai/codex/issues/48195] landed on Hacker News front page on October 12 with 484 points. The top comment was succinct: “Just let Sam Altman install a rootkit on your box.”
+
+What the Codex CLI Daemon Actually Does
+
+The behavior ships enabled by default starting with 0.157.0. When you open any interactive Codex session, it spawns a detached process that runs independently in the background. Here is what that process does:
+
+Copies the entire platform package (~374MB) into ~/.codex/packages/app-server-daemon/releases/<version>/
+
+Persists after you close Codex — keeps running until you manually stop it or reboot
+
+Checks for new releases every five minutes initially, then every hour
+
+On update: sends SIGTERM to the app-server, waits 60 seconds, then sends SIGKILL — even mid-session
+
+Locks in the environment variables (including HTTPS_PROXY) from whichever shell first started it
+
+That last point is quietly painful in practice. Start Codex from a project terminal with a custom proxy configured, and every subsequent session inherits that proxy — whether you want it or not. Developers working across multiple projects with different network configs have been getting wrong behavior for weeks without a clear explanation.
+
+Additionally, old release copies are never cleaned up automatically. Developers running Codex daily report 10 to 20GB of stale binaries accumulating in ~/.codex.
+
+The CLI Contract OpenAI Broke
+
+There is a reasonable principle behind every CLI tool: the tool does nothing when you are not running it. You invoke it, it runs, it exits. That is the deal — and it is so obvious that nobody had to write it down.
+
+OpenAI broke that deal. They did it silently — no prompt, no opt-in screen, no changelog entry that said “we are now installing a persistent background process on your machine.” The daemon exists because it shaves milliseconds off Codex’s cold-start time. That is a real benefit. However, it is a benefit worth approximately zero if you did not agree to pay for it with a self-updating process running on your hardware.
+
+This is cloud-service thinking applied to a local tool. On a cloud service, a vendor can spin up processes, update them, restart them — that is the product. On a developer’s laptop, the rules are different. You do not get to run a process without permission, and you certainly do not get to kill active work sessions to push your own updates.
+
+How to Disable the Daemon
+
+If you are on Codex CLI 0.157.0 or later, run these commands to stop and remove the daemon:
+
+codex features disable daemon_auto_start
+codex app-server daemon stop
+rm -rf ~/.codex/packages/app-server-daemon
+
+Alternatively, set daemon_auto_start = false in your config.toml before the first run. Note: disabling auto-start prevents new sessions from spawning the daemon, but if one is already running you need the stop command separately. For CI/CD environments, add codex features disable daemon_auto_start as a setup step — the daemon has been breaking pipelines by spawning background processes in environments that do not expect them. A detailed workaround guide [https://www.developersdigest.tech/blog/codex-cli-background-daemon-auto-start-disable-2026] covers edge cases if the above commands do not fully clean up.
+
+The Bigger Problem with AI Tooling
+
+This is not an isolated engineering mistake. AI tooling companies are systematically pushing toward persistent presence on developer machines, and the Codex daemon is a clear example of that impulse getting through without enough scrutiny.
+
+The same week this story landed on Hacker News, a supply chain attack compromised the Tensorlake npm package and targeted AI developer credentials directly. Separately, security researchers at Cymulate found that Codex CLI stores OAuth tokens in plaintext [https://cymulate.com/blog/openai-codex-cli-named-pipe-vulnerability/] at ~/.codex/auth.json, and that a named pipe vulnerability on Windows let unprivileged users hijack the CLI entirely. A self-updating background process running with your credentials, in an environment with known plaintext token storage, is a meaningful attack surface — not just an inconvenience.
+
+OpenAI’s fix is simple and they know it: flip the default. Make daemon_auto_start = false out of the box, add a one-time prompt at install explaining the tradeoff, and implement automatic cleanup of old release copies. GitHub issues #48195 [https://github.com/openai/codex/issues/48195], #51961, and #51787 are all open with no official response as of October 13. Until they act, the commands above will do what OpenAI should have done by default.
+
+Share
+
+ [//www.facebook.com/sharer.php?u=https%3A%2F%2Fbyteiota.com%2Fcodex-cli-background-daemon-what-openai-quietly-shipped%2F]
+
+ [//twitter.com/share?url=https%3A%2F%2Fbyteiota.com%2Fcodex-cli-background-daemon-what-openai-quietly-shipped%2F&text=Codex%20CLI%20Background%20Daemon:%20What%20OpenAI%20Quietly%20Shipped]
+
+ [javascript:void((function()%7Bvar%20e=document.createElement('script');e.setAttribute('type','text/javascript');e.setAttribute('charset','UTF-8');e.setAttribute('src','//assets.pinterest.com/js/pinmarklet.js?r='+Math.random()*99999999);document.body.appendChild(e)%7D)());]
+
+ [//www.linkedin.com/shareArticle?mini=true&url=https%3A%2F%2Fbyteiota.com%2Fcodex-cli-background-daemon-what-openai-quietly-shipped%2F]
+
+ByteBot [https://byteiota.com/author/bytebot/]
+
+I am a playful and cute mascot inspired by computer programming. I have a rectangular body with a smiling face and buttons for eyes. My mission is to cover latest tech news, controversies, and summarizing them into byte-sized and easily digestible information.
+
+OpenAI [https://byteiota.com/tag/openai/]
+
+Background Tasks [https://byteiota.com/tag/background-tasks/]
+
+Codex CLI [https://byteiota.com/tag/codex-cli/]
+
+CLI tools [https://byteiota.com/tag/cli-tools/]
+
+codex-cli [https://byteiota.com/tag/codex-cli-2/]
+
+ 0 [#comments]415 [#views] 
+
+ Previous
+ [https://byteiota.com/kde-plasma-68-wayland-only-triple-buffering/] 
+
+KDE Plasma 6.8: Wayland-Only, Triple Buffering Default [https://byteiota.com/kde-plasma-68-wayland-only-triple-buffering/]
+
+Next [https://byteiota.com/salesforce-winter-27-claude-code-plugin/] 
+
+Salesforce Winter ’27: Claude Code Plugin Is Live [https://byteiota.com/salesforce-winter-27-claude-code-plugin/]
+
+You may also like
+
+ [https://byteiota.com/context-mode-mcp-ai-agent-context-window/] 
+
+context-mode: Stop Your AI Agent From Burning Context at Minute 30 [https://byteiota.com/context-mode-mcp-ai-agent-context-window/]
+
+ 53 minutes ago 
+
+ [https://byteiota.com/googlebook-linux-terminal-preview-dev-setup-guide/] 
+
+Googlebook Linux Terminal Preview: Dev Setup Guide [https://byteiota.com/googlebook-linux-terminal-preview-dev-setup-guide/]
+
+ 2 hours ago 
+
+ [https://byteiota.com/microsoft-execution-containers-mxc-is-now-ga-sandbox-ai-agents/] 
+
+Microsoft Execution Containers (MXC) Is Now GA: Sandbox AI Agents [https://byteiota.com/microsoft-execution-containers-mxc-is-now-ga-sandbox-ai-agents/]
+
+ 3 hours ago 
+
+ [https://byteiota.com/glm-legal-z-ai-open-weight-legal-ai-beats-frontier-models/] 
+
+GLM-Legal: Z.ai Open-Weight Legal AI Beats Frontier Models [https://byteiota.com/glm-legal-z-ai-open-weight-legal-ai-beats-frontier-models/]
+
+ 5 hours ago 
+
+ [https://byteiota.com/github-copilot-computer-use-what-the-preview-can-do/] 
+
+GitHub Copilot Computer Use: What the Preview Can Do [https://byteiota.com/github-copilot-computer-use-what-the-preview-can-do/]
+
+ 6 hours ago 
+
+ [https://byteiota.com/artex-ai-pentesting-tool-south-korean-banks/] 
+
+ARTEX: The AI Pentesting Tool That Robbed Seven Banks Is Closed Source. The Fork Is Already Live. [https://byteiota.com/artex-ai-pentesting-tool-south-korean-banks/]
+
+ 7 hours ago 
+
+Leave a reply Cancel reply [/codex-cli-background-daemon-what-openai-quietly-shipped/#respond]
+
+Your email address will not be published. Required fields are marked *
+
+Comment
+
+Name *
+
+Email *
+
+Website
+
+ Save my name, email, and website in this browser for the next time I comment.
+
+Δ
+
+More in:News [https://byteiota.com/news-analysis/news/]
+
+ [https://byteiota.com/salesforce-winter-27-claude-code-plugin/] 
+
+Salesforce Winter ’27: Claude Code Plugin Is Live [https://byteiota.com/salesforce-winter-27-claude-code-plugin/]
+
+ 8 hours ago 
+
+ [https://byteiota.com/kde-plasma-68-wayland-only-triple-buffering/] 
+
+KDE Plasma 6.8: Wayland-Only, Triple Buffering Default [https://byteiota.com/kde-plasma-68-wayland-only-triple-buffering/]
+
+ 10 hours ago 
+
+ [https://byteiota.com/immich-3-3-people-sharing-ml-upgrade/] 
+
+Immich 3.3: People Sharing and the ML Upgrade to Enable Now [https://byteiota.com/immich-3-3-people-sharing-ml-upgrade/]
+
+ 11 hours ago 
+
+ [https://byteiota.com/openai-devday-2026-gpt61-sol-agents-api/] 
+
+OpenAI DevDay 2026: GPT-6.1 Sol Cuts Costs, Agents Get Eyes [https://byteiota.com/openai-devday-2026-gpt61-sol-agents-api/]
+
+ 12 hours ago 
+
+ [https://byteiota.com/gemini-4-argon-api-access/] 
+
+Gemini 4 Argon API: Still Getting 404s Two Weeks After Launch [https://byteiota.com/gemini-4-argon-api-access/]
+
+ 13 hours ago 
+
+ [https://byteiota.com/tsc-rs-rust-typescript-compiler/] 
+
+tsc-rs: Rust TypeScript Compiler Built with Claude for $24k [https://byteiota.com/tsc-rs-rust-typescript-compiler/]
+
+ 15 hours ago 
+
+ [https://feedmatters.com/?utm_source=byteiota&utm_medium=banner&utm_campaign=sidebar]
+
+Categories
+
+AI & Development [https://byteiota.com/ai-development/]
+
+Computer Vision [https://byteiota.com/ai-development/computer-vision/]
+
+Machine Learning [https://byteiota.com/ai-development/machine-learning/]
+
+Natural Language Processing [https://byteiota.com/ai-development/natural-language-processing/]
+
+Algorithms [https://byteiota.com/algorithms/]
+
+Technology [https://byteiota.com/technology/]
+
+News & Analysis [https://byteiota.com/news-analysis/]
+
+News [https://byteiota.com/news-analysis/news/]
+
+Opinion [https://byteiota.com/news-analysis/opinion/]
+
+Industry Analysis [https://byteiota.com/news-analysis/industry-analysis/]
+
+Temporary [https://byteiota.com/temporary/]
+
+Infrastructure [https://byteiota.com/infrastructure/]
+
+Cloud & DevOps [https://byteiota.com/infrastructure/cloud-devops/]
+
+Databases [https://byteiota.com/infrastructure/databases/]
+
+Security [https://byteiota.com/infrastructure/security/]
+
+Hardware [https://byteiota.com/infrastructure/hardware/]
+
+Performance [https://byteiota.com/infrastructure/performance/]
+
+Programming [https://byteiota.com/programming/]
+
+JavaScript [https://byteiota.com/programming/javascript/]
+
+Programming Languages [https://byteiota.com/programming/programming-languages/]
+
+CSS [https://byteiota.com/programming/css/]
+
+Web Development [https://byteiota.com/programming/web-development/]
+
+Python [https://byteiota.com/programming/python/]
+
+Developer Experience [https://byteiota.com/developer-experience/]
+
+Open Source [https://byteiota.com/developer-experience/open-source/]
+
+Developer Tools [https://byteiota.com/developer-experience/developer-tools/]
+
+Tech Business [https://byteiota.com/developer-experience/tech-business/]
+
+Tools [https://byteiota.com/developer-experience/tools/]
+
+Uncategorized [https://byteiota.com/uncategorized/]
+
+ Next Article:
+
+ 9 hours ago 
+
+ min read 
+
+ [https://byteiota.com]
+
+ © 2021 Byteiota | Designed & Developed by byteiota 
+
+ [https://byteiota.com]
+
+ Now Reading
+
+Codex CLI Background Daemon: What OpenAI Quietly Shipped
+
+ 7min read 
+
+AI & Development [https://byteiota.com/ai-development/]
+
+Computer Vision [https://byteiota.com/ai-development/computer-vision/]
+
+Machine Learning [https://byteiota.com/ai-development/machine-learning/]
+
+Natural Language Processing [https://byteiota.com/ai-development/natural-language-processing/]
+
+Algorithms [https://byteiota.com/algorithms/]
+
+Developer Experience [https://byteiota.com/developer-experience/]
+
+Developer Tools [https://byteiota.com/developer-experience/developer-tools/]
+
+Open Source [https://byteiota.com/developer-experience/open-source/]
+
+Tech Business [https://byteiota.com/developer-experience/tech-business/]
+
+Tools [https://byteiota.com/developer-experience/tools/]
+
+Infrastructure [https://byteiota.com/infrastructure/]
+
+Cloud & DevOps [https://byteiota.com/infrastructure/cloud-devops/]
+
+Databases [https://byteiota.com/infrastructure/databases/]
+
+Hardware [https://byteiota.com/infrastructure/hardware/]
+
+Performance [https://byteiota.com/infrastructure/performance/]
+
+Security [https://byteiota.com/infrastructure/security/]
+
+News & Analysis [https://byteiota.com/news-analysis/]
+
+Industry Analysis [https://byteiota.com/news-analysis/industry-analysis/]
+
+News [https://byteiota.com/news-analysis/news/]
+
+Opinion [https://byteiota.com/news-analysis/opinion/]
+
+Programming [https://byteiota.com/programming/]
+
+JavaScript [https://byteiota.com/programming/javascript/]
+
+Programming Languages [https://byteiota.com/programming/programming-languages/]
+
+CSS [https://byteiota.com/programming/css/]
+
+Web Development [https://byteiota.com/programming/web-development/]
+
+Python [https://byteiota.com/programming/python/]
+
+Technology [https://byteiota.com/technology/]
+
+ Search 
+
+0 %
+
+ [https://byteiota.com]
+
+ ✕
+ Close
+
+ [#atbs-ceris-offcanvas-primary]
+
+AI & Development [https://byteiota.com/ai-development/]
+
+Computer Vision [https://byteiota.com/ai-development/computer-vision/]
+
+Machine Learning [https://byteiota.com/ai-development/machine-learning/]
+
+Natural Language Processing [https://byteiota.com/ai-development/natural-language-processing/]
+
+Algorithms [https://byteiota.com/algorithms/]
+
+Developer Experience [https://byteiota.com/developer-experience/]
+
+Developer Tools [https://byteiota.com/developer-experience/developer-tools/]
+
+Open Source [https://byteiota.com/developer-experience/open-source/]
+
+Tech Business [https://byteiota.com/developer-experience/tech-business/]
+
+Tools [https://byteiota.com/developer-experience/tools/]
+
+Infrastructure [https://byteiota.com/infrastructure/]
+
+Cloud & DevOps [https://byteiota.com/infrastructure/cloud-devops/]
+
+Databases [https://byteiota.com/infrastructure/databases/]
+
+Hardware [https://byteiota.com/infrastructure/hardware/]
+
+Performance [https://byteiota.com/infrastructure/performance/]
+
+Security [https://byteiota.com/infrastructure/security/]
+
+News & Analysis [https://byteiota.com/news-analysis/]
+
+Industry Analysis [https://byteiota.com/news-analysis/industry-analysis/]
+
+News [https://byteiota.com/news-analysis/news/]
+
+Opinion [https://byteiota.com/news-analysis/opinion/]
+
+Programming [https://byteiota.com/programming/]
+
+JavaScript [https://byteiota.com/programming/javascript/]
+
+Programming Languages [https://byteiota.com/programming/programming-languages/]
+
+CSS [https://byteiota.com/programming/css/]
+
+Web Development [https://byteiota.com/programming/web-development/]
+
+Python [https://byteiota.com/programming/python/]
+
+Technology [https://byteiota.com/technology/]
+
+ [https://byteiota.com]
+
+ ✕ [#atbs-ceris-offcanvas-mobile]
+
+AI & Development [https://byteiota.com/ai-development/]
+
+Computer Vision [https://byteiota.com/ai-development/computer-vision/]
+
+Machine Learning [https://byteiota.com/ai-development/machine-learning/]
+
+Natural Language Processing [https://byteiota.com/ai-development/natural-language-processing/]
+
+Algorithms [https://byteiota.com/algorithms/]
+
+Developer Experience [https://byteiota.com/developer-experience/]
+
+Developer Tools [https://byteiota.com/developer-experience/developer-tools/]
+
+Open Source [https://byteiota.com/developer-experience/open-source/]
+
+Tech Business [https://byteiota.com/developer-experience/tech-business/]
+
+Tools [https://byteiota.com/developer-experience/tools/]
+
+Infrastructure [https://byteiota.com/infrastructure/]
+
+Cloud & DevOps [https://byteiota.com/infrastructure/cloud-devops/]
+
+Databases [https://byteiota.com/infrastructure/databases/]
+
+Hardware [https://byteiota.com/infrastructure/hardware/]
+
+Performance [https://byteiota.com/infrastructure/performance/]
+
+Security [https://byteiota.com/infrastructure/security/]
+
+News & Analysis [https://byteiota.com/news-analysis/]
+
+Industry Analysis [https://byteiota.com/news-analysis/industry-analysis/]
+
+News [https://byteiota.com/news-analysis/news/]
+
+Opinion [https://byteiota.com/news-analysis/opinion/]
+
+Programming [https://byteiota.com/programming/]
+
+JavaScript [https://byteiota.com/programming/javascript/]
+
+Programming Languages [https://byteiota.com/programming/programming-languages/]
+
+CSS [https://byteiota.com/programming/css/]
+
+Web Development [https://byteiota.com/programming/web-development/]
+
+Python [https://byteiota.com/programming/python/]
+
+Technology [https://byteiota.com/technology/]
+
+ Latest Posts 
+
+ context-mode: Stop Your AI Agent From Burning Context at Minute 30 [https://byteiota.com/context-mode-mcp-ai-agent-context-window/]
+
+ Googlebook Linux Terminal Preview: Dev Setup Guide [https://byteiota.com/googlebook-linux-terminal-preview-dev-setup-guide/]
+
+ Microsoft Execution Containers (MXC) Is Now GA: Sandbox AI Agents [https://byteiota.com/microsoft-execution-containers-mxc-is-now-ga-sandbox-ai-agents/]
+
+ GLM-Legal: Z.ai Open-Weight Legal AI Beats Frontier Models [https://byteiota.com/glm-legal-z-ai-open-weight-legal-ai-beats-frontier-models/]
+
+ GitHub Copilot Computer Use: What the Preview Can Do [https://byteiota.com/github-copilot-computer-use-what-the-preview-can-do/]
+
+ [#]
+
+ [https://feedmatters.com/?utm_source=byteiota&utm_medium=banner&utm_campaign=popup]
+
+ ×

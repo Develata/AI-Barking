@@ -1,0 +1,233 @@
+Each model sets up Llama3.1-8B by itself — how fast does it run?
+rows = the model acting as the agent, columns = the hardware it was given; every cell sets up Llama3.1-8B except Jetson† · the last two columns are physical devices on a bench, the rest are cloud instances · cell = speed of the server the model set up (tok/s), color = mean, log scale, normalized within each column · Qwen3.5-9B ran with thinking off · click a cell, or a row/column label, for boxplots · data as of 30 July 2026
+Display tokens per second by: Median Mean Max Min
+Failed setups: Count as 0 tok/s Exclude (successful setups only)
+Chart: Boxplot Mean ± 90% CI
+📌 Pin graph
+model \ hardware	Xeon CPU	4090	Mac	Win	TPU	MI300X	H200	Jetson†	Orange Pi
+Llama3.1-8B	0
+set up: 0/15
+	0
+set up: 0/15
+	0
+set up: 0/15
+	0
+set up: 0/9
+	0
+set up: 0/10
+	0
+set up: 0/6
+	0
+set up: 0/9
+	·	·
+Qwen3.5-9B	9.2
+set up: 13/15
+	169
+set up: 8/13
+	17.2
+set up: 7/13
+	7.6
+set up: 6/10
+	145
+set up: 1/5
+	0
+set up: 0/4
+	583
+set up: 4/6
+	0.6
+set up: 3/5
+	2.4
+set up: 4/5
+
+Gemma4-26B-A4B	11.4
+set up: 15/15
+	342
+set up: 17/17
+	11.8
+set up: 4/16
+	3.4
+set up: 2/10
+	0
+set up: 0/5
+	337
+set up: 11/12
+	487
+set up: 7/14
+	1.1
+set up: 5/5
+	2.7
+set up: 5/5
+
+Qwen3-Coder-30B-A3B	10.1
+set up: 14/15
+	143
+set up: 8/15
+	3.9
+set up: 2/15
+	3.6
+set up: 2/10
+	0
+set up: 0/6
+	41.9
+set up: 3/12
+	76.1
+set up: 1/9
+	·	·
+Qwen3-Coder-Next	11.3
+set up: 15/15
+	372
+set up: 15/15
+	15.5
+set up: 9/15
+	13.9
+set up: 9/10
+	0
+set up: 0/10
+	292
+set up: 11/11
+	741
+set up: 14/16
+	0.9
+set up: 4/5
+	3.5
+set up: 5/5
+
+gpt-oss-120b	11.0
+set up: 14/15
+	327
+set up: 13/15
+	5.6
+set up: 2/15
+	4.7
+set up: 2/8
+	0
+set up: 0/9
+	161
+set up: 5/8
+	245
+set up: 2/9
+	·	·
+Qwen3-235B-Thinking	8.4
+set up: 13/15
+	250
+set up: 10/16
+	6.9
+set up: 3/14
+	0
+set up: 0/10
+	0
+set up: 0/10
+	42.1
+set up: 1/5
+	363
+set up: 5/13
+	·	·
+DeepSeek-V3	8.1
+set up: 13/17
+	184
+set up: 8/15
+	0
+set up: 0/15
+	0
+set up: 0/8
+	·	0
+set up: 0/5
+	398
+set up: 3/9
+	·	·
+DeepSeek-R1	10.0
+set up: 14/15
+	137
+set up: 8/15
+	6.9
+set up: 4/15
+	0
+set up: 0/10
+	61.5
+set up: 1/7
+	0
+set up: 0/5
+	3.8
+set up: 1/9
+	·	·
+GLM-5.2	12.2
+set up: 14/15
+	1237
+set up: 15/15
+	24.7
+set up: 17/18
+	18.8
+set up: 9/10
+	474
+set up: 6/7
+	1225
+set up: 11/11
+	1940
+set up: 14/16
+	0.6
+set up: 5/5
+	2.2
+set up: 5/5
+
+Kimi-K2-Thinking	11.3
+set up: 15/15
+	455
+set up: 17/18
+	13.1
+set up: 6/15
+	9.4
+set up: 6/10
+	1.4
+set up: 1/5
+	399
+set up: 11/11
+	749
+set up: 9/13
+	·	·
+Cell = mean tok/s over runs, taking each run's best attempt; color = log scale, normalized within each column  slowest → fastest model on that hardware. ■ no successful setup · ■ not attempted. Click a cell, or a row / column label, for boxplots.
+4090 across models — 11 models · failed setups count as 0 · mean · boxplot
+The hardware roofline (dashed) is the highest tok/s achievable on this hardware with regular decode-stage inference — without speculative decoding or EAGLE, which can push measured throughput above it. For the two physical columns the line is a single-stream ceiling (that is how those runs were measured), whereas the cloud columns are aggregates at concurrency 8; and on the Jetson Nano, prefill is compute-bound (no Armv8.2 SDOT), so this decode-bandwidth line is optimistic there.
+0
+500
+1000
+1500
+2000
+tok/s
+Llama3.1-8B
+Qwen3.5-9B
+Gemma4-26B-A4B
+Qwen3-Coder-30B-A3B
+Qwen3-Coder-Next
+gpt-oss-120b
+Qwen3-235B-Thinking
+DeepSeek-V3
+DeepSeek-R1
+GLM-5.2
+Kimi-K2-Thinking
+naive roofline (1983 tok/s)
+Throughput vs. capability (ECI)
+Each point = one model on one kind of hardware — x = ECI, y = tok/s. ECI scores are Epoch's, as of 1 October 2026. ◇ = our own estimate, for the two models Epoch does not score. Pick one kind of hardware (linear y), or "All" to overlay them (log y, where a model with no successful setup has no point). Llama3.1-8B (ECI 116.58, no successful setup) is left out, because one far-off zero would steer the fit.
+Hardware (this chart):AllXeon CPU4090MacWinTPUMI300XH200JetsonOrange Pi
+0
+250
+500
+750
+1000
+1250
+tok/s (mean)
+ECI (capability) · 4090
+135
+140
+145
+150
+exponential fit · Spearman ρ = 0.76 (rank correlation, n=10)
+Qwen3.5-9B
+Gemma4-26B-A4B
+Qwen3-Coder-30B-A3B
+Qwen3-Coder-Next
+gpt-oss-120b
+Qwen3-235B-Thinking
+DeepSeek-V3
+DeepSeek-R1
+GLM-5.2
+Kimi-K2-Thinking
