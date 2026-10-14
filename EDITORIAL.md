@@ -107,7 +107,7 @@
 2. 取证：少量条目 Claude 直接查；大批量取证、页面存档与截图，Claude 按 `templates/codex-evidence.md` 机械采集（截图、页面存档）派给 Sonnet 子代理或 Codex `gpt-6-luna`（max）；需要判断的取证（回溯一手来源、定级、找吠点）若交给 Codex，用 `gpt-6-astra`（medium 或 max）。Windows 主机 Codex 一律 full-access，见 codex-orchestration。执行方用 opencli / agent-reach 直接完成。派工单由 `barking handoff` 按 `templates/handoff-evidence.md` 生成；执行方的网页截图、PDF 页裁切、HTML 转文本与热度采样用 `barking shot / html2txt / heat`（见 `templates/codex-evidence.md`），不再每期重写同样的脚本。产出：`sources/` 存档、`images/` 截图、事实清单。
 3. 抽查：Claude 对照代理产出的存档检查工作区改动，并对高风险条目（价格、跑分、对比结论、标题所涉说法）逐字核对一手页面。自述回报不算验收。
 4. 起草：Claude 按本规范写 `_publish.txt` 与 `images/README.md`。
-5. 反向核验：`codex-reviewer` 只读检查正文、省流卡、速览聚合图与每条译注中的每个数字与判断是否都能在事实清单中找到、有无夸大（省流卡、速览与译注是公开说法，风险与封面文字同级）。取证由 Claude 系代理（Sonnet 或 Claude 本身）完成时，同时让它逐行核对事实清单与 `sources/` 存档是否相符，补上取证环节的跨模型核对。提示词与 WSL Codex 命令由 `barking review <期次目录> --reverse` 拼出（视觉复核用 `--visual`，见 `templates/cards/README.md`）。Claude 逐条判断采纳与否，记入 `fact-check.md`。
+5. 反向核验：`codex-reviewer` 只读检查正文、省流卡、速览聚合图与每条译注中的每个数字与判断是否都能在事实清单中找到、有无夸大（省流卡、速览与译注是公开说法，风险与封面文字同级）。取证由 Claude 系代理（Sonnet 或 Claude 本身）完成时，同时让它逐行核对事实清单与 `sources/` 存档是否相符，补上取证环节的跨模型核对。提示词与 WSL Codex 命令由 `barking review <期次目录> --reverse` 拼出（视觉复核用 `--visual`，见 `templates/cards/README.md`）。Claude 逐条判断采纳与否，记入 `fact-check.md`。时机（2026-10-13 起）：正文与事实清单一定稿就开第一轮，只审正文与事实清单，与封面、卡片制作并行（一轮约 15 分钟，1012 期因卡片做完才送审，BLOCKER 在发布后才回来）；省流卡、速览与译注渲染后再补一轮短审，或与视觉复核合并。两轮都回来、BLOCKER 改完才交付 Develata 终审。
 6. 修订后运行 `cargo run --release --manifest-path tools/barking/Cargo.toml -- lint <期次目录>`，0 个错误才交付 Develata。它机械检查本规范与 `AGENTS.md` 中可精确判定的条目（字数上限、固定开场/省流/Slogan 顺序、禁用套话、中英文空格、Markdown 残留、配图文件、两张封面、省流卡与速览聚合图是否齐全，速览条目的级别与措辞）；这些规则改动时同步改 `tools/barking/src/lint.rs` 顶部常量。warn 需人工确认，不阻塞。
 
 每期 `sources/fact-check.md` 格式：
