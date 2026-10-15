@@ -230,6 +230,26 @@ fn host_of(url: &str) -> Option<String> {
     (!host.is_empty()).then_some(host)
 }
 
+/// A URL as copied from a browser's address bar may carry raw non-ASCII
+/// (`/新闻/…`) or spaces, which the HTTP library refuses to parse. Those bytes
+/// after the host are percent-encoded as UTF-8, as the browser itself sends
+/// them; existing `%XX` escapes and the host are left alone.
+fn encode_url(url: &str) -> String {
+    let start = url.find("://").map_or(0, |i| i + 3);
+    let path_at = url[start..]
+        .find(['/', '?', '#'])
+        .map_or(url.len(), |i| start + i);
+    let mut out = url[..path_at].to_string();
+    for &b in &url.as_bytes()[path_at..] {
+        if b >= 0x80 || b" \"<>`{}|\\^".contains(&b) {
+            out.push_str(&format!("%{b:02X}"));
+        } else {
+            out.push(char::from(b));
+        }
+    }
+    out
+}
+
 /// `name<TAB>url` lines → items. Blank lines and `#` lines are skipped; any
 /// other malformed line, bad name, non-http(s) URL or repeated name fails the
 /// whole manifest (line numbers are 1-based), before anything is fetched.
@@ -253,8 +273,14 @@ fn parse_manifest(text: &str) -> Result<Vec<Item>, String> {
             ));
             continue;
         }
+        let url = &encode_url(url);
         let Some(host) = host_of(url) else {
-            errors.push(format!("第 {n} 行：「{url}」不是 http(s) URL"));
+            let why = if url.is_ascii() {
+                "不是有效的 http(s) URL"
+            } else {
+                "域名含非 ASCII 字符，请改写为 punycode（xn--…）"
+            };
+            errors.push(format!("第 {n} 行：「{url}」{why}"));
             continue;
         };
         if items.iter().any(|i| i.name == name) {
@@ -1218,6 +1244,23 @@ mod tests {
         assert_eq!(parse_manifest("# only\n\n").unwrap_err(), "清单为空");
         assert!(parse_manifest("x\thttps://\n").is_err());
         assert!(parse_manifest(&format!("{}\thttps://a.com/\n", "a".repeat(61))).is_err());
+    }
+
+    #[test]
+    fn manifest_encodes_non_ascii_paths() {
+        let items = parse_manifest(
+            "cn\thttps://Example.com/新闻/a b?q=中文#段\nkept\thttps://x.com/a%20b?q=%E4%B8%AD\n",
+        )
+        .unwrap();
+        assert_eq!(
+            items[0].url,
+            "https://Example.com/%E6%96%B0%E9%97%BB/a%20b?q=%E4%B8%AD%E6%96%87#%E6%AE%B5"
+        );
+        assert_eq!(items[0].host, "example.com");
+        assert_eq!(items[1].url, "https://x.com/a%20b?q=%E4%B8%AD");
+        assert_eq!(encode_url("https://x.com"), "https://x.com");
+        let e = parse_manifest("idn\thttps://例子.中国/\n").unwrap_err();
+        assert!(e.contains("punycode"), "{e}");
     }
 
     #[test]
