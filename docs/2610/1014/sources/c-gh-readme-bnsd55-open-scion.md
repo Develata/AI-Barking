@@ -1,0 +1,179 @@
+<p align="center">
+  <img src="docs/assets/banner.jpg" alt="open-scion logo: a young scion grafted onto a rootstock whose roots are circuit traces" width="720">
+</p>
+
+# open-scion
+
+[![CI](https://github.com/bnsd55/open-scion/actions/workflows/ci.yml/badge.svg)](https://github.com/bnsd55/open-scion/actions/workflows/ci.yml)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
+[![Rust 1.88+](https://img.shields.io/badge/rust-1.88%2B-orange.svg)](https://www.rust-lang.org)
+![Status: proof of concept](https://img.shields.io/badge/status-proof%20of%20concept-yellow.svg)
+
+A version control system for large monorepos where most of the writers are
+AI agents. The server keeps the history and makes the commits; clients ask
+only for what they need. Written in Rust.
+
+> **Early proof of concept.** It runs on one machine and is not ready for real
+> code. Planned work is tracked in [issues](https://github.com/bnsd55/open-scion/issues)
+> and [milestones](https://github.com/bnsd55/open-scion/milestones).
+
+## What this is, and what it is not
+
+open-scion is an independent, open-source implementation of the design that
+Anthropic described in
+[Redesigning source control](https://www.anthropic.com/engineering/redesigning-source-control)
+(October 2026). Anthropic built a system called Scion for its own monorepo.
+This project rebuilds the ideas from that public article.
+
+- It is **not** affiliated with or endorsed by Anthropic, and it contains no
+  Anthropic code. Where the article does not say how something works, this
+  project makes its own choice, and the design notes below say so.
+- It is **not** related to the [SCION Internet architecture](https://github.com/scionproto/scion),
+  to [GoogleCloudPlatform/scion](https://github.com/GoogleCloudPlatform/scion),
+  or to the `scion` crate on crates.io.
+
+## Why
+
+Git assumes that every clone is a full, offline copy of the repository, and
+that every merge starts on a developer's machine. That works for people. It
+works badly when thousands of agents and CI jobs write to one large repository
+all day. Anthropic reported more than 30,000 merges and about 25 million CI
+checkouts per day on a repository with about 100 GB of history.
+
+With git, each of those jobs copies data it does not need, and each merge
+needs a fresh clone, a local rebase and a push that fails when someone else
+pushed first.
+
+## How it works
+
+```
+ git:          agent ── clone everything ──> work ── rebase, push ──> server
+ open-scion:   agent ── "src/a.rs changed" ──> server: commit, rebase, move main
+```
+
+**The server does the work.** History, commits and rebases live on the
+server. An agent reads only the files it needs over the API, sends the files
+it changed, and asks the server to land them. It never clones the repository.
+
+**A commit lists only what changed.** A commit is called a *changeset*. It
+stores the files that changed compared to its first parent, plus content
+hashes of those files. Files and directory trees are stored once, by content
+hash (BLAKE3), and never change. So creating a changeset costs as much as the
+change, not as much as the repository.
+
+**Landing is a server-side rebase.** To land a changeset on `main`, the
+server checks whether any of its paths also changed on `main` after the
+changeset's base. If not, it puts the same changes on top of the newest
+`main` and moves `main` with one compare-and-swap. Two agents that change
+different files never conflict and never need to pull. An agent sees a
+conflict only when someone else changed the same file, or a directory above
+or below it.
+
+```
+agent A changes a.rs ──land──> main 101   ok
+agent B changes b.rs ──land──> main 102   ok: the server rebased B onto 101
+agent C changes a.rs ──land──> conflict   a.rs changed after C's base
+```
+
+**Derived data is computed from the parents.** Anything that is not part of a
+changeset, such as the full directory tree of a commit, is *derived*: computed
+from the parent's value plus the changes, then cached. A client never sees
+how it is stored, so the server can change it freely.
+
+### For an agent
+
+```sh
+scn cat main:src/lib.rs                                      # read one file, no clone
+cs=$(scn commit -m "fix parser" --put src/lib.rs=./lib.rs)   # create a changeset
+scn land "$cs"                                               # rebase onto main and move it
+```
+
+`scn land` exits non-zero on a conflict and prints the paths, so an agent can
+re-read them, redo the change, and try again. A retry of the same land is safe:
+the server returns the first result.
+
+## Try it
+
+```sh
+cargo build --release
+export SCION_TOKEN=dev SCION_SERVER=http://127.0.0.1:7878
+./target/release/scion-server --data /tmp/scion import /path/to/a/git/repo
+./target/release/scion-server --data /tmp/scion serve &
+
+./target/release/scn log -n 5
+./target/release/scn cat main:README.md
+./target/release/scn checkout main --into /tmp/work   # --sparse DIR for part of it
+echo hello > hello.txt
+cs=$(./target/release/scn commit -m "add hello" --put hello.txt=hello.txt)
+./target/release/scn land "$cs"
+./target/release/scn bench --agents 200 --lands 10000
+```
+
+Every `scn` command takes `--json` for machine-readable output.
+
+`scn bench` runs many agents that land changes at the same time, then checks
+that `main` gained each landed change exactly once. With one server process on
+one machine, 200 agents landed 10,000 changes at about 200 lands per second,
+with none lost or duplicated. Every land is on disk before it replies, and
+concurrent requests share each full disk flush
+([#3](https://github.com/bnsd55/open-scion/issues/3)). Importing a git
+repository with 23,871 commits took 50 seconds.
+
+## Layout
+
+| Path | Contents |
+|---|---|
+| [`crates/scion-core`](crates/scion-core) | Object model and canonical byte format |
+| [`crates/scion-proto`](crates/scion-proto) | gRPC API ([`proto/scion.proto`](proto/scion.proto)) |
+| [`crates/scion-server`](crates/scion-server) | Storage, commits, lands, reads, git import |
+| [`crates/scn`](crates/scn) | Command-line client |
+| [`docs/architecture.md`](docs/architecture.md) | How the parts fit together: storage, lands, reads, and the planned cache tiers |
+| [`docs/format-v1.md`](docs/format-v1.md) | The v1 byte format. Object IDs are hashes of these bytes. |
+
+## Design notes
+
+These are this project's choices where the article does not give details.
+
+| Topic | Choice |
+|---|---|
+| Hash and format | BLAKE3 with a different prefix per object kind, over a written, frozen byte format |
+| Storage | SQLite for metadata and trees, one compressed file per blob. Anthropic uses Spanner and cloud storage; this is the single-machine stand-in. |
+| Conflicts | Path-level only: the same path, or a directory above or below it. No text merge. |
+| Landing | One land at a time per ref, inside one process. A changeset can be created in parallel without any lock. |
+| Retries | Each land has a caller-chosen request key, so a retry returns the first result |
+| Git | One-way import. Commit IDs are not kept identical to git commit IDs. |
+
+Deliberate simplifications are marked `SHORTCUT:` in the code, each with its
+limit and its upgrade path.
+
+## Build and test
+
+Requires Rust 1.88 or newer and `protoc` (the Protocol Buffers compiler; for
+example `brew install protobuf` or `apt install protobuf-compiler`).
+
+```sh
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+```
+
+Fuzz the decoders (needs nightly and `cargo-fuzz`):
+
+```sh
+cd crates/scion-core
+cargo +nightly fuzz run decode "$PWD/fuzz/corpus/decode" "$PWD/fuzz/seeds/decode"
+```
+
+## Contributing
+
+The project is at an early stage and the design still moves. Issues and
+discussion are welcome. Before a large pull request, please open an issue to
+agree on the approach.
+
+## License
+
+Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
+[MIT license](LICENSE-MIT) at your option.
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in this project by you, as defined in the Apache-2.0 license,
+shall be dual licensed as above, without any additional terms or conditions.

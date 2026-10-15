@@ -1,0 +1,243 @@
+REA FAQ: Setup, Updates and Troubleshooting
+
+ Skip to content [#main]
+
+ REAReverse Engineer Anything [../]
+
+ Get started [../get-started/]
+ Showcases [../showcase/]
+ Blog [../blog/]
+ Guides [../guides/]
+ FAQ [../faq/]
+ Contributors [../contributors/]
+
+ 文 / A English
+English [../faq/]简体中文 [../zh-CN/faq/]繁體中文 [../zh-TW/faq/]日本語 [../ja/faq/]한국어 [../ko/faq/]Türkçe [../tr/faq/]Русский [../ru/faq/]Tiếng Việt [../vi/faq/]ไทย [../th/faq/]Deutsch [../de/faq/]Español [../es/faq/]Français [../fr/faq/]Українська [../uk/faq/]Polski [../pl/faq/]Português (Brasil) [../pt-BR/faq/]العربية [../ar/faq/]فارسی [../fa/faq/]Bahasa Indonesia [../id/faq/]Italiano [../it/faq/]Ελληνικά [../el/faq/]
+
+ [https://github.com/morluto/rea]
+
+ [https://discord.gg/GkcryMnJDM]
+
+ [https://x.com/reatools]
+
+Home [../] / FAQ
+
+REA FAQ.
+
+Setup, updates, analysis and troubleshooting.
+
+Topics
+
+Setup and updates [#setup]
+
+Analysis [#analysis]
+
+Troubleshooting [#troubleshooting]
+
+Data and sharing [#sharing]
+
+Setup and updates
+
+ How do I install REA?
+
+ With Node.js and npm available,
+ run setup, choose your coding agent and review the proposed
+ changes.
+
+ Terminal · agent setup
+ Copy
+
+npx rea-agents@latest setup
+
+ Setup registers REA's MCP connection and installs the matching
+ investigation skill. Restart your agent when it finishes, then
+ give it a target path and a question.
+ Follow the setup guide [../get-started/] for
+ prerequisites and your first analysis.
+
+ Which coding agents can use REA?
+
+ Any agent that supports local MCP servers. Setup includes
+ Claude Code, Claude Desktop, Codex, Cursor, Gemini CLI,
+ Windsurf, Devin, OpenCode, Antigravity, GitHub Copilot CLI,
+ Command Code, Grok Build, OMP, and VS Code. Grok Bot's
+ connector is added from its chat.
+
+ Connect your coding agent [../get-started/#agent].
+
+ How do I update REA?
+
+ REA releases frequently, including bug fixes. If you installed
+ the CLI with npm:
+
+ Terminal · installed CLI
+ Copy
+
+rea update
+
+ Follow the setup refresh command printed by the update. If you
+ set up your agent through npx, run:
+
+ Terminal · refresh agent setup
+ Copy
+
+npx rea-agents@latest setup
+
+ Review the changes and restart your agent. Its REA connection
+ pins a package version, so refreshing setup makes it use the
+ new release. For one-off CLI commands, use
+ npx -y rea-agents@latest followed by the command.
+
+ Is installing the skill from skills.sh enough?
+
+ The skill gives your agent investigation instructions. Run
+ REA setup [#install] to connect the MCP server and
+ install the matching skill, then restart your agent so it can
+ call the tools.
+
+Analysis
+
+ What can I analyze with REA?
+
+Start with the kind of software you have:
+
+ Native executables and libraries [../guides/native/]: functions, assembly, pseudocode and references.
+
+ JavaScript and Electron apps [../guides/javascript/]: modules, imports, IPC and source locations.
+
+ Browser pages [../guides/browser/]: scripts,
+ requests and runtime observations.
+
+ REA also has workflows for managed assemblies, Android APKs,
+ firmware and packaged resources.
+ See the case studies [../showcase/] for worked
+ investigations.
+
+ Do I need Hopper, Ghidra or IDA?
+
+ Deep native analysis uses one of them. Static JavaScript and
+ .NET inspection work with the supplied files and do not need a
+ native analysis engine.
+
+ Connect your existing Ghidra or IDA installation, or let setup
+ detect Hopper and propose an installation. Your host and
+ target determine which provider can be used.
+ Set up native analysis [../get-started/#native].
+
+ Can I use REA without a coding agent?
+
+ Yes. The CLI uses the same analysis workflows. For a local
+ JavaScript or Electron app:
+
+ Terminal · static application analysis
+ Copy
+
+npx -y rea-agents@latest analyze-javascript-application \
+ /absolute/path/to/app --json
+
+ Replace the path with an extracted application folder or ASAR
+ file. Use the CLI [../get-started/#terminal] for
+ installation options.
+
+ What code does REA return?
+
+ Native analysis returns assembly and pseudocode, with calls,
+ references and relevant constants. JavaScript analysis returns
+ modules, their relationships and source locations.
+
+ Your agent uses these findings to explain the behavior or
+ write and test an implementation. The
+ DX-Ball calculation [../showcase/dx-ball/#sound-pan]
+ and CTF flag checker [../showcase/ctf/] show how
+ that process works.
+
+ What should I ask my agent?
+
+ Give it a local target and one behavior to investigate. For a
+ JavaScript or Electron app:
+
+ Your coding agent
+ Copy
+
+ ›Use REA to analyze
+ /absolute/path/to/app and
+ explain how it exports data. Show the relevant code and
+ source locations.
+
+ Replace the path with your target. The
+ guides [../guides/] provide prompts for native,
+ Electron and browser examples.
+
+Troubleshooting
+
+ Why can't my agent see the REA tools?
+
+ Restart or reconnect your agent after setup. Check its REA
+ registration with doctor; for Codex:
+
+ Terminal · check one client
+ Copy
+
+npx -y rea-agents@latest doctor --client codex --json
+
+ Replace codex with your client ID, such as
+ claude_code or cursor. If the report
+ shows a missing or stale registration, run setup for that
+ client:
+
+ Terminal · repair one client's setup
+ Copy
+
+npx rea-agents@latest setup --client codex
+
+ Review its plan and restart the client. If registration is
+ healthy but tools remain absent, check the client's MCP
+ connection error.
+ More setup diagnostics [../get-started/#help].
+
+ Do I need to start Hopper first?
+
+ REA starts Hopper when an operation needs it. On macOS,
+ complete the first-run choice of demo mode or license
+ activation before unattended analysis.
+ See native provider setup [../get-started/#native].
+
+ What should I do if I hit a bug?
+
+ Update REA [#update], restart your agent and retry
+ the same task. A recent release may already fix the problem.
+
+ If it persists,
+ open an issue [https://github.com/morluto/rea/issues/new/choose]
+ with your REA version, operating system, target type, steps to
+ reproduce and error output. Include the provider name when the
+ problem involves native analysis.
+
+Data and sharing
+
+ Does REA upload my app?
+
+ REA analyzes targets on your machine. Your agent receives the
+ results, and its model provider's data policy applies to those
+ results.
+
+ How can I share an example or contribute?
+
+ Have a useful REA example? We'd love to see it. Share the
+ target, your question, the findings and how you checked them
+ in an
+ issue [https://github.com/morluto/rea/issues/new/choose]
+ or
+ pull request [https://github.com/morluto/rea/pulls]. Short code excerpts and figures help others follow the
+ investigation.
+
+ Bug reports, feature requests, documentation and code
+ improvements are welcome too. You can also discuss an example
+ in the community [https://discord.gg/GkcryMnJDM].
+
+REA · Reverse Engineer Anything
+
+ Contributors [../contributors/]Source [https://github.com/morluto/rea]MIT license [https://github.com/morluto/rea/blob/main/LICENSE]Join the community [https://discord.gg/GkcryMnJDM]Follow us on X [https://x.com/reatools]
+
+ ↑ Top
+ [#top]

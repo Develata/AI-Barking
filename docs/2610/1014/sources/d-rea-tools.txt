@@ -1,0 +1,533 @@
+REA — Reverse Engineering for Your Coding Agent
+
+ Skip to content [#main]
+
+ REAReverse Engineer Anything [./]
+
+ Get started [./get-started/]
+ Showcases [./showcase/]
+ Blog [./blog/]
+ Guides [./guides/]
+ FAQ [./faq/]
+ Contributors [./contributors/]
+
+ 文 / A English
+English [./]简体中文 [./zh-CN/]繁體中文 [./zh-TW/]日本語 [./ja/]한국어 [./ko/]Türkçe [./tr/]Русский [./ru/]Tiếng Việt [./vi/]ไทย [./th/]Deutsch [./de/]Español [./es/]Français [./fr/]Українська [./uk/]Polski [./pl/]Português (Brasil) [./pt-BR/]العربية [./ar/]فارسی [./fa/]Bahasa Indonesia [./id/]Italiano [./it/]Ελληνικά [./el/]
+
+ [https://github.com/morluto/rea]
+
+ [https://discord.gg/GkcryMnJDM]
+
+ [https://x.com/reatools]
+
+ On this page
+ Set up REA
+
+On this page
+
+Set up REA [#setup]
+
+How it works [#what-is-re]
+
+Dinosaur game [#dinosaur]
+
+Calculator [#calculator]
+
+Showcases [#showcases]
+
+Try REA [#try-rea]
+
+Go deeper [#analyze]
+
+Reverse engineering, with your coding agent
+
+Find out how
+software works.
+
+ Ask your coding agent about an app, a game or a website. REA gives
+ it the tools to inspect the code behind the answer.
+
+ Get started [get-started/]
+ See an example ↓ [#dinosaur]
+
+ Showcases → [showcase/] — investigations and
+ interactive demos.
+
+ Blog → [blog/] — methods and reconstruction notes.
+
+Set up REA
+
+Copy this into your coding agent:
+
+ Your coding agent
+
+ Copy
+
+ ›Install REA and connect it to this coding agent using
+ npx rea-agents@latest setup.
+ Show me the setup plan for approval, then verify the
+ installation.
+
+Or run this in your terminal:
+
+ npx rea-agents@latest setup
+
+ Copy
+
+ Approve the setup plan, then restart your agent.
+
+ Setup for your platform:
+ Windows (PowerShell) [get-started/#node-windows-help]
+ macOS [get-started/#node-macos-help]
+ Linux [get-started/#node-linux-help]
+
+ Other install options:
+ curl → [get-started/#curl-installation]
+
+ First time, or missing Node.js or a
+ coding agent?
+ Follow the step-by-step setup guide → [get-started/]
+
+How it works
+
+ Reverse engineering means learning how software works by inspecting
+ the program itself. With REA, your agent can follow the code,
+ explain a feature and help you rebuild it.
+
+Ask about one feature
+
+Give your agent a program or page and a question.
+
+Inspect the program
+
+REA returns code, references and runtime observations.
+
+Explain it, then try a change
+
+ Your agent uses the findings to explain or rebuild the feature.
+
+ See the full Calculator investigation
+
+ Why does Calculator give 220 for
+ 200 + 10%?
+
+ Follow the instructions step by step
+
+ 01 Decode branches
+
+ 02 Trace calls
+
+ 03 Recover the rule
+
+ Original x64 · selected instructions
+
+0x180124945: MOV EAX, dword ptr [R13 + 0x18]
+0x180124949: CMP EAX, 0x5c
+0x18012494c: JZ 0x180124aba
+0x180124952: CMP EAX, 0x5b
+0x180124955: JZ 0x180124aba
+0x18012495b: MOV EDX, 0x64
+0x180124960: LEA RCX, [RSP + 0x160]
+0x180124968: CALL 0x180122650
+0x18012496e: LEA RDX, [R13 + 0x160]
+0x180124975: LEA RCX, [RSP + 0x78]
+0x18012497a: CALL 0x180109720
+0x18012497f: MOV RSI, RAX
+0x180124982: MOV qword ptr [RSP + 0x28], RAX
+0x180124987: LEA RDX, [RSP + 0x160]
+0x18012498f: MOV RCX, RAX
+0x180124992: CALL 0x180123190
+; … value-copy instructions omitted …
+0x180124a14: MOV RDX, RDI
+0x180124a17: LEA RCX, [RSP + 0xf8]
+0x180124a1f: CALL 0x180109720
+0x180124a24: LEA R8, [RSP + 0x30]
+0x180124a29: MOV RDX, RAX
+0x180124a2c: LEA RCX, [RSP + 0xb8]
+0x180124a34: CALL 0x180123c10
+
+01 · Which branch?
+
+ “0x5b? 0x5c? Two jumps to the same
+ place. Which operators are these?”
+
+ Look up the command IDs, then label the branch.
+
+0x5b
+
+Divide ÷
+
+0x5c
+
+Multiply ×
+
+02 · What do the calls do?
+
+ “100 is clear. The calls are just addresses.
+ Which one divides? Which value goes in?”
+
+ Inspect the helpers and trace the stored values.
+
+0x64
+
+100
+
+…123190
+
+Divide
+
+03 · What is the rule?
+
+ “This path multiplies by the other input. So
+ 10% means 10% of 200 after +.”
+
+ Name the operands and check both operator paths.
+
+ 200 × 10 / 100
+ 20
+
+Illustrative expert reasoning
+
+ You decode the instructions, follow the calls and
+ reconstruct the calculation.
+
+Ask your agent the same question
+
+ Example prompt · Calculator
+
+ Copy
+
+ ›Use REA to inspect Windows Calculator. Why does
+ 200 + 10% give 220?
+
+ Example answer · based on the findings
+
+ After +, the % button takes
+ a percentage of the first number.
+
+ 10% of 200 = 20↓200 + 20 = 220
+
+REA supplies
+
+ The handler’s instructions, decompiled code and calls.
+
+Your agent explains
+
+ Which branch applies, what it calculates and how to
+ rebuild it.
+
+ Selected assembly from the installed Calculator DLL. The
+ thoughts and reply illustrate the findings.
+ Continue with the Calculator example ↓ [#calculator]
+
+ Let’s try two examples: change a game’s speed, then rebuild
+ Calculator’s % button.
+
+Example 01 · Chrome’s dinosaur game
+
+Why does the dinosaur get faster?
+
+ The game gets faster as you run. To rebuild it with a speed control,
+ we first need to find out how the speed changes.
+
+1. Ask about the speed
+
+ Example question · Dinosaur game
+
+ Copy
+
+ ›Use REA to inspect this dinosaur game. Why does it get
+ faster? Show the speed rule, then build a small version with
+ an adjustable speed.
+
+2. Find the speed rule
+
+ REA lets the agent read the game’s running code. The speed
+ starts at 6 and increases a little each update while it is below
+ 13.
+
+3. Play the result
+
+ We rebuilt that rule in the mini-game below and added a speed
+ slider. Press Play, then choose your own speed.
+
+ Play
+
+ Jump ↑
+ Restart
+
+ Speed 6.0
+ Use the
+ recovered acceleration rule
+
+ Original rule: start at 6, then increase toward 13.
+
+ Move the slider to set your own speed. Space or Jump clears a
+ cactus.
+
+ Open the speed lab → [examples/dino-lab/]
+
+ See the script, checks and how to try the analysis
+
+ Inspected target:
+ wayou’s Chromium-derived browser edition [https://wayou.github.io/t-rex-runner/].
+
+ REA · loaded index.js · selected
+ lines
+
+if (this.currentSpeed < this.config.MAX_SPEED) {
+ this.currentSpeed += this.config.ACCELERATION;
+}
+
+ Start at 6. Add 0.001 each update without a collision, while speed
+ is below 13.
+
+What each part does
+
+ 01 · REARead the running game’s scriptReturn its actual code and settings to the agent.
+
+ 02 · Your agentRebuild the rule, add a controlUse the recovered acceleration in a small game with a speed
+ slider.
+
+ 03 · YouChange the speed and playTry the original acceleration, then choose your own
+ pace.
+
+ REA inspected the HTTP browser edition through a local debugging
+ connection and returned the loaded index.js,
+ including its source and digest.
+
+ Selected settings from the inspected script
+
+ACCELERATION: 0.001,
+MAX_SPEED: 13,
+SPEED: 6
+
+ We called the original game’s update function in a controlled
+ browser check, with obstacles and automatic scheduling disabled.
+ After 4,000 updates, speed was 10.0; after 10,000, it was 13.0,
+ rounded to one decimal.
+
+ The new mini-game keeps that speed rule. Its drawing, jumping and
+ collision code are a small teaching implementation.
+ Open the lab [examples/dino-lab/] to see the new code
+ and run the same speed check.
+
+ To inspect the target yourself, follow the
+ browser connection steps [guides/browser/#prepare]
+ using
+ the dinosaur page [https://wayou.github.io/t-rex-runner/]. Give your agent that page URL and your local debugging
+ endpoint, then copy the prompt above.
+
+ Inspected speed code [https://github.com/wayou/t-rex-runner/blob/5455bfa408ec6b707c7300ff194b7390733a766d/index.js#L565-L571]
+ ·
+ Chromium Authors · BSD license [assets/licenses/dinosaur.txt]
+
+Example 02 · Windows Calculator
+
+Rebuild Calculator’s % button.
+
+ The % button does different things after + and ×. Let’s find both
+ rules and try them in a small calculator.
+
+1. Ask about the % button
+
+ Example question · Calculator
+
+ Copy
+
+ ›Use REA to inspect Windows Calculator’s % button. Recover
+ the rules after + and ×, then build a small calculator that
+ uses both.
+
+2. Find both rules
+
+ REA helps the agent read the code behind the % button. It
+ applies two different rules:
+
+With +
+
+ Take 10% of the first number.10% of 200 = 20 → 200 + 20 = 220
+
+With ×
+
+ Turn 10% into 0.1.200 × 0.1 = 20
+
+3. Try the % button
+
+ We recreated both rules below. Choose + or ×, press %, then
+ press =.
+
+ 200 + 10%
+
+ 200 × 10%
+
+ 200 +
+ 20
+
+ %
+
+ =
+
+ Reset
+
+ 10% of 200 = 20. Then 200 + 20 = 220.
+
+ Interactive illustration of the inspected percentage rule.
+
+ See the real code and how the answer was checked
+
+ For this example, previous = 200 and
+ current = 10.
+
+ Readable summary of the % handler
+
+if (operation == multiply || operation == divide) {
+ percent = current / 100;
+} else {
+ percent = current * previous / 100;
+}
+
+ From the installed app to a working % button
+
+ 01 · REA reads calc.exeIt launches the Calculator appThe code opens ms-calculator:. The agent then
+ selects the installed app’s library.
+
+ 02 · REA reads the libraryReturn the % handler’s codeThe function checks the operator and uses the constant
+ 100.
+
+ 03 · Your agent interprets itExplain and reproduce the rulesCrosscheck the branch with Microsoft’s source, then try +
+ and × above.
+
+ REA · selected original instructions
+
+0x180124945: MOV EAX, dword ptr [R13 + 0x18]
+0x180124949: CMP EAX, 0x5c
+0x18012494c: JZ 0x180124aba
+0x180124952: CMP EAX, 0x5b
+0x180124955: JZ 0x180124aba
+0x18012495b: MOV EDX, 0x64
+
+ Operator IDs · Microsoft’s source
+
+#define IDC_MUL 92 // 0x5c
+#define IDC_DIV 91 // 0x5b
+#define IDC_PERCENT 118 // 0x76
+
+0x64 = 100
+
+ Inspected with REA 4.1.0: Windows Calculator 11.2508.4.0, x64. The
+ readable summary uses names from Microsoft’s public source to
+ explain the recovered branch.
+
+ Percentage implementation [https://github.com/microsoft/calculator/blob/d125246a4e19842ce1332e6c7839cf0e110027d8/src/CalcManager/CEngine/scifunc.cpp#L98-L111]
+ ·
+ Microsoft’s test cases [https://github.com/microsoft/calculator/blob/d125246a4e19842ce1332e6c7839cf0e110027d8/src/CalculatorUnitTests/CalculatorManagerTest.cpp#L350-L370]
+ · Native setup guide [guides/native/]
+
+REA case studies.
+
+ Explore a feature in a released app or game, with code and
+ checked results.
+
+ Showcases → [showcase/]
+
+Android · APK analysis
+
+How an authenticator generates a login code
+
+ Trace Aegis's six-digit login code through its released APK,
+ then move a demo clock to see why it changes every 30 seconds.
+
+ Read the Android case study [showcase/aegis/]
+
+Electron · Feature tracing
+
+How Notion copies text and HTML
+
+ Follow Notion's packaged JavaScript to the system clipboard and
+ see how a copy preserves rich block data.
+
+ Read the Notion case study [showcase/notion/]
+
+Native · Reconstruction
+
+DX-Ball's sound-pan calculation
+
+ Recover how a ball's position becomes left/right sound in a 1996
+ Windows game.
+
+ Read the DX-Ball case study [showcase/dx-ball/]
+
+Your first investigation
+
+Try REA on a small app.
+
+ Download our Notes example, trace its CSV export, and check one
+ changed input.
+
+ Try the guided example [first-investigation/]
+
+Choose your target.
+
+ These guides cover setup and a first investigation for each kind
+ of software.
+
+Native binaries
+
+ Inspect functions, strings, references and call relationships in
+ executables and libraries.
+
+ Native analysis guide [guides/native/]
+
+JavaScript & Electron
+
+ Map modules, routes, IPC and native dependencies from an
+ application folder or ASAR archive.
+
+ Application workflows [guides/javascript/]
+
+Browser & runtime activity
+
+ Capture selected browser or process activity, then compare the
+ results across runs.
+
+ Browser observation guide [guides/browser/]
+
+ Try a larger project
+
+ Example prompt · Website
+
+ Copy
+
+ ›Use REA to inspect
+ https://rea.tools/. Clone this
+ website for me.
+
+Yes, this one.
+
+ Example prompt · Game reconstruction
+
+ Copy
+
+ ›Use REA to reconstruct this game from its executable.
+ Recover the gameplay logic in C and test it against the
+ original.
+
+ See the DX-Ball case study → [showcase/dx-ball/]
+
+Any questions?
+
+ Read the FAQ [faq/] — setup and common questions.
+
+ Join Discord [https://discord.gg/GkcryMnJDM] — get
+ help and discuss your investigations.
+
+ GitHub issues [https://github.com/morluto/rea/issues/new/choose]
+ — report a bug or request a feature.
+
+REA · Reverse Engineer Anything
+
+ Contributors [./contributors/]Source [https://github.com/morluto/rea]MIT license [https://github.com/morluto/rea/blob/main/LICENSE]Join the community [https://discord.gg/GkcryMnJDM]Follow us on X [https://x.com/reatools]
+
+ ↑ Top
+ [#top]
