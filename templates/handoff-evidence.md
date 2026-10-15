@@ -34,6 +34,7 @@
 - 不写 `_publish.txt`、`images/README.md`、`images/cards.toml`、`fact-check.md`、`sources/README.md`。
 - 每组交付 `docs/{YYMM}/{MMDD}/sources/evidence-<组>.md` 与 `docs/{YYMM}/{MMDD}/sources/capture-log-<组>.md`（每次抓取的 URL、工具、结果/失败原因、北京时间）；Claude 事后合并。
 - PDF、HTML 原件、图片、音视频只存本地（不入库，Claude 事后传网盘）；文本存档（txt/md/json）可以入库，但单个文件超过 1 MB 的先在回报里告知。
+- 时间与范围（2026-10-15 起，Develata 要求提速；1013 期 A/B/C 组各跑了约 3 小时）：每组目标 60 分钟内交回，超过 90 分钟就先交已完成部分并在回报里列出未完成项。只截正文可能用到的图（每组 3–6 张）；媒体报道每个事件只存 3–5 篇代表性的（首发、最权威、最典型的夸大实例），不逐家归档；社区热度只记主帖数字与 2–3 条有理有据的评论。
 
 ## 验收
 
