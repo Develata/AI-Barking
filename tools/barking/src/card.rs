@@ -432,7 +432,10 @@ fn render_issue(dir: &Path, only: &[&str], all: bool) -> Result<Outcome, String>
     // Held until this run returns: a concurrent run could otherwise write
     // back cache entries that this one has invalidated.
     let _lock = cache_file.as_deref().map(Lock::acquire).transpose()?;
-    let mut cache = cache_file.as_deref().map(Cache::load).unwrap_or_default();
+    let mut cache = match cache_file.as_deref() {
+        Some(f) => Cache::load(f)?,
+        None => Cache::default(),
+    };
     // Tesseract build and model per language setting, looked up on first need;
     // `None` when they cannot be identified.
     let mut ocr_ids: BTreeMap<&str, Option<String>> = BTreeMap::new();
@@ -679,24 +682,38 @@ fn cache_path(images: &Path) -> Option<PathBuf> {
 struct Cache(BTreeMap<String, String>);
 
 impl Cache {
-    /// A missing or unreadable cache is empty: everything renders. Keys that
-    /// differ only in case (written before keys were lowercased) are all
-    /// dropped, since which one describes the file on disk is unknown.
-    fn load(path: &Path) -> Cache {
-        let raw: BTreeMap<String, String> = fs::read_to_string(path)
-            .ok()
-            .and_then(|t| serde_json::from_str(&t).ok())
-            .unwrap_or_default();
+    /// A missing cache is empty: everything renders. One that exists but
+    /// cannot be read or parsed is an error: going on with an empty cache
+    /// would silently rewrite it, and something is wrong with the temp dir.
+    /// Keys that differ only in case (written before keys were lowercased)
+    /// are all dropped, since which one describes the file on disk is unknown.
+    fn load(path: &Path) -> Result<Cache, String> {
+        let text = match fs::read_to_string(path) {
+            Ok(t) => t,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Cache::default()),
+            Err(e) => {
+                return Err(format!(
+                    "读不了渲染缓存 {}：{e}。查明原因，或删掉它（下次全部重渲）",
+                    path.display()
+                ));
+            }
+        };
+        let raw: BTreeMap<String, String> = serde_json::from_str(&text).map_err(|e| {
+            format!(
+                "渲染缓存 {} 已损坏：{e}。删掉它即可（下次全部重渲）",
+                path.display()
+            )
+        })?;
         let mut variants: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for (k, v) in raw {
             variants.entry(k.to_lowercase()).or_default().push(v);
         }
-        Cache(
+        Ok(Cache(
             variants
                 .into_iter()
                 .filter_map(|(k, mut vs)| (vs.len() == 1).then(|| (k, vs.remove(0))))
                 .collect(),
-        )
+        ))
     }
 
     fn save(&self, path: &Path) -> Result<(), String> {
@@ -800,15 +817,51 @@ fn tess() -> Option<&'static Tess> {
     TESS.get_or_init(|| {
         let run = |arg: &str| {
             let o = Command::new("tesseract").arg(arg).output().ok()?;
-            let mut text = String::from_utf8_lossy(&o.stdout).into_owned();
-            text.push_str(&String::from_utf8_lossy(&o.stderr));
-            Some(text)
+            Some(Probe {
+                ok: o.status.success(),
+                stdout: String::from_utf8_lossy(&o.stdout).into_owned(),
+                stderr: String::from_utf8_lossy(&o.stderr).into_owned(),
+            })
         };
-        let version = run("--version")?.lines().next()?.trim().to_owned();
-        let dir = tessdata_dir(&run("--list-langs")?)?;
-        (!version.is_empty()).then_some(Tess { version, dir })
+        parse_tess(&run("--version")?, &run("--list-langs")?)
     })
     .as_ref()
+}
+
+/// What one `tesseract` probe printed.
+struct Probe {
+    ok: bool,
+    stdout: String,
+    stderr: String,
+}
+
+/// `Tess` from the `--version` and `--list-langs` probes, or `None` unless
+/// both exited 0, the first line printed by `--version` reads `tesseract
+/// <version>` (Tesseract prints it to stdout, some builds to stderr), and
+/// `--list-langs` has its `List of available languages in "<dir>" (N):`
+/// header. Anything else means a different program or a broken install, and
+/// then nothing that depends on it is cached.
+fn parse_tess(version: &Probe, langs: &Probe) -> Option<Tess> {
+    if !version.ok || !langs.ok {
+        return None;
+    }
+    let first_line = |p: &Probe| {
+        (p.stdout.lines().chain(p.stderr.lines()))
+            .map(str::trim)
+            .find(|l| !l.is_empty())
+            .map(str::to_owned)
+    };
+    let line = first_line(version)?;
+    let v = line.strip_prefix("tesseract ")?;
+    let v = v.strip_prefix('v').unwrap_or(v);
+    let well_formed = v.starts_with(|c: char| c.is_ascii_digit())
+        && v.chars()
+            .all(|c| c.is_ascii_alphanumeric() || ".-+".contains(c));
+    if !well_formed {
+        return None;
+    }
+    let dir = (langs.stdout.lines().chain(langs.stderr.lines())).find_map(tessdata_dir)?;
+    Some(Tess { version: line, dir })
 }
 
 /// Which Tesseract locates quotes for `lang` (`eng`, `eng+chi_sim`): its
@@ -827,11 +880,16 @@ fn ocr_identity(lang: &str) -> Option<String> {
     Some(id)
 }
 
-/// The directory in `List of available languages in "<dir>" (N):`.
-fn tessdata_dir(list_langs: &str) -> Option<PathBuf> {
-    let start = list_langs.find('"')? + 1;
-    let len = list_langs[start..].find('"')?;
-    Some(PathBuf::from(&list_langs[start..start + len]))
+/// The directory in the header line `List of available languages in "<dir>"
+/// (N):`, if `line` is that header with a non-empty directory.
+fn tessdata_dir(line: &str) -> Option<PathBuf> {
+    let rest = line
+        .trim()
+        .strip_prefix("List of available languages in \"")?;
+    let (dir, count) = rest.split_once("\" (")?;
+    let n = count.strip_suffix("):")?;
+    let counted = !n.is_empty() && n.chars().all(|c| c.is_ascii_digit());
+    (counted && !dir.is_empty()).then(|| PathBuf::from(dir))
 }
 
 fn touch(path: &Path) -> io::Result<()> {
@@ -1611,62 +1669,70 @@ fn locate(words: &[Word], quote: &str) -> Result<Located, String> {
     Ok(Located { lines, words: idx })
 }
 
-/// Largest horizontal gap between neighbouring words of one line, in
-/// multiples of the line's tallest word box (about one em, ascender to
+/// Largest horizontal gap next to a matched word on its line, in multiples
+/// of the line's tallest matched word box (about one em, ascender to
 /// descender). Measured on issue 1014's five raw images (`--psm 6`, eng):
 /// prose word gaps average 0.24–0.44 and reach 0.69; a ` — ` whose dash word
-/// carries no text, 1.65; a list label before its item (`l.  Enjoin`), up to
-/// about 2.9, which is why the gap before a quote's first word is never
-/// checked. A column gutter or table cell boundary is usually wider.
+/// carries no text, 1.65. A column gutter or table cell boundary is usually
+/// wider.
 const MAX_GAP: f32 = 2.5;
+/// The same after a list marker (`a.`, `(iv)`, `12)`): hanging labels are
+/// set off by a tab, 2.18–2.73 on 1014's legal-filing base (`m.`, `n.`, and
+/// an `l.` that OCR read as `I,`, which is not recognised as a marker).
+const MARKER_GAP: f32 = 4.0;
+/// Largest vertical gap between two lines of one quote (next line's top
+/// minus previous line's bottom), in the same units: about the leading of
+/// ordinary text, with room for 1.5 line spacing.
+const MAX_LEADING: f32 = 1.5;
 
 /// Tesseract's (block, paragraph, line) numbers of one text line.
 type LineKey = (u32, u32, u32);
 
+/// `a.`, `B)`, `(3)`, `[iv]`, `12.`: a list item's label.
+fn is_list_marker(text: &str) -> bool {
+    let t = text.strip_prefix(['(', '[']).unwrap_or(text);
+    let Some(body) = t.strip_suffix(['.', ')', ']']) else {
+        return false;
+    };
+    let n = body.chars().count();
+    let digits = (1..=3).contains(&n) && body.chars().all(|c| c.is_ascii_digit());
+    let letter = n == 1 && body.chars().all(|c| c.is_ascii_alphabetic());
+    let roman = (1..=5).contains(&n) && body.chars().all(|c| "ivxlcdmIVXLCDM".contains(c));
+    digits || letter || roman
+}
+
 /// Whether matched words `idx` (in reading order) form one stretch of text.
 /// Tesseract's `--psm 6` reads the image as one block and joins side-by-side
-/// columns into shared lines, so the character stream alone can splice a
-/// column's tail onto the next column's head. Required:
+/// columns into shared lines, so the character stream alone can splice text
+/// that is not adjacent on the page. With h the tallest matched word box on
+/// a line and "textual" meaning at least one letter or digit:
 ///
-/// - one Tesseract block;
-/// - within each line, neighbouring matched words no further apart than
-///   `MAX_GAP` word heights;
-/// - across lines: lines consecutive in OCR order; each continuation line
-///   starting at its OCR line's first word with text, or near the left edge
-///   of the quote's lines; and on the last line, no gap over `MAX_GAP` from
-///   the quote's start there to the line's end.
+/// - (a) consecutive matched words on a line are at most `MAX_GAP`·h apart;
+/// - (b) the textual word before a line's first matched word, if any, is at
+///   most `MAX_GAP`·h away (`MARKER_GAP`·h after a list marker);
+/// - (c) the textual word after a line's last matched word, if any, is at
+///   most `MAX_GAP`·h away;
+/// - (d) across lines: every line but the last ends at its OCR line's last
+///   textual word, every continuation starts at its first; the lines are
+///   consecutive in OCR order, each below the previous, at most
+///   `MAX_LEADING`·h apart vertically;
 ///
-/// The first two cross-line rules mostly restate what a contiguous stream
-/// match already implies. The last one catches the splice: in joined columns
-/// a wrapped match runs from the right column's tail into the next line's
-/// left-column head, which a gutter then follows. A genuine wrap needs a
-/// single-column layout (in two columns the stream would not be contiguous),
-/// so there the rest of the last line follows at word spacing.
-fn continuity(words: &[Word], idx: &[usize]) -> Result<(), &'static str> {
+/// and all words lie in one Tesseract block. The error names the rule and
+/// the measured ratio.
+fn continuity(words: &[Word], idx: &[usize]) -> Result<(), String> {
     let block = words[idx[0]].line.0;
     if idx.iter().any(|&i| words[i].line.0 != block) {
-        return Err("跨越 OCR 的两个文本块");
+        return Err("跨越 OCR 的两个文本块".into());
     }
-    let has_text = |w: &Word| w.text.chars().any(|c| c.is_alphanumeric() || c == '|');
-    let height = |ws: &[&Word]| ws.iter().map(|w| w.bottom - w.top).max().unwrap_or(0) as f32;
-    let tight = |ws: &[&Word]| {
-        let h = height(ws);
-        ws.windows(2)
-            .all(|p| p[1].left.saturating_sub(p[0].right) as f32 <= MAX_GAP * h)
-    };
-    // Matched words grouped by OCR line, in quote order.
-    let mut groups: Vec<(LineKey, Vec<&Word>)> = Vec::new();
-    for w in idx.iter().map(|&i| &words[i]) {
+    let textual = |w: &Word| w.text.chars().any(char::is_alphanumeric);
+    let gap = |a: usize, b: usize| words[b].left.saturating_sub(words[a].right) as f32;
+    // Matched word indices grouped by OCR line, in quote order.
+    let mut groups: Vec<(LineKey, Vec<usize>)> = Vec::new();
+    for &i in idx {
         match groups.last_mut() {
-            Some((k, g)) if *k == w.line => g.push(w),
-            _ => groups.push((w.line, vec![w])),
+            Some((k, g)) if *k == words[i].line => g.push(i),
+            _ => groups.push((words[i].line, vec![i])),
         }
-    }
-    if groups.iter().any(|(_, g)| !tight(g)) {
-        return Err("同一行内两词相隔过远");
-    }
-    if groups.len() == 1 {
-        return Ok(());
     }
     let mut order: Vec<LineKey> = Vec::new();
     for w in words {
@@ -1675,28 +1741,85 @@ fn continuity(words: &[Word], idx: &[usize]) -> Result<(), &'static str> {
         }
     }
     let pos = |k: &LineKey| order.iter().position(|o| o == k);
-    if groups
-        .windows(2)
-        .any(|p| pos(&p[1].0) != pos(&p[0].0).map(|i| i + 1))
-    {
-        return Err("换行处不是相邻的两行");
-    }
-    let min_left = groups.iter().map(|(_, g)| g[0].left).min().unwrap_or(0);
-    let last = groups.len() - 1;
+    let last_line = groups.len() - 1;
+    // (OCR line, top, bottom, h) of the previous matched line.
+    let mut prev: Option<(LineKey, u32, u32, f32)> = None;
     for (k, (key, g)) in groups.iter().enumerate() {
-        let line: Vec<&Word> = words
+        let h = g
             .iter()
-            .filter(|w| w.line == *key && has_text(w))
-            .collect();
-        let first = g[0];
-        let at = line.iter().position(|w| std::ptr::eq(*w, first));
-        if k > 0 && at != Some(0) && first.left as f32 > min_left as f32 + height(g) {
-            return Err("续行没有从行首接上");
+            .map(|&i| words[i].bottom - words[i].top)
+            .max()
+            .unwrap_or(1) as f32;
+        let ratio = |px: f32| px / h;
+        for p in g.windows(2) {
+            if gap(p[0], p[1]) > MAX_GAP * h {
+                return Err(format!(
+                    "同一行内「{}」与「{}」相隔过远，{:.1} 倍词高",
+                    words[p[0]].text,
+                    words[p[1]].text,
+                    ratio(gap(p[0], p[1]))
+                ));
+            }
         }
-        // The last line, from the quote's start on it to the line's end.
-        if k == last && !tight(&line[at.unwrap_or(0)..]) {
-            return Err("换行后，引文之后隔着大段空白，可能是分栏");
+        let (first, last) = (g[0], g[g.len() - 1]);
+        let same_line = |i: &usize| words[*i].line == *key;
+        let before = (0..first)
+            .rev()
+            .take_while(same_line)
+            .find(|&i| textual(&words[i]));
+        let after = (last + 1..words.len())
+            .take_while(same_line)
+            .find(|&i| textual(&words[i]));
+        if let Some(b) = before {
+            if k > 0 {
+                return Err(format!("续行没有从该行第一个词「{}」开始", words[b].text));
+            }
+            let limit = if is_list_marker(&words[b].text) {
+                MARKER_GAP
+            } else {
+                MAX_GAP
+            };
+            if gap(b, first) > limit * h {
+                return Err(format!(
+                    "引文前一个词「{}」相隔过远，{:.1} 倍词高",
+                    words[b].text,
+                    ratio(gap(b, first))
+                ));
+            }
         }
+        if let Some(a) = after {
+            if k < last_line {
+                return Err(format!(
+                    "换行前没有读到该行末尾，之后还有「{}」",
+                    words[a].text
+                ));
+            }
+            if gap(last, a) > MAX_GAP * h {
+                return Err(format!(
+                    "引文后一个词「{}」相隔过远，{:.1} 倍词高",
+                    words[a].text,
+                    ratio(gap(last, a))
+                ));
+            }
+        }
+        let top = g.iter().map(|&i| words[i].top).min().unwrap_or(0);
+        let bottom = g.iter().map(|&i| words[i].bottom).max().unwrap_or(0);
+        if let Some((pkey, ptop, pbottom, ph)) = prev {
+            if pos(key) != pos(&pkey).map(|i| i + 1) {
+                return Err("换行处不是相邻的两行".into());
+            }
+            if top <= ptop {
+                return Err("下一行不在上一行下方".into());
+            }
+            let leading = top.saturating_sub(pbottom) as f32;
+            if leading > MAX_LEADING * h.max(ph) {
+                return Err(format!(
+                    "两行上下相隔过远，{:.1} 倍词高",
+                    leading / h.max(ph)
+                ));
+            }
+        }
+        prev = Some((*key, top, bottom, h));
     }
     Ok(())
 }
@@ -2019,7 +2142,7 @@ mod tests {
 
     #[test]
     fn tessdata_dir_comes_from_list_langs() {
-        let out = "List of available languages in \"C:\\t\\tessdata/\" (2):\neng\nosd\n";
+        let out = "List of available languages in \"C:\\t\\tessdata/\" (2):";
         assert_eq!(tessdata_dir(out), Some(PathBuf::from("C:\\t\\tessdata/")));
         assert_eq!(tessdata_dir("tesseract: not found"), None);
     }
@@ -2151,14 +2274,12 @@ note = []
         let bytes = fps(&toml("d", "g"), "t1");
         assert_eq!((bytes[0] == base[0], bytes[1] == base[1]), (true, false));
 
-        // Cache round trip; a corrupt file reads as empty.
+        // Cache round trip.
         let file = images.join("cache.json");
         let mut cache = Cache::default();
         cache.insert("01-x.png", base[1].clone());
         cache.save(&file).unwrap();
-        assert_eq!(Cache::load(&file), cache);
-        fs::write(&file, "{not json").unwrap();
-        assert_eq!(Cache::load(&file), Cache::default());
+        assert_eq!(Cache::load(&file).unwrap(), cache);
 
         // One run per images directory; the lock goes away with its holder.
         let held = Lock::acquire(&file).unwrap();
@@ -2186,7 +2307,7 @@ note = []
         let dir = scratch("aba");
         let file = dir.join("cache.json");
         let run = |out: &str, fp: &str| {
-            let mut cache = Cache::load(&file);
+            let mut cache = Cache::load(&file).unwrap();
             let fresh = cache.get(out) == Some(&fp.to_string());
             if !fresh {
                 render_one(&mut cache, Some(&file), out, Some(fp.into()), || Ok(())).unwrap();
@@ -2200,7 +2321,7 @@ note = []
 
         // A cache written before keys were lowercased: drop every variant.
         fs::write(&file, r#"{"01-x.png":"A","01-X.png":"B","02-y.png":"C"}"#).unwrap();
-        let cache = Cache::load(&file);
+        let cache = Cache::load(&file).unwrap();
         assert_eq!(
             (cache.get("01-x.png"), cache.get("02-Y.png")),
             (None, Some(&"C".into()))
@@ -2262,7 +2383,16 @@ note = []
         );
         let e = locate(&cols, "model was").err().unwrap();
         assert!(e.contains("相隔过远") && e.contains("rects"), "{e}");
-        assert!(locate(&cols, "was paused").is_ok());
+        // Since round 3, a quote must not touch the gutter on either side
+        // (rules b and c); one inside a column still resolves.
+        assert!(
+            locate(&cols, "was paused")
+                .err()
+                .unwrap()
+                .contains("前一个词")
+        );
+        assert!(locate(&cols, "the").is_ok());
+        assert!(locate(&cols, "paused").is_ok());
 
         // A wrap from the right column's line into the next line's left
         // column: each line has a gutter.
@@ -2276,8 +2406,137 @@ note = []
         ]
         .join("\n");
         let w = parse_tsv(&tsv, 1);
+        assert!(locate(&w, "gamma delta").err().unwrap().contains("rects"));
+        assert!(locate(&w, "alpha beta").err().unwrap().contains("后一个词"));
+        assert!(locate(&w, "alpha").is_ok());
+    }
+
+    /// Lines of (text, left, top), one TSV line each in order, height 12.
+    fn placed(lines: &[&[(&str, u32, u32)]]) -> Vec<Word> {
+        let mut tsv = vec!["header".to_string()];
+        for (n, line) in lines.iter().enumerate() {
+            for &(t, left, top) in line.iter() {
+                tsv.push(row(t, left, top, n as u32 + 1, 95));
+            }
+        }
+        parse_tsv(&tsv.join("\n"), 1)
+    }
+
+    #[test]
+    fn continuity_round_3_counterexamples() {
+        // (b): the right column's tail spliced onto the next line's head.
+        let w = placed(&[
+            &[("alpha", 0, 0), ("beta", 40, 0), ("gamma", 600, 0)],
+            &[("delta", 0, 20)],
+        ]);
         let e = locate(&w, "gamma delta").err().unwrap();
-        assert!(e.contains("分栏"), "{e}");
-        assert!(locate(&w, "alpha beta").is_ok());
+        assert!(e.contains("前一个词「beta」") && e.contains("rects"), "{e}");
+
+        // (d): consecutive OCR lines far apart on the page.
+        let w = placed(&[&[("approved", 0, 0)], &[("denied", 0, 1000)]]);
+        let e = locate(&w, "approved denied").err().unwrap();
+        assert!(e.contains("上下相隔过远"), "{e}");
+        // A line above the previous one.
+        let w = placed(&[&[("approved", 0, 100)], &[("denied", 0, 90)]]);
+        assert!(
+            locate(&w, "approved denied")
+                .err()
+                .unwrap()
+                .contains("下方")
+        );
+        // A wrapped line that does not reach its line's end, and a
+        // continuation that does not start at its line's start.
+        let w = placed(&[
+            &[("one", 0, 0), ("two", 40, 0), ("three", 80, 0)],
+            &[("four", 0, 20), ("five", 40, 20)],
+        ]);
+        assert!(locate(&w, "two three four").is_ok());
+        let e = locate(&w, "three four five").unwrap();
+        assert_eq!(e.words, [2, 3, 4]);
+        let w = placed(&[
+            &[("one", 0, 0), ("two", 40, 0)],
+            &[("x", 0, 20), ("three", 40, 20)],
+        ]);
+        // "two three" would need to skip "x": the stream itself refuses it.
+        assert!(locate(&w, "two three").is_err());
+
+        // A list marker may be set off by a tab (up to 4 heights), other
+        // words by at most 2.5.
+        let w = placed(&[&[("m.", 0, 0), ("Enjoin", 75, 0), ("them", 115, 0)]]);
+        assert!(locate(&w, "Enjoin them").is_ok());
+        let w = placed(&[&[("so", 0, 0), ("Enjoin", 75, 0), ("them", 115, 0)]]);
+        assert!(
+            locate(&w, "Enjoin them")
+                .err()
+                .unwrap()
+                .contains("前一个词「so」")
+        );
+    }
+
+    #[test]
+    fn list_markers() {
+        for m in ["a.", "B)", "(3)", "[iv]", "12.", "(xiv)", "IV."] {
+            assert!(is_list_marker(m), "{m}");
+        }
+        for m in ["I,", "the.", "1234.", "a", "(ab)", "vvvvvv."] {
+            assert!(!is_list_marker(m), "{m}");
+        }
+    }
+
+    #[test]
+    fn unreadable_cache_stops_the_run() {
+        let dir = scratch("unreadable");
+        let file = dir.join("cache.json");
+        assert_eq!(Cache::load(&file).unwrap(), Cache::default(), "absent");
+        fs::write(&file, "{not json").unwrap();
+        assert!(Cache::load(&file).err().unwrap().contains("已损坏"));
+        // A directory where the file should be: exists, cannot be read.
+        fs::remove_file(&file).unwrap();
+        fs::create_dir(&file).unwrap();
+        assert!(Cache::load(&file).err().unwrap().contains("读不了"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn tesseract_probes_must_look_right() {
+        let p = |ok: bool, out: &str, err: &str| Probe {
+            ok,
+            stdout: out.into(),
+            stderr: err.into(),
+        };
+        let version = p(true, "tesseract v5.5.3.20260724\n leptonica-1.87.0\n", "");
+        let langs = p(
+            true,
+            "List of available languages in \"C:\\t/\" (2):\neng\nosd\n",
+            "",
+        );
+        let t = parse_tess(&version, &langs).unwrap();
+        assert_eq!(
+            (t.version.as_str(), t.dir),
+            ("tesseract v5.5.3.20260724", PathBuf::from("C:\\t/"))
+        );
+        // Older builds print the version to stderr.
+        assert!(parse_tess(&p(true, "", "tesseract 4.1.1\n"), &langs).is_some());
+
+        let failed = p(false, "tesseract v5.5.3\n", "");
+        assert!(parse_tess(&failed, &langs).is_none(), "exit status");
+        assert!(parse_tess(&version, &p(false, langs.stdout.as_str(), "")).is_none());
+        for bad in [
+            "",
+            "Tesseract Open Source OCR Engine",
+            "tesseract",
+            "tesseract vX",
+            "usage: tesseract",
+        ] {
+            assert!(parse_tess(&p(true, bad, ""), &langs).is_none(), "{bad:?}");
+        }
+        for bad in [
+            "",
+            "eng\nosd\n",
+            "List of available languages in \"\" (0):",
+            "List of available languages in \"C:/t/\"",
+        ] {
+            assert!(parse_tess(&version, &p(true, bad, "")).is_none(), "{bad:?}");
+        }
     }
 }
