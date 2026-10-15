@@ -36,7 +36,7 @@ const USAGE_HEAT: &str = "用法：barking heat <期次目录> <组前缀> [--hn
 
 /// Same desktop-Chrome string the per-issue `a-heat.py` scripts sent; Reddit's
 /// public JSON refuses the default library user agent.
-const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36";
+pub(crate) const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36";
 const HN_SEARCH: &str = "https://hn.algolia.com/api/v1/search";
 const HN_ITEM: &str = "https://hn.algolia.com/api/v1/items";
 const REDDIT_SEARCH: &str = "https://old.reddit.com/search.json";
@@ -79,7 +79,7 @@ fn finish(result: Result<(), String>) -> ExitCode {
 
 /// Create `path` and write `bytes`, refusing to replace an existing file
 /// (`create_new` makes the check atomic, unlike `exists()` followed by write).
-fn write_new(path: &Path, bytes: &[u8]) -> Result<(), String> {
+pub(crate) fn write_new(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let mut f = fs::OpenOptions::new()
         .write(true)
         .create_new(true)

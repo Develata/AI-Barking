@@ -1280,7 +1280,7 @@ fn cut_warnings(lines: &[Line], rect: Rect) -> Vec<String> {
 // ---------------------------------------------------------------------------
 // External programs
 
-fn poppler_dirs() -> Vec<PathBuf> {
+pub(crate) fn poppler_dirs() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
     if let Some(d) = std::env::var_os("BARKING_POPPLER") {
         dirs.push(PathBuf::from(d));
@@ -1294,7 +1294,7 @@ fn poppler_dirs() -> Vec<PathBuf> {
 /// `name` in the first directory that has it, else the bare name for PATH
 /// lookup. PATH comes last on purpose: Git Bash puts an old xpdf `pdftotext`
 /// there, which has no `-bbox-layout`.
-fn pick_tool(dirs: &[PathBuf], name: &str) -> PathBuf {
+pub(crate) fn pick_tool(dirs: &[PathBuf], name: &str) -> PathBuf {
     let exe = format!("{name}{}", std::env::consts::EXE_SUFFIX);
     dirs.iter()
         .map(|d| d.join(&exe))
@@ -1405,7 +1405,7 @@ fn exists_msg(path: &Path) -> String {
 
 /// One JSON object per line with the keys in the order given (serde_json's
 /// own map would sort them), matching the old `a-shots-log.jsonl` look.
-fn jsonl(fields: &[(&str, Value)]) -> String {
+pub(crate) fn jsonl(fields: &[(&str, Value)]) -> String {
     let body: Vec<String> = fields
         .iter()
         .map(|(k, v)| format!("{}:{v}", Value::from(*k)))
@@ -1620,7 +1620,7 @@ fn log_file_url(root: &Path, url: &str) -> String {
 /// loses its `user:pass@` and the values of credential-like query (and
 /// fragment) parameters. The scratch `.tool.txt` keeps the raw URL: it lives
 /// in the temp directory, never in the repository.
-fn log_url(root: &Path, url: &str) -> String {
+pub(crate) fn log_url(root: &Path, url: &str) -> String {
     if starts_with_ci(url, "file://") {
         return log_file_url(root, url);
     }
