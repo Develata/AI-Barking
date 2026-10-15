@@ -24,11 +24,17 @@
 //!   cards.toml first and are reported together; then each card renders
 //!   independently, and one card's failure does not stop the others.
 //! - Each output's inputs (its cards.toml entry plus shared fields, the base
-//!   image or avatar bytes, the template, and this executable's own bytes, so
-//!   any rebuild counts as a change) are hashed. An output whose PNG exists
-//!   and whose hash matches the last successful render is skipped; `--all` or
-//!   naming the file forces it. Outputs themselves are not hashed: publish
-//!   recompresses them with oxipng, which must not count as a change.
+//!   image or avatar bytes, the template, the Tesseract build and model for
+//!   annotated screenshots, and this executable's own bytes, so any rebuild
+//!   counts as a change) are hashed. An output whose PNG exists and whose
+//!   hash matches the last successful render is skipped; `--all` or naming
+//!   the file forces it. Outputs themselves are not hashed: publish
+//!   recompresses them with oxipng, which must not count as a change. Chrome
+//!   and system fonts are not hashed either; after changing them, `--all`.
+//! - A card's entry is dropped (and the drop saved) before its image may be
+//!   replaced, and recorded only after the new image is in place, so an
+//!   interrupted run causes a re-render, never a trusted stale image. A lock
+//!   file per images directory keeps two runs from writing the cache at once.
 //! - The hashes live in the system temp dir, keyed by the images directory's
 //!   absolute path, not in `images/`: `offsite` registers and uploads every
 //!   git-ignored file there, and an unignored file would be a commit
@@ -41,6 +47,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::fs;
 use std::io;
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 use std::time::SystemTime;
@@ -243,14 +250,12 @@ impl Spec {
     }
 
     /// Where the retired 吠点 fields are still filled in, if anywhere.
-    fn retired_barks(&self) -> Option<String> {
-        self.tldr
-            .iter()
-            .find(|t| !t.barks.is_empty())
-            .map(|t| format!("[[tldr]]「{}」的 barks", t.tag))
-            .or_else(|| {
-                (self.annot.iter().find(|a| a.bark.is_some())).map(|a| format!("{} 的 bark", a.out))
-            })
+    fn retired_barks(&self) -> Vec<String> {
+        let tldr = (self.tldr.iter().filter(|t| !t.barks.is_empty()))
+            .map(|t| format!("[[tldr]]「{}」的 barks", t.tag));
+        let annot =
+            (self.annot.iter().filter(|a| a.bark.is_some())).map(|a| format!("{} 的 bark", a.out));
+        tldr.chain(annot).collect()
     }
 
     /// Image file names this spec renders.
@@ -275,11 +280,19 @@ impl Spec {
         jobs
     }
 
-    /// Hash of everything that determines `job`'s image except Chrome and
-    /// Tesseract themselves. `tool` is the hash of this executable. Unreadable
-    /// files hash as missing; rendering then fails, and failures are never
-    /// cached.
-    fn fingerprint(&self, job: &Job, images: &Path, avatar: Option<&Path>, tool: &str) -> String {
+    /// Hash of everything that determines `job`'s image except Chrome and the
+    /// system fonts. `tool` is the hash of this executable; `ocr` identifies
+    /// the Tesseract build and model an annotated screenshot is located with
+    /// (see [`ocr_identity`]). Unreadable files hash as missing; rendering
+    /// then fails, and failures are never cached.
+    fn fingerprint(
+        &self,
+        job: &Job,
+        images: &Path,
+        avatar: Option<&Path>,
+        tool: &str,
+        ocr: &str,
+    ) -> String {
         let mut hasher = Sha256::new();
         let mut part = |bytes: &[u8]| {
             // Length-prefixed, so adjacent parts cannot run together.
@@ -307,6 +320,7 @@ impl Spec {
                 part(ANNOT_TEMPLATE.as_bytes());
                 part(&json(a));
                 part(&file(raw_path(a, images).as_deref()));
+                part(ocr.as_bytes());
             }
         }
         hex(&hasher.finalize())
@@ -415,7 +429,12 @@ fn render_issue(dir: &Path, only: &[&str], all: bool) -> Result<Outcome, String>
         println!("（读不到程序自身，无法判断哪些卡片未变，全部重渲）");
     }
     let cache_file = cache_path(&images);
+    // Held until this run returns: a concurrent run could otherwise write
+    // back cache entries that this one has invalidated.
+    let _lock = cache_file.as_deref().map(Lock::acquire).transpose()?;
     let mut cache = cache_file.as_deref().map(load_cache).unwrap_or_default();
+    // Tesseract build and model per language setting, looked up on first need.
+    let mut ocr_ids: BTreeMap<&str, String> = BTreeMap::new();
 
     let mut todo = Vec::new();
     let mut skipped = Vec::new();
@@ -423,9 +442,16 @@ fn render_issue(dir: &Path, only: &[&str], all: bool) -> Result<Outcome, String>
         if !only.is_empty() && !only.contains(&out) {
             continue;
         }
+        let ocr = match job {
+            Job::Annot(a) => ocr_ids
+                .entry(a.lang.as_str())
+                .or_insert_with(|| ocr_identity(&a.lang))
+                .as_str(),
+            _ => "",
+        };
         let fp = tool
             .as_deref()
-            .map(|t| spec.fingerprint(&job, &images, avatar.as_deref(), t));
+            .map(|t| spec.fingerprint(&job, &images, avatar.as_deref(), t, ocr));
         let png = images.join(out);
         let unchanged = fp.is_some() && cache.get(out) == fp.as_ref() && png.is_file();
         if only.is_empty() && !all && unchanged {
@@ -464,6 +490,16 @@ fn render_issue(dir: &Path, only: &[&str], all: bool) -> Result<Outcome, String>
     let mut failed = Vec::new();
     let mut rendered = 0;
     for (out, job, fp) in todo {
+        // Distrust the old image on disk before anything may replace it: a
+        // run that dies from here on leaves no entry, so the next run renders
+        // this card again instead of skipping a half-written or stale PNG.
+        if cache.remove(out).is_some()
+            && let Some(file) = cache_file.as_deref()
+            && let Err(e) = save_cache(file, &cache)
+        {
+            failed.push(format!("{out}：缓存写入失败，未覆盖旧图：{e}"));
+            continue;
+        }
         let result = job_html(&spec, job, &images, &work, avatar.as_deref())
             .and_then(|(html, size)| render(&chrome, &work, &html, size, &images.join(out)));
         match result {
@@ -476,16 +512,7 @@ fn render_issue(dir: &Path, only: &[&str], all: bool) -> Result<Outcome, String>
                     }
                 }
             }
-            Err(e) => {
-                // Forget the old entry: a failed render may have left nothing
-                // or a stale PNG, so the card renders again next time.
-                if cache.remove(out).is_some()
-                    && let Some(file) = cache_file.as_deref()
-                {
-                    let _ = save_cache(file, &cache);
-                }
-                failed.push(format!("{out}：{e}"));
-            }
+            Err(e) => failed.push(format!("{out}：{e}")),
         }
     }
     if !failed.is_empty() {
@@ -525,7 +552,7 @@ fn job_html(
 /// editing round can fix them all. Empty means rendering may start.
 fn precheck(spec: &Spec, images: &Path, only: &[&str]) -> Vec<String> {
     let mut errs = Vec::new();
-    if let Some(at) = spec.retired_barks() {
+    for at in spec.retired_barks() {
         errs.push(format!(
             "{at} 已停用：2026-10-03 起图上不放吠点（只留事实、原文批注与译注），从 cards.toml 删去"
         ));
@@ -540,8 +567,9 @@ fn precheck(spec: &Spec, images: &Path, only: &[&str]) -> Vec<String> {
             errs.push(format!(
                 "输出名「{out}」须为 images/ 下的 .png 文件名，不含路径"
             ));
-        } else if outputs[..i].contains(out) {
-            errs.push(format!("输出名「{out}」重复"));
+        } else if (outputs[..i].iter()).any(|o| o.to_lowercase() == out.to_lowercase()) {
+            // Windows file names ignore case: both would write one file.
+            errs.push(format!("输出名「{out}」与前面的重复（文件名不分大小写）"));
         }
     }
     let unknown: Vec<&&str> = only.iter().filter(|o| !outputs.contains(o)).collect();
@@ -665,6 +693,76 @@ fn save_cache(path: &Path, cache: &BTreeMap<String, String>) -> Result<(), Strin
     let tmp = path.with_extension(format!("{}.tmp", std::process::id()));
     fs::write(&tmp, json(cache)).map_err(|e| format!("{}: {e}", tmp.display()))?;
     fs::rename(&tmp, path).map_err(|e| format!("{}: {e}", path.display()))
+}
+
+/// One `barking card` run per images directory at a time: a lock file next to
+/// the cache, created exclusively and holding the owner's PID, removed when
+/// the run ends. A killed run (Ctrl+C) leaves it behind; the error says how
+/// to clear it. No liveness check: std has no portable one.
+struct Lock(PathBuf);
+
+impl Lock {
+    fn acquire(cache: &Path) -> Result<Lock, String> {
+        let path = cache.with_extension("lock");
+        if let Some(dir) = path.parent() {
+            fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+        }
+        match fs::File::options().write(true).create_new(true).open(&path) {
+            Ok(mut f) => {
+                let _ = write!(f, "{}", std::process::id());
+                Ok(Lock(path))
+            }
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+                let pid = fs::read_to_string(&path).unwrap_or_default();
+                Err(format!(
+                    "另一个 barking card 进程（PID {}）正在处理这一期的卡片。若它已结束（例如被中断），删除锁文件 {} 后重试",
+                    pid.trim(),
+                    path.display()
+                ))
+            }
+            Err(e) => Err(format!("{}: {e}", path.display())),
+        }
+    }
+}
+
+impl Drop for Lock {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.0);
+    }
+}
+
+/// Which Tesseract locates quotes for `lang` (`eng`, `eng+chi_sim`): its
+/// version line plus a content hash of each `.traineddata` in the directory
+/// `tesseract --list-langs` reports, i.e. whatever TESSDATA_PREFIX resolves
+/// to. Content rather than size and mtime: a reinstall that rewrites the same
+/// model must not force re-OCR, and a swapped model must; the models are a
+/// few MB, hashed once per language setting per run. Anything unreadable
+/// hashes as missing; such a card fails to OCR and is not cached anyway.
+fn ocr_identity(lang: &str) -> String {
+    let run = |arg: &str| {
+        let o = Command::new("tesseract").arg(arg).output().ok()?;
+        let mut text = String::from_utf8_lossy(&o.stdout).into_owned();
+        text.push_str(&String::from_utf8_lossy(&o.stderr));
+        Some(text)
+    };
+    let version = run("--version")
+        .and_then(|t| t.lines().next().map(str::to_owned))
+        .unwrap_or_default();
+    let dir = run("--list-langs").and_then(|t| tessdata_dir(&t));
+    let mut id = version;
+    for l in lang.split('+') {
+        let model = (dir.as_ref()).and_then(|d| fs::read(d.join(format!("{l}.traineddata"))).ok());
+        let hash = model.map_or_else(|| "missing".to_string(), |b| hex(&Sha256::digest(&b)));
+        let _ = write!(id, "\n{l}:{hash}");
+    }
+    id
+}
+
+/// The directory in `List of available languages in "<dir>" (N):`.
+fn tessdata_dir(list_langs: &str) -> Option<PathBuf> {
+    let start = list_langs.find('"')? + 1;
+    let len = list_langs[start..].find('"')?;
+    Some(PathBuf::from(&list_langs[start..start + len]))
 }
 
 fn touch(path: &Path) -> io::Result<()> {
@@ -990,16 +1088,20 @@ fn render(
         }
     }
 
-    let out_abs = std::path::absolute(out).map_err(|e| format!("{}: {e}", out.display()))?;
+    // Shoot into the scratch dir and replace the output only once the shot
+    // exists, so a failed render never touches the previous image.
+    let shot = std::path::absolute(work.join(format!("{name}.png")))
+        .map_err(|e| format!("{}: {e}", out.display()))?;
+    let _ = fs::remove_file(&shot);
     let started = SystemTime::now();
     let status = chrome_cmd(chrome, work, size)
-        .arg(format!("--screenshot={}", out_abs.display()))
+        .arg(format!("--screenshot={}", shot.display()))
         .arg(&url)
         .stdout(Stdio::null())
         .status()
         .map_err(|e| format!("无法运行 {}: {e}", chrome.display()))?;
     // Chrome may exit 0 without writing; require a file newer than the launch.
-    let fresh = fs::metadata(&out_abs)
+    let fresh = fs::metadata(&shot)
         .and_then(|m| m.modified())
         .is_ok_and(|t| t >= started);
     if !status.success() || !fresh {
@@ -1009,6 +1111,12 @@ fn render(
             page.display()
         ));
     }
+    // Rename within a volume; the scratch dir is often on another drive, so
+    // fall back to copying. An interrupted copy can leave a broken PNG, which
+    // is safe because the caller has already dropped this card's cache entry.
+    fs::rename(&shot, out)
+        .or_else(|_| fs::copy(&shot, out).map(|_| ()))
+        .map_err(|e| format!("{}: {e}", out.display()))?;
     println!("{}  （HTML：{}）", out.display(), page.display());
     Ok(())
 }
@@ -1266,18 +1374,17 @@ struct QGlyph {
     c: char,
     /// Index into the quote's tokens.
     run: usize,
-    /// The token is one letter or digit, so OCR glyph confusion applies.
+    /// The token is a single character.
     single: bool,
 }
 
 /// Whether quote character `q` reads as OCR glyph `g`. Exact after folding,
-/// except that a one-character quote word from `I_LIKE` (normally `I`) also
-/// matches any `I_LIKE` glyph that starts an OCR token: a lone `|`, or the
-/// head of a merged `|do`. The accepted risk: a quoted `1` or `l` word would
-/// match an OCR `I`, and vice versa; the rest of the quote must still match
-/// exactly and uniquely.
+/// with one exception: a quote word that is exactly the letter `I` also
+/// matches an `I_LIKE` glyph that starts an OCR token (a lone `|`, `l` or
+/// `1`, or the head of a merged `|do`). No other letter or digit is relaxed,
+/// so a quoted `l` never matches an OCR `1`, nor a quoted `1` an OCR `I`.
 fn same(q: &QGlyph, g: &Glyph) -> bool {
-    q.c == g.c || (q.single && g.tok_start && I_LIKE.contains(&q.c) && I_LIKE.contains(&g.c))
+    q.c == g.c || (q.single && q.c == 'i' && g.tok_start && I_LIKE.contains(&g.c))
 }
 
 /// Where a quote sits on the image.
@@ -1296,8 +1403,10 @@ struct Located {
 /// and neither does where OCR splits or merges words inside the quote. A
 /// candidate must start and end on token boundaries; it counts towards
 /// uniqueness even if those fall inside an OCR word, and is then rejected as
-/// partial. A `|` inside the quoted span must stand for a one-letter quote
-/// word: it is never skipped, since it may be an `I` the quote left out.
+/// partial. A `|` inside the quoted span must stand for the quote word `I`:
+/// it is never skipped, since it may be an `I` the quote left out. A match
+/// may not span two Tesseract blocks: separate blocks (columns, captions,
+/// sidebars) read one after another could fake a sentence.
 ///
 /// Confidence: every matched word, single characters included, needs
 /// `MIN_CONF`. A confident `|` read for `I` passes, since the rest of the
@@ -1307,7 +1416,8 @@ struct Located {
 ///
 /// Pre: `words` are in Tesseract reading order. Post: the match covers whole
 /// OCR words only (a box is never wider than the quote); lines follow the
-/// quote's order; every matched word has confidence ≥ `MIN_CONF`.
+/// quote's order; every matched word has confidence ≥ `MIN_CONF` and lies in
+/// one Tesseract block.
 fn locate(words: &[Word], quote: &str) -> Result<Located, String> {
     let runs = tokens(quote);
     if runs.is_empty() {
@@ -1394,6 +1504,12 @@ fn locate(words: &[Word], quote: &str) -> Result<Located, String> {
 
     let mut idx: Vec<usize> = o[s..=e].iter().map(|g| g.word).collect();
     idx.dedup();
+    let block = words[idx[0]].line.0;
+    if idx.iter().any(|&i| words[i].line.0 != block) {
+        return Err(
+            "原句跨越 OCR 的两个文本块，可能把不相连的文字拼成了一句；核对原文后改用 rects".into(),
+        );
+    }
     if let Some(w) = idx.iter().map(|&i| &words[i]).find(|w| w.conf < MIN_CONF) {
         return Err(format!(
             "「{}」识别置信度 {:.0} 低于 {MIN_CONF}，不可靠；放大核对后改用 rects",
@@ -1457,7 +1573,7 @@ mod tests {
         assert_eq!(spec.tldr.len(), 2);
         // Two 省流 facts and the two main-post 速览 titles.
         assert_eq!(spec.quoted_texts().len(), 4);
-        assert!(spec.retired_barks().is_none());
+        assert!(spec.retired_barks().is_empty());
         assert!(spec.structure_errors().is_empty());
         assert_eq!(
             spec.outputs(),
@@ -1512,7 +1628,18 @@ mod tests {
             toml::from_str("date = \"d\"\n[[tldr]]\ntag = \"t\"\nfact = \"f\"\nbarks = [\"b\"]\n")
                 .unwrap();
         assert_eq!(spec.quoted_texts(), ["f", "b"]);
-        assert!(spec.retired_barks().unwrap().contains("barks"));
+        assert!(spec.retired_barks()[0].contains("barks"));
+
+        // Every occurrence is reported, not just the first.
+        let many: Spec = toml::from_str(
+            "date = \"d\"\n[[tldr]]\ntag = \"t1\"\nfact = \"f\"\nbarks = [\"b\"]\n\
+             [[tldr]]\ntag = \"t2\"\nfact = \"g\"\nbarks = [\"c\"]\n\
+             [[annot]]\nout = \"01-x.png\"\ntitle = \"t\"\nsource = \"s\"\nbark = \"x\"\nnote = []\n",
+        )
+        .unwrap();
+        let all = many.retired_barks();
+        assert_eq!(all.len(), 3, "{all:?}");
+        assert!(all[1].contains("t2") && all[2].contains("01-x.png"));
     }
 
     #[test]
@@ -1697,6 +1824,54 @@ mod tests {
     }
 
     #[test]
+    fn glyph_tolerance_is_only_for_the_word_i() {
+        // Codex review 2026-10-15: `l` ↔ `1` must not match, nor a quoted
+        // digit an OCR `I`.
+        let w = line_words(&[("Model", 97), ("1", 96), ("wins", 97)]);
+        assert!(locate(&w, "Model l wins").err().unwrap().contains("找不到"));
+        assert!(locate(&w, "Model 1 wins").is_ok());
+        for ocr in ["I", "|", "l"] {
+            let w = line_words(&[("step", 97), (ocr, 96), ("done", 97)]);
+            let e = locate(&w, "step 1 done").err().unwrap();
+            assert!(e.contains("找不到"), "{ocr}: {e}");
+        }
+        let w = line_words(&[("Model", 97), ("l", 96), ("wins", 97)]);
+        assert!(locate(&w, "Model 1 wins").err().unwrap().contains("找不到"));
+    }
+
+    #[test]
+    fn locate_refuses_a_match_across_tesseract_blocks() {
+        // level page block par line word left top width height conf text
+        let tsv = [
+            "header",
+            "5\t1\t1\t1\t1\t1\t0\t0\t30\t12\t95\tthe\n5\t1\t1\t1\t1\t2\t40\t0\t30\t12\t95\tmodel",
+            "5\t1\t2\t1\t1\t1\t0\t40\t30\t12\t95\twas\n5\t1\t2\t1\t1\t2\t40\t40\t30\t12\t95\tpaused",
+        ]
+        .join("\n");
+        let w = parse_tsv(&tsv, 1);
+        assert!(locate(&w, "model was").err().unwrap().contains("rects"));
+        assert!(locate(&w, "was paused").is_ok());
+    }
+
+    #[test]
+    fn output_names_clash_case_insensitively() {
+        let spec: Spec = toml::from_str(
+            "[[annot]]\nout = \"01-x.png\"\ntitle = \"t\"\nsource = \"s\"\nnote = []\n\
+             [[annot]]\nout = \"01-X.png\"\ntitle = \"t\"\nsource = \"s\"\nnote = []\n",
+        )
+        .unwrap();
+        let errs = precheck(&spec, Path::new("no-such-issue/images"), &[]).join("\n");
+        assert!(errs.contains("「01-X.png」与前面的重复"), "{errs}");
+    }
+
+    #[test]
+    fn tessdata_dir_comes_from_list_langs() {
+        let out = "List of available languages in \"C:\\t\\tessdata/\" (2):\neng\nosd\n";
+        assert_eq!(tessdata_dir(out), Some(PathBuf::from("C:\\t\\tessdata/")));
+        assert_eq!(tessdata_dir("tesseract: not found"), None);
+    }
+
+    #[test]
     fn locate_low_confidence_single_letter_is_refused() {
         let w = line_words(&[("|", 50), ("am", 97), ("very", 97), ("glad", 97)]);
         assert!(locate(&w, "I am very").err().unwrap().contains("置信度"));
@@ -1799,14 +1974,18 @@ note = []
             ))
             .unwrap()
         };
-        let fps = |spec: &Spec, tool: &str| -> Vec<String> {
+        let fps_ocr = |spec: &Spec, tool: &str, ocr: &str| -> Vec<String> {
             spec.jobs()
                 .iter()
-                .map(|(_, job)| spec.fingerprint(job, &images, None, tool))
+                .map(|(_, job)| spec.fingerprint(job, &images, None, tool, ocr))
                 .collect()
         };
+        let fps = |spec: &Spec, tool: &str| fps_ocr(spec, tool, "tess 5\neng:aa");
         let base = fps(&toml("d", "g"), "t1");
         assert_eq!(base, fps(&toml("d", "g"), "t1"), "deterministic");
+        // A different Tesseract model touches only the annotated screenshot.
+        let model = fps_ocr(&toml("d", "g"), "t1", "tess 5\neng:bb");
+        assert_eq!((model[0] == base[0], model[1] == base[1]), (true, false));
         // An annot edit touches only that card; a shared field or a rebuild
         // touches all; so do the base image's bytes for its card.
         let gloss = fps(&toml("d", "g2"), "t1");
@@ -1826,6 +2005,13 @@ note = []
         assert_eq!(load_cache(&file), cache);
         fs::write(&file, "{not json").unwrap();
         assert!(load_cache(&file).is_empty());
+
+        // One run per images directory; the lock goes away with its holder.
+        let held = Lock::acquire(&file).unwrap();
+        let busy = Lock::acquire(&file).err().unwrap();
+        assert!(busy.contains("锁文件") && busy.contains(&std::process::id().to_string()));
+        drop(held);
+        assert!(Lock::acquire(&file).is_ok());
         let _ = fs::remove_dir_all(&images);
     }
 }
