@@ -19,6 +19,9 @@
 //! - Requests are anonymous: ureq is built without its `cookies` feature, so
 //!   there is no jar; the only identifying request header is the desktop
 //!   Chrome User-Agent everyone sends. Nothing about the request is logged.
+//!   The committed `.headers` must not place the fetcher either: CDN edge,
+//!   request-id and client-IP headers keep their name but lose their value
+//!   (`LOCATION_HEADERS`); the log carries no response headers at all.
 //! - Timeouts are end to end (ureq's global timeout covers the body): 60 s,
 //!   or 180 s when the URL path ends in `.pdf`. A response that turns out to
 //!   be `application/pdf` at a URL without that suffix (arXiv `/pdf/<id>`) is
@@ -64,7 +67,7 @@ const USAGE: &str = "\
 清单每行一条：name<TAB>url（空行与 # 开头的行忽略；- 表示从标准输入读）。
   name 只许小写字母、数字与 -，输出在 sources/<组前缀>-<name>.*：
     正文 .html / .pdf（先看文件头再看 Content-Type；其他类型为 .json .xml .txt .png 等，未知为 .bin）
-    .headers  状态行、最终 URL 与响应头（Set-Cookie 只留名字）
+    .headers  状态行、最终 URL 与响应头（Set-Cookie 只留名字；CDN 节点、请求编号与客户端 IP 类头的值记为“已删”，不暴露抓取地点）
     .txt      文本存档：HTML 转纯文本（同 html2txt），PDF 用 poppler 的 pdftotext -enc UTF-8 -layout
   匿名 GET（桌面 Chrome UA、Accept-Language en-US、跟随跳转、无 Cookie），每条限时 60 秒（PDF 180 秒）；
   网络错误或 5xx 重试一次，4xx 不重试。并发 --jobs（默认 6，最多 16），同一站点最多 2 个。
@@ -719,12 +722,63 @@ fn redact_cookie(v: &str) -> String {
     format!("{}=[REDACTED]", name.trim())
 }
 
+/// Response headers that can tell where the fetcher sits: the CDN edge (POP)
+/// that served it, a request id the CDN maps back to that edge and the
+/// client address, or an echo of the client IP. The repository is public
+/// and `.headers` is committed, so their values are replaced (the line stays,
+/// to show something was there). `cf-ray` loses its id too, not only the
+/// `-XXX` POP suffix: the id is a key into Cloudflare's logs of this very
+/// request, and as evidence it proves nothing the status line does not.
+const LOCATION_HEADERS: [&str; 22] = [
+    // Edge / POP names.
+    "cf-ray",
+    "x-amz-cf-pop",
+    "x-amz-cf-id",
+    "x-served-by",
+    "x-cache",
+    "via",
+    "server-timing",
+    "fly-request-id",
+    "x-vercel-id",
+    "x-azure-ref",
+    "x-msedge-ref",
+    "akamai-grn",
+    "x-edge-location",
+    "x-cdn-pop",
+    // Cloudflare puts an opaque per-request token (`?s=…`) in the NEL
+    // reporting URL; not readable, so not trusted to be location-free.
+    "report-to",
+    "reporting-endpoints",
+    // Echoes of the client address.
+    "x-forwarded-for",
+    "x-real-ip",
+    "cf-connecting-ip",
+    "x-client-ip",
+    "true-client-ip",
+    "forwarded",
+];
+/// Header-name prefixes of whole families that carry POP or client fields.
+const LOCATION_HEADER_PREFIXES: [&str; 2] = ["x-fastly-", "x-akamai-"];
+const LOCATION_REDACTED: &str = "[已删：可能暴露抓取地点]";
+
+/// Whether a (lower-case) header name is in `LOCATION_HEADERS` or one of the
+/// `LOCATION_HEADER_PREFIXES` families.
+fn reveals_location(name: &str) -> bool {
+    let name = name.to_ascii_lowercase();
+    LOCATION_HEADERS.contains(&name.as_str())
+        || LOCATION_HEADER_PREFIXES.iter().any(|p| name.starts_with(p))
+}
+
 /// The `.headers` sidecar: status line, final URL, then the response headers
-/// as received (names lower-cased by the HTTP library).
+/// as received (names lower-cased by the HTTP library), except that
+/// `Set-Cookie` keeps only the cookie name and location-revealing headers
+/// (`reveals_location`) lose their value.
 fn headers_text(root: &Path, g: &Got) -> String {
     let mut s = format!("{}\nURL: {}\n", g.status_line, log_url(root, &g.final_url));
     for (k, v) in &g.headers {
-        let v = if k == "set-cookie" {
+        let v = if reveals_location(k) {
+            LOCATION_REDACTED.to_string()
+        } else if k == "set-cookie" {
             redact_cookie(v)
         } else {
             v.clone()
@@ -1495,6 +1549,77 @@ mod tests {
         );
         assert!(headers.contains("set-cookie: __cf_bm=[REDACTED]\n"));
         assert!(!headers.contains("SECRETVALUE") && !headers.contains("user:pw"));
+        let _ = fs::remove_dir_all(&issue.root);
+    }
+
+    #[test]
+    fn location_headers_are_listed_and_matched() {
+        for h in LOCATION_HEADERS {
+            assert!(reveals_location(h), "{h}");
+            assert_eq!(h, h.to_ascii_lowercase(), "{h} must be lower-case");
+        }
+        for h in ["X-Fastly-Pop", "x-akamai-edgescape", "CF-Ray", "Via"] {
+            assert!(reveals_location(h), "{h}");
+        }
+        for h in [
+            "content-type",
+            "cf-cache-status",
+            "x-cache-hits",
+            "x-timer",
+            "date",
+            "server",
+        ] {
+            assert!(!reveals_location(h), "{h}");
+        }
+    }
+
+    #[test]
+    fn location_headers_are_redacted_in_headers_and_absent_from_log() {
+        let issue = test_issue("pop");
+        let mut g = got(200, "text/html", ARTICLE.as_bytes());
+        g.headers.extend(
+            [
+                ("cf-ray", "8f1e2d3c4b5a6978-NRT"),
+                ("x-amz-cf-pop", "HKG62-P1"),
+                ("x-served-by", "cache-hkg17920-HKG"),
+                ("x-cache", "HIT from cloudfront"),
+                ("via", "1.1 abc.cloudfront.net (CloudFront)"),
+                ("server-timing", "cdn-cache; desc=HIT, edge; dur=1"),
+                ("x-fastly-request-id", "f00"),
+                ("fly-request-id", "01J-sin"),
+                ("x-vercel-id", "hkg1::iad1::abc"),
+                ("x-forwarded-for", "203.0.113.7"),
+                ("x-real-ip", "203.0.113.7"),
+                ("cf-connecting-ip", "203.0.113.7"),
+                ("x-client-ip", "203.0.113.7"),
+                ("cf-cache-status", "HIT"),
+            ]
+            .map(|(k, v)| (k.to_string(), v.to_string())),
+        );
+        let o = job(&issue, false).archive(&issue.sources(), "a-pop", g);
+        let text = fs::read_to_string(issue.sources().join("a-pop.headers")).unwrap();
+        for leak in [
+            "NRT",
+            "8f1e2d3c",
+            "HKG",
+            "hkg",
+            "cloudfront",
+            "edge; dur",
+            "f00",
+            "sin",
+            "203.0.113.7",
+        ] {
+            assert!(!text.contains(leak), "{leak} leaked:\n{text}");
+        }
+        assert!(text.contains(&format!("cf-ray: {LOCATION_REDACTED}\n")));
+        assert!(text.contains(&format!("x-forwarded-for: {LOCATION_REDACTED}\n")));
+        assert!(text.contains("cf-cache-status: HIT\n"));
+        assert_eq!(text.matches(LOCATION_REDACTED).count(), 13);
+        let item = parse_manifest("pop\thttps://example.com/\n")
+            .unwrap()
+            .remove(0);
+        let line = log_line(&issue, &item, &o);
+        assert!(!line.contains("NRT") && !line.contains("203.0.113.7") && !line.contains("hkg"));
         let _ = fs::remove_dir_all(&issue.root);
     }
 
