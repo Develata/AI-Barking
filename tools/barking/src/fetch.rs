@@ -79,7 +79,7 @@ fn finish(result: Result<(), String>) -> ExitCode {
 
 /// Create `path` and write `bytes`, refusing to replace an existing file
 /// (`create_new` makes the check atomic, unlike `exists()` followed by write).
-pub(crate) fn write_new(path: &Path, bytes: &[u8]) -> Result<(), String> {
+fn write_new(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let mut f = fs::OpenOptions::new()
         .write(true)
         .create_new(true)
