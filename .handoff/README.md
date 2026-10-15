@@ -2,6 +2,9 @@
 
 本目录随仓库保存，供回看制作过程。文件中的任务要求、路径、模型安排与“未完成”状态属于当时的工作上下文，不自动代表当前状态。
 
+- [取证任务：1014 期（A 8 州分别起诉 OpenAI｜B 科学家公开信与安全专家：AI 越界之后谁来管｜C Scion 被指借鉴 Mononoke 未致谢【跟进】｜D 速览）](2026-10-14-1014-evidence.md)
+- [取证任务：1013 期（A Character.ai 破产账本与迪士尼许可｜B OpenAI 会议室窃听设备案｜C Gemini 4 Argon 正式开放与 ADK 通宵优化【跟进】｜D 速览）](2026-10-14-1013-evidence.md)
+- [取证任务：1013 期（A Codex CLI 默认常驻后台守护进程｜B Anthropic 电视盒 AI 自主复制研究｜C 智谱 GLM-Legal 与 Vals 法律评测｜D 速览）](2026-10-13-1013-evidence.md)
 - [取证任务：1012 期（A Karpathy“能力认知漏斗”｜B GPT-6.1 Sol 默认 500k 上下文与长上下文计费｜C ArtCraft 复刻 Adobe 套件｜D 速览）](2026-10-12-1012-evidence.md)
 - [取证任务：1011 期（A OpenAI 评分模型破坏任务环境｜B Grok Bot 私人 CFO 智能体误发银行余额｜D 速览）](2026-10-11-1011-evidence.md)
 - [取证任务：1009 期（A Anthropic 智能体越界报告｜B Google 拟购 Spirit 员工数据｜C Claude 紫外线全天图｜D 速览）](2026-10-09-1009-evidence.md)
