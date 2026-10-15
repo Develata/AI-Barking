@@ -553,8 +553,11 @@ fn precheck(spec: &Spec, images: &Path, only: &[&str]) -> Vec<String> {
         errs.push("cards.toml 缺少 date（省流卡、速览聚合图与速览专帖封面都要写日期）".into());
     }
     for a in &spec.annot {
+        // Base images are git-ignored and may be absent from a fresh checkout;
+        // when rendering named outputs, only theirs must be present.
+        let selected = only.is_empty() || only.contains(&a.out.as_str());
         errs.extend(
-            annot_problems(a, images)
+            annot_problems(a, images, selected)
                 .into_iter()
                 .map(|e| format!("{}：{e}", a.out)),
         );
@@ -570,14 +573,17 @@ fn raw_path(a: &Annot, images: &Path) -> Option<PathBuf> {
 
 /// What is wrong with one [[annot]] short of OCR. Empty means `annot_html`
 /// can rely on: 1–4 notes, each with exactly one of quote/rects, rects inside
-/// the base image, underline only with quote, emph inside its gloss.
-fn annot_problems(a: &Annot, images: &Path) -> Vec<String> {
+/// the base image, underline only with quote, emph inside its gloss. Without
+/// `with_raw` the base image is not read, and rects go unchecked against it.
+fn annot_problems(a: &Annot, images: &Path, with_raw: bool) -> Vec<String> {
     let mut errs = Vec::new();
     if a.note.is_empty() || a.note.len() > MAX_NOTES {
         errs.push(format!("每张批注图需 1–{MAX_NOTES} 条 note"));
     }
     // A non-.png `out` has no base image; the output-name check reports it.
-    let size = raw_path(a, images).and_then(|raw| png_size(&raw).map_err(|e| errs.push(e)).ok());
+    let size = raw_path(a, images)
+        .filter(|_| with_raw)
+        .and_then(|raw| png_size(&raw).map_err(|e| errs.push(e)).ok());
     for (i, note) in a.note.iter().enumerate() {
         let c = i + 1;
         match (&note.rects, &note.quote) {
@@ -756,7 +762,7 @@ pub(crate) fn repo_root(dir: &Path) -> Result<PathBuf, String> {
 fn annot_html(a: &Annot, images: &Path, work: &Path) -> Result<String, String> {
     // Normally already reported by `precheck`; repeated so this function
     // never relies on a caller for its own invariants.
-    if let Some(e) = annot_problems(a, images).into_iter().next() {
+    if let Some(e) = annot_problems(a, images, true).into_iter().next() {
         return Err(e);
     }
     let raw = raw_path(a, images).ok_or("out 须为 .png 文件名")?;
@@ -1762,20 +1768,19 @@ note = []
 "#,
         )
         .unwrap();
-        let errs = precheck(&spec, Path::new("no-such-issue/images"), &["nope.png"]);
-        let all = errs.join("\n");
-        for needle in [
-            "重复",
-            "nope.png",
-            "date",
-            "二选一",
-            "emph",
-            "1–4 条 note",
-            "底图",
-        ] {
+        let images = Path::new("no-such-issue/images");
+        let all = precheck(&spec, images, &[]).join("\n");
+        for needle in ["重复", "date", "二选一", "emph", "1–4 条 note", "底图"] {
             assert!(all.contains(needle), "missing {needle}: {all}");
         }
-        assert!(precheck(&spec, Path::new("x"), &[]).len() < errs.len());
+        // Naming outputs: unknown names are reported, and only the named
+        // cards need their (git-ignored) base images.
+        let named = precheck(&spec, images, &["nope.png"]).join("\n");
+        assert!(
+            named.contains("nope.png") && named.contains("emph"),
+            "{named}"
+        );
+        assert!(!named.contains("底图"), "{named}");
     }
 
     #[test]
