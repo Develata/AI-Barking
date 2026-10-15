@@ -529,11 +529,35 @@ fn replace_tags(s: &str) -> String {
             return memo.find_gt(s.as_bytes(), at).map(|p| p + 1);
         }
         let tag = parse_tag(s, at, &mut memo)?;
-        if BLOCK_TAGS.iter().any(|n| tag.name.eq_ignore_ascii_case(n)) {
+        if BLOCK_TAGS.iter().any(|n| tag.name.eq_ignore_ascii_case(n))
+            && !(tag.name.eq_ignore_ascii_case("br") && aria_hidden(tag.attrs))
+        {
             out.push('\n');
         }
         Some(tag.end)
     })
+}
+
+/// Whether the attributes carry `aria-hidden="true"`. Justified-text
+/// typesetters (anoma.ly, 1014) wrap every word in a span preceded by a
+/// `<br aria-hidden="true">` break opportunity; read as real breaks they
+/// put one word per line. A hidden break is not a line break for the reader.
+fn aria_hidden(attrs: &str) -> bool {
+    let lower = attrs.to_ascii_lowercase();
+    let mut rest = lower.as_str();
+    while let Some(p) = rest.find("aria-hidden") {
+        // Attribute name boundary: not the tail of e.g. `data-aria-hidden`.
+        let before_ok = p == 0 || rest.as_bytes()[p - 1].is_ascii_whitespace();
+        let after = rest[p + "aria-hidden".len()..].trim_start();
+        if before_ok && let Some(v) = after.strip_prefix('=') {
+            let v = v.trim_start().trim_start_matches(['"', '\'']);
+            if v.starts_with("true") {
+                return true;
+            }
+        }
+        rest = &rest[p + 1..];
+    }
+    false
 }
 
 /// Windows-1252 meanings of the C1 range, which is what a browser (and
@@ -1298,6 +1322,16 @@ mod tests {
             rewrite_links("<a title=\"a > b\" href=\"/h\">t</a>"),
             "t [/h]"
         );
+    }
+
+    #[test]
+    fn aria_hidden_br_is_not_a_line_break() {
+        // anoma.ly's justified text: a hidden break before every word.
+        let html = "<span>is</span><br class=\"j\" aria-hidden=\"true\"><span>a</span>\
+                    <br aria-hidden='TRUE'/>b<br aria-hidden=false>c<br data-aria-hidden=\"true\">d";
+        assert_eq!(replace_tags(html), "isab\nc\nd");
+        assert!(aria_hidden(" aria-hidden = \"true\""));
+        assert!(!aria_hidden(" aria-hidden=\"false\""));
     }
 
     #[test]
