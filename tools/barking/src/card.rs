@@ -432,9 +432,10 @@ fn render_issue(dir: &Path, only: &[&str], all: bool) -> Result<Outcome, String>
     // Held until this run returns: a concurrent run could otherwise write
     // back cache entries that this one has invalidated.
     let _lock = cache_file.as_deref().map(Lock::acquire).transpose()?;
-    let mut cache = cache_file.as_deref().map(load_cache).unwrap_or_default();
-    // Tesseract build and model per language setting, looked up on first need.
-    let mut ocr_ids: BTreeMap<&str, String> = BTreeMap::new();
+    let mut cache = cache_file.as_deref().map(Cache::load).unwrap_or_default();
+    // Tesseract build and model per language setting, looked up on first need;
+    // `None` when they cannot be identified.
+    let mut ocr_ids: BTreeMap<&str, Option<String>> = BTreeMap::new();
 
     let mut todo = Vec::new();
     let mut skipped = Vec::new();
@@ -445,13 +446,23 @@ fn render_issue(dir: &Path, only: &[&str], all: bool) -> Result<Outcome, String>
         let ocr = match job {
             Job::Annot(a) => ocr_ids
                 .entry(a.lang.as_str())
-                .or_insert_with(|| ocr_identity(&a.lang))
-                .as_str(),
-            _ => "",
+                .or_insert_with(|| {
+                    let id = ocr_identity(&a.lang);
+                    if id.is_none() {
+                        println!(
+                            "（认不出 Tesseract 或语言包 {}，用它的批注图不记缓存、每次重渲）",
+                            a.lang
+                        );
+                    }
+                    id
+                })
+                .as_deref(),
+            _ => Some(""),
         };
-        let fp = tool
-            .as_deref()
-            .map(|t| spec.fingerprint(&job, &images, avatar.as_deref(), t, ocr));
+        // No fingerprint, no caching: the card always renders.
+        let fp = (tool.as_deref())
+            .zip(ocr)
+            .map(|(t, ocr)| spec.fingerprint(&job, &images, avatar.as_deref(), t, ocr));
         let png = images.join(out);
         let unchanged = fp.is_some() && cache.get(out) == fp.as_ref() && png.is_file();
         if only.is_empty() && !all && unchanged {
@@ -490,28 +501,12 @@ fn render_issue(dir: &Path, only: &[&str], all: bool) -> Result<Outcome, String>
     let mut failed = Vec::new();
     let mut rendered = 0;
     for (out, job, fp) in todo {
-        // Distrust the old image on disk before anything may replace it: a
-        // run that dies from here on leaves no entry, so the next run renders
-        // this card again instead of skipping a half-written or stale PNG.
-        if cache.remove(out).is_some()
-            && let Some(file) = cache_file.as_deref()
-            && let Err(e) = save_cache(file, &cache)
-        {
-            failed.push(format!("{out}：缓存写入失败，未覆盖旧图：{e}"));
-            continue;
-        }
-        let result = job_html(&spec, job, &images, &work, avatar.as_deref())
-            .and_then(|(html, size)| render(&chrome, &work, &html, size, &images.join(out)));
+        let result = render_one(&mut cache, cache_file.as_deref(), out, fp, || {
+            let (html, size) = job_html(&spec, job, &images, &work, avatar.as_deref())?;
+            render(&chrome, &work, &html, size, &images.join(out))
+        });
         match result {
-            Ok(()) => {
-                rendered += 1;
-                if let (Some(fp), Some(file)) = (fp, cache_file.as_deref()) {
-                    cache.insert(out.to_string(), fp);
-                    if let Err(e) = save_cache(file, &cache) {
-                        println!("（缓存写入失败，下次将重渲：{e}）");
-                    }
-                }
-            }
+            Ok(()) => rendered += 1,
             Err(e) => failed.push(format!("{out}：{e}")),
         }
     }
@@ -677,22 +672,82 @@ fn cache_path(images: &Path) -> Option<PathBuf> {
     )
 }
 
-/// Output name → input fingerprint of its last successful render. A missing
-/// or unreadable cache is empty: everything renders.
-fn load_cache(path: &Path) -> BTreeMap<String, String> {
-    fs::read_to_string(path)
-        .ok()
-        .and_then(|t| serde_json::from_str(&t).ok())
-        .unwrap_or_default()
+/// Output name → input fingerprint of its last successful render. Keys are
+/// lowercased output names: they are file names, and Windows ignores case,
+/// so `01-x.png` and `01-X.png` are one file and must be one entry.
+#[derive(Default, Debug, PartialEq)]
+struct Cache(BTreeMap<String, String>);
+
+impl Cache {
+    /// A missing or unreadable cache is empty: everything renders. Keys that
+    /// differ only in case (written before keys were lowercased) are all
+    /// dropped, since which one describes the file on disk is unknown.
+    fn load(path: &Path) -> Cache {
+        let raw: BTreeMap<String, String> = fs::read_to_string(path)
+            .ok()
+            .and_then(|t| serde_json::from_str(&t).ok())
+            .unwrap_or_default();
+        let mut variants: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        for (k, v) in raw {
+            variants.entry(k.to_lowercase()).or_default().push(v);
+        }
+        Cache(
+            variants
+                .into_iter()
+                .filter_map(|(k, mut vs)| (vs.len() == 1).then(|| (k, vs.remove(0))))
+                .collect(),
+        )
+    }
+
+    fn save(&self, path: &Path) -> Result<(), String> {
+        let dir = path.parent().ok_or("缓存路径无上级目录")?;
+        fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+        // Write then rename, so an interrupted run never leaves half a file.
+        let tmp = path.with_extension(format!("{}.tmp", std::process::id()));
+        fs::write(&tmp, json(&self.0)).map_err(|e| format!("{}: {e}", tmp.display()))?;
+        fs::rename(&tmp, path).map_err(|e| format!("{}: {e}", path.display()))
+    }
+
+    fn get(&self, out: &str) -> Option<&String> {
+        self.0.get(&out.to_lowercase())
+    }
+
+    fn remove(&mut self, out: &str) -> bool {
+        self.0.remove(&out.to_lowercase()).is_some()
+    }
+
+    fn insert(&mut self, out: &str, fp: String) {
+        self.0.insert(out.to_lowercase(), fp);
+    }
 }
 
-fn save_cache(path: &Path, cache: &BTreeMap<String, String>) -> Result<(), String> {
-    let dir = path.parent().ok_or("缓存路径无上级目录")?;
-    fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    // Write then rename, so an interrupted run never leaves half a file.
-    let tmp = path.with_extension(format!("{}.tmp", std::process::id()));
-    fs::write(&tmp, json(cache)).map_err(|e| format!("{}: {e}", tmp.display()))?;
-    fs::rename(&tmp, path).map_err(|e| format!("{}: {e}", path.display()))
+/// Renders one card with the cache kept honest. Its entry is dropped, and the
+/// drop saved, before `render` may replace the image: a run that dies from
+/// then on leaves no entry, so the next run renders the card again instead of
+/// trusting a half-written or stale PNG. If that save fails, `render` is not
+/// called. The new fingerprint is recorded only after `render` succeeds.
+fn render_one(
+    cache: &mut Cache,
+    file: Option<&Path>,
+    out: &str,
+    fp: Option<String>,
+    render: impl FnOnce() -> Result<(), String>,
+) -> Result<(), String> {
+    if cache.remove(out)
+        && let Some(file) = file
+    {
+        cache
+            .save(file)
+            .map_err(|e| format!("缓存写入失败，未覆盖旧图：{e}"))?;
+    }
+    render()?;
+    if let (Some(fp), Some(file)) = (fp, file) {
+        cache.insert(out, fp);
+        if let Err(e) = cache.save(file) {
+            println!("（缓存写入失败，下次将重渲：{e}）");
+        }
+    }
+    Ok(())
 }
 
 /// One `barking card` run per images directory at a time: a lock file next to
@@ -731,31 +786,45 @@ impl Drop for Lock {
     }
 }
 
+/// The Tesseract on PATH: its version line and the tessdata directory it
+/// reports in `--list-langs` (whatever TESSDATA_PREFIX resolves to). Probed
+/// once per process; every OCR call passes this directory explicitly, so the
+/// model hashed into the cache is the model OCR loads.
+struct Tess {
+    version: String,
+    dir: PathBuf,
+}
+
+fn tess() -> Option<&'static Tess> {
+    static TESS: std::sync::OnceLock<Option<Tess>> = std::sync::OnceLock::new();
+    TESS.get_or_init(|| {
+        let run = |arg: &str| {
+            let o = Command::new("tesseract").arg(arg).output().ok()?;
+            let mut text = String::from_utf8_lossy(&o.stdout).into_owned();
+            text.push_str(&String::from_utf8_lossy(&o.stderr));
+            Some(text)
+        };
+        let version = run("--version")?.lines().next()?.trim().to_owned();
+        let dir = tessdata_dir(&run("--list-langs")?)?;
+        (!version.is_empty()).then_some(Tess { version, dir })
+    })
+    .as_ref()
+}
+
 /// Which Tesseract locates quotes for `lang` (`eng`, `eng+chi_sim`): its
-/// version line plus a content hash of each `.traineddata` in the directory
-/// `tesseract --list-langs` reports, i.e. whatever TESSDATA_PREFIX resolves
-/// to. Content rather than size and mtime: a reinstall that rewrites the same
-/// model must not force re-OCR, and a swapped model must; the models are a
-/// few MB, hashed once per language setting per run. Anything unreadable
-/// hashes as missing; such a card fails to OCR and is not cached anyway.
-fn ocr_identity(lang: &str) -> String {
-    let run = |arg: &str| {
-        let o = Command::new("tesseract").arg(arg).output().ok()?;
-        let mut text = String::from_utf8_lossy(&o.stdout).into_owned();
-        text.push_str(&String::from_utf8_lossy(&o.stderr));
-        Some(text)
-    };
-    let version = run("--version")
-        .and_then(|t| t.lines().next().map(str::to_owned))
-        .unwrap_or_default();
-    let dir = run("--list-langs").and_then(|t| tessdata_dir(&t));
-    let mut id = version;
+/// version line plus a content hash of each `.traineddata` it loads. Content
+/// rather than size and mtime: a reinstall that rewrites the same model must
+/// not force re-OCR, and a swapped model must; the models are a few MB,
+/// hashed once per language setting per run. `None` if Tesseract or a model
+/// cannot be read: such cards are then never cached.
+fn ocr_identity(lang: &str) -> Option<String> {
+    let t = tess()?;
+    let mut id = t.version.clone();
     for l in lang.split('+') {
-        let model = (dir.as_ref()).and_then(|d| fs::read(d.join(format!("{l}.traineddata"))).ok());
-        let hash = model.map_or_else(|| "missing".to_string(), |b| hex(&Sha256::digest(&b)));
-        let _ = write!(id, "\n{l}:{hash}");
+        let model = fs::read(t.dir.join(format!("{l}.traineddata"))).ok()?;
+        let _ = write!(id, "\n{l}:{}", hex(&Sha256::digest(&model)));
     }
-    id
+    Some(id)
 }
 
 /// The directory in `List of available languages in "<dir>" (N):`.
@@ -1219,17 +1288,14 @@ pub(crate) fn run_ocr(
         }
         tmp
     };
-    let out = Command::new("tesseract")
-        .arg(&input)
-        .args([
-            "stdout",
-            "--psm",
-            "6",
-            "-l",
-            lang,
-            "-c",
-            "tessedit_create_tsv=1",
-        ])
+    let mut cmd = Command::new("tesseract");
+    cmd.arg(&input).arg("stdout");
+    // The directory whose model `ocr_identity` hashed.
+    if let Some(t) = tess() {
+        cmd.arg("--tessdata-dir").arg(&t.dir);
+    }
+    let out = cmd
+        .args(["--psm", "6", "-l", lang, "-c", "tessedit_create_tsv=1"])
         .output()
         .map_err(|e| {
             format!("无法运行 tesseract（scoop install tesseract tesseract-languages）：{e}")
@@ -1504,12 +1570,9 @@ fn locate(words: &[Word], quote: &str) -> Result<Located, String> {
 
     let mut idx: Vec<usize> = o[s..=e].iter().map(|g| g.word).collect();
     idx.dedup();
-    let block = words[idx[0]].line.0;
-    if idx.iter().any(|&i| words[i].line.0 != block) {
-        return Err(
-            "原句跨越 OCR 的两个文本块，可能把不相连的文字拼成了一句；核对原文后改用 rects".into(),
-        );
-    }
+    continuity(words, &idx).map_err(|why| {
+        format!("原句在图上不连续（{why}），可能把不相连的文字拼成了一句；核对原文后改用 rects")
+    })?;
     if let Some(w) = idx.iter().map(|&i| &words[i]).find(|w| w.conf < MIN_CONF) {
         return Err(format!(
             "「{}」识别置信度 {:.0} 低于 {MIN_CONF}，不可靠；放大核对后改用 rects",
@@ -1546,6 +1609,96 @@ fn locate(words: &[Word], quote: &str) -> Result<Located, String> {
         })
         .collect();
     Ok(Located { lines, words: idx })
+}
+
+/// Largest horizontal gap between neighbouring words of one line, in
+/// multiples of the line's tallest word box (about one em, ascender to
+/// descender). Measured on issue 1014's five raw images (`--psm 6`, eng):
+/// prose word gaps average 0.24–0.44 and reach 0.69; a ` — ` whose dash word
+/// carries no text, 1.65; a list label before its item (`l.  Enjoin`), up to
+/// about 2.9, which is why the gap before a quote's first word is never
+/// checked. A column gutter or table cell boundary is usually wider.
+const MAX_GAP: f32 = 2.5;
+
+/// Tesseract's (block, paragraph, line) numbers of one text line.
+type LineKey = (u32, u32, u32);
+
+/// Whether matched words `idx` (in reading order) form one stretch of text.
+/// Tesseract's `--psm 6` reads the image as one block and joins side-by-side
+/// columns into shared lines, so the character stream alone can splice a
+/// column's tail onto the next column's head. Required:
+///
+/// - one Tesseract block;
+/// - within each line, neighbouring matched words no further apart than
+///   `MAX_GAP` word heights;
+/// - across lines: lines consecutive in OCR order; each continuation line
+///   starting at its OCR line's first word with text, or near the left edge
+///   of the quote's lines; and on the last line, no gap over `MAX_GAP` from
+///   the quote's start there to the line's end.
+///
+/// The first two cross-line rules mostly restate what a contiguous stream
+/// match already implies. The last one catches the splice: in joined columns
+/// a wrapped match runs from the right column's tail into the next line's
+/// left-column head, which a gutter then follows. A genuine wrap needs a
+/// single-column layout (in two columns the stream would not be contiguous),
+/// so there the rest of the last line follows at word spacing.
+fn continuity(words: &[Word], idx: &[usize]) -> Result<(), &'static str> {
+    let block = words[idx[0]].line.0;
+    if idx.iter().any(|&i| words[i].line.0 != block) {
+        return Err("跨越 OCR 的两个文本块");
+    }
+    let has_text = |w: &Word| w.text.chars().any(|c| c.is_alphanumeric() || c == '|');
+    let height = |ws: &[&Word]| ws.iter().map(|w| w.bottom - w.top).max().unwrap_or(0) as f32;
+    let tight = |ws: &[&Word]| {
+        let h = height(ws);
+        ws.windows(2)
+            .all(|p| p[1].left.saturating_sub(p[0].right) as f32 <= MAX_GAP * h)
+    };
+    // Matched words grouped by OCR line, in quote order.
+    let mut groups: Vec<(LineKey, Vec<&Word>)> = Vec::new();
+    for w in idx.iter().map(|&i| &words[i]) {
+        match groups.last_mut() {
+            Some((k, g)) if *k == w.line => g.push(w),
+            _ => groups.push((w.line, vec![w])),
+        }
+    }
+    if groups.iter().any(|(_, g)| !tight(g)) {
+        return Err("同一行内两词相隔过远");
+    }
+    if groups.len() == 1 {
+        return Ok(());
+    }
+    let mut order: Vec<LineKey> = Vec::new();
+    for w in words {
+        if !order.contains(&w.line) {
+            order.push(w.line);
+        }
+    }
+    let pos = |k: &LineKey| order.iter().position(|o| o == k);
+    if groups
+        .windows(2)
+        .any(|p| pos(&p[1].0) != pos(&p[0].0).map(|i| i + 1))
+    {
+        return Err("换行处不是相邻的两行");
+    }
+    let min_left = groups.iter().map(|(_, g)| g[0].left).min().unwrap_or(0);
+    let last = groups.len() - 1;
+    for (k, (key, g)) in groups.iter().enumerate() {
+        let line: Vec<&Word> = words
+            .iter()
+            .filter(|w| w.line == *key && has_text(w))
+            .collect();
+        let first = g[0];
+        let at = line.iter().position(|w| std::ptr::eq(*w, first));
+        if k > 0 && at != Some(0) && first.left as f32 > min_left as f32 + height(g) {
+            return Err("续行没有从行首接上");
+        }
+        // The last line, from the quote's start on it to the line's end.
+        if k == last && !tight(&line[at.unwrap_or(0)..]) {
+            return Err("换行后，引文之后隔着大段空白，可能是分栏");
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -2000,11 +2153,12 @@ note = []
 
         // Cache round trip; a corrupt file reads as empty.
         let file = images.join("cache.json");
-        let cache = BTreeMap::from([("01-x.png".to_string(), base[1].clone())]);
-        save_cache(&file, &cache).unwrap();
-        assert_eq!(load_cache(&file), cache);
+        let mut cache = Cache::default();
+        cache.insert("01-x.png", base[1].clone());
+        cache.save(&file).unwrap();
+        assert_eq!(Cache::load(&file), cache);
         fs::write(&file, "{not json").unwrap();
-        assert!(load_cache(&file).is_empty());
+        assert_eq!(Cache::load(&file), Cache::default());
 
         // One run per images directory; the lock goes away with its holder.
         let held = Lock::acquire(&file).unwrap();
@@ -2013,5 +2167,117 @@ note = []
         drop(held);
         assert!(Lock::acquire(&file).is_ok());
         let _ = fs::remove_dir_all(&images);
+    }
+
+    /// A scratch directory for one test, removed by the caller.
+    fn scratch(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir()
+            .join("barking-card-test")
+            .join(format!("{}-{name}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn cache_keys_ignore_case_so_a_b_a_rerenders() {
+        // Codex review round 2: `01-x.png` (A) → `01-X.png` (B) → `01-x.png`
+        // (A) wrote one file three times; A must not be skipped at the end.
+        let dir = scratch("aba");
+        let file = dir.join("cache.json");
+        let run = |out: &str, fp: &str| {
+            let mut cache = Cache::load(&file);
+            let fresh = cache.get(out) == Some(&fp.to_string());
+            if !fresh {
+                render_one(&mut cache, Some(&file), out, Some(fp.into()), || Ok(())).unwrap();
+            }
+            fresh
+        };
+        assert!(!run("01-x.png", "A"));
+        assert!(!run("01-X.png", "B"));
+        assert!(!run("01-x.png", "A"), "A skipped while the file holds B");
+        assert!(run("01-X.png", "A"), "same file, same inputs");
+
+        // A cache written before keys were lowercased: drop every variant.
+        fs::write(&file, r#"{"01-x.png":"A","01-X.png":"B","02-y.png":"C"}"#).unwrap();
+        let cache = Cache::load(&file);
+        assert_eq!(
+            (cache.get("01-x.png"), cache.get("02-Y.png")),
+            (None, Some(&"C".into()))
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn unsaved_cache_drop_leaves_the_old_image_alone() {
+        let dir = scratch("unsaved");
+        // The cache's parent is a file, so saving fails.
+        fs::write(dir.join("blocker"), "").unwrap();
+        let file = dir.join("blocker").join("cache.json");
+        let mut cache = Cache::default();
+        cache.insert("01-x.png", "A".into());
+        let mut rendered = false;
+        let e = render_one(
+            &mut cache,
+            Some(&file),
+            "01-x.png",
+            Some("B".into()),
+            || {
+                rendered = true;
+                Ok(())
+            },
+        )
+        .err()
+        .unwrap();
+        assert!(e.contains("未覆盖旧图") && !rendered, "{e}");
+
+        // Without a stale entry there is nothing to distrust: it renders, and
+        // a failed save of the new entry is only reported.
+        let mut empty = Cache::default();
+        render_one(
+            &mut empty,
+            Some(&file),
+            "02-y.png",
+            Some("C".into()),
+            || Ok(()),
+        )
+        .unwrap();
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn locate_refuses_words_from_two_columns() {
+        // Codex review round 2: `--psm 6` joins side-by-side columns into one
+        // line, so the stream alone would accept these.
+        let w = line_words(&[("the", 97), ("model", 97)]);
+        let mut cols = w;
+        cols.extend(
+            line_words(&[("was", 97), ("paused", 97)])
+                .into_iter()
+                .map(|mut x| {
+                    x.left += 600;
+                    x.right += 600;
+                    x
+                }),
+        );
+        let e = locate(&cols, "model was").err().unwrap();
+        assert!(e.contains("相隔过远") && e.contains("rects"), "{e}");
+        assert!(locate(&cols, "was paused").is_ok());
+
+        // A wrap from the right column's line into the next line's left
+        // column: each line has a gutter.
+        let tsv = [
+            "header",
+            &row("alpha", 0, 0, 1, 95),
+            &row("beta", 40, 0, 1, 95),
+            &row("gamma", 600, 0, 1, 95),
+            &row("delta", 0, 20, 2, 95),
+            &row("eps", 600, 20, 2, 95),
+        ]
+        .join("\n");
+        let w = parse_tsv(&tsv, 1);
+        let e = locate(&w, "gamma delta").err().unwrap();
+        assert!(e.contains("分栏"), "{e}");
+        assert!(locate(&w, "alpha beta").is_ok());
     }
 }
