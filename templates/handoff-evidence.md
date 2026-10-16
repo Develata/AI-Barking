@@ -33,7 +33,7 @@
 - 只在 `docs/{YYMM}/{MMDD}/` 下新增文件，文件名带本组前缀；不改动仓库其他文件；不 commit、不 push、不删除任何文件（自己刚生成的试验文件除外，须记入日志；删除只用普通 `rm` 加精确路径，不用 `-f`、`-r` 或通配符，删前确认对象）。
 - 不写 `_publish.txt`、`images/README.md`、`images/cards.toml`、`fact-check.md`、`sources/README.md`。
 - 每组交付 `docs/{YYMM}/{MMDD}/sources/evidence-<组>.md` 与 `docs/{YYMM}/{MMDD}/sources/capture-log-<组>.md`（每次抓取的 URL、工具、结果/失败原因、北京时间）；Claude 事后合并。
-- PDF、HTML 原件、图片、音视频只存本地（不入库，Claude 事后传网盘）；文本存档（txt/md/json）可以入库，但单个文件超过 1 MB 的先在回报里告知。
+- PDF、WPS/DOC 文档、HTML 原件、图片、音视频只存本地（不入库，Claude 事后传网盘）；文本存档（txt/md/json）可以入库，但单个文件超过 1 MB 的先在回报里告知。
 - 时间与范围（2026-10-15 起，Develata 要求提速；1013 期 A/B/C 组各跑了约 3 小时）：每组目标 60 分钟内交回，超过 90 分钟就先交已完成部分并在回报里列出未完成项。只截正文可能用到的图（每组 3–6 张）；媒体报道每个事件只存 3–5 篇代表性的（首发、最权威、最典型的夸大实例），不逐家归档；社区热度只记主帖数字与 2–3 条有理有据的评论。每个外部请求都设超时（curl 加 `--max-time 60`，PDF 等大文件 `--max-time 180`），同一来源失败两次就记失败、换来源，不原地重试；不跑可能长时间无输出的命令（大 PDF OCR 先估页数，超过 30 页只 OCR 需要的页）。收到 Claude 催交的消息，立即交已完成部分。
 
 ## 验收
