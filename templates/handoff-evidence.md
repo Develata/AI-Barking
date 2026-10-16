@@ -30,7 +30,7 @@
 
 ## 授权与范围
 
-- 只在 `docs/{YYMM}/{MMDD}/` 下新增文件，文件名带本组前缀；不改动仓库其他文件；不 commit、不 push、不删除任何文件（自己刚生成的试验文件除外，须记入日志）。
+- 只在 `docs/{YYMM}/{MMDD}/` 下新增文件，文件名带本组前缀；不改动仓库其他文件；不 commit、不 push、不删除任何文件（自己刚生成的试验文件除外，须记入日志；删除只用普通 `rm` 加精确路径，不用 `-f`、`-r` 或通配符，删前确认对象）。
 - 不写 `_publish.txt`、`images/README.md`、`images/cards.toml`、`fact-check.md`、`sources/README.md`。
 - 每组交付 `docs/{YYMM}/{MMDD}/sources/evidence-<组>.md` 与 `docs/{YYMM}/{MMDD}/sources/capture-log-<组>.md`（每次抓取的 URL、工具、结果/失败原因、北京时间）；Claude 事后合并。
 - PDF、HTML 原件、图片、音视频只存本地（不入库，Claude 事后传网盘）；文本存档（txt/md/json）可以入库，但单个文件超过 1 MB 的先在回报里告知。
