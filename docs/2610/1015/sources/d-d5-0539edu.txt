@@ -1,0 +1,517 @@
+实锤！腾讯 WorkBuddyAI = Claude Code 换皮移植：494 字符逐字节一样，903 个遥测事件被批量改名，连 /tmp/claude 都忘了改-育师
+
+编程博客
+
+ [/index.html]
+
+首页
+ [/index.html]
+
+博文分享
+ [/news.html]
+
+关于我
+ [/about]
+
+首页
+ [/index.html]
+
+博文分享
+ [/news.html]
+
+关于我
+ [/about]
+
+news
+
+2026/10/16 1:47:27
+
+实锤！腾讯 WorkBuddyAI = Claude Code 换皮移植：494 字符逐字节一样，903 个遥测事件被批量改名，连 /tmp/claude 都忘了改
+
+张小明
+
+前端开发工程师
+
+1.2k
+
+24
+
+实锤！腾讯 WorkBuddyAI = Claude Code 换皮移植：494 字符逐字节一样，903 个遥测事件被批量改名，连 /tmp/claude 都忘了改
+
+本文不站队、不带节奏，只上证据。所有结论均可复现：下载 Claude Code v2.1.88 泄露源码 + 解包 WorkBuddyAI 的app.asar，跑一遍字符串比对就能自己验。
+
+一、先说结论
+
+一句话：WorkBuddyAI 的 Agent 内核，不是"抄了某个开源 Agent 框架"，而是把 Anthropic 的闭源产品 Claude Code 逆向移植了一遍——然后做了品牌替换。
+
+对比对象：
+
+项目内容
+
+被测对象WorkBuddyAIcli/dist/codebuddy.js（22.4 MB）、codebuddy-headless.js（19.0 MB）
+
+安装位置C:\Users\admin\AppData\Local\Programs\WorkBuddyAI\
+
+外壳Electron 37.10.3-24，app.asar296.6 MB / 20404 个条目
+
+Agent 包名@genie/agent-cli（对外叫 CodeBuddy CLI，命令codebuddy/codebuddy-code/cbc）
+
+对照组Claude Code v2.1.88 完整 TS 源码（因 npm 误打包.map泄露）1902 个.ts文件 / 29.5 MB
+
+判定分三级：A 级逐字节雷同、B 级专有接口全同构、C 级改名漏出的残留指纹。三级证据叠加，才叫实锤。
+
+二、A 级证据：逐字节一模一样的长文本
+
+2.1 比对方法
+
+从泄露源码里抽取所有"长度 ≥ 45 字符、且含 ≥ 4 个空格"的自然语言字符串（这类高熵文案很难独立写出完全一致的结果），再拿去 22.4 MB 的codebuddy.js里做精确字节匹配。
+
+统计口径：
+
+候选串：9467 条（覆盖 1060 个源文件）
+
+逐字节命中：224 条（命中率 2.4%）
+
+先别急着说 2.4% 低——这个数字放在 22 MB 压缩过、且版本差了一个月的两个产物之间，是异常高的。原因见后文"版本差"一节。
+
+2.2 最长完全一致片段：494 字符
+
+出自src/memdir/memoryTypes.ts，一字未改：
+
+<when_to_save>Any time the user corrects your approach ("no not that", "don't", "stop doing X") OR confirms a non-obvious approach worked ("yes exactly", "perfect, keep doing that", accepting an unusual choice without pushback). Corrections are easy to notice; confirmations are quieter — watch for them.
+
+连破折号—、括号引号、"yes exactly"这种口语例子都对齐。这种长度的字符串在两次独立开发中撞车的概率，约等于零。
+
+2.3 命中片段按长度分层
+
+长度区间命中条数
+
+45 ~ 60 字符61
+
+60 ~ 80 字符43
+
+80 ~ 120 字符48
+
+120 ~ 200 字符42
+
+200 ~ 400 字符25
+
+400 字符以上5
+
+注意最后一行：5 条超 400 字符的段落级雷同。短串撞车可以解释为"通用术语"，段落级撞车解释不了。
+
+2.4 源文件级重合率（只统计高熵文案文件）
+
+Claude Code 源文件命中 / 候选重合率
+
+memdir/memoryTypes.ts46 / 6966.7%
+
+tools/GrepTool/GrepTool.ts10 / 1855.6%
+
+memdir/teamMemPrompts.ts11 / 2055.0%
+
+services/extractMemories/prompts.ts7 / 1838.9%
+
+memdir/memdir.ts13 / 3933.3%
+
+tools/AskUserQuestionTool.tsx7 / 2330.4%
+
+tools/NotebookEditTool.ts4 / 1723.5%
+
+memdir（记忆目录）这一整套提示词工程，重合率最高。这块恰恰是 Claude Code 里最"值钱"、最不像公开文档的东西。
+
+2.5 直接挑几个 Claude Code 独有的示例文案
+
+下面这些都是泄露源码里的测试/示例文案，在codebuddy.js里能搜到原文：
+
+grafana.internal/d/api-latency pipeline bugs are tracked in Linear project "INGEST" I've been writing Go for ten years but this is my first time touching the React side of this repo stop summarizing what you just did at the end of every response, I can read the diff don't mock the database in these tests — we got burned last quarter when mocked tests passed but the prod migration failed
+
+一个"高德/腾讯系"的 AI 产品，为什么会内置"用 Go 写了十年、第一次碰 React"这种英文人物设定示例？答案只有一个：这些文案是从别处搬过来的，而且搬的时候没翻译、没改。
+
+三、B 级证据：Claude Code 专有接口，一个不落全同构
+
+上面是"文案"，下面是"接口"。这些命名不是业界通用术语，而是 Claude Code 自己定的家规。
+
+3.1 工具集（Tool Set）完全一致
+
+Bash Read Edit Write Glob Grep Task WebFetch WebSearch TodoWrite NotebookEdit MultiEdit ExitPlanMode AskUserQuestion BashOutput KillShell Skill ListMcpResources ReadMcpResource SlashCommand ScheduleCron
+
+BashOutput、KillShell、ExitPlanMode、AskUserQuestion这几个名字，是 Claude Code 特有的。任何一个从零设计的 Agent 框架都不会恰好起出这组名字。
+
+3.2 Hooks 事件名（Claude Code 的标志性机制）
+
+PreToolUse PostToolUse UserPromptSubmit SubagentStop PreCompact SessionStart SessionEnd Notification Stop
+
+外加hook_event_name、transcript_path这两个 payload 字段名。Hooks 是 Claude Code 2024 年底才推出的配置体系，WorkBuddy 的事件名与之逐字一致。
+
+3.3 CLI 命令行参数
+
+--dangerously-skip-permissions --permission-mode --input-format stream-json --output-format stream-json --append-system-prompt --mcp-config --fork-session --strict-mcp-config --agents --include-partial-messages --setting-sources --add-dir
+
+其中--dangerously-skip-permissions这个"不要命"的命名，是从 Claude Code 原封不动继承的。
+
+3.4settings.json配置字段
+
+cleanupPeriodDays outputStyle statusLine includeCoAuthoredBy disableAllHooks settingSources allowedTools disallowedTools permissions mcpServers alwaysThinkingEnabled
+
+连cleanupPeriodDays（日志清理天数）、includeCoAuthoredBy（Git 提交加 Co-Authored-By 尾注）这种细节都带过来了。
+
+3.5 斜杠命令
+
+/compact /clear /cost /doctor /init /login /logout /memory /model /permissions /status /vim /agents /hooks /output-style /rewind /todos /add-dir
+
+3.6 依赖包直接引用 Anthropic 官方仓库
+
+"@anthropic-ai/sandbox-runtime":"^0.0.17"
+
+而且源码里还留着构建机的绝对路径（见下一节），证明这不是"同名巧合"。
+
+四、C 级证据：改名时漏出来的残留指纹
+
+这是最致命、也最难辩解的一类证据：批量改名做不干净的痕迹。
+
+4.1/tmp/claude忘改了
+
+codebuddy.js里真实存在的代码片段：
+
+functiongetDangerousDirectories(){return[...ip.filter(eA=>".git"!==eA),".claude/commands",".claude/agents"]}return["/dev/stdout","/dev/stderr",...,"/tmp/claude","/private/tmp/claude",il.join(eA,".npm/_logs"),il.join(eA,".claude/debug")]}letec=["SANDBOX_RUNTIME=1","TMPDIR=/tmp/claude"]
+
+腾讯把全局品牌替换成了codebuddy：
+
+CLAUDE.md→CODEBUDDY.md
+
+.claude→.codebuddy（目录名）
+
+CLAUDE_CONFIG_DIR→CODEBUDDY_CONFIG_DIR
+
+但沙箱路径、危险目录清单这些地方漏了，.claude残留111 处，/tmp/claude、.claude/debug、.claude/commands、.claude/agents原样健在。
+
+4.2 遥测事件tengu_*：903 个被改，5 个漏网
+
+Claude Code 的内部遥测事件全部以tengu_（Anthropic 内部代号）开头：
+
+Claude Code v2.1.88 源码中：903 个唯一事件名，1500 处引用
+
+codebuddy.js中：只剩 5 个，交集为空
+
+漏网的 5 个：
+
+ep="goal:",eg={SET:"tengu_goal_set",CLEARED:"tengu_goal_cleared",ACHIEVED:"tengu_goal_achieved",MET:"goal_met",FAILED:"tengu_goal_failed",RESTORED:"tengu_goal_restored_on_resume"};
+
+自己是"改了名字"的正面证据——903 个事件名不可能独立开发出同一套命名规范，只能是照着改的，改的时候这一组漏了。
+
+4.3 构建机路径被泄进产物
+
+file:///D:/git/workbuddy-desktop-en-1/genie/genie/node_modules/.pnpm/@anthropic-ai+sandbox-runtime@0.0.17/... file:///D:/git/workbuddy-desktop-en-1/genie/genie/node_modules/.pnpm/yoga-layout@3.2.1/...
+
+D:/git/workbuddy-desktop-en-1/genie/是腾讯构建机目录。他们依赖树里直接装着@anthropic-ai/sandbox-runtime。
+
+五、D 级证据：官方文档自己承认了（最省事的证据）
+
+cli/dist/web-ui/docs/en/cli/workflow-stdio-protocol.md里白纸黑字：
+
+This document explains how this protocolaligns with Claude Code 2.1.220…
+any SDK / daemon / CI that implements theClaude Code official stream-json protocol
+can consume cbc’s workflow eventswithout code changes.
+
+Parts cbc guarantees are byte-for-byte equivalent to Claude Code 2.1.220.
+
+中文翻译：本协议与 Claude Code 2.1.220 对齐，其中部分内容与 Claude Code 2.1.220 逐字节等价。
+
+产品文档亲自说明了对齐目标。这是全篇最无法反驳的一条。
+
+六、别急着说 2.4% 命中率低——那是版本差造成的
+
+有人会问：既然同源，为什么逐字节命中率只有 2.4%？三个原因：
+
+版本差了一个月。对照的泄露源码是Claude Code v2.1.88；WorkBuddy 文档自述对齐的是2.1.220。中间隔了几十个版本，提示词被改过好几轮。
+
+压缩与重写。codebuddy.js是经过 esbuild/bun 压缩的产物（22.4 MB），函数名被压成eA/el/ec这种两字母，结构性代码无法做字符串匹配——只有"高熵文案"和"接口名"能对上。所以 2.4% 是"能对上的池子"里的比例，不是代码重合度。
+
+中文场景改造。腾讯把面向中文用户的提示词翻译/改写了，英文原文自然对不上。
+
+结论：2.4% 是在"两个不同版本、且一方被压缩过"的前提下算出来的。把对照组换成 2.1.220，命中率只会更高。而且关键判断不靠这个百分比，靠的是下一条↓
+
+关键对比：为什么"文案撞车"不能是巧合
+
+证据类型能否用"独立开发"解释
+
+通用术语（如Bash、Read）能
+
+494 字符英文段落逐字节一致不能
+
+memdir/memoryTypes.ts66.7% 重合不能
+
+tengu_前缀 903 个改剩 5 个不能
+
+/tmp/claude残留 111 处不能
+
+官方文档自述"与 Claude Code 2.1.220 逐字节等价"不能
+
+七、公平起见：腾讯自己做了哪些东西
+
+WorkBuddy 不是 100% 照搬，它做了外壳和适配层，这部分也值得说清楚：
+
+7.1 多模型网关（这是最像"自研"的部分）
+
+内置 19+ 模型供应商路由：
+
+anthropic openai bedrock deepseek qwen kimi glm minimax opencode ...
+
+但这一层明显是从opencode / models.dev系拿的（源码里有provider:"opencode"、baseUrl:"https://opencode.ai/zen/v1"、模型名big-pickle等特征串）。所以是"抄 A 的内核 + 借 B 的网关"。
+
+7.2 通信协议换成了 ACP
+
+引入@agentclientprotocol/sdk（Zed 编辑器主导的 Agent Client Protocol）+@openai/agents，把 Claude Code 原本的 stdio 协议包了一层。
+
+7.3 纯自研部分
+
+模块语言/技术说明
+
+Electron 主程序TypeScript桌面外壳，20404 个文件条目
+
+Rust 沙箱Rustsandbox-cli.exe/sandbox-center.exe/sandbox-cli-gc.exe
+
+Go 工具链Gobetterleaks.exe（21.8 MB）、agently-cli.exe
+
+Windows 集成C# / .NET系统层对接
+
+原生扩展C / C++ N-API性能敏感模块
+
+腾讯云风控JSTuringShield天御、qimei设备指纹
+
+企微/微信支付插件JS国内生态对接
+
+中文提示词文本面向前台的翻译改写
+
+语言总览：Agent 内核 = TypeScript/Node.js；沙箱 = Rust；工具 = Go；桌面 = Electron；系统集成 = C#/.NET。
+
+八、判定边界（不吹不黑）
+
+我把话说完整，避免过度断言：
+
+能证明的：代码与文案深度同源、接口体系/命名规范/配置 schema 完全一致，属于移植级同源（port/clone）。
+
+没做的：完整的代码调用图比对、逐函数实现结构比对。法律意义上的"抄袭"认定需要更严谨的代码比对，本文不做法律定性。
+
+版本差异：对照物 v2.1.88 vs 目标自述 2.1.220，存在版本代差。
+
+性质定性：Anthropic Claude Code 是闭源商业产品（其泄露源于 npm 误打包.map）。所以这件事的性质是"逆向移植闭源商业产品"，而不是"抄开源项目"——两者法律和道德评价完全不同。
+
+九、5 分钟自己复现
+
+Step 1：拿到对照源码
+
+# Claude Code v2.1.88 泄露源码（社区备份，多个镜像）gitclone--depth1https://gitee.com/zerofreeze/claude-code-source-code.git cc-leak# 得到 src/ 下 1902 个 .ts 文件，约 29.5 MB
+
+Step 2：解包被测产品
+
+# asar 解包（npx 即可）npx asar extract"C:\Users\admin\AppData\Local\Programs\WorkBuddyAI\resources\app.asar".\wb-asar# 目标文件# .\wb-asar\cli\dist\codebuddy.js 22.4 MB# .\wb-asar\cli\dist\codebuddy-headless.js 19.0 MB
+
+Step 3：跑字符串比对
+
+importos,re CC=r'cc-leak/src'CB=open(r'wb-asar/cli/dist/codebuddy.js','rb').read()# 抽取 CC 源码中 >=45 字符、含 >=4 空格的自然语言串STR=re.compile(rb'"((?:[^"\\\n]|\\.){45,500})"')cands=set()forroot,_,fnsinos.walk(CC):forfninfns:iffn.endswith(('.ts','.tsx')):t=open(os.path.join(root,fn),'rb').read()forminSTR.finditer(t):s=m.group(1)ifs.count(b' ')>=4:cands.add(s)hits=[sforsincandsifsinCB]print('候选 %d / 命中 %d'%(len(cands),len(hits)))forsinsorted(hits,key=len,reverse=True)[:5]:print(len(s),s.decode('utf-8','ignore')[:120])
+
+Step 4：验证指纹
+
+$f='.\wb-asar\cli\dist\codebuddy.js'Select-String-Path$f-Pattern'tengu_goal_','/tmp/claude','\.claude/debug','byte-for-byte equivalent'
+
+十、一句话总结
+
+腾讯 WorkBuddyAI 的 Agent 内核是Claude Code 的逆向移植版：
+
+A 级：494 字符段落逐字节相同，memdir提示词工程 66.7% 重合；
+
+B 级：Hooks 事件、CLI 参数、settings schema、斜杠命令、工具名全套同构；
+
+C 级：tengu_*903 个遥测事件改剩 5 个，/tmp/claude残留 111 处；
+
+D 级：官方文档自己写着"与 Claude Code 2.1.220 逐字节等价"。
+
+它不是抄开源框架，而是把闭源产品扒了重装。而真正自研的部分，是多模型网关、ACP 协议层、Rust 沙箱和腾讯云生态对接。
+
+本文所有结论来自静态比对，可复现。欢迎指正与补充证据。
+
+标签建议：Claude CodeWorkBuddyAICodeBuddy逆向工程源码分析AI Agent腾讯
+
+版权声明:
+
+本文来自互联网用户投稿，该文观点仅代表作者本人，不代表本站立场。本站仅提供信息存储空间服务，不拥有所有权，不承担相关法律责任。如若内容造成侵权/违法违规/事实不符，请联系邮箱：809451989@qq.com进行投诉反馈，一经查实，立即删除！
+
+网站建设
+2026/10/16 12:39:34
+
+Apollo-11制导计算机源码深度拆解：从绳芯存储器到实时调度 [/news/5690758/]
+
+/* MD / 富文本中的 .toc（含博客园搬家等嵌套结构）；.toc-box 在侧栏，不受影响 */#content_views .toc,/* 编辑器常在目录前后插入空 p（:empty 仍占 20px），一并去掉避免顶空隙 */#content_views.markdown_views > p:empty:has(+ .toc),#content_views.markdown_views …
+
+李华
+
+网站建设
+2026/10/16 12:39:34
+
+C++多态与文件流实战：企业职工管理系统核心设计 [/news/5690746/]
+
+/* MD / 富文本中的 .toc（含博客园搬家等嵌套结构）；.toc-box 在侧栏，不受影响 */#content_views .toc,/* 编辑器常在目录前后插入空 p（:empty 仍占 20px），一并去掉避免顶空隙 */#content_views.markdown_views > p:empty:has(+ .toc),#content_views.markdown_views …
+
+李华
+
+网站建设
+2026/10/16 12:39:34
+
+MATLAB单频声阻抗放大：从信号解调到校准验证的完整链路 [/news/5690733/]
+
+/* MD / 富文本中的 .toc（含博客园搬家等嵌套结构）；.toc-box 在侧栏，不受影响 */#content_views .toc,/* 编辑器常在目录前后插入空 p（:empty 仍占 20px），一并去掉避免顶空隙 */#content_views.markdown_views > p:empty:has(+ .toc),#content_views.markdown_views …
+
+李华
+
+网站建设
+2026/10/16 12:39:34
+
+英飞凌TC297安全管理单元SMU代码实现与避坑指南 [/news/5690705/]
+
+/* MD / 富文本中的 .toc（含博客园搬家等嵌套结构）；.toc-box 在侧栏，不受影响 */#content_views .toc,/* 编辑器常在目录前后插入空 p（:empty 仍占 20px），一并去掉避免顶空隙 */#content_views.markdown_views > p:empty:has(+ .toc),#content_views.markdown_views …
+
+李华
+
+网站建设
+2026/10/16 12:39:32
+
+51单片机霍尔传感器自行车码表测速与超速报警设计 [/news/5690699/]
+
+/* MD / 富文本中的 .toc（含博客园搬家等嵌套结构）；.toc-box 在侧栏，不受影响 */#content_views .toc,/* 编辑器常在目录前后插入空 p（:empty 仍占 20px），一并去掉避免顶空隙 */#content_views.markdown_views > p:empty:has(+ .toc),#content_views.markdown_views …
+
+李华
+
+网站建设
+2026/10/16 12:39:34
+
+Shell进阶必会：jq/awk/sed/xargs组合用法与面试实战 [/news/5690697/]
+
+/* MD / 富文本中的 .toc（含博客园搬家等嵌套结构）；.toc-box 在侧栏，不受影响 */#content_views .toc,/* 编辑器常在目录前后插入空 p（:empty 仍占 20px），一并去掉避免顶空隙 */#content_views.markdown_views > p:empty:has(+ .toc),#content_views.markdown_views …
+
+李华
+
+编程爱好者
+
+专注于前端开发和人工智能领域，热爱分享技术心得和编程技巧。
+
+ [#]
+
+ [#]
+
+ [#]
+
+ [#]
+
+最新文章
+
+Java生态SVG转换实战：Batik与FOP搞定PNG/PDF/印刷格式
+
+2026/10/16 19:24:25
+
+ [/news/5789614/]
+
+Struts2验证框架原理与实战：拦截器链、XML配置与调试
+
+2026/10/16 19:20:50
+
+ [/news/5789566/]
+
+ACGAN原理深度解析：解耦生成与属性控制的隐空间机制
+
+2026/10/16 19:20:11
+
+ [/news/5789560/]
+
+BrowserSkill 深度解析：AI Agent 浏览器操作技能与 CLI 实践
+
+2026/10/16 19:11:36
+
+ [/news/5789441/]
+
+AI系统为何会拒绝处理请求？从安全机制到模型对齐
+
+2026/10/16 19:11:00
+
+ [/news/5789438/]
+
+测试工程师必学Git：从安装配置到分支合并与冲突解决
+
+2026/10/16 19:09:30
+
+ [/news/5789418/]
+
+推荐文章
+
+YOLO手套检测实战：3893张标注数据集与工业落地避坑指南
+
+2026/10/15 15:45:54
+
+ [/news/5509669/]
+
+YOLOv8训练狗狗行为检测数据集：VOC转YOLO实战与避坑指南
+
+2026/10/16 11:53:28
+
+ [/news/5509672/]
+
+一个管空中现实，一个造仿真练兵场：无人集群协同分野技术方案
+
+2026/10/16 11:53:30
+
+ [/news/5509682/]
+
+2026计算机就业指南：热门方向、真实门槛与零基础入行路线
+
+2026/10/16 9:33:04
+
+ [/news/5509686/]
+
+VideoJAM：用运动感知联合表示攻克视频生成运动一致性难题
+
+2026/10/16 11:53:33
+
+ [/news/5509697/]
+
+PyQt5+YOLOv5本地目标检测GUI实战
+
+2026/10/16 11:53:35
+
+ [/news/5509761/]
+
+关于博客
+
+这是一个专注于编程技术分享的极简博客，旨在为开发者提供高质量的技术文章和教程。
+
+快速链接
+
+首页
+ [index.html]
+
+博文分享
+ [blog.html]
+
+关于我
+ [#]
+
+联系我们
+ [#]
+
+订阅更新
+
+输入您的邮箱，获取最新文章更新。
+
+邮箱地址
+
+订阅更新
+
+© 2025 极简编程博客. 保留所有权利.
+
+ [#]
+
+ [#]
+
+ [#]
+
+ [#]

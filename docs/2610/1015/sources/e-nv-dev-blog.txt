@@ -1,0 +1,516 @@
+NVIDIA Nemotron 3.5 Super VL Powers Specialized Agents with Multimodal Reasoning | NVIDIA Technical Blog
+
+ [/]
+ DEVELOPER [/]
+
+Home [/]
+
+Blog [/blog]
+
+Forums [https://forums.developer.nvidia.com/]
+
+Docs [https://docs.nvidia.com/]
+
+Downloads [https://developer.nvidia.com/downloads]
+
+Training [https://www.nvidia.com/en-us/training/]
+
+ Join
+ [https://developer.nvidia.com/login]
+
+ [https://developer.nvidia.com/login]
+
+ Technical Blog [https://developer.nvidia.com/blog]
+
+ Subscribe
+
+ [https://developer.nvidia.com/email-signup]
+
+ Related Resources 
+ [#main-content-end]
+
+ Agentic AI / Generative AI [https://developer.nvidia.com/blog/category/generative-ai/]
+
+NVIDIA Nemotron 3.5 Super VL Powers Specialized Agents with Multimodal Reasoning
+
+ Oct 15, 2026
+
+ By Chris Alexiuk [https://developer.nvidia.com/blog/author/chrisalexiuk/] and Chintan Patel [https://developer.nvidia.com/blog/author/cpatel/] 
+
+ Like
+
+ Discuss (0)
+ [#entry-content-comments]
+
+L [https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fdeveloper.nvidia.com%2Fblog%2Fnvidia-nemotron-3-5-super-vl-powers-specialized-agents-with-multimodal-reasoning%2F]
+
+T [https://twitter.com/intent/tweet?text=NVIDIA+Nemotron+3.5+Super+VL+Powers+Specialized+Agents+with+Multimodal+Reasoning+%7C+NVIDIA+Technical+Blog+https%3A%2F%2Fdeveloper.nvidia.com%2Fblog%2Fnvidia-nemotron-3-5-super-vl-powers-specialized-agents-with-multimodal-reasoning%2F]
+
+F [https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fdeveloper.nvidia.com%2Fblog%2Fnvidia-nemotron-3-5-super-vl-powers-specialized-agents-with-multimodal-reasoning%2F]
+
+R [https://www.reddit.com/submit?url=https%3A%2F%2Fdeveloper.nvidia.com%2Fblog%2Fnvidia-nemotron-3-5-super-vl-powers-specialized-agents-with-multimodal-reasoning%2F&title=NVIDIA+Nemotron+3.5+Super+VL+Powers+Specialized+Agents+with+Multimodal+Reasoning+%7C+NVIDIA+Technical+Blog]
+
+E [mailto:?subject=I'd like to share a link with you&body=https%3A%2F%2Fdeveloper.nvidia.com%2Fblog%2Fnvidia-nemotron-3-5-super-vl-powers-specialized-agents-with-multimodal-reasoning%2F]
+
+AI-Generated Summary
+
+NVIDIA Nemotron 3.5 Super VL [https://www.nvidia.com/en-us/glossary/mixture-of-experts/] is an open, customizable multimodal model with a 120B-parameter mixture-of-experts architecture that activates 12B parameters per token for agentic workflows.
+
+The model combines reasoning, instruction following, tool use, and text, image, document, and video understanding in a single model, eliminating the need for separate vision-language models.
+
+On a single GPU, Nemotron 3.5 Super VL delivers up to 5x higher throughput for agentic tasks compared to other open models in its size category.
+
+Organizations including Scale AI, Ramp, and AI21 have post-trained the model for specialized workflows, achieving improvements such as 40x lower inference cost, 10x lower latency, and 40% higher accuracy.
+
+Developers can customize the model using NVIDIA NeMo [https://www.nvidia.com/en-us/ai-data-science/products/nemo/get-started/] with supervised fine-tuning, low-rank adaptation, and reinforcement learning on open datasets released on Hugging Face.
+
+The model uses LiLiCorr speculative decoding, NVFP4 quantization with quantization-aware distillation, multi-token prediction, and context reuse to optimize inference efficiency on platforms including NVIDIA DGX Spark [https://www.nvidia.com/en-us/products/workstations/dgx-spark/].
+
+Next Steps
+
+Read the Nemotron 3.5 technical report [https://research.nvidia.com/labs/nemotron/files/NVIDIA-Nemotron-3.5-Super-and-Lightning-Technical-Report.pdf] for model details.
+
+Explore the Nemotron 3.5 Super VL usage cookbook [https://github.com/NVIDIA-NeMo/Nemotron/tree/main/usage-cookbook/Nemotron-3.5-Super-VL] on GitHub for customization resources.
+
+Get started with NVIDIA NIM [https://catalog.ngc.nvidia.com/orgs/nim/nvidia/containers/nemotron-3.5-super-vl-120b-a12b] for optimized deployment.
+
+Powered by NVIDIA Nemotron. AI-generated content may summarize information incompletely. Verify important information. Learn more [https://www.nvidia.com/en-us/agreements/trustworthy-ai/terms/]
+
+Always-on agents are taking on longer, more complex enterprise workflows. A single request can involve reading a document, checking information across sources, following company policy, and calling several tools.
+
+NVIDIA Nemotron 3.5 Super VL is an open, customizable multimodal model for these specialized workflows. Its 120B-parameter mixture-of-experts (MoE) [https://www.nvidia.com/en-us/glossary/mixture-of-experts/] architecture activates 12B parameters per token, balancing model capacity with inference efficiency.
+
+On a single GPU, this model delivers up to 5x higher throughput for agentic tasks compared to other open models [https://www.nvidia.com/en-us/glossary/open-models/] in its size category.
+
+Figure 1. Nemotron 3.5 Super VL delivers over 600 TPS on Artificial Analysis Intelligence Index agentic tasks on the Baseten endpoint
+
+The model combines reasoning, instruction following, and tool use with text, image, document, and video understanding. By combining these capabilities into one model, teams can handle text and visual tasks without deploying separate text and vision-language models [https://www.nvidia.com/en-us/glossary/vision-language-models/] or passing task context between them.
+
+Developers can post-train Nemotron 3.5 Super VL with NVIDIA NeMo [https://www.nvidia.com/en-us/ai-data-science/products/nemo/get-started/] using their own data, tools, policies, and workflows. This post explains how to use that foundation to build specialized enterprise agents and describes the training and inference techniques that power it.
+
+Why Nemotron 3.5 Super VL for specialized agents? [#why_nemotron_35_super_vl_for_specialized_agents]
+
+Agents need to understand both their tasks and operating environments. A customer-service agent must follow company return policies. Research agents connect evidence across sources, while document agents interpret tables, charts, and page layouts.
+
+Nemotron 3.5 Super VL combines reasoning and visual understanding across a range of agent workflows, including:
+
+Coding: Test and validate code, analyze errors, and recommend fixes.
+
+Web research: Search across websites, connect information, and verify answers.
+
+Document intelligence: Extract information from tables, charts, and page layouts to produce summaries and reports.
+
+Cybersecurity: Identify security vulnerabilities and triage threats to prioritize remediation.
+
+Video understanding: Extract information for search, content review, and incident analysis.
+
+Within a system of models, Nemotron 3.5 Super VL handles specialized, multistep work that needs reasoning, tool use, and text and visual understanding together. Smaller models, such as NVIDIA Nemotron 3.5 Lightning [https://developer.nvidia.com/blog/nvidia-nemotron-3-5-lightning-delivers-fast-accurate-specialized-task-execution-for-long-running-agents/], handle high-volume text tasks, while frontier models such as NVIDIA Nemotron 3 Ultra [https://developer.nvidia.com/blog/nvidia-nemotron-3-ultra-powers-faster-more-efficient-reasoning-for-long-running-agents/] tackle complex planning and orchestration.
+
+Customize Nemotron 3.5 Super VL for domain data, tools, and policies [#customize_nemotron_35_super_vl_for_domain_data_tools_and_policies]
+
+Specialized agents must learn how an organization works. Domain terminology, tool interfaces, operating procedures, and policy requirements shape how agents complete tasks successfully.
+
+Organizations in industries ranging from cybersecurity and finance to healthcare are post-training Nemotron 3.5 Super VL to outperform frontier models in accuracy and efficiency across their production workflows. For example:
+
+Scale AI, an AI data and technology provider, post-trained Nemotron 3.5 Super VL for automated vendor credit processing at Skydance Corporation, a media and entertainment company. Inference cost for this workload will decrease by 40x and latency by 5x.
+
+Ramp, a financial operations platform provider, is converting receipt images into structured JSON containing merchant information, dates, and payment data. Ramp expects up to 50% higher throughput and 10x lower latency.
+
+AI21 and Alice post-trained Nemotron 3.5 Super VL for threat intelligence and vulnerability analysis, improving accuracy by 41%.
+
+Figure 2. Post-trained Nemotron 3.5 Super VL achieves leading performance for specialized tasks across industries
+
+Teams can use NVIDIA NeMo open libraries to post-train models to meet these requirements. Developers can use NVIDIA NeMo AutoModel [https://github.com/NVIDIA-NeMo/Automodel/blob/main/docs/guides/vlm/nemotron-3-5-super-vl.mdx] for supervised fine-tuning (SFT) and low-rank adaptation (LoRA) to teach domain-specific behavior. Reinforcement learning [https://www.nvidia.com/en-us/glossary/reinforcement-learning/] (RL) improves performance in agentic environments that reflect organizational workflows.
+
+Alongside Nemotron 3.5 Super VL, NVIDIA is releasing open datasets on Hugging Face. These include agentic tool-use and conversational data, finance reasoning and tool-calling datasets, instruction-following and chat data, long-context transduction and translation data, fairness data, and 40 vision-language datasets. These datasets can supplement proprietary data for SFT and RL.
+
+For multimodal data, start with NeMo Data Designer [https://docs.nvidia.com/nemo/datadesigner/getting-started/welcome] resources for chart question answering [https://docs.nvidia.com/nemo/datadesigner/recipes/chart-qa/chart-question-answering] and long-document understanding [https://docs.nvidia.com/nemo/datadesigner/dev-notes/vlm-long-document-understanding]. Explore NVIDIA NeMo RL [https://github.com/NVIDIA-NeMo/RL] and NVIDIA NeMo Gym [https://github.com/NVIDIA-NeMo/Gym] for RL and environment-based evaluation.
+
+Organizations can adapt and deploy the model’s open weights in supported local, data center, or cloud environments to meet their infrastructure and data requirements. For customization resources, see the Nemotron 3.5 Super VL usage cookbook [https://github.com/NVIDIA-NeMo/Nemotron/tree/main/usage-cookbook/Nemotron-3.5-Super-VL] on GitHub.
+
+Combine text and visual understanding in one workflow [#combine_text_and_visual_understanding_in_one_workflow]
+
+Nemotron 3.5 Super VL combines text, image, document, and video understanding with reasoning and instruction following to answer questions across these inputs.
+
+Its visual training covers charts, tables, optical character recognition (OCR), multipage documents, and video understanding. A two-stage SFT pipeline trains the language and vision components, combining visual evidence with reasoning, chat, safety, long-context data, and agent trajectories.
+
+For document intelligence, the same model can interpret a chart, connect it with a table elsewhere in a document, and summarize both. Developers can tailor the workflow to their own documents and evaluation criteria.
+
+Diverse training data generated with NeMo Data Designer [https://docs.nvidia.com/nemo/datadesigner/getting-started/welcome] helped the model better understand complex charts. On CharXiv, a chart-reasoning benchmark, the model scored 80.8%, compared with 63% for Nemotron 3 Nano Omni [https://developer.nvidia.com/blog/nvidia-nemotron-3-nano-omni-powers-multimodal-agent-reasoning-in-a-single-efficient-open-model/]. With Python code interpretation, it reached 84%. For the approach and lessons learned, read the chart-understanding deep dive [https://docs.nvidia.com/nemo/datadesigner/dev-notes/chart-understanding] and the open-source chart question-answering pipeline [https://docs.nvidia.com/nemo/datadesigner/recipes/chart-qa/chart-question-answering].
+
+This model was built with support and expertise from Nemotron Coalition [http://nvidianews.nvidia.com/news/nvidia-launches-nemotron-coalition-of-leading-global-ai-labs-to-advance-open-frontier-models] organizations. For instance, high-quality datasets from Perplexity helped improve and streamline the model’s mid-training. Environments from Prime Intellect enabled building better teacher models.
+
+Nemotron 3.5 Super VL is also one of the top open models on the OCRBench v2 leaderboard [https://99franklin.github.io/ocrbench_v2/].
+
+Accuracy and efficiency across agent tasks [#accuracy_and_efficiency_across_agent_tasks]
+
+Evaluations of Nemotron 3.5 Super VL span Hermes, LangChain, OpenClaw, OpenCode, Pi, Codex, and Claude. In addition to coding tasks, agent harness providers use their own evaluations to test a wide range of agent tasks. On Hermes Bench and LangChain behavioral evaluations, Nemotron 3.5 Super VL scores higher than Nemotron 3 Ultra.
+
+ModelHermes Bench [https://portal.nousresearch.com/bench]LangChain Evals [https://github.com/langchain-ai/deepagents/tree/main/libs/evals]
+
+Nemotron 3 Ultra56.33%84.3%
+
+Nemotron 3.5 Super VL63.44%87.05%
+
+Table 1. Nemotron 3.5 Super VL scores higher than Nemotron 3 Ultra on Hermes Bench and LangChain evaluations
+
+For always-on agents, efficiency determines how much work a deployment can complete. Throughput, token usage, tool calls, and the steps needed to reach a correct result all affect task completion time.
+
+Figure 3. Nemotron 3.5 Super VL uses higher throughput and token efficiency to deliver 4x faster task completion
+
+This model was also optimized to run locally on NVIDIA DGX Spark [https://www.nvidia.com/en-us/products/workstations/dgx-spark/]. An independent evaluation by EXO Labs placed Nemotron 3.5 Super VL on the Pareto frontier for accuracy and task completion time.
+
+Figure 4. Nemotron 3.5 Super VL balances accuracy and speed for agent tasks on DGX Spark
+
+Nemotron 3.5 Super VL under the hood [#nemotron_35_super_vl_under_the_hood]
+
+The model builds on a strong foundation and uses a hybrid architecture, speculative decoding, context reuse, and mixed precision to reduce inference work across repeated agent calls.
+
+Building a strong base model [#building_a_strong_base_model]
+
+Nemotron 3.5 Super VL was distilled from Nemotron 3 Ultra. Ultra’s coding capabilities, combined with the SkewReverse loss used during distillation, helped improve coding accuracy.
+
+During post-training, multi-teacher on-policy distillation (MOPD) combines guidance from specialized teachers across text and vision. The model generates responses, and the teachers score them for video reasoning and tracking, vision tool use, and alignment.
+
+Additional training on examples of agent actions, code repositories, and software engineering tasks improved the model’s performance on agent tasks. Nemotron 3.5 Super VL outperforms Nemotron 3 Super on SWE-bench and Terminal-Bench across multiple evaluation setups.
+
+Continued pretraining with high-quality natural and synthetic data improved Indic-language capabilities and contributed to higher overall scores after post-training. This stage added 10B Indic tokens, drawn from a 12-language subset of Nemotron-pretraining-Indic-v1 and natural Indic text.
+
+NVIDIA is releasing the full dataset, which contains about 2.8T tokens across 22 Indian languages and was developed with IIT Madras and its AI4Bharat lab. The following results are based on the post-trained Nemotron 3.5 Super VL.
+
+Figure 5. Nemotron 3.5 Super VL delivers leading accuracy on Indic benchmarks, thanks to specialized Indic data
+
+Developers can use NeMo to build on this foundation and customize Nemotron 3.5 Super VL for their applications, adapting its reasoning and agentic capabilities to their data, tools, and workflows.
+
+LiLiCorr: An open speculative decoding technique [#lilicorr_an_open_speculative_decoding_technique]
+
+LiLiCorr improves parallel speculative decoding by jointly evaluating token candidates across an entire draft, capturing dependencies that independent token predictions miss. A lightweight network computes compatibility scores in a single pass to produce more coherent drafts, leaving only a low-cost, sequential final selection step.
+
+On DGX Spark, LiLiCorr is the recommended drafter for low-latency inference with Nemotron 3.5 Super VL. It delivers up to 2.3x faster token generation than decoding without speculation.
+
+NVFP4 and mixed precision [#nvfp4_and_mixed_precision]
+
+The model uses NVIDIA Model Optimizer [https://github.com/NVIDIA/Model-Optimizer] for post-training quantization and quantization-aware distillation (QAD). The NVFP4 recipe uses 4-bit weights and activations on the NVIDIA Blackwell architecture [https://www.nvidia.com/en-us/data-center/technologies/blackwell-architecture/]. The same checkpoint runs on non-Blackwell platforms with 4-bit weights and 16-bit activations. Precision is selected separately for sensitive components.
+
+NVFP4 makes the model smaller, and QAD helps it retain its accuracy at lower precision. During QAD, the quantized model learns to match the outputs of the original BF16 model, which closes the accuracy gap that quantization introduces. QAD also supports storing the key-value (KV) cache in NVFP4 instead of FP8 while still meeting accuracy targets. Because QAD happens during training, it adds no inference overhead.
+
+Multi-token prediction [#multi-token_prediction]
+
+Multi-token prediction (MTP) gives Nemotron 3.5 Super VL an internal drafter that proposes several tokens for the main model to verify in one forward pass. Accepting multiple tokens at once reduces the number of compute-intensive verification steps needed to generate a response.
+
+A dedicated MTP-boosting training phase further aligned the drafter with the final model.
+
+Context reuse across agent turns [#context_reuse_across_agent_turns]
+
+Agents repeatedly pass system instructions, tool definitions, and conversation history back to the model. Prefix caching reuses computation from those shared inputs.
+
+The model’s serving optimizations preserve both attention caches and Mamba recurrent states. Additional Mamba checkpoints reduce the replay needed to recover inputs for speculative decoding, while internal checkpointing avoids extra model passes during prompt processing.
+
+Simplify production deployment with NVIDIA NIM and NVIDIA Dynamo [#simplify_production_deployment_with_nvidia_nim_and_nvidia_dynamo]
+
+NVIDIA NIM [https://www.nvidia.com/en-us/ai-data-science/products/nim-microservices/] packages models with optimized inference engines, validated configurations, and standard APIs for cloud and data center deployment. NIM receives ongoing security, feature, and performance updates. Enterprise support is available through NVIDIA AI Enterprise. Get started with NIM [https://catalog.ngc.nvidia.com/orgs/nim/nvidia/containers/nemotron-3.5-super-vl-120b-a12b].
+
+NVIDIA Dynamo [https://docs.nvidia.com/dynamo/] supports distributed inference optimizations to increase throughput and reduce latency, including KV-cache-aware routing, KV cache management, and disaggregated serving.
+
+On 16 NVIDIA B200 GPUs at 50 tokens per second per user, KV-aware routing with session affinity and KV cache offload serves up to 8x as many users while reducing first-token latency by 85%. Get started with the Dynamo deployment recipes [https://docs.nvidia.com/dynamo/dev/recipes/nemotron-3-5-super-vl].
+
+Figure 6. NVIDIA Dynamo serves 8x as many users and reduces first-token latency by 85% at the same per-user token rate
+
+Get started with Nemotron 3.5 Super VL [#get_started_with_nemotron_35_super_vl]
+
+Build specialized agents with multimodal reasoning and tool use. Customize the model for specialized workflows, then deploy it in a supported environment.
+
+The release includes base, post-trained, and NVFP4-quantized checkpoints with training recipes, data, and reinforcement-learning environments.
+
+See the Nemotron 3.5 technical report [https://research.nvidia.com/labs/nemotron/files/NVIDIA-Nemotron-3.5-Super-and-Lightning-Technical-Report.pdf] for model details and Hugging Face [https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-NVFP4] or ModelScope [https://modelscope.ai/collections/nv-community/Nemotron-35-Super-VL] for deployment instructions. For hosted model access, see OpenRouter [https://openrouter.ai/private/nvidia/nemotron-3.5-super-vl].
+
+Partner ecosystem [#partner_ecosystem]
+
+Partners support customization and deployment of Nemotron 3.5 Super VL for domain-specific workflows.
+
+View partners:
+
+Post-training
+
+AfterQuery [https://www.afterquery.com/blog/post-training-nemotron-on-credit-workflows-in-partnership-with-hebbia]
+
+AgileRL [https://agilerl.com/blog/nemotron-3-5-super-vl-is-on-arena-training-a-vision-model-to-use-the-web-better-than-opus-5-5-and-humans]
+
+AI21 [https://www.ai21.com/blog/ai21-post-trains-nvidia-nemotron-35-super-vl/]
+
+Alice [https://alice.io/blog/nemotron-ai21]
+
+Applied Compute
+
+Baseten [https://www.baseten.co/products/model-apis/]
+
+Bespoke Labs [https://bespokelabs.ai/blog/teaching-nvidias-nemotron-ml-engineering]
+
+Databricks
+
+distil labs [https://www.distillabs.ai/blog/build-your-own-jev-with-nemotron-3-5-super-vl-for-under-usd-20/]
+
+Fastino Labs [https://fastino.ai/blog/nvidia-nemotron-3-5-super-vl-fine-tuning]
+
+Fireworks AI
+
+Handshake [https://joinhandshake.com/research/ai/vials-nemotron-post-training/]
+
+Mercor [https://www.mercor.com/blog/mercor-nvidia-nemotron-3-5/]
+
+Mindbeam [https://mindbeam.ai/research/mindbeam-nvidia-nemotron-collaboration]
+
+ms-swift [https://github.com/modelscope/ms-swift]
+
+Multiverse Computing [https://multiversecomputing.com/resources/multiverse-computing-launches-comet-60b-in-collaboration-with-nvidia]
+
+Prime Intellect [https://www.primeintellect.ai/blog/nemotron-3-5-super-vl]
+
+Reasonable [https://reasonable.io/blog/post-training-nemotron-3-5-super-vl/]
+
+River AI [https://river.ai/announcing-nemotron-3-5-super]
+
+Scale AI [https://scale.com/blog/scale-partners-with-nvidia]
+
+Thinking Machines Lab (Tinker) [https://thinkingmachines.ai/tinker/]
+
+TNG [https://huggingface.co/blog/tngtech/nvidia-nemotron-3-5-super-vl-agentic-web-dev-rl]
+
+Trajectory [https://www.trajectory.ai/field-notes/harvey-nemotron-3-5-super]
+
+Inference software
+
+Actual Computer [https://actual.inc/company/blog/case-study-dgx-station-and-nemotron-3-5-super-vl]
+
+Canonical
+
+Exo
+
+LM Studio
+
+Ollama
+
+SGLang [https://docs.sglang.io/cookbook/autoregressive/NVIDIA/Nemotron3.5-Super#hw=b200&variant=default&quant=nvfp4&strategy=high-throughput&nodes=single&mambaDtype=bfloat16]
+
+Unsloth [https://unsloth.ai/docs/models/nemotron-3.5-super-vl]
+
+vLLM [https://vllm.ai/blog/2026-10-15-nemotron-3-5-super-vl-vllm]
+
+Harnesses and agent frameworks
+
+Aible [https://www.aible.com/nemotron-35-super-vl]
+
+Cline [https://cline.bot/blog/nvidia-nemotron-3-5-super-vl-cline-agent-harness]
+
+Hermes Agent
+
+Kilo Code [https://blog.kilo.ai/p/nvidia-nemotron-35-super-vl]
+
+LangChain [https://docs.langchain.com/oss/python/integrations/chat/nvidia_ai_endpoints#use-nemotron-3-5-super-vl]
+
+LM Studio Bionic
+
+OpenClaw
+
+OpenCode
+
+OpenHands [https://www.openhands.dev/blog/nvidia-nemotron-3.5-super-vl]
+
+Pi
+
+Cloud platforms
+
+Amazon SageMaker JumpStart
+
+Google Cloud Gemini Enterprise Agent Platform [https://googlecloudplatform.github.io/vertex-ai-samples/vertex-training-cluster/self_evolving_data_synthesis_for_conversational_agents]
+
+MSFT Foundry
+
+OCI Enterprise AI
+
+Global systems integrators
+
+HCLTech
+
+Infosys
+
+Tata Consultancy Services
+
+Hardware and infrastructure
+
+Dell
+
+HPE Services [https://community.hpe.com/t5/the-cloud-experience-everywhere/accelerating-next-gen-agentic-ai-with-nvidia-nemotron-3-5-and/ba-p/7273992]
+
+Red Hat [https://developers.redhat.com/articles/2026/10/15/optimized-support-nemotron-super-3-5-vl]
+
+AI natives
+
+APMIC
+
+Cognition
+
+Daily
+
+Domyn [https://domyn.webflow.io/blog/nvidia-nemotron-3-5-super-financial-knowledge-graph-extraction]
+
+Dream [https://dreamgroup.com/blog/mid-training-nvidia-nemotron-3-5-super-vl-for-cybersecurity]
+
+Eon [https://www.eon.io/blog/improving-nemotron-3-5-super-with-era]
+
+Factory AI
+
+H Company [https://hcompany.ai/newsroom/lab-notes-nemotron-3.5-super-vl]
+
+Harvey
+
+Inflection AI
+
+Navan
+
+NextLM [https://nextlm.ai/articles/nvidia-nemotron-super-vl-savant]
+
+NYB.AI [https://nyb.ai/en]
+
+Orca Security [https://orca.security/resources/blog/frontier-level-red-teaming-from-a-self-hostable-open-weight-model-testing-nvidia-nemotron-3-5-super/]
+
+Perplexity
+
+Ramp
+
+Terray [https://www.terraytx.ai/news-and-research/enhanced-parsing-of-chemical-reaction-diagrams-with-Nvidia-Nemotron]
+
+Two Delta [https://www.twodelta.com/blog/dcoco?utm_source=linkedin&utm_medium=social&utm_campaign=nvidia_campaign]
+
+Versos [https://www.versos.ai/blog/versos-dataset-building-agents-for-ai-model-training-built-on-top-of-nvidia-nemotron-3-5-super-vl]
+
+Hosted inference service providers
+
+Baseten [https://www.baseten.co/blog/nvidia-nemotron-35-super-vl-launch/]
+
+Bitdeer AI [https://www.bitdeer.ai/en/services/ai-inference/mdl-db86bpqafdjc73bp3ceg]
+
+BLACKBOX.AI [https://www.blackbox.ai/blog/nemotron-3-5-super-vl]
+
+CoreWeave [https://forge.coreweave.com/inference/models/cw_nvidia_Nemotron-3.5-Super-VL-120B-A12B]
+
+Crusoe [https://www.crusoe.ai/cloud/managed-inference]
+
+DeepInfra [https://deepinfra.com/nvidia/NVIDIA-Nemotron-3.5-Super-VL]
+
+DigitalOcean [https://www.digitalocean.com/blog/whats-new-on-inference-engine#week-of-october-12]
+
+fal.ai [https://fal.ai/models/nvidia/nemotron-3-5-super/vision]
+
+Fireworks AI [https://app.fireworks.ai/models/fireworks/nvidia-nemotron-3p5-super-vl-120b-a12b-nvfp4]
+
+FriendliAI [https://friendli.ai/blog/nvidia-nemotron-3.5-super-vl]
+
+GMI Cloud [https://www.gmicloud.ai/en/blog/nvidia-nemotron-35-super-vl-on-gmi-cloud-agents-that-can-see]
+
+Lambda [https://lambda.ai/inference-models/nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B]
+
+Modal [https://modal.com/library/nvidia/nemotron-3-5-super-vl-120b-a12b-nvfp4]
+
+Nebius [https://tokenfactory.nebius.com/?modals=endpoint-details&model-id=nvidia/Nemotron-3.5-Super-VL]
+
+Nscale [https://www.nscale.com/blog/nvidia-nemotron-3-5-super-vl-available-on-nscale]
+
+Together AI [https://www.together.ai/models/nemotron-3-5-super-vl]
+
+ Discuss (0)
+ [#entry-content-comments]
+
+ Like
+
+Tags
+
+ Agentic AI / Generative AI [https://developer.nvidia.com/blog/category/generative-ai/] | Developer Tools & Techniques [https://developer.nvidia.com/blog/category/development/] | General [https://developer.nvidia.com/blog/recent-posts/?industry=General] | NeMo [https://developer.nvidia.com/blog/recent-posts/?products=NeMo] | Nemotron [https://developer.nvidia.com/blog/recent-posts/?products=Nemotron] | NIM [https://developer.nvidia.com/blog/recent-posts/?products=NIM] | Intermediate Technical [https://developer.nvidia.com/blog/recent-posts/?learning_levels=Intermediate+Technical] | Deep dive [https://developer.nvidia.com/blog/recent-posts/?content_types=Deep+dive] | AI Agent [https://developer.nvidia.com/blog/tag/ai-agent/] | featured [https://developer.nvidia.com/blog/tag/featured/] | NVFP4 [https://developer.nvidia.com/blog/tag/nvfp4/] 
+
+ About the Authors
+
+ About Chris Alexiuk
+
+ Chris Alexiuk is a deep learning developer advocate at NVIDIA, working on creating technical assets that help developers use the incredible suite of AI tools available at NVIDIA. Chris comes from a machine learning and data science background, and he is obsessed with everything and anything about large language models.
+
+ View all posts by Chris Alexiuk
+ [https://developer.nvidia.com/blog/author/chrisalexiuk/]
+
+ About Chintan Patel
+
+ Chintan Patel is a senior product manager at NVIDIA focused on bringing GPU-accelerated solutions to the HPC community. He leads the management and offering of the HPC application containers on the NVIDIA GPU Cloud registry. Prior to NVIDIA, he held product management, marketing and engineering positions at Micrel, Inc. He holds an MBA from Santa Clara University and a bachelor's degree in electrical engineering and computer science from UC Berkeley.
+
+ View all posts by Chintan Patel
+ [https://developer.nvidia.com/blog/author/cpatel/]
+
+Comments
+
+Related posts
+
+ NVIDIA Nemotron 3.5 Lightning Delivers Fast, Accurate Specialized Task Execution for Long-Running Agents
+
+ NVIDIA Nemotron 3.5 Lightning Delivers Fast, Accurate Specialized Task Execution for Long-Running Agents
+ [https://developer.nvidia.com/blog/nvidia-nemotron-3-5-lightning-delivers-fast-accurate-specialized-task-execution-for-long-running-agents/]
+
+ Building NVIDIA Nemotron 3 Agents for Reasoning, Multimodal RAG, Voice, and Safety
+
+ Building NVIDIA Nemotron 3 Agents for Reasoning, Multimodal RAG, Voice, and Safety
+ [https://developer.nvidia.com/blog/building-nvidia-nemotron-3-agents-for-reasoning-multimodal-rag-voice-and-safety/]
+
+ Introducing Nemotron 3 Super: An Open Hybrid Mamba-Transformer MoE for Agentic Reasoning
+
+ Introducing Nemotron 3 Super: An Open Hybrid Mamba-Transformer MoE for Agentic Reasoning
+ [https://developer.nvidia.com/blog/introducing-nemotron-3-super-an-open-hybrid-mamba-transformer-moe-for-agentic-reasoning/]
+
+ Develop Specialized AI Agents with New NVIDIA Nemotron Vision, RAG, and Guardrail Models 
+
+ Develop Specialized AI Agents with New NVIDIA Nemotron Vision, RAG, and Guardrail Models 
+ [https://developer.nvidia.com/blog/develop-specialized-ai-agents-with-new-nvidia-nemotron-vision-rag-and-guardrail-models/]
+
+ Advancing Agentic AI with NVIDIA Nemotron Open Reasoning Models
+
+ Advancing Agentic AI with NVIDIA Nemotron Open Reasoning Models
+ [https://developer.nvidia.com/blog/advancing-agentic-ai-with-nvidia-nemotron-open-reasoning-models/]
+
+Related posts
+
+ Scale Agentic Coding Workflows with Meta’s Muse Spark Open on NVIDIA GB300 NVL72 
+
+ Scale Agentic Coding Workflows with Meta’s Muse Spark Open on NVIDIA GB300 NVL72 
+ [https://developer.nvidia.com/blog/scale-agentic-coding-workflows-with-metas-muse-spark-open-on-nvidia-gb300-nvl72/]
+
+ Accelerating Dropless MoE Training in JAX with NVIDIA Transformer Engine
+
+ Accelerating Dropless MoE Training in JAX with NVIDIA Transformer Engine
+ [https://developer.nvidia.com/blog/accelerating-dropless-moe-training-in-jax-with-nvidia-transformer-engine/]
+
+ When to Use Encode-Prefill-Decode Disaggregation to Accelerate Multimodal Model Serving
+
+ When to Use Encode-Prefill-Decode Disaggregation to Accelerate Multimodal Model Serving
+ [https://developer.nvidia.com/blog/when-to-use-encode-prefill-decode-disaggregation-to-accelerate-multimodal-model-serving/]
+
+ Co-Designing AI Models Using Speculative Decoding for Faster LLM Inference
+
+ Co-Designing AI Models Using Speculative Decoding for Faster LLM Inference
+ [https://developer.nvidia.com/blog/co-designing-ai-models-using-speculative-decoding-for-faster-llm-inference/]
+
+ Developing Nemotron 3.5 Lightning NVFP4 with QAD Using NVIDIA Model Optimizer
+
+ Developing Nemotron 3.5 Lightning NVFP4 with QAD Using NVIDIA Model Optimizer
+ [https://developer.nvidia.com/blog/developing-nemotron-3-5-lightning-nvfp4-with-qad-using-nvidia-model-optimizer/]
+
+ Close
+
+ Previous
+
+ Next
+
+L [https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fdeveloper.nvidia.com%2Fblog%2Fnvidia-nemotron-3-5-super-vl-powers-specialized-agents-with-multimodal-reasoning%2F]
+
+T [https://twitter.com/intent/tweet?text=NVIDIA+Nemotron+3.5+Super+VL+Powers+Specialized+Agents+with+Multimodal+Reasoning+%7C+NVIDIA+Technical+Blog+https%3A%2F%2Fdeveloper.nvidia.com%2Fblog%2Fnvidia-nemotron-3-5-super-vl-powers-specialized-agents-with-multimodal-reasoning%2F]
+
+F [https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fdeveloper.nvidia.com%2Fblog%2Fnvidia-nemotron-3-5-super-vl-powers-specialized-agents-with-multimodal-reasoning%2F]
+
+R [https://www.reddit.com/submit?url=https%3A%2F%2Fdeveloper.nvidia.com%2Fblog%2Fnvidia-nemotron-3-5-super-vl-powers-specialized-agents-with-multimodal-reasoning%2F&title=NVIDIA+Nemotron+3.5+Super+VL+Powers+Specialized+Agents+with+Multimodal+Reasoning+%7C+NVIDIA+Technical+Blog]
+
+E [mailto:?subject=I'd like to share a link with you&body=https%3A%2F%2Fdeveloper.nvidia.com%2Fblog%2Fnvidia-nemotron-3-5-super-vl-powers-specialized-agents-with-multimodal-reasoning%2F]
