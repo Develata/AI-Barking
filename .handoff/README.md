@@ -2,6 +2,7 @@
 
 本目录随仓库保存，供回看制作过程。文件中的任务要求、路径、模型安排与“未完成”状态属于当时的工作上下文，不自动代表当前状态。
 
+- [取证任务：1015 期（A 两部门拟管 23 项 AI 技术出口｜B Meta Muse Spark Open：美国最强开源权重？｜C ARC-AGI-3 上 Gemini-4-Argon 换 harness 分数翻倍【跟进】｜D 速览（产品与公司）｜E 速览（研究与模型））](2026-10-15-1015-evidence.md)
 - [取证任务：1014 期（A 8 州分别起诉 OpenAI｜B 科学家公开信与安全专家：AI 越界之后谁来管｜C Scion 被指借鉴 Mononoke 未致谢【跟进】｜D 速览）](2026-10-14-1014-evidence.md)
 - [取证任务：1013 期（A Character.ai 破产账本与迪士尼许可｜B OpenAI 会议室窃听设备案｜C Gemini 4 Argon 正式开放与 ADK 通宵优化【跟进】｜D 速览）](2026-10-14-1013-evidence.md)
 - [取证任务：1013 期（A Codex CLI 默认常驻后台守护进程｜B Anthropic 电视盒 AI 自主复制研究｜C 智谱 GLM-Legal 与 Vals 法律评测｜D 速览）](2026-10-13-1013-evidence.md)

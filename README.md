@@ -33,6 +33,7 @@ AI 吠点是由 **[Develata](https://github.com/Develata)** 主理的独立内�
 | 2026 / 1012 | [Codex关窗仍在跑？AI蠕虫进电视盒？](docs/2610/1012/doc_1012_publish.txt) | [配图说明](docs/2610/1012/images/README.md) | [来源入口](docs/2610/1012/sources/README.md) |
 | 2026 / 1013 | [AI陪聊破产怪算力？窃听案靠AI破？](docs/2610/1013/doc_1013_publish.txt) | [配图说明](docs/2610/1013/images/README.md) | [来源入口](docs/2610/1013/sources/README.md) |
 | 2026 / 1014 | [8州要禁AI自我进化？科学家喊断网？](docs/2610/1014/doc_1014_publish.txt) | [配图说明](docs/2610/1014/images/README.md) | [来源入口](docs/2610/1014/sources/README.md) |
+| 2026 / 1015 | [AI技术出口要登记？Meta最强带限定](docs/2610/1015/doc_1015_publish.txt) | [配图说明](docs/2610/1015/images/README.md) | [来源入口](docs/2610/1015/sources/README.md) |
 
 正文采用可直接复制的纯文本，图片单独保存。阅读或发布时不需要依赖 Markdown 插图。
 
