@@ -1780,11 +1780,16 @@ fn continuity(words: &[Word], idx: &[usize]) -> Result<(), String> {
         let toks: Vec<usize> = (0..words.len())
             .filter(|&i| words[i].line == *key && is_token(&words[i]))
             .collect();
+        // A zero height would make every gap limit zero or, if patched to 1,
+        // meaningless: refuse rather than guess.
         let h = (toks.iter())
-            .map(|&i| words[i].bottom - words[i].top)
+            .map(|&i| words[i].bottom.saturating_sub(words[i].top))
             .max()
-            .unwrap_or(1)
-            .max(1) as f32;
+            .unwrap_or(0);
+        if h == 0 {
+            return Err("OCR 词框高度为 0，改用 rects".into());
+        }
+        let h = h as f32;
         let at = |i: usize| toks.iter().position(|&t| t == i);
         // Matched words carry letters, digits or `|`, so they are tokens.
         let (Some(a), Some(b)) = (at(g[0]), at(g[g.len() - 1])) else {
@@ -2511,6 +2516,19 @@ note = []
             &[("x", 0, 20), ("three", 40, 20)],
         ]);
         assert!(locate(&w, "two three").is_err());
+    }
+
+    #[test]
+    fn zero_height_line_is_refused() {
+        // Codex review round 5: `alpha` 0..30 and `beta` 31..61, top = bottom.
+        let tsv = [
+            "header",
+            "5\t1\t1\t1\t1\t1\t0\t0\t30\t0\t95\talpha",
+            "5\t1\t1\t1\t1\t2\t31\t0\t30\t0\t95\tbeta",
+        ]
+        .join("\n");
+        let e = locate(&parse_tsv(&tsv, 1), "alpha beta").err().unwrap();
+        assert!(e.contains("高度为 0") && e.contains("rects"), "{e}");
     }
 
     #[test]
