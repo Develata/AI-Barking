@@ -23,12 +23,14 @@
 //!   (not by ureq) so that a `Location` carrying userinfo is refused too.
 //! - The repository is public and `.headers` is committed, so it must not
 //!   place the fetcher: header names are all kept, but a value is printed
-//!   only for the reviewed `SAFE_HEADERS`; URL-valued headers lose userinfo,
-//!   query and fragment; everything else reads `[已删]` (CDN edge, request-id
-//!   and client-IP headers say why: `LOCATION_HEADERS`). The log carries no
-//!   response headers and no local absolute paths.
-//! - Timeouts are end to end (ureq's global timeout covers the body; the
-//!   redirect chain shares one deadline): 60 s, or 180 s when the URL path
+//!   only for the reviewed `SAFE_HEADERS`; `location` / `content-location`
+//!   keep only `scheme://host`; everything else reads `[已删]` (CDN edge,
+//!   request-id and client-IP headers say why: `LOCATION_HEADERS`). Every URL
+//!   fetch publishes (`.headers` `URL:`, the log's `final_url`) loses
+//!   userinfo, query and fragment (`public_url`); only the manifest URL is
+//!   logged as given. The log carries no response headers and no local paths.
+//! - One deadline per item, from its start, covers redirects, body, the retry
+//!   and its pause, and the PDF re-request: 60 s, or 180 s when the URL path
 //!   ends in `.pdf`. A response that turns out to be `application/pdf` at a
 //!   URL without that suffix (arXiv `/pdf/<id>`) is dropped at its headers and
 //!   requested again with the PDF budget, because ureq cannot extend a
@@ -78,13 +80,13 @@ const USAGE: &str = "\
 清单每行一条：name<TAB>url（空行与 # 开头的行忽略；- 表示从标准输入读；URL 不得带 user:pass@）。
   name 只许小写字母、数字与 -，输出在 sources/<组前缀>-<name>.*：
     正文 .html / .pdf（先看文件头再看 Content-Type；其他类型为 .json .xml .png 等，未知或不可用作存档的文本为 .bin）
-    .headers  状态行、最终 URL 与响应头：头名全留，值只留审定的安全头；URL 类头去掉用户名、查询与片段；其余记为 [已删]（不暴露抓取地点）
+    .headers  状态行、最终 URL 与响应头：头名全留，值只留审定的安全头；location 类头只留 scheme://host；其余记为 [已删]（不暴露抓取地点）；最终 URL 去掉查询与片段
     .txt      文本存档：HTML 按声明的字符集解码后转纯文本（同 html2txt），PDF 用 poppler 的 pdftotext -enc UTF-8 -layout
   匿名 GET（桌面 Chrome UA、Accept-Language en-US、无 Cookie），自行跟随至多 10 次跳转（目标带用户名或密码则拒绝）；
-  每条限时 60 秒（PDF 180 秒，含跳转）；超时、连接或 I/O 错误与 5xx 重试一次，4xx、协议与解码错误不重试。
+  每条限时 60 秒（PDF 180 秒），从开始算起，跳转、重试与重新请求都在内；超时、连接或 I/O 错误与 5xx 重试一次，4xx、协议与解码错误不重试。
   并发 --jobs（默认 6，最多 16），同一清单域名最多 2 个（按清单里写的域名计，跳转后的域名不计）。
   401/402/403/429、Cloudflare 质询与疑似验证页、付费墙、过短正文记为 blocked：保留正文与 .headers，不生成 .txt。
-  字符集无法识别、PDF 转文本失败等记为 failed（正文保留，原因写明）。
+  字符集无法识别或正文含无效字节、PDF 转文本失败或无可提取文本等记为 failed（正文保留，原因写明）。
   任一条目已有输出则整批拒绝；加 --force 时，每条写入前先删去该条上次的全部输出（同一 name 只留一版）。
   每条在 sources/<组前缀>-fetch-log.jsonl 追加一行（北京时间、URL、状态、字节、sha256、输出、结果与原因）。
   部分条目失败仍以 0 退出，末行写明失败数；用法错误、拒绝覆盖与日志写入失败以非 0 退出。
@@ -502,16 +504,20 @@ fn status_verdict(status: u16) -> Verdict {
     }
 }
 
-/// Signals that settle "this is a Cloudflare challenge" whatever the page
-/// length: the `cf-mitigated: challenge` header, or `GATE_SIGNATURES` in the
-/// raw HTML (`html` is `None` for non-HTML bodies).
-fn challenge_signal(headers: &[(String, String)], html: Option<&[u8]>) -> Option<String> {
-    if headers.iter().any(|(k, v)| {
-        k.eq_ignore_ascii_case("cf-mitigated") && v.to_ascii_lowercase().contains("challenge")
-    }) {
-        return Some("Cloudflare 质询（cf-mitigated: challenge）".into());
-    }
-    let raw = String::from_utf8_lossy(html?).to_ascii_lowercase();
+/// The `cf-mitigated: challenge` header: a Cloudflare challenge whatever
+/// the body.
+fn challenge_header(headers: &[(String, String)]) -> Option<String> {
+    headers
+        .iter()
+        .any(|(k, v)| {
+            k.eq_ignore_ascii_case("cf-mitigated") && v.to_ascii_lowercase().contains("challenge")
+        })
+        .then(|| "Cloudflare 质询（cf-mitigated: challenge）".to_string())
+}
+
+/// `GATE_SIGNATURES` in the decoded HTML, whatever the page length.
+fn challenge_markup(html: &str) -> Option<String> {
+    let raw = html.to_ascii_lowercase();
     GATE_SIGNATURES
         .iter()
         .find(|(n, _)| raw.contains(n))
@@ -625,56 +631,90 @@ fn ct_charset(content_type: &str) -> Option<String> {
 }
 
 /// The charset an HTML head declares, in `<meta charset=…>` or
-/// `<meta http-equiv="Content-Type" content="…; charset=…">`.
+/// `<meta http-equiv="Content-Type" content="…; charset=…">`. Comments are
+/// skipped (a commented-out `<meta>` declares nothing), as in the HTML
+/// standard's prescan.
 fn meta_charset(body: &[u8]) -> Option<String> {
     let head = String::from_utf8_lossy(&body[..body.len().min(META_PRESCAN)]).to_ascii_lowercase();
     let mut from = 0;
-    while let Some(off) = head[from..].find("<meta") {
+    while let Some(off) = head[from..].find('<') {
         let start = from + off;
+        if head[start..].starts_with("<!--") {
+            from = head[start + 4..]
+                .find("-->")
+                .map_or(head.len(), |e| start + 4 + e + 3);
+            continue;
+        }
         let end = head[start..].find('>').map_or(head.len(), |e| start + e);
         let tag = &head[start..end];
-        if let Some(c) = tag.find("charset") {
-            let rest = tag[c + 7..].trim_start();
-            if let Some(rest) = rest.strip_prefix('=') {
-                let label: String = rest
-                    .trim_start()
-                    .trim_start_matches(['"', '\''])
-                    .chars()
-                    .take_while(|ch| ch.is_ascii_alphanumeric() || "-_.:".contains(*ch))
-                    .collect();
-                if !label.is_empty() {
-                    return Some(label);
-                }
+        if tag.starts_with("<meta")
+            && let Some(c) = tag.find("charset")
+            && let Some(rest) = tag[c + 7..].trim_start().strip_prefix('=')
+        {
+            let label: String = rest
+                .trim_start()
+                .trim_start_matches(['"', '\''])
+                .chars()
+                .take_while(|ch| ch.is_ascii_alphanumeric() || "-_.:".contains(*ch))
+                .collect();
+            if !label.is_empty() {
+                return Some(label);
             }
         }
-        from = end;
+        from = end.max(start + 1);
     }
     None
 }
 
+/// A body decoded to text.
+struct Decoded {
+    text: String,
+    enc: &'static Encoding,
+    /// The body is UTF-8 without a BOM, valid as it stands: only then may
+    /// it be reused byte for byte as a `.txt`.
+    utf8_as_is: bool,
+}
+
 /// The body as text: a BOM wins, then the Content-Type charset, then (HTML
-/// only) a `<meta>` declaration, then UTF-8. A declared label that
-/// `encoding_rs` does not know is an error: guessing would put mojibake into
-/// an archive that looks fine.
-fn decode_body(
-    content_type: &str,
-    body: &[u8],
-    html: bool,
-) -> Result<(String, &'static Encoding), String> {
-    if let Some((enc, bom)) = Encoding::for_bom(body) {
-        let (text, _) = enc.decode_without_bom_handling(&body[bom..]);
-        return Ok((text.into_owned(), enc));
-    }
-    let label = ct_charset(content_type).or_else(|| html.then(|| meta_charset(body)).flatten());
-    let enc = match label {
-        None => UTF_8,
-        Some(l) => Encoding::for_label(l.as_bytes()).ok_or_else(|| {
-            let shown: String = l.chars().take(40).collect();
-            format!("无法识别的字符集「{shown}」")
-        })?,
+/// only) a `<meta>` declaration, then UTF-8. A `<meta>` that says UTF-16
+/// means UTF-8 (HTML standard: a page that could read its own `<meta>` as
+/// ASCII is not UTF-16). An unknown label, or bytes that are invalid in the
+/// chosen encoding, are errors: replacement characters would put silent
+/// gaps into an archive that looks fine.
+fn decode_body(content_type: &str, body: &[u8], html: bool) -> Result<Decoded, String> {
+    let (enc, rest, bom) = match Encoding::for_bom(body) {
+        Some((enc, n)) => (enc, &body[n..], true),
+        None => {
+            let declared = match ct_charset(content_type) {
+                Some(l) => Some((l, false)),
+                None if html => meta_charset(body).map(|l| (l, true)),
+                None => None,
+            };
+            let enc = match declared {
+                None => UTF_8,
+                Some((l, from_meta)) => {
+                    let enc = Encoding::for_label(l.as_bytes()).ok_or_else(|| {
+                        let shown: String = l.chars().take(40).collect();
+                        format!("无法识别的字符集「{shown}」")
+                    })?;
+                    if from_meta && (enc == encoding_rs::UTF_16LE || enc == encoding_rs::UTF_16BE) {
+                        UTF_8
+                    } else {
+                        enc
+                    }
+                }
+            };
+            (enc, body, false)
+        }
     };
-    let (text, _) = enc.decode_without_bom_handling(body);
-    Ok((text.into_owned(), enc))
+    let text = enc
+        .decode_without_bom_handling_and_without_replacement(rest)
+        .ok_or_else(|| format!("正文含 {} 下无效的字节", enc.name()))?;
+    Ok(Decoded {
+        text: text.into_owned(),
+        enc,
+        utf8_as_is: enc == UTF_8 && !bom,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -737,18 +777,6 @@ fn put(sources: &Path, file: &str, bytes: &[u8]) -> Result<(), String> {
     Ok(())
 }
 
-/// Reads at most `cap` bytes of `path`; more is an error, not a truncation.
-fn read_capped(path: &Path, cap: u64) -> Result<Vec<u8>, String> {
-    let mut out = Vec::new();
-    fs::File::open(path)
-        .and_then(|f| f.take(cap + 1).read_to_end(&mut out))
-        .map_err(|e| format!("读取失败（{e}）"))?;
-    if out.len() as u64 > cap {
-        return Err(format!("超过 {} MB 上限", cap / (1024 * 1024)));
-    }
-    Ok(out)
-}
-
 fn sha256_hex(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
         .iter()
@@ -806,6 +834,8 @@ struct Net {
     agent: ureq::Agent,
     max_body: u64,
     retry_pause: Duration,
+    page_timeout: Duration,
+    pdf_timeout: Duration,
 }
 
 impl Net {
@@ -814,6 +844,8 @@ impl Net {
             agent: http_agent(true),
             max_body: MAX_BODY,
             retry_pause: RETRY_PAUSE,
+            page_timeout: PAGE_TIMEOUT,
+            pdf_timeout: PDF_TIMEOUT,
         }
     }
 }
@@ -854,39 +886,91 @@ fn classify(what: &str, e: ureq::Error) -> Attempt {
     }
 }
 
-/// `loc` (a `Location` value) against `base`: absolute, scheme-relative,
-/// absolute-path, query-only or relative-path. Dot segments are left to the
-/// server.
+/// RFC 3986 §5.2.4 `remove_dot_segments`.
+fn remove_dot_segments(path: &str) -> String {
+    let mut input = path.to_string();
+    let mut out = String::new();
+    let pop = |out: &mut String| match out.rfind('/') {
+        Some(i) => out.truncate(i),
+        None => out.clear(),
+    };
+    while !input.is_empty() {
+        if let Some(rest) = input.strip_prefix("../") {
+            input = rest.to_string();
+        } else if let Some(rest) = input.strip_prefix("./") {
+            input = rest.to_string();
+        } else if input.starts_with("/./") {
+            input.replace_range(..3, "/");
+        } else if input == "/." {
+            input = "/".into();
+        } else if input.starts_with("/../") {
+            input.replace_range(..4, "/");
+            pop(&mut out);
+        } else if input == "/.." {
+            input = "/".into();
+            pop(&mut out);
+        } else if input == "." || input == ".." {
+            input.clear();
+        } else {
+            let skip = usize::from(input.starts_with('/'));
+            let end = input[skip..].find('/').map_or(input.len(), |i| skip + i);
+            out.push_str(&input[..end]);
+            input.replace_range(..end, "");
+        }
+    }
+    out
+}
+
+/// `origin + path?query`, with the dot segments of the path removed.
+fn with_clean_path(origin: &str, rest: &str) -> String {
+    let split = rest.find(['?', '#']).unwrap_or(rest.len());
+    let path = remove_dot_segments(&rest[..split]);
+    let path = if path.is_empty() {
+        "/".to_string()
+    } else {
+        path
+    };
+    format!("{origin}{path}{}", &rest[split..])
+}
+
+/// `loc` (a `Location` value) against `base` (RFC 3986 §5.2): absolute,
+/// scheme-relative, absolute-path, query-only or relative-path, dot
+/// segments removed.
 fn resolve(base: &str, loc: &str) -> String {
     let loc = loc.trim();
-    let scheme_end = loc.find(':').filter(|&i| {
-        loc[..i]
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || "+-.".contains(c))
-            && i > 0
+    let has_scheme = loc.find(':').is_some_and(|i| {
+        i > 0
+            && loc[..i]
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || "+-.".contains(c))
     });
-    if scheme_end.is_some() {
-        return loc.to_string();
-    }
-    let Some((scheme, auth)) = split_authority(base) else {
+    let target = if has_scheme {
+        loc.to_string()
+    } else if let Some((scheme, auth)) = split_authority(base) {
+        let origin = format!("{scheme}{auth}");
+        let path_query = base[origin.len()..].split('#').next().unwrap_or("");
+        let path = path_query.split('?').next().unwrap_or("");
+        if let Some(rest) = loc.strip_prefix("//") {
+            format!("{scheme}{rest}")
+        } else if loc.starts_with('/') {
+            format!("{origin}{loc}")
+        } else if loc.starts_with('?') {
+            format!("{origin}{path}{loc}")
+        } else if loc.starts_with('#') || loc.is_empty() {
+            format!("{origin}{path_query}")
+        } else {
+            let dir = path.rfind('/').map_or("/", |i| &path[..=i]);
+            format!("{origin}{dir}{loc}")
+        }
+    } else {
         return loc.to_string();
     };
-    if let Some(rest) = loc.strip_prefix("//") {
-        return format!("{scheme}{rest}");
-    }
-    let origin = format!("{scheme}{auth}");
-    let path_query = &base[origin.len()..];
-    let path_query = path_query.split('#').next().unwrap_or("");
-    let path = path_query.split('?').next().unwrap_or("");
-    if loc.starts_with('/') {
-        format!("{origin}{loc}")
-    } else if loc.starts_with('?') {
-        format!("{origin}{path}{loc}")
-    } else if loc.starts_with('#') || loc.is_empty() {
-        format!("{origin}{path_query}")
-    } else {
-        let dir = path.rfind('/').map_or("/", |i| &path[..=i]);
-        format!("{origin}{dir}{loc}")
+    match split_authority(&target) {
+        Some((scheme, auth)) => {
+            let origin_len = scheme.len() + auth.len();
+            with_clean_path(&target[..origin_len], &target[origin_len..])
+        }
+        None => target,
     }
 }
 
@@ -903,15 +987,15 @@ fn next_url(base: &str, loc: &str) -> Result<String, String> {
     Ok(url)
 }
 
-/// One GET with its redirect chain, all within `budget`.
-fn attempt(net: &Net, url: &str, budget: Duration) -> Attempt {
-    let deadline = Instant::now() + budget;
+/// One GET with its redirect chain, all before `deadline`. `pdf_budget`
+/// says the deadline is already the PDF one.
+fn attempt(net: &Net, url: &str, deadline: Instant, pdf_budget: bool) -> Attempt {
     let mut current = url.to_string();
     let mut hops = 0;
     loop {
         let left = deadline.saturating_duration_since(Instant::now());
         if left.is_zero() {
-            return Attempt::Retry(format!("超过 {} 秒限时", budget.as_secs()));
+            return Attempt::Retry("条目限时已到".into());
         }
         let call = net
             .agent
@@ -947,7 +1031,7 @@ fn attempt(net: &Net, url: &str, budget: Duration) -> Attempt {
         let content_type = header("content-type").unwrap_or_default();
         // By Content-Type only: a PDF recognised by its magic bytes alone
         // (served as octet-stream at a non-.pdf URL) stays on the page budget.
-        if budget < PDF_TIMEOUT && mime(&content_type) == "application/pdf" {
+        if !pdf_budget && mime(&content_type) == "application/pdf" {
             return Attempt::NeedsPdfBudget;
         }
         let headers: Vec<(String, String)> = resp
@@ -988,20 +1072,32 @@ fn attempt(net: &Net, url: &str, budget: Duration) -> Attempt {
 /// The response to archive, plus notes on what it took; `Err` when no
 /// response came. A 5xx that persists through the retry is still returned:
 /// what the server answered is the record.
+///
+/// One deadline covers the whole item — redirects, the retry and its pause,
+/// and the PDF re-request — measured from the item's start: 60 s, or 180 s
+/// once the URL or a response says PDF. A retry gets whatever is left.
 fn fetch_url(net: &Net, url: &str) -> (Result<Got, String>, Vec<String>) {
-    let mut budget = if is_pdf_url(url) {
-        PDF_TIMEOUT
-    } else {
-        PAGE_TIMEOUT
+    let start = Instant::now();
+    let mut pdf_budget = is_pdf_url(url);
+    let deadline = |pdf: bool| {
+        start
+            + if pdf {
+                net.pdf_timeout
+            } else {
+                net.page_timeout
+            }
     };
     let mut notes = Vec::new();
     let mut retried = false;
     loop {
-        let (failure, response) = match attempt(net, url, budget) {
+        let (failure, response) = match attempt(net, url, deadline(pdf_budget), pdf_budget) {
             // Cannot repeat: the budget is now the PDF one.
             Attempt::NeedsPdfBudget => {
-                budget = PDF_TIMEOUT;
-                notes.push("响应为 PDF，按 180 秒限时重新请求".to_string());
+                pdf_budget = true;
+                notes.push(format!(
+                    "响应为 PDF，按 {} 秒限时重新请求",
+                    net.pdf_timeout.as_secs()
+                ));
                 continue;
             }
             Attempt::Got(g) if g.status >= 500 => (g.status_line.clone(), Some(g)),
@@ -1017,18 +1113,24 @@ fn fetch_url(net: &Net, url: &str) -> (Result<Got, String>, Vec<String>) {
         }
         retried = true;
         notes.push(format!("首次失败（{failure}），已重试"));
-        thread::sleep(net.retry_pause);
+        let left = deadline(pdf_budget).saturating_duration_since(Instant::now());
+        thread::sleep(net.retry_pause.min(left));
     }
 }
 
 // ---------------------------------------------------------------------------
 // The `.headers` sidecar
 
-/// Headers whose value is a property of the resource or the server, the
-/// same for every client, and useful as evidence (type, size, dates, cache
-/// state, the block itself). Everything else is `[已删]`: an allowlist,
-/// because CDNs keep inventing headers that name the edge or the client.
-const SAFE_HEADERS: [&str; 26] = [
+/// Headers whose value is a fixed-vocabulary property of the resource or
+/// the server — the same for every client — and useful as evidence (type,
+/// size, dates, cache state, the block itself). Everything else is `[已删]`:
+/// an allowlist, because CDNs keep inventing headers that name the edge or
+/// the client. Left out on purpose, as free-form strings that can be minted
+/// per response: `etag` (a known per-client tracker), `server` (some CDNs
+/// put the edge node in it), `content-disposition` (a download name can carry
+/// a token); `www-authenticate` keeps only its scheme names
+/// (`auth_schemes`), since a Digest nonce can be tied to the client address.
+const SAFE_HEADERS: [&str; 22] = [
     "accept-ranges",
     "age",
     "allow",
@@ -1036,29 +1138,26 @@ const SAFE_HEADERS: [&str; 26] = [
     "cf-cache-status",
     "cf-mitigated",
     "connection",
-    "content-disposition",
     "content-encoding",
     "content-language",
     "content-length",
     "content-range",
     "content-type",
     "date",
-    "etag",
     "expires",
     "last-modified",
     "pragma",
     "retry-after",
-    "server",
     "strict-transport-security",
     "transfer-encoding",
     "vary",
-    "www-authenticate",
     "x-content-type-options",
     "x-frame-options",
 ];
-/// Headers whose value is a URL (or holds URLs): printed with userinfo,
-/// query and fragment removed.
-const URL_HEADERS: [&str; 4] = ["location", "content-location", "link", "refresh"];
+/// Headers whose value is one URL: only its `scheme://host` is printed
+/// (`url_origin`). `link` and `refresh` carry URLs inside parameters and are
+/// simply `[已删]`.
+const ORIGIN_HEADERS: [&str; 2] = ["location", "content-location"];
 /// Headers known to name the CDN edge (POP), carry a request id the CDN maps
 /// back to that edge and the client address, or echo the client IP. They
 /// are not in `SAFE_HEADERS` either; the separate list only gives their
@@ -1103,51 +1202,52 @@ fn reveals_location(name: &str) -> bool {
         || LOCATION_HEADER_PREFIXES.iter().any(|p| name.starts_with(p))
 }
 
-/// A URL without userinfo, query and fragment (relative URLs keep their
-/// path).
-fn strip_url(u: &str) -> String {
+/// `scheme://host[:port]` of an absolute URL, `//host[:port]` of a
+/// scheme-relative one, userinfo dropped; `None` for anything else (a
+/// relative path says nothing worth keeping and may carry a token).
+fn url_origin(u: &str) -> Option<String> {
     let u = u.trim();
-    let u = &u[..u.find(['?', '#']).unwrap_or(u.len())];
-    match split_authority(u) {
-        Some((scheme, auth)) => match auth.rfind('@') {
-            Some(at) => format!(
-                "{scheme}{}{}",
-                &auth[at + 1..],
-                &u[scheme.len() + auth.len()..]
-            ),
-            None => u.to_string(),
-        },
-        None => u.to_string(),
-    }
+    let (prefix, rest) = if let Some(rest) = u.strip_prefix("//") {
+        ("//".to_string(), rest)
+    } else {
+        let i = u.find("://")?;
+        let scheme = &u[..i];
+        if scheme.is_empty()
+            || !scheme
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || "+-.".contains(c))
+        {
+            return None;
+        }
+        (u[..i + 3].to_ascii_lowercase(), &u[i + 3..])
+    };
+    let auth = &rest[..rest.find(['/', '?', '#']).unwrap_or(rest.len())];
+    let host = &auth[auth.rfind('@').map_or(0, |at| at + 1)..];
+    let ok = !host.is_empty()
+        && host
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "-.:[]".contains(c));
+    ok.then(|| format!("{prefix}{host}"))
 }
 
-/// `location` / `content-location` hold one URL, `link` several in `<…>`,
-/// `refresh` a delay and `url=…`.
-fn scrub_url_header(name: &str, value: &str) -> String {
-    match name {
-        "link" => {
-            let mut out = String::new();
-            let mut rest = value;
-            while let Some(open) = rest.find('<') {
-                let Some(close) = rest[open..].find('>').map(|c| open + c) else {
-                    break;
-                };
-                out.push_str(&rest[..=open]);
-                out.push_str(&strip_url(&rest[open + 1..close]));
-                out.push('>');
-                rest = &rest[close + 1..];
-            }
-            out.push_str(rest);
-            out
-        }
-        "refresh" => match value.to_ascii_lowercase().find("url=") {
-            Some(i) => {
-                let target = value[i + 4..].trim().trim_matches(['"', '\'']);
-                format!("{}{}", &value[..i + 4], strip_url(target))
-            }
-            None => value.to_string(),
-        },
-        _ => strip_url(value),
+/// The auth-scheme names of a `WWW-Authenticate` value (`Basic`, `Bearer`,
+/// `Digest` …), every parameter dropped. A comma-separated piece starts a
+/// new challenge when its first word is a bare token, not `name=value`.
+fn auth_schemes(value: &str) -> String {
+    let is_token = |w: &str| {
+        !w.is_empty()
+            && w.chars()
+                .all(|c| c.is_ascii_alphanumeric() || "!#$%&'*+-.^_`|~".contains(c))
+    };
+    let schemes: Vec<&str> = value
+        .split(',')
+        .filter_map(|piece| piece.split_whitespace().next())
+        .filter(|w| is_token(w))
+        .collect();
+    if schemes.is_empty() {
+        REDACTED.to_string()
+    } else {
+        schemes.join(", ")
     }
 }
 
@@ -1156,8 +1256,10 @@ fn header_value(name: &str, value: &str) -> String {
     let name = name.to_ascii_lowercase();
     if reveals_location(&name) {
         LOCATION_REDACTED.to_string()
-    } else if URL_HEADERS.contains(&name.as_str()) {
-        scrub_url_header(&name, value)
+    } else if ORIGIN_HEADERS.contains(&name.as_str()) {
+        url_origin(value).unwrap_or_else(|| REDACTED.to_string())
+    } else if name == "www-authenticate" {
+        auth_schemes(value)
     } else if SAFE_HEADERS.contains(&name.as_str()) {
         value.to_string()
     } else {
@@ -1165,10 +1267,25 @@ fn header_value(name: &str, value: &str) -> String {
     }
 }
 
-/// Status line, final URL (credentials scrubbed by `log_url`), then every
-/// response header by name with its `header_value`.
-fn headers_text(root: &Path, g: &Got) -> String {
-    let mut s = format!("{}\nURL: {}\n", g.status_line, log_url(root, &g.final_url));
+/// A URL as fetch publishes it (the `.headers` `URL:` line, the log's
+/// `final_url`): userinfo, query and fragment dropped — not a keyword
+/// blacklist, since a token can sit under any parameter name.
+fn public_url(u: &str) -> String {
+    let u = u.trim();
+    let u = &u[..u.find(['?', '#']).unwrap_or(u.len())];
+    match split_authority(u) {
+        Some((scheme, auth)) => {
+            let host = &auth[auth.rfind('@').map_or(0, |at| at + 1)..];
+            format!("{scheme}{host}{}", &u[scheme.len() + auth.len()..])
+        }
+        None => u.to_string(),
+    }
+}
+
+/// Status line, final URL (`public_url`), then every response header by
+/// name with its `header_value`.
+fn headers_text(g: &Got) -> String {
+    let mut s = format!("{}\nURL: {}\n", g.status_line, public_url(&g.final_url));
     for (k, v) in &g.headers {
         s.push_str(&format!("{k}: {}\n", header_value(k, v)));
     }
@@ -1178,19 +1295,27 @@ fn headers_text(root: &Path, g: &Got) -> String {
 // ---------------------------------------------------------------------------
 // PDF text
 
-/// `pdftotext -enc UTF-8 -layout <pdf> <tmp>`, bounded by
-/// `PDFTOTEXT_TIMEOUT` and `MAX_PDF_TEXT`, then saved as `sources/<txt>`;
-/// returns its line count. Output goes through a temp file, not a pipe, so
-/// that a large text cannot block the child while this thread polls it.
-fn pdf_to_text(tool: &Path, pdf: &Path, sources: &Path, txt: &str) -> Result<usize, String> {
-    let tmp = std::env::temp_dir().join(format!("barking-fetch-{}-{txt}", std::process::id()));
-    let _ = fs::remove_file(&tmp);
+/// A child process that is killed and reaped on every exit path.
+struct Reaped(std::process::Child);
+
+impl Drop for Reaped {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+/// `<tool> -enc UTF-8 -layout <pdf> -`, its stdout read as it comes with a
+/// byte cap, the whole run bounded by `timeout`. Any failure — spawn, wait,
+/// read, cap, timeout, exit status — kills and reaps the child (`Reaped`);
+/// nothing is written to disk here.
+fn pdf_to_text(tool: &Path, pdf: &Path, cap: u64, timeout: Duration) -> Result<Vec<u8>, String> {
     let mut child = Command::new(tool)
         .args(["-enc", "UTF-8", "-layout"])
         .arg(pdf)
-        .arg(&tmp)
+        .arg("-")
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
+        .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
         .map_err(|e| match e.kind() {
@@ -1200,35 +1325,72 @@ fn pdf_to_text(tool: &Path, pdf: &Path, sources: &Path, txt: &str) -> Result<usi
             }
             _ => format!("无法运行 pdftotext（{e}）"),
         })?;
+    let stdout = child.stdout.take();
+    let mut child = Reaped(child);
+    let Some(stdout) = stdout else {
+        return Err("pdftotext 没有标准输出".into());
+    };
+    // The reader stops at cap + 1 bytes; past the cap the child then blocks
+    // on a full pipe and is killed below, so neither side can run away.
+    let reader = thread::spawn(move || {
+        let mut out = Vec::new();
+        stdout.take(cap + 1).read_to_end(&mut out).map(|_| out)
+    });
     let started = Instant::now();
     let status = loop {
-        match child.try_wait() {
-            Ok(Some(s)) => break s,
-            Ok(None) if started.elapsed() > PDFTOTEXT_TIMEOUT => {
-                let _ = child.kill();
-                let _ = child.wait();
-                let _ = fs::remove_file(&tmp);
+        if reader.is_finished() {
+            // Either the child closed stdout (it is exiting) or the cap hit.
+            break None;
+        }
+        match child.0.try_wait() {
+            Ok(Some(s)) => break Some(s),
+            Ok(None) if started.elapsed() > timeout => {
                 return Err(format!(
                     "pdftotext 超过 {} 秒未结束，已终止",
-                    PDFTOTEXT_TIMEOUT.as_secs()
+                    timeout.as_secs()
                 ));
             }
-            Ok(None) => thread::sleep(Duration::from_millis(100)),
+            Ok(None) => thread::sleep(Duration::from_millis(20)),
             Err(e) => return Err(format!("等待 pdftotext 失败（{e}）")),
         }
     };
-    let result = if status.success() {
-        read_capped(&tmp, MAX_PDF_TEXT)
-            .map_err(|e| format!("pdftotext 输出{e}，已丢弃"))
-            .and_then(|text| {
-                put(sources, txt, &text)?;
-                Ok(String::from_utf8_lossy(&text).lines().count())
-            })
-    } else {
-        Err(format!("pdftotext 失败（{status}）"))
+    let out = match reader.join() {
+        Ok(Ok(out)) => out,
+        Ok(Err(e)) => return Err(format!("读取 pdftotext 输出失败（{e}）")),
+        Err(_) => return Err("读取 pdftotext 输出的线程异常退出".into()),
     };
-    let _ = fs::remove_file(&tmp);
-    result
+    if out.len() as u64 > cap {
+        return Err(format!(
+            "pdftotext 输出超过 {} MB 上限，已终止并丢弃",
+            cap / (1024 * 1024)
+        ));
+    }
+    let status = match status {
+        Some(s) => s,
+        None => loop {
+            match child.0.try_wait() {
+                Ok(Some(s)) => break s,
+                Ok(None) if started.elapsed() > timeout => {
+                    return Err(format!(
+                        "pdftotext 超过 {} 秒未结束，已终止",
+                        timeout.as_secs()
+                    ));
+                }
+                Ok(None) => thread::sleep(Duration::from_millis(20)),
+                Err(e) => return Err(format!("等待 pdftotext 失败（{e}）")),
+            }
+        },
+    };
+    if !status.success() {
+        return Err(format!("pdftotext 失败（{status}）"));
+    }
+    Ok(out)
+}
+
+/// Whether converter output holds any text at all: a scanned PDF without a
+/// text layer comes back as blank lines and form feeds.
+fn has_text(out: &[u8]) -> bool {
+    !String::from_utf8_lossy(out).trim().is_empty()
 }
 
 // ---------------------------------------------------------------------------
@@ -1325,7 +1487,7 @@ impl Job<'_> {
         let text = format!(
             "# 无响应：{}\nURL: {}\n",
             o.reasons[0],
-            log_url(&self.issue.root, &item.url)
+            public_url(&item.url)
         );
         let file = format!("{base}.headers");
         match put(sources, &file, text.as_bytes()) {
@@ -1349,40 +1511,49 @@ impl Job<'_> {
             reasons.push(format!("{}，但正文为空", g.status_line));
         }
         if verdict != Verdict::Failed
-            && let Some(why) = challenge_signal(&g.headers, (ext == "html").then_some(&g.body[..]))
+            && let Some(why) = challenge_header(&g.headers)
         {
             verdict = Verdict::Blocked;
             reasons.push(why);
         }
         let decoded = matches!(ext, "html" | "txt")
             .then(|| decode_body(&g.content_type, &g.body, ext == "html"));
-        let html_text = match (&decoded, ext) {
-            (Some(Ok((text, _))), "html") => {
-                Some(html_to_text(text.trim_start_matches('\u{feff}')))
-            }
+        if let Some(Ok(d)) = &decoded
+            && d.enc != UTF_8
+        {
+            reasons.push(format!("按 {} 解码", d.enc.name()));
+        }
+        let page = match &decoded {
+            Some(Ok(d)) if ext == "html" => Some(d.text.trim_start_matches('\u{feff}')),
             _ => None,
         };
+        // Markup is matched on the decoded page, so a UTF-16 challenge page
+        // is caught as surely as a UTF-8 one.
+        if verdict != Verdict::Failed
+            && let Some(why) = page.and_then(challenge_markup)
+        {
+            verdict = Verdict::Blocked;
+            reasons.push(why);
+        }
+        let html_text = page.map(html_to_text);
         if verdict == Verdict::Ok {
-            match &decoded {
-                Some(Err(e)) => {
-                    verdict = Verdict::Failed;
-                    reasons.push(format!("{e}，未生成 txt"));
-                }
-                Some(Ok((raw, _))) => {
-                    if let Some(why) = html_text.as_deref().and_then(|t| detect_gate(raw, t)) {
-                        verdict = Verdict::Blocked;
-                        reasons.push(why);
-                    }
-                }
-                None => {}
+            if let Some(Err(e)) = &decoded {
+                verdict = Verdict::Failed;
+                reasons.push(format!("{e}，未生成 txt"));
+            } else if let (Some(p), Some(t)) = (page, html_text.as_deref())
+                && let Some(why) = detect_gate(p, t)
+            {
+                verdict = Verdict::Blocked;
+                reasons.push(why);
             }
         }
         // `.txt` is reserved for usable text: a plain-text body takes that
-        // name only when it is an ok item already in UTF-8; otherwise the
-        // raw bytes are `.bin` (and an ok item gets its decoded `.txt`).
-        let utf8 = matches!(&decoded, Some(Ok((_, enc))) if *enc == UTF_8);
+        // name only when it is an ok item that is valid UTF-8 as it stands;
+        // otherwise the raw bytes are `.bin` (and an ok item gets its decoded
+        // `.txt`).
+        let as_is = matches!(&decoded, Some(Ok(d)) if d.utf8_as_is);
         let body_ext = match ext {
-            "txt" if verdict == Verdict::Ok && utf8 => "txt",
+            "txt" if verdict == Verdict::Ok && as_is => "txt",
             "txt" => "bin",
             e => e,
         };
@@ -1402,11 +1573,7 @@ impl Job<'_> {
             return o;
         }
         let headers_file = format!("{base}.headers");
-        if let Err(e) = put(
-            sources,
-            &headers_file,
-            headers_text(&self.issue.root, &g).as_bytes(),
-        ) {
+        if let Err(e) = put(sources, &headers_file, headers_text(&g).as_bytes()) {
             o.fail(e);
             return o;
         }
@@ -1425,30 +1592,42 @@ impl Job<'_> {
         }
 
         let txt = format!("{base}.txt");
-        let text = match (ext, &decoded) {
-            ("html", _) => html_text,
-            ("txt", Some(Ok((text, _)))) if body_ext == "bin" => Some(text.clone()),
-            ("txt", Some(Ok((text, _)))) => {
-                o.txt_lines = Some(text.lines().count());
+        let text: Option<Vec<u8>> = match (ext, &decoded) {
+            ("html", _) => html_text.map(String::into_bytes),
+            ("txt", Some(Ok(d))) if body_ext == "bin" => Some(d.text.clone().into_bytes()),
+            ("txt", Some(Ok(d))) => {
+                o.txt_lines = Some(d.text.lines().count());
                 None
+            }
+            ("pdf", _) => {
+                match pdf_to_text(
+                    &self.pdftotext,
+                    &sources.join(&body_file),
+                    MAX_PDF_TEXT,
+                    PDFTOTEXT_TIMEOUT,
+                ) {
+                    Ok(out) if has_text(&out) => Some(out),
+                    Ok(_) => {
+                        o.fail(
+                            "PDF 已保存，但 PDF 无可提取文本（可能是扫描件），未生成 txt".into(),
+                        );
+                        None
+                    }
+                    Err(e) => {
+                        o.fail(format!("PDF 已保存，但未生成 txt：{e}"));
+                        None
+                    }
+                }
             }
             _ => None,
         };
         if let Some(text) = text {
-            match put(sources, &txt, text.as_bytes()) {
+            match put(sources, &txt, &text) {
                 Ok(()) => {
                     o.outputs.push(txt);
-                    o.txt_lines = Some(text.lines().count());
+                    o.txt_lines = Some(String::from_utf8_lossy(&text).lines().count());
                 }
                 Err(e) => o.fail(e),
-            }
-        } else if ext == "pdf" {
-            match pdf_to_text(&self.pdftotext, &sources.join(&body_file), sources, &txt) {
-                Ok(n) => {
-                    o.outputs.push(txt);
-                    o.txt_lines = Some(n);
-                }
-                Err(e) => o.fail(format!("PDF 已保存，但未生成 txt：{e}")),
             }
         }
         o
@@ -1469,7 +1648,7 @@ fn log_line(issue: &Issue, item: &Item, o: &Outcome) -> String {
         ("url", Value::from(log_url(root, &item.url))),
         (
             "final_url",
-            Value::from(o.final_url.as_deref().map(|u| log_url(root, u))),
+            Value::from(o.final_url.as_deref().map(public_url)),
         ),
         ("status", Value::from(o.status)),
         ("content_type", Value::from(o.content_type.clone())),
@@ -1703,6 +1882,27 @@ mod tests {
             agent: http_agent(false),
             max_body,
             retry_pause: Duration::ZERO,
+            page_timeout: PAGE_TIMEOUT,
+            pdf_timeout: PDF_TIMEOUT,
+        }
+    }
+
+    /// A stand-in for pdftotext: a script that prints `body` (a shell /
+    /// batch fragment) to stdout, whatever its arguments.
+    fn fake_converter(dir: &Path, name: &str, body: &str) -> PathBuf {
+        #[cfg(windows)]
+        {
+            let p = dir.join(format!("{name}.cmd"));
+            fs::write(&p, format!("@echo off\r\n{body}\r\n")).unwrap();
+            p
+        }
+        #[cfg(not(windows))]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            let p = dir.join(name);
+            fs::write(&p, format!("#!/bin/sh\n{body}\n")).unwrap();
+            fs::set_permissions(&p, fs::Permissions::from_mode(0o755)).unwrap();
+            p
         }
     }
 
@@ -2072,6 +2272,56 @@ mod tests {
         assert_eq!(next_url(base, "/新").unwrap(), "https://a.com/%E6%96%B0");
     }
 
+    #[test]
+    fn dot_segments_are_removed() {
+        // RFC 3986 §5.2.4 and §5.4 examples (base http://a/b/c/d;p?q).
+        assert_eq!(remove_dot_segments("/a/b/c/./../../g"), "/a/g");
+        assert_eq!(remove_dot_segments("mid/content=5/../6"), "mid/6");
+        assert_eq!(remove_dot_segments("/a/./b/../c"), "/a/c");
+        assert_eq!(remove_dot_segments("/.."), "/");
+        let base = "http://a/b/c/d;p?q";
+        for (loc, want) in [
+            ("../g", "http://a/b/g"),
+            ("./g", "http://a/b/c/g"),
+            ("../..", "http://a/"),
+            ("../../../g", "http://a/g"),
+            ("/./g", "http://a/g"),
+            ("g/./h", "http://a/b/c/g/h"),
+            ("g;x=1/../y", "http://a/b/c/y"),
+            (".", "http://a/b/c/"),
+            ("/a/./b/../c", "http://a/a/c"),
+            ("http://a/x/../y?z=1", "http://a/y?z=1"),
+        ] {
+            assert_eq!(resolve(base, loc), want, "{loc}");
+        }
+    }
+
+    #[test]
+    fn one_deadline_covers_retry_and_redirects() {
+        // A server that accepts and never answers: the first try uses the
+        // whole item budget, so the retry has nothing left.
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        thread::spawn(move || {
+            let mut held = Vec::new();
+            while let Ok((s, _)) = listener.accept() {
+                held.push(s);
+            }
+        });
+        let mut net = test_net(MAX_BODY);
+        net.page_timeout = Duration::from_millis(400);
+        net.retry_pause = Duration::from_millis(300);
+        let started = Instant::now();
+        let (g, notes) = fetch_url(&net, &url);
+        let took = started.elapsed();
+        assert!(g.is_err());
+        assert_eq!(notes.len(), 1, "{notes:?}");
+        assert!(
+            took < Duration::from_millis(700),
+            "item took {took:?}, more than one budget"
+        );
+    }
+
     // ---- classification ----
 
     #[test]
@@ -2146,30 +2396,40 @@ mod tests {
             )
         };
         let h = |k: &str, v: &str| vec![(k.to_string(), v.to_string())];
-        let page = long("");
         assert!(
-            challenge_signal(&h("cf-mitigated", "challenge"), Some(page.as_bytes()))
+            challenge_header(&h("CF-Mitigated", "challenge"))
                 .unwrap()
                 .contains("cf-mitigated")
         );
+        assert_eq!(challenge_header(&h("cf-cache-status", "HIT")), None);
         let chl = long("<script>window._cf_chl_opt={cvId:'3'}</script>");
-        assert!(challenge_signal(&[], Some(chl.as_bytes())).is_some());
+        assert!(challenge_markup(&chl).is_some());
         let orchestrate = long(
             "<script src=\"/cdn-cgi/challenge-platform/h/b/orchestrate/chl_page/v1\"></script>",
         );
-        assert!(challenge_signal(&[], Some(orchestrate.as_bytes())).is_some());
+        assert!(challenge_markup(&orchestrate).is_some());
         // Bot-detection script on an ordinary page: not a challenge.
         let jsd = long("<script src=\"/cdn-cgi/challenge-platform/scripts/jsd/main.js\"></script>");
-        assert_eq!(challenge_signal(&[], Some(jsd.as_bytes())), None);
-        assert_eq!(challenge_signal(&h("cf-cache-status", "HIT"), None), None);
+        assert_eq!(challenge_markup(&jsd), None);
 
         // Through `archive`: a long 200 page with the header is blocked.
         let issue = test_issue("cfmit");
+        let page = long("");
         let mut g = got(200, "text/html", page.as_bytes());
         g.headers.push(("cf-mitigated".into(), "challenge".into()));
         let o = job(&issue, false).archive(&issue.sources(), "a-cf", g);
         assert_eq!(o.verdict, Verdict::Blocked);
         assert!(!issue.sources().join("a-cf.txt").exists());
+        // A UTF-16 page: the marker is only visible after decoding.
+        let mut utf16 = vec![0xff, 0xfe];
+        for u in chl.encode_utf16() {
+            utf16.extend_from_slice(&u.to_le_bytes());
+        }
+        assert!(!String::from_utf8_lossy(&utf16).contains("_cf_chl_opt"));
+        let o =
+            job(&issue, false).archive(&issue.sources(), "a-u16", got(200, "text/html", &utf16));
+        assert_eq!(o.verdict, Verdict::Blocked, "{:?}", o.reasons);
+        assert!(o.reasons.iter().any(|r| r.contains("_cf_chl_opt")));
         let _ = fs::remove_dir_all(&issue.root);
     }
 
@@ -2229,32 +2489,69 @@ mod tests {
             Some("big5")
         );
         assert_eq!(meta_charset(b"<meta name=\"x\" content=\"y\">"), None);
+        // A commented-out declaration is not one.
+        assert_eq!(
+            meta_charset(b"<!-- <meta charset=\"gbk\"> --><meta charset=\"big5\">").as_deref(),
+            Some("big5")
+        );
+        assert_eq!(meta_charset(b"<!-- <meta charset=\"gbk\"> -->"), None);
 
         let (gbk, _, _) = encoding_rs::GBK.encode("中文新闻");
-        let (text, enc) = decode_body("text/plain; charset=gbk", &gbk, false).unwrap();
-        assert_eq!((text.as_str(), enc), ("中文新闻", encoding_rs::GBK));
+        let d = decode_body("text/plain; charset=gbk", &gbk, false).unwrap();
+        assert_eq!((d.text.as_str(), d.enc), ("中文新闻", encoding_rs::GBK));
+        assert!(!d.utf8_as_is);
         // The header wins over the meta.
         let mut page = b"<meta charset=\"utf-8\">".to_vec();
         page.extend_from_slice(&gbk);
         assert_eq!(
             decode_body("text/html; charset=gb18030", &page, true)
                 .unwrap()
-                .1,
+                .enc,
             encoding_rs::GB18030
         );
-        // A BOM wins over both.
-        let (t, enc) =
-            decode_body("text/plain; charset=gbk", "\u{feff}ok".as_bytes(), false).unwrap();
-        assert_eq!((t.as_str(), enc), ("ok", UTF_8));
-        assert_eq!(
-            decode_body("text/html", b"<p>x</p>", true).unwrap().1,
-            UTF_8
-        );
+        // A BOM wins over both, and BOM'd UTF-8 is not reused as is.
+        let d = decode_body("text/plain; charset=gbk", "\u{feff}ok".as_bytes(), false).unwrap();
+        assert_eq!((d.text.as_str(), d.enc, d.utf8_as_is), ("ok", UTF_8, false));
+        let d = decode_body("text/html", b"<p>x</p>", true).unwrap();
+        assert_eq!((d.enc, d.utf8_as_is), (UTF_8, true));
         assert!(
             decode_body("text/html; charset=klingon-7", b"x", true)
-                .unwrap_err()
+                .err()
+                .unwrap()
                 .contains("klingon-7")
         );
+    }
+
+    #[test]
+    fn meta_utf16_means_utf8_and_invalid_bytes_fail() {
+        // An ASCII-readable page that claims UTF-16 in a <meta> is UTF-8.
+        let page = "<meta charset=\"utf-16\"><p>中文</p>".as_bytes();
+        let d = decode_body("text/html", page, true).unwrap();
+        assert_eq!(d.enc, UTF_8);
+        assert!(d.text.contains("中文"));
+        // A header that says UTF-16 is believed (no meta rule there).
+        assert_eq!(
+            decode_body("text/html; charset=utf-16le", b"a\x00", true)
+                .unwrap()
+                .enc,
+            encoding_rs::UTF_16LE
+        );
+        // Bytes invalid in the chosen encoding: an error, not U+FFFD.
+        assert!(
+            decode_body("text/html; charset=utf-8", b"ok \xff\xfe bad", true)
+                .err()
+                .unwrap()
+                .contains("无效的字节")
+        );
+        let issue = test_issue("badbytes");
+        let o = job(&issue, false).archive(
+            &issue.sources(),
+            "a-x",
+            got(200, "text/plain; charset=utf-8", b"text \xc3 broken"),
+        );
+        assert_eq!(o.verdict, Verdict::Failed);
+        assert_eq!(o.outputs, s(&["a-x.headers", "a-x.bin"]));
+        let _ = fs::remove_dir_all(&issue.root);
     }
 
     #[test]
@@ -2322,12 +2619,65 @@ mod tests {
     }
 
     #[test]
-    fn capped_reads_refuse_oversized_files() {
-        let issue = test_issue("cap");
-        let p = issue.sources().join("t");
-        fs::write(&p, vec![b'x'; 2048]).unwrap();
-        assert_eq!(read_capped(&p, 2048).unwrap().len(), 2048);
-        assert!(read_capped(&p, 2047).unwrap_err().contains("上限"));
+    fn converter_output_is_streamed_capped_and_classified() {
+        let issue = test_issue("conv");
+        let dir = issue.root.clone();
+        let pdf = issue.sources().join("x.pdf");
+        fs::write(&pdf, b"%PDF-1.7\n").unwrap();
+        let t = Duration::from_secs(20);
+        let ok = fake_converter(&dir, "ok", "echo Section 1 Introduction");
+        let out = pdf_to_text(&ok, &pdf, 1024, t).unwrap();
+        assert!(String::from_utf8_lossy(&out).contains("Section 1 Introduction"));
+        assert!(has_text(&out));
+        // Over the cap: refused, child killed, nothing kept.
+        #[cfg(windows)]
+        let flood = "for /L %%i in (1,1,400) do echo 0123456789012345678901234567890123456789";
+        #[cfg(not(windows))]
+        let flood = "i=0; while [ $i -lt 400 ]; do echo 0123456789012345678901234567890123456789; i=$((i+1)); done";
+        let big = fake_converter(&dir, "big", flood);
+        assert!(
+            pdf_to_text(&big, &pdf, 1024, t)
+                .err()
+                .unwrap()
+                .contains("上限")
+        );
+        // A failing converter is an error, not empty text.
+        let bad = fake_converter(&dir, "bad", "exit 3");
+        assert!(
+            pdf_to_text(&bad, &pdf, 1024, t)
+                .err()
+                .unwrap()
+                .contains("失败")
+        );
+        // Blank output (a scan without a text layer) is "no text".
+        assert!(!has_text(b"\n \x0c\n\r\n"));
+
+        // Through `archive`: blank output fails the item, the PDF stays.
+        #[cfg(windows)]
+        let blank = "echo.";
+        #[cfg(not(windows))]
+        let blank = "echo";
+        let mut j = job(&issue, false);
+        j.pdftotext = fake_converter(&dir, "blank", blank);
+        let o = j.archive(
+            &issue.sources(),
+            "a-scan",
+            got(200, "application/pdf", b"%PDF-1.7\n%%EOF\n"),
+        );
+        assert_eq!(o.verdict, Verdict::Failed);
+        assert_eq!(o.outputs, s(&["a-scan.headers", "a-scan.pdf"]));
+        assert!(o.reasons[0].contains("PDF 无可提取文本"), "{:?}", o.reasons);
+        j.pdftotext = ok;
+        let o = j.archive(
+            &issue.sources(),
+            "a-paper",
+            got(200, "application/pdf", b"%PDF-1.7\n%%EOF\n"),
+        );
+        assert_eq!(o.verdict, Verdict::Ok, "{:?}", o.reasons);
+        assert_eq!(
+            o.outputs,
+            s(&["a-paper.headers", "a-paper.pdf", "a-paper.txt"])
+        );
         let _ = fs::remove_dir_all(&issue.root);
     }
 
@@ -2352,12 +2702,11 @@ mod tests {
         assert!(txt.contains("Learn more [https://iana.org/domains/example]"));
         assert_eq!(o.txt_lines, Some(txt.lines().count()));
         let headers = fs::read_to_string(issue.sources().join("a-home.headers")).unwrap();
-        assert!(
-            headers.starts_with("HTTP/1.1 200\nURL: https://example.com/a?token=[REDACTED]&q=1\n")
-        );
+        assert!(headers.starts_with("HTTP/1.1 200\nURL: https://example.com/a\n"));
         assert!(headers.contains("content-type: text/html; charset=UTF-8\n"));
         assert!(headers.contains("set-cookie: [已删]\n"));
         assert!(!headers.contains("SECRETVALUE") && !headers.contains("user:pw"));
+        assert!(!headers.contains("token") && !headers.contains("q=1"));
         let _ = fs::remove_dir_all(&issue.root);
     }
 
@@ -2368,7 +2717,7 @@ mod tests {
             assert!(!SAFE_HEADERS.contains(&h), "{h} cannot be both");
             assert_eq!(h, h.to_ascii_lowercase(), "{h} must be lower-case");
         }
-        for h in SAFE_HEADERS.iter().chain(&URL_HEADERS) {
+        for h in SAFE_HEADERS.iter().chain(&ORIGIN_HEADERS) {
             assert_eq!(*h, h.to_ascii_lowercase());
         }
         assert_eq!(header_value("Content-Type", "text/html"), "text/html");
@@ -2382,34 +2731,52 @@ mod tests {
             header_value("x-forwarded-for", "203.0.113.7"),
             LOCATION_REDACTED
         );
-        // Unknown headers: allowlist, not denylist.
+        // Unknown and free-form headers: allowlist, not denylist.
         for (k, v) in [
             ("x-request-id", "abc"),
             ("x-geo-country", "CN"),
             ("set-cookie", "a=b"),
             ("content-security-policy", "default-src 'self'"),
+            ("etag", "\"client-7f3a\""),
+            ("server", "BunnyCDN-DE1-1052"),
+            ("content-disposition", "attachment; filename=\"u123.pdf\""),
+            (
+                "link",
+                "<https://a.com/p>; rel=\"canonical\"; anchor=\"https://a.com/?token=t\"",
+            ),
+            ("refresh", "0; URL = https://a.com/b?token=t"),
         ] {
             assert_eq!(header_value(k, v), REDACTED, "{k}");
         }
+        // One-URL headers keep only where they point.
         assert_eq!(
             header_value("Location", "https://u:p@a.com/next?sig=1#x"),
-            "https://a.com/next"
+            "https://a.com"
         );
         assert_eq!(
-            header_value("content-location", "/doc.pdf?token=z"),
-            "/doc.pdf"
+            header_value("content-location", "//user:pass@host.example:8443/doc"),
+            "//host.example:8443"
         );
+        assert_eq!(header_value("location", "/doc.pdf?token=z"), REDACTED);
+        assert_eq!(header_value("location", "javascript:alert(1)"), REDACTED);
+        // WWW-Authenticate: scheme names only.
         assert_eq!(
             header_value(
-                "link",
-                "<https://a.com/p?s=TOKEN>; rel=\"canonical\", </x.css?v=2>; rel=preload"
+                "WWW-Authenticate",
+                "Digest realm=\"a, b\", nonce=\"dcd98b7102dd2f0e\", qop=\"auth\", Basic realm=\"x\""
             ),
-            "<https://a.com/p>; rel=\"canonical\", </x.css>; rel=preload"
+            "Digest, Basic"
         );
         assert_eq!(
-            header_value("refresh", "5; URL='https://a.com/b?ip=203.0.113.7'"),
-            "5; URL=https://a.com/b"
+            header_value("www-authenticate", "Bearer error=\"invalid_token\""),
+            "Bearer"
         );
+        // Public URLs: no userinfo, query or fragment.
+        assert_eq!(
+            public_url("https://u:p@a.com/x/y?token=1&utm=2#frag"),
+            "https://a.com/x/y"
+        );
+        assert_eq!(public_url("https://a.com"), "https://a.com");
     }
 
     #[test]
@@ -2622,7 +2989,7 @@ mod tests {
         let text = fs::read_to_string(issue.sources().join("a-x.headers")).unwrap();
         assert_eq!(
             text,
-            "# 无响应：请求失败：timeout\nURL: https://example.com/?sig=[REDACTED]\n"
+            "# 无响应：请求失败：timeout\nURL: https://example.com/\n"
         );
         let _ = fs::remove_dir_all(&issue.root);
     }
@@ -2659,7 +3026,7 @@ mod tests {
         want.sort();
         assert_eq!(keys, want);
         assert_eq!(v["url"], "https://example.com/?api_key=[REDACTED]");
-        assert_eq!(v["final_url"], "https://example.com/a?token=[REDACTED]&q=1");
+        assert_eq!(v["final_url"], "https://example.com/a");
         assert_eq!(v["result"], "ok");
         assert_eq!(v["outputs"][0], "docs/2610/1015/sources/a-home.headers");
         assert!(!line.to_lowercase().contains("user-agent"));
