@@ -630,15 +630,64 @@ fn is_pdf_url(url: &str) -> bool {
 // ---------------------------------------------------------------------------
 // Charsets
 
-/// The `charset` parameter of a Content-Type, unquoted.
+/// The parameters of a Content-Type (RFC 9110 §5.6.6), names lower-cased:
+/// a value is a token or a quoted-string with `\` quoted-pairs, so a `;` or
+/// `charset=` inside quotes belongs to that value, not to the list.
+fn ct_params(content_type: &str) -> Vec<(String, String)> {
+    let b = content_type.as_bytes();
+    let mut i = b.iter().position(|&c| c == b';').map_or(b.len(), |p| p + 1);
+    let mut params = Vec::new();
+    while i < b.len() {
+        while i < b.len() && (b[i].is_ascii_whitespace() || b[i] == b';') {
+            i += 1;
+        }
+        let start = i;
+        while i < b.len() && !matches!(b[i], b'=' | b';') {
+            i += 1;
+        }
+        let name = content_type[start..i].trim().to_ascii_lowercase();
+        if b.get(i) != Some(&b'=') {
+            continue;
+        }
+        i += 1;
+        while i < b.len() && b[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        let mut value = Vec::new();
+        if b.get(i) == Some(&b'"') {
+            i += 1;
+            while i < b.len() && b[i] != b'"' {
+                if b[i] == b'\\' && i + 1 < b.len() {
+                    i += 1;
+                }
+                value.push(b[i]);
+                i += 1;
+            }
+            // Past the closing quote, then up to the next `;`.
+            while i < b.len() && b[i] != b';' {
+                i += 1;
+            }
+        } else {
+            while i < b.len() && b[i] != b';' {
+                value.push(b[i]);
+                i += 1;
+            }
+        }
+        let value = String::from_utf8_lossy(&value).trim().to_string();
+        if !name.is_empty() {
+            params.push((name, value));
+        }
+    }
+    params
+}
+
+/// The first top-level `charset` parameter of a Content-Type.
 fn ct_charset(content_type: &str) -> Option<String> {
-    content_type.split(';').skip(1).find_map(|p| {
-        let (k, v) = p.split_once('=')?;
-        k.trim()
-            .eq_ignore_ascii_case("charset")
-            .then(|| v.trim().trim_matches(['"', '\'']).to_string())
-            .filter(|v| !v.is_empty())
-    })
+    ct_params(content_type)
+        .into_iter()
+        .find(|(k, _)| k == "charset")
+        .map(|(_, v)| v)
+        .filter(|v| !v.is_empty())
 }
 
 /// Index of `needle` in `b` at or after `from`.
@@ -1316,6 +1365,22 @@ const WEEKDAYS: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 /// RFC 9110 §5.6.7), re-emitted as IMF-fixdate with the weekday computed,
 /// not copied. `None` for anything that is not a valid date and time.
 fn http_date(s: &str) -> Option<String> {
+    http_date_at(s, current_year())
+}
+
+/// The UTC year now.
+fn current_year() -> u32 {
+    let days = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs() / 86_400) as i64;
+    repo::Date::from_days(days).y as u32
+}
+
+/// `http_date` with the reference year given: an RFC 850 two-digit year is
+/// put in this century, unless that lands more than 50 years after `now`,
+/// in which case it is the previous century (RFC 9110 §5.6.7). A leap second
+/// (`:60`) is accepted.
+fn http_date_at(s: &str, now: u32) -> Option<String> {
     let num = |t: &str, lo: u32, hi: u32| {
         (!t.is_empty() && t.len() <= 4 && t.bytes().all(|b| b.is_ascii_digit()))
             .then(|| t.parse::<u32>().ok())
@@ -1337,12 +1402,9 @@ fn http_date(s: &str) -> Option<String> {
                 return None;
             }
             let yy = num(yy, 0, 99)?;
-            (
-                num(d, 1, 31)?,
-                month(m)?,
-                if yy < 70 { 2000 + yy } else { 1900 + yy },
-                *t,
-            )
+            let year = now / 100 * 100 + yy;
+            let year = if year > now + 50 { year - 100 } else { year };
+            (num(d, 1, 31)?, month(m)?, year, *t)
         }
         // Sun Nov  6 08:49:37 1994
         [_, m, d, t, y] => (num(d, 1, 31)?, month(m)?, num(y, 1900, 9999)?, *t),
@@ -1353,7 +1415,7 @@ fn http_date(s: &str) -> Option<String> {
     if hms.next().is_some() || h.len() != 2 || mi.len() != 2 || sec.len() != 2 {
         return None;
     }
-    let (h, mi, sec) = (num(h, 0, 23)?, num(mi, 0, 59)?, num(sec, 0, 59)?);
+    let (h, mi, sec) = (num(h, 0, 23)?, num(mi, 0, 59)?, num(sec, 0, 60)?);
     let date = repo::Date::new(y as i32, m, d)?;
     // 1970-01-01 was a Thursday.
     let wd = WEEKDAYS[(date.days() + 4).rem_euclid(7) as usize];
@@ -1447,6 +1509,30 @@ fn valid_host(h: &str) -> bool {
         })
 }
 
+/// An RFC 3986 path: `/` and pchar only (unreserved, sub-delims, `:`, `@`),
+/// every `%` starting a two-hex-digit triplet.
+fn valid_path(path: &str) -> bool {
+    let b = path.as_bytes();
+    let mut i = 0;
+    while i < b.len() {
+        let c = b[i];
+        if c == b'%' {
+            if !(b.get(i + 1).is_some_and(u8::is_ascii_hexdigit)
+                && b.get(i + 2).is_some_and(u8::is_ascii_hexdigit))
+            {
+                return false;
+            }
+            i += 3;
+            continue;
+        }
+        if !(c.is_ascii_alphanumeric() || b"-._~!$&'()*+,;=:@/".contains(&c)) {
+            return false;
+        }
+        i += 1;
+    }
+    true
+}
+
 /// A URL as fetch publishes it (`.headers` `URL:` and `Location` lines, the
 /// log's `final_url`): `http(s)://host[:port]/path`, with userinfo, query and
 /// fragment dropped; `None` — the URL is left out — unless the scheme is
@@ -1494,10 +1580,7 @@ fn public_url(u: &str) -> Option<String> {
         }
     };
     let path = encode_url(&rest[path_at..]);
-    if !path
-        .bytes()
-        .all(|b| b.is_ascii_graphic() && !b"\"<>\\^`{|}".contains(&b))
-    {
+    if !valid_path(&path) {
         return None;
     }
     let path = if path.is_empty() {
@@ -1536,13 +1619,51 @@ fn headers_text(g: &Got) -> String {
 // ---------------------------------------------------------------------------
 // PDF text
 
-/// A child process that is killed and reaped on every exit path.
-struct Reaped(std::process::Child);
+/// How long a killed converter gets to be reaped before it is left behind.
+const REAP_GRACE: Duration = Duration::from_secs(2);
+
+/// Polls `exited` until it reports true or `grace` has passed; whether the
+/// process was reaped. An error counts as not reaped.
+fn reap_bounded(mut exited: impl FnMut() -> io::Result<bool>, grace: Duration) -> bool {
+    let until = Instant::now() + grace;
+    loop {
+        match exited() {
+            Ok(true) => return true,
+            Ok(false) if Instant::now() < until => thread::sleep(Duration::from_millis(20)),
+            _ => return false,
+        }
+    }
+}
+
+/// A child process that is killed and reaped on every exit path, but never
+/// waited on without a bound: a child that will not die (uninterruptible
+/// I/O, a failed kill) is handed to a background thread that waits for it,
+/// so the item moves on.
+struct Reaped(Option<std::process::Child>);
+
+impl Reaped {
+    fn child(&mut self) -> &mut std::process::Child {
+        self.0
+            .as_mut()
+            .unwrap_or_else(|| unreachable!("taken only in drop"))
+    }
+}
 
 impl Drop for Reaped {
     fn drop(&mut self) {
-        let _ = self.0.kill();
-        let _ = self.0.wait();
+        let Some(mut child) = self.0.take() else {
+            return;
+        };
+        let _ = child.kill();
+        if !reap_bounded(|| child.try_wait().map(|s| s.is_some()), REAP_GRACE) {
+            eprintln!(
+                "warn: pdftotext 终止后 {} 秒仍未退出，转入后台等待",
+                REAP_GRACE.as_secs()
+            );
+            thread::spawn(move || {
+                let _ = child.wait();
+            });
+        }
     }
 }
 
@@ -1572,7 +1693,7 @@ fn pdf_to_text(tool: &Path, pdf: &Path, cap: u64, timeout: Duration) -> Result<V
             }
         })?;
     let stdout = child.stdout.take();
-    let mut child = Reaped(child);
+    let mut child = Reaped(Some(child));
     let Some(stdout) = stdout else {
         return Err(fail("无标准输出"));
     };
@@ -1610,7 +1731,7 @@ fn pdf_to_text(tool: &Path, pdf: &Path, cap: u64, timeout: Duration) -> Result<V
             thread::sleep(tick);
         }
         if status.is_none() {
-            match child.0.try_wait() {
+            match child.child().try_wait() {
                 Ok(s) => status = s,
                 Err(e) => {
                     eprintln!("warn: 等待 pdftotext：{e}");
@@ -2593,6 +2714,97 @@ mod tests {
             "{e}"
         );
         assert_eq!(notes.len(), 1);
+    }
+
+    #[test]
+    fn reaping_is_bounded() {
+        // A child that never exits: given up on after the grace period.
+        let started = Instant::now();
+        assert!(!reap_bounded(|| Ok(false), Duration::from_millis(100)));
+        assert!(started.elapsed() < Duration::from_secs(1));
+        // An error is "not reaped", at once.
+        assert!(!reap_bounded(
+            || Err(io::Error::other("x")),
+            Duration::from_secs(5)
+        ));
+        // A child that exits on the third poll.
+        let mut polls = 0;
+        assert!(reap_bounded(
+            || {
+                polls += 1;
+                Ok(polls >= 3)
+            },
+            Duration::from_secs(5)
+        ));
+        assert_eq!(polls, 3);
+    }
+
+    #[test]
+    fn content_type_params_respect_quotes() {
+        let ct = "text/html; note=\"; charset=windows-1252\"; charset=UTF-8";
+        assert_eq!(ct_charset(ct).as_deref(), Some("UTF-8"));
+        assert_eq!(
+            public_content_type(ct).as_deref(),
+            Some("text/html; charset=UTF-8")
+        );
+        assert_eq!(decode_body(ct, "中文".as_bytes(), true).unwrap().enc, UTF_8);
+        assert_eq!(
+            ct_charset("text/plain; charset=\"gb\\\"k\"").as_deref(),
+            Some("gb\"k")
+        );
+        assert_eq!(
+            ct_charset("text/plain;charset=gbk ").as_deref(),
+            Some("gbk")
+        );
+        assert_eq!(ct_charset("text/plain; x=\"charset=gbk\""), None);
+        assert_eq!(ct_charset("text/plain; charset"), None);
+    }
+
+    #[test]
+    fn http_dates_two_digit_years_and_leap_seconds() {
+        // Relative to the reference year, not a fixed pivot.
+        assert_eq!(
+            http_date_at("Sunday, 06-Nov-94 08:49:37 GMT", 2026).as_deref(),
+            Some("Sun, 06 Nov 1994 08:49:37 GMT")
+        );
+        assert_eq!(
+            http_date_at("Monday, 06-Nov-75 08:49:37 GMT", 2026).as_deref(),
+            Some("Wed, 06 Nov 2075 08:49:37 GMT")
+        );
+        assert_eq!(
+            http_date_at("Monday, 06-Nov-77 08:49:37 GMT", 2026).as_deref(),
+            Some("Sun, 06 Nov 1977 08:49:37 GMT")
+        );
+        assert_eq!(
+            http_date_at("Monday, 06-Nov-30 08:49:37 GMT", 2090).as_deref(),
+            Some("Wed, 06 Nov 2030 08:49:37 GMT")
+        );
+        assert_eq!(
+            http_date_at("Wed, 31 Dec 2016 23:59:60 GMT", 2026).as_deref(),
+            Some("Sat, 31 Dec 2016 23:59:60 GMT")
+        );
+        assert_eq!(http_date_at("Sat, 31 Dec 2016 23:59:61 GMT", 2026), None);
+        assert!(current_year() >= 2026);
+    }
+
+    #[test]
+    fn public_url_paths_must_be_rfc3986() {
+        assert_eq!(
+            public_url("https://a.com/a/b%20c").as_deref(),
+            Some("https://a.com/a/b%20c")
+        );
+        assert_eq!(
+            public_url("https://a.com/p;x=1/@u:v!$&'()*+,=~").as_deref(),
+            Some("https://a.com/p;x=1/@u:v!$&'()*+,=~")
+        );
+        for bad in [
+            "https://a.com/bad%ZZ",
+            "https://a.com/bad%",
+            "https://a.com/a[b]",
+            "https://a.com/%2",
+        ] {
+            assert_eq!(public_url(bad), None, "{bad}");
+        }
     }
 
     #[test]
