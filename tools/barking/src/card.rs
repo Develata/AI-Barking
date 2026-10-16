@@ -852,16 +852,34 @@ fn parse_tess(version: &Probe, langs: &Probe) -> Option<Tess> {
             .map(str::to_owned)
     };
     let line = first_line(version)?;
-    let v = line.strip_prefix("tesseract ")?;
-    let v = v.strip_prefix('v').unwrap_or(v);
-    let well_formed = v.starts_with(|c: char| c.is_ascii_digit())
-        && v.chars()
-            .all(|c| c.is_ascii_alphanumeric() || ".-+".contains(c));
-    if !well_formed {
+    if !is_version_line(&line) {
         return None;
     }
     let dir = (langs.stdout.lines().chain(langs.stderr.lines())).find_map(tessdata_dir)?;
     Some(Tess { version: line, dir })
+}
+
+/// `tesseract v?N(.N)*`, optionally followed by `-` or `+` and a non-empty
+/// suffix of ASCII letters, digits, `.` and `-` (`tesseract 5.3.0-1-gabc`).
+/// Every numeric component must be non-empty: `tesseract 5...` is refused.
+fn is_version_line(line: &str) -> bool {
+    let Some(v) = line.strip_prefix("tesseract ") else {
+        return false;
+    };
+    let v = v.strip_prefix('v').unwrap_or(v);
+    let (number, suffix) = match v.find(['-', '+']) {
+        Some(i) => (&v[..i], Some(&v[i + 1..])),
+        None => (v, None),
+    };
+    let numeric = number
+        .split('.')
+        .all(|c| !c.is_empty() && c.chars().all(|d| d.is_ascii_digit()));
+    let suffix_ok = suffix.is_none_or(|s| {
+        !s.is_empty()
+            && s.chars()
+                .all(|c| c.is_ascii_alphanumeric() || ".-".contains(c))
+    });
+    numeric && suffix_ok
 }
 
 /// Which Tesseract locates quotes for `lang` (`eng`, `eng+chi_sim`): its
@@ -1669,29 +1687,41 @@ fn locate(words: &[Word], quote: &str) -> Result<Located, String> {
     Ok(Located { lines, words: idx })
 }
 
-/// Largest horizontal gap next to a matched word on its line, in multiples
-/// of the line's tallest matched word box (about one em, ascender to
-/// descender). Measured on issue 1014's five raw images (`--psm 6`, eng):
-/// prose word gaps average 0.24–0.44 and reach 0.69; a ` — ` whose dash word
-/// carries no text, 1.65. A column gutter or table cell boundary is usually
-/// wider.
+/// Largest gap between neighbouring tokens of a line before it counts as a
+/// gutter, in multiples of the line's tallest token box (about one em,
+/// ascender to descender). Measured on issue 1014's five raw images
+/// (`--psm 6`, eng): prose word gaps average 0.24–0.44 and reach 0.69. A
+/// column gutter or table cell boundary is usually wider.
 const MAX_GAP: f32 = 2.5;
-/// The same after a list marker (`a.`, `(iv)`, `12)`): hanging labels are
-/// set off by a tab, 2.18–2.73 on 1014's legal-filing base (`m.`, `n.`, and
-/// an `l.` that OCR read as `I,`, which is not recognised as a marker).
+/// The same right after a list marker that opens its line (`a.`, `(iv)`,
+/// `12)`): hanging labels are set off by a tab, 2.18–2.45 after `m.` and
+/// `n.` on 1014's legal-filing base.
 const MARKER_GAP: f32 = 4.0;
 /// Largest vertical gap between two lines of one quote (next line's top
-/// minus previous line's bottom), in the same units: about the leading of
-/// ordinary text, with room for 1.5 line spacing.
+/// minus previous line's bottom), in multiples of the smaller of the two
+/// lines' heights: the smaller, so that one tall box (a `|`, a bracket)
+/// cannot stretch the allowance. About the leading of ordinary text, with
+/// room for 1.5 line spacing.
 const MAX_LEADING: f32 = 1.5;
+/// Words made only of these are ignored as gap boundaries: bare punctuation
+/// that OCR scatters between words. Everything else counts, `|` included.
+const SKIPPABLE: &str = ".,;:'\"‘’“”";
 
 /// Tesseract's (block, paragraph, line) numbers of one text line.
 type LineKey = (u32, u32, u32);
 
-/// `a.`, `B)`, `(3)`, `[iv]`, `12.`: a list item's label.
+/// A list item's label: `(x)`, `[x]`, `x.` or `x)`, where x is one to three
+/// digits, one ASCII letter, or one to five roman-numeral letters. Brackets
+/// must pair: `(a]`, `[iv)` and `(1.` are not labels.
 fn is_list_marker(text: &str) -> bool {
-    let t = text.strip_prefix(['(', '[']).unwrap_or(text);
-    let Some(body) = t.strip_suffix(['.', ')', ']']) else {
+    let body = if let Some(b) = text.strip_prefix('(') {
+        b.strip_suffix(')')
+    } else if let Some(b) = text.strip_prefix('[') {
+        b.strip_suffix(']')
+    } else {
+        text.strip_suffix(['.', ')'])
+    };
+    let Some(body) = body else {
         return false;
     };
     let n = body.chars().count();
@@ -1704,28 +1734,29 @@ fn is_list_marker(text: &str) -> bool {
 /// Whether matched words `idx` (in reading order) form one stretch of text.
 /// Tesseract's `--psm 6` reads the image as one block and joins side-by-side
 /// columns into shared lines, so the character stream alone can splice text
-/// that is not adjacent on the page. With h the tallest matched word box on
-/// a line and "textual" meaning at least one letter or digit:
+/// that is not adjacent on the page. Conservative on purpose:
 ///
-/// - (a) consecutive matched words on a line are at most `MAX_GAP`·h apart;
-/// - (b) the textual word before a line's first matched word, if any, is at
-///   most `MAX_GAP`·h away (`MARKER_GAP`·h after a list marker);
-/// - (c) the textual word after a line's last matched word, if any, is at
-///   most `MAX_GAP`·h away;
-/// - (d) across lines: every line but the last ends at its OCR line's last
-///   textual word, every continuation starts at its first; the lines are
-///   consecutive in OCR order, each below the previous, at most
-///   `MAX_LEADING`·h apart vertically;
+/// - Tokens are the OCR words with any text but `SKIPPABLE` punctuation, `|`
+///   included. h is a line's tallest token box. A gutter is a gap over
+///   `MAX_GAP`·h between neighbouring tokens; right after a list marker that
+///   is its line's first token, over `MARKER_GAP`·h.
+/// - A one-line quote: no gutter from the token before it to the token after
+///   it.
+/// - A quote over several lines: no gutter anywhere on any of its lines, so
+///   multi-line quotes on multi-column layouts are refused outright. Every
+///   line but the last ends at its last token, every continuation starts at
+///   its first; the lines are consecutive in OCR order, each below the
+///   previous, at most `MAX_LEADING` × the smaller line height apart.
+/// - All words in one Tesseract block.
 ///
-/// and all words lie in one Tesseract block. The error names the rule and
-/// the measured ratio.
+/// The error names the rule and the measured ratio.
 fn continuity(words: &[Word], idx: &[usize]) -> Result<(), String> {
     let block = words[idx[0]].line.0;
     if idx.iter().any(|&i| words[i].line.0 != block) {
         return Err("跨越 OCR 的两个文本块".into());
     }
-    let textual = |w: &Word| w.text.chars().any(char::is_alphanumeric);
-    let gap = |a: usize, b: usize| words[b].left.saturating_sub(words[a].right) as f32;
+    let is_token =
+        |w: &Word| (w.text.chars()).any(|c| !c.is_whitespace() && !SKIPPABLE.contains(c));
     // Matched word indices grouped by OCR line, in quote order.
     let mut groups: Vec<(LineKey, Vec<usize>)> = Vec::new();
     for &i in idx {
@@ -1741,69 +1772,66 @@ fn continuity(words: &[Word], idx: &[usize]) -> Result<(), String> {
         }
     }
     let pos = |k: &LineKey| order.iter().position(|o| o == k);
+    let multi = groups.len() > 1;
     let last_line = groups.len() - 1;
     // (OCR line, top, bottom, h) of the previous matched line.
     let mut prev: Option<(LineKey, u32, u32, f32)> = None;
     for (k, (key, g)) in groups.iter().enumerate() {
-        let h = g
-            .iter()
+        let toks: Vec<usize> = (0..words.len())
+            .filter(|&i| words[i].line == *key && is_token(&words[i]))
+            .collect();
+        let h = (toks.iter())
             .map(|&i| words[i].bottom - words[i].top)
             .max()
-            .unwrap_or(1) as f32;
-        let ratio = |px: f32| px / h;
-        for p in g.windows(2) {
-            if gap(p[0], p[1]) > MAX_GAP * h {
-                return Err(format!(
-                    "同一行内「{}」与「{}」相隔过远，{:.1} 倍词高",
-                    words[p[0]].text,
-                    words[p[1]].text,
-                    ratio(gap(p[0], p[1]))
-                ));
-            }
-        }
-        let (first, last) = (g[0], g[g.len() - 1]);
-        let same_line = |i: &usize| words[*i].line == *key;
-        let before = (0..first)
-            .rev()
-            .take_while(same_line)
-            .find(|&i| textual(&words[i]));
-        let after = (last + 1..words.len())
-            .take_while(same_line)
-            .find(|&i| textual(&words[i]));
-        if let Some(b) = before {
-            if k > 0 {
-                return Err(format!("续行没有从该行第一个词「{}」开始", words[b].text));
-            }
-            let limit = if is_list_marker(&words[b].text) {
+            .unwrap_or(1)
+            .max(1) as f32;
+        let at = |i: usize| toks.iter().position(|&t| t == i);
+        // Matched words carry letters, digits or `|`, so they are tokens.
+        let (Some(a), Some(b)) = (at(g[0]), at(g[g.len() - 1])) else {
+            return Err("匹配词不在 OCR 行内".into());
+        };
+        let end = toks.len() - 1;
+        let (from, to) = if multi {
+            (0, end)
+        } else {
+            (a.saturating_sub(1), (b + 1).min(end))
+        };
+        for j in from..to {
+            let (l, r) = (&words[toks[j]], &words[toks[j + 1]]);
+            let limit = if j == 0 && is_list_marker(&l.text) {
                 MARKER_GAP
             } else {
                 MAX_GAP
             };
-            if gap(b, first) > limit * h {
+            let px = r.left.saturating_sub(l.right) as f32;
+            if px > limit * h {
+                let scope = if multi {
+                    "；跨行引文所在的每一行都不能有分栏空白"
+                } else {
+                    ""
+                };
                 return Err(format!(
-                    "引文前一个词「{}」相隔过远，{:.1} 倍词高",
-                    words[b].text,
-                    ratio(gap(b, first))
+                    "「{}」与「{}」之间空白达 {:.1} 倍词高{scope}",
+                    l.text,
+                    r.text,
+                    px / h
                 ));
             }
         }
-        if let Some(a) = after {
-            if k < last_line {
-                return Err(format!(
-                    "换行前没有读到该行末尾，之后还有「{}」",
-                    words[a].text
-                ));
-            }
-            if gap(last, a) > MAX_GAP * h {
-                return Err(format!(
-                    "引文后一个词「{}」相隔过远，{:.1} 倍词高",
-                    words[a].text,
-                    ratio(gap(last, a))
-                ));
-            }
+        if multi && k < last_line && b != end {
+            return Err(format!(
+                "换行前没有读到该行末尾，之后还有「{}」",
+                words[toks[b + 1]].text
+            ));
         }
-        let top = g.iter().map(|&i| words[i].top).min().unwrap_or(0);
-        let bottom = g.iter().map(|&i| words[i].bottom).max().unwrap_or(0);
+        if multi && k > 0 && a != 0 {
+            return Err(format!(
+                "续行没有从该行第一个词「{}」开始",
+                words[toks[0]].text
+            ));
+        }
+        let top = toks.iter().map(|&i| words[i].top).min().unwrap_or(0);
+        let bottom = toks.iter().map(|&i| words[i].bottom).max().unwrap_or(0);
         if let Some((pkey, ptop, pbottom, ph)) = prev {
             if pos(key) != pos(&pkey).map(|i| i + 1) {
                 return Err("换行处不是相邻的两行".into());
@@ -1812,10 +1840,10 @@ fn continuity(words: &[Word], idx: &[usize]) -> Result<(), String> {
                 return Err("下一行不在上一行下方".into());
             }
             let leading = top.saturating_sub(pbottom) as f32;
-            if leading > MAX_LEADING * h.max(ph) {
+            if leading > MAX_LEADING * h.min(ph) {
                 return Err(format!(
                     "两行上下相隔过远，{:.1} 倍词高",
-                    leading / h.max(ph)
+                    leading / h.min(ph)
                 ));
             }
         }
@@ -1823,7 +1851,6 @@ fn continuity(words: &[Word], idx: &[usize]) -> Result<(), String> {
     }
     Ok(())
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2382,32 +2409,24 @@ note = []
                 }),
         );
         let e = locate(&cols, "model was").err().unwrap();
-        assert!(e.contains("相隔过远") && e.contains("rects"), "{e}");
-        // Since round 3, a quote must not touch the gutter on either side
-        // (rules b and c); one inside a column still resolves.
         assert!(
-            locate(&cols, "was paused")
-                .err()
-                .unwrap()
-                .contains("前一个词")
+            e.contains("「model」与「was」") && e.contains("rects"),
+            "{e}"
         );
+        // A one-line quote must not touch the gutter on either side; one
+        // inside a column still resolves.
+        assert!(locate(&cols, "was paused").is_err());
         assert!(locate(&cols, "the").is_ok());
         assert!(locate(&cols, "paused").is_ok());
 
         // A wrap from the right column's line into the next line's left
-        // column: each line has a gutter.
-        let tsv = [
-            "header",
-            &row("alpha", 0, 0, 1, 95),
-            &row("beta", 40, 0, 1, 95),
-            &row("gamma", 600, 0, 1, 95),
-            &row("delta", 0, 20, 2, 95),
-            &row("eps", 600, 20, 2, 95),
-        ]
-        .join("\n");
-        let w = parse_tsv(&tsv, 1);
+        // column.
+        let w = placed(&[
+            &[("alpha", 0, 0), ("beta", 40, 0), ("gamma", 600, 0)],
+            &[("delta", 0, 20), ("eps", 600, 20)],
+        ]);
         assert!(locate(&w, "gamma delta").err().unwrap().contains("rects"));
-        assert!(locate(&w, "alpha beta").err().unwrap().contains("后一个词"));
+        assert!(locate(&w, "alpha beta").is_err());
         assert!(locate(&w, "alpha").is_ok());
     }
 
@@ -2423,63 +2442,136 @@ note = []
     }
 
     #[test]
-    fn continuity_round_3_counterexamples() {
-        // (b): the right column's tail spliced onto the next line's head.
+    fn continuity_counterexamples() {
+        // Round 3 (b): the right column's tail spliced onto the next line.
         let w = placed(&[
             &[("alpha", 0, 0), ("beta", 40, 0), ("gamma", 600, 0)],
             &[("delta", 0, 20)],
         ]);
         let e = locate(&w, "gamma delta").err().unwrap();
-        assert!(e.contains("前一个词「beta」") && e.contains("rects"), "{e}");
+        assert!(
+            e.contains("「beta」与「gamma」") && e.contains("rects"),
+            "{e}"
+        );
 
-        // (d): consecutive OCR lines far apart on the page.
+        // Round 3 (d): consecutive OCR lines far apart on the page, or a
+        // line above the previous one.
         let w = placed(&[&[("approved", 0, 0)], &[("denied", 0, 1000)]]);
         let e = locate(&w, "approved denied").err().unwrap();
         assert!(e.contains("上下相隔过远"), "{e}");
-        // A line above the previous one.
         let w = placed(&[&[("approved", 0, 100)], &[("denied", 0, 90)]]);
+        let e = locate(&w, "approved denied").err().unwrap();
+        assert!(e.contains("下方"), "{e}");
+
+        // Round 4: a gutter further away than the quote's neighbours, on a
+        // line the quote wraps from or into.
+        let w = placed(&[
+            &[("intro", 0, 0), ("gamma", 40, 0)],
+            &[("delta", 0, 20), ("epsilon", 40, 20), ("zeta", 600, 20)],
+        ]);
+        let e = locate(&w, "gamma delta").err().unwrap();
         assert!(
-            locate(&w, "approved denied")
+            e.contains("「epsilon」与「zeta」") && e.contains("每一行"),
+            "{e}"
+        );
+        let w = placed(&[
+            &[("intro", 0, 0), ("zeta", 600, 0), ("gamma", 640, 0)],
+            &[("delta", 0, 20), ("epsilon", 40, 20)],
+        ]);
+        assert!(
+            locate(&w, "gamma delta")
                 .err()
                 .unwrap()
-                .contains("下方")
+                .contains("「intro」与「zeta」")
         );
-        // A wrapped line that does not reach its line's end, and a
-        // continuation that does not start at its line's start.
+        // Round 4: a `|` (a rule, or another column's I) counts as a token.
+        let w = placed(&[
+            &[("alpha", 0, 0), ("beta", 40, 0)],
+            &[("gamma", 0, 20), ("|", 600, 20)],
+        ]);
+        let e = locate(&w, "beta gamma").err().unwrap();
+        assert!(e.contains("「gamma」与「|」"), "{e}");
+        // Bare punctuation does not, so a stray `.` far right is no gutter.
+        let w = placed(&[
+            &[("alpha", 0, 0), ("beta", 40, 0)],
+            &[("gamma", 0, 20), (".", 600, 20)],
+        ]);
+        assert!(locate(&w, "beta gamma").is_ok());
+
+        // A normal two-line paragraph, wrapping at word spacing.
         let w = placed(&[
             &[("one", 0, 0), ("two", 40, 0), ("three", 80, 0)],
             &[("four", 0, 20), ("five", 40, 20)],
         ]);
-        assert!(locate(&w, "two three four").is_ok());
-        let e = locate(&w, "three four five").unwrap();
-        assert_eq!(e.words, [2, 3, 4]);
+        assert_eq!(locate(&w, "two three four").unwrap().words, [1, 2, 3]);
+        assert_eq!(locate(&w, "three four five").unwrap().words, [2, 3, 4]);
+        // "two three" would need to skip "x": the stream itself refuses it.
         let w = placed(&[
             &[("one", 0, 0), ("two", 40, 0)],
             &[("x", 0, 20), ("three", 40, 20)],
         ]);
-        // "two three" would need to skip "x": the stream itself refuses it.
         assert!(locate(&w, "two three").is_err());
+    }
 
-        // A list marker may be set off by a tab (up to 4 heights), other
-        // words by at most 2.5.
+    #[test]
+    fn list_marker_gap_only_at_line_start() {
+        // A tab after a line-opening marker (3.75 heights) is allowed.
         let w = placed(&[&[("m.", 0, 0), ("Enjoin", 75, 0), ("them", 115, 0)]]);
         assert!(locate(&w, "Enjoin them").is_ok());
+        // After an ordinary word, or a marker that does not open the line,
+        // the same gap is a gutter.
         let w = placed(&[&[("so", 0, 0), ("Enjoin", 75, 0), ("them", 115, 0)]]);
         assert!(
             locate(&w, "Enjoin them")
                 .err()
                 .unwrap()
-                .contains("前一个词「so」")
+                .contains("「so」与「Enjoin」")
         );
+        let w = placed(&[&[("so", 0, 0), ("m.", 40, 0), ("Enjoin", 115, 0)]]);
+        assert!(locate(&w, "Enjoin").is_err());
+        // Over 4 heights even after a marker.
+        let w = placed(&[&[("m.", 0, 0), ("Enjoin", 90, 0)]]);
+        assert!(locate(&w, "Enjoin").is_err());
     }
 
     #[test]
     fn list_markers() {
-        for m in ["a.", "B)", "(3)", "[iv]", "12.", "(xiv)", "IV."] {
+        for m in [
+            "a.", "a)", "B)", "(3)", "[iv]", "12.", "(xiv)", "IV.", "[7]",
+        ] {
             assert!(is_list_marker(m), "{m}");
         }
-        for m in ["I,", "the.", "1234.", "a", "(ab)", "vvvvvv."] {
+        for m in [
+            "I,", "the.", "1234.", "a", "(ab)", "vvvvvv.", "(a]", "[iv)", "(1.", "(a", "a]", "()",
+        ] {
             assert!(!is_list_marker(m), "{m}");
+        }
+    }
+
+    #[test]
+    fn version_lines() {
+        for v in [
+            "tesseract v5.5.3.20260724",
+            "tesseract 4.1.1",
+            "tesseract 5",
+            "tesseract 5.3.0-1-gabc12",
+            "tesseract v5.0.0+git.2024",
+        ] {
+            assert!(is_version_line(v), "{v}");
+        }
+        for v in [
+            "tesseract 5...",
+            "tesseract 5..1",
+            "tesseract .5",
+            "tesseract v",
+            "tesseract 5.3-",
+            "tesseract 5.3-a b",
+            "tesseract 5.3+x+y",
+            "tesseract vX",
+            "Tesseract 5.3",
+            "tesseract  5.3",
+        ] {
+            assert!(!is_version_line(v), "{v}");
         }
     }
 
