@@ -1,0 +1,200 @@
+DeepSeek's V4.1 Flash Adds Live Web Search to Its 552B Agent Model | AlphaSignal
+
+Skip to main content [#main-content]
+
+ [/]
+LATEST [/]EDITORIAL [/editorial]LEADERBOARD [/company/leaderboard]TOPICS [/topics]
+
+Search
+
+Search
+LATEST [/]EDITORIAL [/editorial]LEADERBOARD [/company/leaderboard]TOPICS [/topics]
+
+Sign inSign up
+
+About [/about]Advertise [https://wsndcchuur6.typeform.com/to/t0Ry7qsf?typeform-source=alphasignal.ai&utm_source=alphasignal]Privacy [/privacy]
+
+DeepSeek's V4.1 Flash Adds Live Web Search to Its 552B Agent Model
+
+DeepSeek ships a snapshot refresh of its sparse MoE Flash model with cheaper caching, and opens its Search and Fetch APIs to all developers.
+
+DeepSeek [/company/deepseek_ai]
+·4 hrs ago4H AGO
+
+16,810·
+
+·
+
+AuthorBy AlphaSignal Newsroom [/editorial-team]
+
+Read4 min
+
+TypeNews [/?ct=news]
+
+TopicLlms [/topic/llms] · Open Source [/topic/open-source]
+
+SubtopicSmall Models [/topic/llms/small-models] · Structured Output [/topic/llms/structured-output]
+
+IntroductionDeepSeek pairs Flash with web toolsFlash spends compute unevenlyBuilt for long agent runsSearch and Fetch open to every accountThe cost model for agents changes
+
+Takeaways−
+
+DeepSeek released V4.1-Flash-1017 [https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash-1017?utm_source=alphasignal], a snapshot refresh of its sparse MoE coding model.
+
+552B-parameter backbone activating 8B on input and 16B on output, with 1M context.
+
+KV cache memory cut to roughly 25 percent of the previous Flash generation.
+
+Priced at $0.15 input and $0.60 output per million tokens on the hosted API.
+
+Search and Fetch APIs [https://api-docs.deepseek.com/guides/search?utm_source=alphasignal] now public at $0.75 per 1,000 successful calls.
+
+Weights are MIT-licensed and available on Hugging Face and ModelScope.
+
+DeepSeek pairs Flash with web tools
+
+DeepSeek has released new model weights [https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash-1017?utm_source=alphasignal] for its cost-efficient coding model and made its Search and Fetch APIs available to all API accounts. Developers can now combine a long-context model with live web retrieval under the same account, authentication system, and pricing structure.
+
+The October 17, 2026 release, named DeepSeek-V4.1-Flash-1017, updates the V4.1 Flash family while retaining the hosted API identifier deepseek-flash. DeepSeek reports higher benchmark scores, faster task completion, and shorter outputs than the previous snapshot at the same token prices.
+
+Flash spends compute unevenly
+
+V4.1 Flash uses a sparse mixture-of-experts architecture with 552 billion total parameters. Input processing activates 8 billion parameters, while output generation activates 16 billion. Activating only a fraction of the model for each token lowers compute requirements while preserving access to the larger parameter pool.
+
+The technical report [https://arxiv.org/pdf/2609.19969?utm_source=alphasignal] describes a 40-layer Causal Encoder-Decoder network divided evenly between encoder and decoder layers. Its feed-forward layers use DeepSeekMoE. The first two encoder layers use sliding-window attention, while the remaining layers use Compressed Sparse Attention 2 to select a learned subset of earlier tokens instead of attending to the entire history.
+
+Compressed key-value caching reduces cache memory to about one-quarter of the previous Flash generation, according to DeepSeek. The key-value cache stores attention state from earlier tokens during generation and can consume much of the available GPU memory in long coding sessions or repeated tool-use loops.
+
+Built for long agent runs
+
+DeepSeek designed the snapshot for coding, terminal, computer-use, and research agents that operate across many steps. Its training included reinforcement learning with self-feedback for end-to-end project generation, including games and 3D models. Image data was included during pretraining, giving the model native image-understanding capabilities.
+
+ Hosted Flash specifications
+
+ Item
+ Details
+
+ API model
+ deepseek-flash
+
+ Context window
+ 1 million tokens
+
+ Input price
+ $0.15 per million tokens
+
+ Output price
+ $0.60 per million tokens
+
+ License
+ MIT
+
+ Weight hosts
+ Hugging Face and ModelScope
+
+DeepSeek also reports that Flash exceeds V4 Pro in benchmark performance, generation speed, and total task-completion time. Those comparisons are vendor-reported, so application-level testing remains necessary for specific repositories, tools, and agent loops.
+
+Search and Fetch open to every account
+
+DeepSeek has also made two JSON APIs generally available. The Search guide [https://api-docs.deepseek.com/guides/search?utm_source=alphasignal] describes an endpoint that returns structured web results for a query, while Fetch retrieves one page and converts it to Markdown. Both services use the same bearer-token authentication as the chat API.
+
+ Web API terms
+
+ Item
+ Details
+
+ Search output
+ Structured results with optional page content
+
+ Fetch output
+ Clean Markdown for one page
+
+ Price
+ $0.75 per 1,000 successful requests
+
+ Rate limit
+ 5 requests per second per account
+
+ Billable request
+ A request that returns a non-empty result
+
+Fields that retrieval pipelines can use
+
+Search forwards operators including site:, -site:, lang:, after:, and before:.
+
+Each result includes a rerank_score from 0 to 3 and an authority tier from 0 to 4 for filtering and ranking.
+
+Empty searches and failed fetches are excluded from billing.
+
+Fetch returns Markdown, reducing the boilerplate removal normally required before indexing web pages for retrieval-augmented generation.
+
+Minimal Search request
+
+python
+
+import os
+import requests
+
+response = requests.post(
+ "https://api.deepseek.com/v1/tools/search",
+ headers={
+ "Authorization": f"Bearer {os.environ['DEEPSEEK_API_KEY']}"
+ },
+ json={
+ "query": "DeepSeek V4 release lang:en after:2026",
+ "count": 5,
+ "need_content": True,
+ },
+ timeout=30,
+)
+response.raise_for_status()
+
+for item in response.json()["results"]:
+ print(item["rerank_score"], item["url"])
+
+DeepSeek says Search and Fetch calls initiated through DeepSeek Harness, Claude Code, and Codex are free for existing API users until billing begins on October 31, 2026. The company also says the underlying search system already handles hundreds of millions of internal requests each day.
+
+The cost model for agents changes
+
+Long-running agents accumulate costs from model inference, retained context, and external tool calls. Flash targets the first two through low token prices and a smaller attention cache, while Search and Fetch price web access at $0.00075 per successful request. One million successful web requests would cost $750 at the listed rate.
+
+The account-level limit of 5 requests per second permits up to 18,000 requests per hour when sustained, which may constrain parallel agent fleets. Production evaluations should measure contention at that limit alongside search relevance, fetch quality, output-token use, cache memory, and end-to-end completion time.
+
+MIT-licensed weights allow teams to begin with DeepSeek’s hosted model and move inference to their own infrastructure later. Search and Fetch remain managed DeepSeek services, so self-hosted inference still carries an external retrieval dependency unless the application replaces that layer.
+
++Create new list
+
+X [https://x.com/intent/tweet?url=&text=]LinkedIn [https://www.linkedin.com/sharing/share-offsite/?url=]Facebook [https://www.facebook.com/sharer/sharer.php?u=]Email [mailto:?subject=&body=]Copy link
+
+Trending
+
+No trending articles
+
+5 sources
+
+Comments
+
+Next Reads
+
+···
+
+···
+
+···
+
+···
+
+AI moves faster than any field in history. AlphaSignal tracks every paper, repo, model, and release in real time—organized, searchable, and tuned to your work.
+
+ [https://x.com/AlphaSignalAI?utm_source=alphasignal] [https://www.linkedin.com/company/alphasignal/?utm_source=alphasignal] [https://alphasignal.substack.com/?utm_source=alphasignal] [https://chatgpt.com/?utm_source=alphasignal] [https://claude.ai/?utm_source=alphasignal]
+
+Product
+Latest [/]Editorial [/editorial]Leaderboard [/company/leaderboard]Topics [/topics]Archive [/archive]
+
+Resources
+Newsletter [/newsletter]UpgradeAdvertise [https://wsndcchuur6.typeform.com/to/t0Ry7qsf?typeform-source=alphasignal.ai&utm_source=alphasignal]Get Listed [mailto:alpha@alphasignal.ai]Enterprise [mailto:kevin@alphasignal.ai]
+
+Company
+About [/about]Editorial Team [/editorial-team]Terms [/terms]Privacy [/privacy]
+
+© 2026 AlphaSignal

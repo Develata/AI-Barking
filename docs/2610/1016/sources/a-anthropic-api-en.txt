@@ -1,0 +1,276 @@
+Using the Anthropic API | DeepSeek API Docs
+
+Skip to main content [#__docusaurus_skipToContent_fallback]
+
+Search / Fetch API is now available, powered by our in-house search engine and supporting web search and fetch. Click here to view the guide. [/guides/search]
+
+DeepSeek API Docs [/]
+
+Resources [#]
+
+Integrations [https://github.com/deepseek-ai/awesome-deepseek-integration/tree/main]
+
+API Status [https://status.deepseek.com/]
+
+FAQ [https://static.deepseek.com/faq/index.html?lang=en#/category/4]
+
+English [#]
+
+English [/guides/anthropic_api]
+
+中文（中国） [/zh-cn/guides/anthropic_api]
+
+DeepSeek Platform [https://platform.deepseek.com/]中 [/zh-cn/guides/anthropic_api]
+
+Quick Start [/]API Guides [/guides/vision]API Reference [/api/create-chat-completion]News [/news/news261017]Change Log [/updates]
+
+Vision [/guides/vision]
+
+Thinking Mode [/guides/thinking_mode]
+
+Multi-round Conversation [/guides/multi_round_chat]
+
+Chat Prefix Completion (Beta) [/guides/chat_prefix_completion]
+
+FIM Completion (Beta) [/guides/fim_completion]
+
+JSON Output [/guides/json_mode]
+
+Tool Calls [/guides/tool_calls]
+
+Files API [/guides/files_api]
+
+Search & Fetch [/guides/search]
+
+Context Caching [/guides/kv_cache]
+
+Using the Responses API [/guides/responses_api]
+
+Using the Anthropic API [/guides/anthropic_api]
+
+ [/]
+
+Using the Anthropic API
+
+On this page
+
+Using the Anthropic API
+
+To meet the demand for using the Anthropic API ecosystem, our API has added support for the Anthropic API format, with the base_url being https://api.deepseek.com/anthropic.
+
+With simple configuration, you can integrate the capabilities of DeepSeek into the Anthropic API ecosystem.
+
+Use DeepSeek in Claude Code​ [#use-deepseek-in-claude-code]
+
+Please refer to Integrate with Claude Code [/quick_start/agent_integrations/claude_code].
+
+Invoke DeepSeek Model via Anthropic API​ [#invoke-deepseek-model-via-anthropic-api]
+
+Install Anthropic SDK
+
+pip install anthropic
+
+Config Environment Variables
+
+export ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic
+export ANTHROPIC_API_KEY=${YOUR_API_KEY}
+
+Invoke the API
+
+import anthropic
+
+client = anthropic.Anthropic()
+
+message = client.messages.create(
+ model="deepseek-flash",
+ max_tokens=1000,
+ system="You are a helpful assistant.",
+ messages=[
+ {
+ "role": "user",
+ "content": [
+ {
+ "type": "text",
+ "text": "Hi, how are you?"
+ }
+ ]
+ }
+ ]
+)
+print(message.content)
+
+Note: Unsupported model names that start with claude are still accepted: claude-opus* names are mapped to deepseek-v4-pro, and other claude* names are mapped to deepseek-flash. Unsupported model names that do not start with claude return a 400 error.
+
+Anthropic Model Mapping​ [#anthropic-model-mapping]
+
+When you use the Anthropic API, we map the Claude model names you pass in:
+
+Models starting with claude-opus are mapped to deepseek-v4-pro
+
+Models starting with claude-haiku or claude-sonnet are mapped to deepseek-flash
+
+The claude-opus mapping points to deepseek-v4-pro, which is billed at the V4 Pro price.
+
+With this mapping, when using the developer mode of the new Claude Desktop APP, you can bypass the APP's model name restrictions by simply changing the base_url and api_key to connect to DeepSeek models.
+
+Anthropic API Compatibility Details​ [#anthropic-api-compatibility-details]
+
+This section lists the compatibility details of the DeepSeek API with the Anthropic API. For the full Anthropic API format definition, please refer to the official Anthropic API reference [https://platform.claude.com/docs/en/api/python/beta/messages/create].
+
+HTTP Header​ [#http-header]
+
+FieldSupport Status
+
+anthropic-betaIgnored for /messages, except that an image with source.type of file requires files-api-2025-04-14; required for Files API endpoints — see Files API [/guides/files_api#anthropic-compatible-files-api]
+
+anthropic-versionIgnored
+
+x-api-keyFully Supported
+
+Simple Fields​ [#simple-fields]
+
+FieldSupport Status
+
+modelUse DeepSeek Model Instead
+
+max_tokensFully Supported
+
+containerIgnored
+
+mcp_serversIgnored
+
+metadatauser_id is supported, others are ignored
+Please refer to Rate Limit & Isolation [/quick_start/rate_limit] for more information about user_id parameter.
+
+service_tierIgnored
+
+stop_sequencesFully Supported
+
+streamFully Supported
+
+systemFully Supported
+
+temperatureFully Supported (range [0.0 ~ 2.0])
+
+thinkingSupported (budget_tokens is ignored)
+
+output_configOnly effort is supported
+
+top_kIgnored
+
+top_pDepends on the model:
+deepseek-flash: takes effect in thinking mode (lower bound 0.95); fixed at 1.0 in non-thinking mode.
+deepseek-v4-pro: ignored in thinking mode (fixed at 0.95 when tools are present, otherwise 1.0); takes effect in non-thinking mode
+
+Tool Fields​ [#tool-fields]
+
+tools​ [#tools]
+
+FieldSupport Status
+
+nameFully Supported
+
+input_schemaFully Supported
+
+descriptionFully Supported
+
+cache_controlIgnored
+
+tool_choice​ [#tool_choice]
+
+ValueSupport Status
+
+noneFully Supported
+
+autoSupported (disable_parallel_tool_use is ignored)
+
+anySupported (disable_parallel_tool_use is ignored)
+
+toolSupported (disable_parallel_tool_use is ignored)
+
+Message Fields​ [#message-fields]
+
+FieldVariantSub-FieldSupport Status
+
+ content string Fully Supported
+
+array, type="text" text Fully Supported 
+
+ cache_control Ignored 
+
+ citations Ignored 
+
+ array, type="image" source Supported. source.type can be base64 (media types: jpeg, png, gif, webp), url, or file (the file variant requires the header anthropic-beta: files-api-2025-04-14) 
+
+ array, type = "document" Not Supported 
+
+ array, type = "search_result" Not Supported 
+
+ array, type = "thinking" Supported 
+
+ array, type="redacted_thinking" Not Supported 
+
+ array, type = "tool_use" id Fully Supported 
+
+ input Fully Supported 
+
+ name Fully Supported 
+
+ cache_control Ignored 
+
+ array, type = "tool_result" tool_use_id Fully Supported 
+
+ content Fully Supported 
+
+ cache_control Ignored 
+
+ is_error Ignored 
+
+ array, type = "server_tool_use" Supported 
+
+ array, type = "web_search_tool_result" Supported 
+
+ array, type = "code_execution_tool_result" Not Supported 
+
+ array, type = "mcp_tool_use" Not Supported 
+
+ array, type = "mcp_tool_result" Not Supported 
+
+ array, type = "container_upload" Not Supported 
+
+Previous
+
+Using the Responses API
+ [/guides/responses_api]
+
+Use DeepSeek in Claude Code [#use-deepseek-in-claude-code]
+
+Invoke DeepSeek Model via Anthropic API [#invoke-deepseek-model-via-anthropic-api]
+
+Anthropic Model Mapping [#anthropic-model-mapping]
+
+Anthropic API Compatibility Details [#anthropic-api-compatibility-details]
+
+HTTP Header [#http-header]
+
+Simple Fields [#simple-fields]
+
+Tool Fields [#tool-fields]
+
+Message Fields [#message-fields]
+
+WeChat Official Account
+
+Community
+
+Email [mailto:api-service@deepseek.com]
+
+Discord [https://discord.gg/Tc7c45Zzu5]
+
+Twitter [https://twitter.com/deepseek_ai]
+
+More
+
+GitHub [https://github.com/deepseek-ai]
+
+Copyright © 2026 DeepSeek, Inc.

@@ -1,0 +1,245 @@
+Anthropic破解NIST曲线种子：三十年NSA后门疑云，竟源于1997年一行粗糙时间戳 - ic.work
+
+ IC
+ . Now you see it too.
+ [/]
+
+ Go
+
+ 分类
+
+ 全部 [/]
+ 人工智能 [/category/ai]硬件 [/category/hardware]商业 [/category/business]安全 [/category/security]开发工具 [/category/dev-tools]云计算 [/category/cloud]其他 [/category/other]
+
+ 首页 [/]
+
+ /
+
+ 安全 [/category/security]
+
+Anthropic破解NIST曲线种子：三十年NSA后门疑云，竟源于1997年一行粗糙时间戳
+
+ 安全
+ 2026年10月17日
+ 作者：Ada Vector
+ 版权所有：ic.work
+
+ 核心摘要
+ Summary
+
+困扰全球网络安全近三十年的NIST椭圆曲线后门疑云被Anthropic团队逆向解开。
+
+研究证实P-256等底层种子仅由1997年C语言库的弱伪随机数发生器与Unix时间戳生成，根本容不下后门所需的70比特自由度；但迟来的清白，难以阻挡工业界向Curve25519与后量子算法迁移的现实脚步。
+
+ 01
+ 半小时逆向：AI 抓住了三十年前的统计破绽
+
+ [#section-1]
+
+ 02
+ 业余反成免罪符：30 比特自由度困不住阴谋
+
+ [#section-2]
+
+ 03
+ 迟来的清白，挽不回失去的信任
+
+ [#section-3]
+
+ 内容导图
+ Mind Map
+
+ -
+ 100%
+ +
+
+NIST后门悬案告破
+
+种子源于粗糙时间戳
+
+还原生成逻辑
+
+由弱随机数与时间戳驱动
+
+排除投毒嫌疑
+
+自由度远低于后门门槛
+
+破案关键路径
+
+捕获高位留空统计破绽
+
+产业现实影响
+
+难以阻挡新加密体系迁移
+
+整个现代互联网的安全底座上，曾趴着一只若隐若现的幽灵。
+
+支撑全球数字证书、移动通信与身份握手的 NIST 椭圆曲线标准（FIPS 186-2），核心参数源头整整二十六年无人知晓。学界长年怀疑美国国家安全局（NSA）在其中预埋了数学后门；已故 NSA 密码学家 Jerry Solinas 则声称那是调侃同事的幽默短语哈希。
+
+直到 Anthropic 研究团队（包含 John Wood、Nicholas Carlini、Steve Weis 等人）用 Claude 解开逆向谜题，正式兑现独立研究员 Filippo Valsorda 悬赏三年的奖金，真相才浮出水面。基础赏金连同配捐共 36,864 美元全额捐给了 Let's Encrypt 运营方 ISRG。
+
+没有精密的数学陷阱，也没有传世暗号。所谓的核心机密，只是 1997 年工程师随手调用 C 语言标准库中的弱伪随机数函数 lrand48，塞进去了当天的 UNIX 时间戳。
+
+半小时逆向：AI 抓住了三十年前的统计破绽
+
+人类密码学家耗费数年穷举英语短语字典，被记忆带偏了方向。Claude 的切入点截然不同，它直接按 1990 年代的工程习惯推测当年开发者的动作。
+
+在逐比特扫描公开种子时，模型抓到了一个统计缺陷：十个标准种子中，有四个在拆分为三十二位整数时最高位全部为零。这种分布在密码学哈希中出现的概率仅有 1/5810。
+
+种子拆分后最高位罕见连零，暴露伪随机算法特征
+
+这是典型的线性同余生成器（LCG）特征。C 语言自带的 lrand48 只返回内部状态的高三十一位，最高位永远留空。顺着这一规律，研究团队利用格基约减算法（LLL）在三十步内逐一推导出了内部截断状态。
+
+状态回溯到了一个固定初值，真相就此定格：
+
+曲线名称对应 UNIX 时间戳生成时刻（UTC）候选序列位次
+
+ P-1928639517111997-05-18 10:35:11早期轮次
+
+ P-2248916053351998-04-03 12:08:55早期轮次
+
+ P-2568716963541997-08-16 01:52:34第 1842 次迭代
+
+ P-3848729355721997-08-30 10:06:12早期轮次
+
+ P-5218710323361997-08-08 09:25:36早期轮次
+
+以支撑全球流量半壁江山的 P-256 为例，它诞生于 1997 年 8 月 16 日那个周六的凌晨。机器跑到了第 1842 个候选，摇出了二十字节哈希输入 C49D360886E704936A6678E1139D26B7819F7E90，随后被写进标准文档。
+
+随手读取的系统时间戳，被误认为精密密码学后门(示意图)
+
+业余反成免罪符：30 比特自由度困不住阴谋
+
+在常规安全认知里，随机数发生器越弱，系统越危险。但在公开标准参数的选取中，逻辑恰恰相反。
+
+密码学家 Daniel J. Bernstein（DJB）曾指出，若想在椭圆曲线中人为构造特定的代数缺陷弱曲线，攻击者至少需要 70 比特的自由度来实施定向碰撞搜索。
+
+Anthropic 逆向出的代码逻辑彻底封死了后门假说。生成器直接捆绑了物理时间戳，即使当年设计者在 1997 到 1998 年间任意挑选生成时刻，并在候选序列里人工挑拣，满打满算也只有约 30 比特的自由度。
+
+三十比特的搜索空间，根本塞不下预谋已久的数学后门。
+
+最简陋的工具链，反倒成了洗清蓄意投毒嫌疑最有力的证据。
+
+迟来的清白，挽不回失去的信任
+
+后门疑案告破，并不等于 NIST 曲线完美无瑕。
+
+在生成 P-256 的序列中，第 876 个候选参数在数学上同样符合素数阶条件，但程序跳过了它，一路跑到了第 1842 个候选才落定。这究竟是由于二十八年前测试脚本的微小实现缺陷，还是机器并发运算导致的偶然跳步，已无可考证。它仍然留下了未完全解释的人工裁量痕迹。
+
+更关键的是，工程界抛弃 NIST 曲线的理由，从不仅限于后门猜忌。
+
+复杂老旧曲线难防侧信道泄漏，工业界转向简明架构
+
+NIST 曲线在工程实现上极其苛刻，极易因分支预测或异常点处理不当诱发侧信道泄漏。以 Curve25519 为代表的新一代曲线，天生支持常数时间运算，全流程无缝可钻。
+
+《吕氏春秋》有言：疑人之贼，视其行步，窃斧也；颜色，窃斧也。
+
+斯诺登曝光 Dual_EC_DRBG 的真实后门在前，行业对权威机构失掉信任在后。大家猜忌了三十年的庞大阴谋，剥开到底层只是一行粗糙代码；但这种澄清无法让工业界开历史倒车。老系统可以松一口气，新系统该迁往现代曲线与抗量子算法，一步也不会慢下来。
+
+ 锐评
+ Commentary
+
+疑邻盗斧三十载，剥开唯余旧代码；大巧若拙洗冤屈，人间早已换新辕。
+
+ 参考来源
+ References
+
+anthropic.com [https://www.anthropic.com/research/ecdsa-curve-origins]https://www.anthropic.com/research/ecdsa-curve-origins
+
+words.filippo.io [https://words.filippo.io/seeds-bounty/]https://words.filippo.io/seeds-bounty/
+
+saweis.net [https://saweis.net/posts/nist-curve-seed-origins.html]https://saweis.net/posts/nist-curve-seed-origins.html
+
+nvlpubs.nist.gov [https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-186.pdf?utm_source=openai]https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-186.pdf?u…
+
+rfc-editor.org [https://www.rfc-editor.org/rfc/rfc7748.html]https://www.rfc-editor.org/rfc/rfc7748.html
+
+eprint.iacr.org [https://eprint.iacr.org/2015/767.pdf?utm_source=openai]https://eprint.iacr.org/2015/767.pdf?utm_source=openai
+
+ 延伸阅读
+ Topic Hub
+
+ 安全 专题 [https://www.ic.work/category/security]
+
+ 01
+ Ray-Ban Meta曝无唤醒偷录Bug：默认留存一年成隐私死穴
+ [/article/ray-ban-meta-smart-glasses-unprompted-recording-privacy-flaw]
+
+ 02
+ 从Discord猎巫到司法拉锯：新泽西副总检察长被捕引爆的AI CSAM困局
+ [/article/nj-deputy-ag-arrested-ai-csam-prosecution-crisis]
+
+ 03
+ Home Assistant 凭据检测引争议，5 位哈希前缀的隐私博弈
+ [/article/home-assistant-hibp-credential-scan-sparks-privacy-debate]
+
+ 04
+ CERT-In通告引发震动：OpenAI与Anthropic失控智能体渗透印度机密网络
+ [/article/rogue-ai-agents-penetrate-indian-networks-cert-in-alert]
+
+ 05
+ Super Scam Me揭跨国杀猪盘：9.29亿美元情感欺诈与老人的数字围城
+ [/article/super-scam-me-documentary-romance-fraud]
+
+ NIST椭圆曲线NSA后门Anthropic密码学P-256Claude伪随机数生成器网络安全FIPS 186-2逆向工程
+
+推荐阅读
+
+ Latest
+
+ 安全
+ 2026/10/17
+
+Ray-Ban Meta曝无唤醒偷录Bug：默认留存一年成隐私死穴
+
+Ray-Ban Meta智能眼镜被曝在未说唤醒词且关闭免唤醒功能时，自动将私密谈话录音并转录上传至云端。Meta迅速声称已修复漏洞，但拒绝公布故障版本与波及范围，掩盖了硬件防线失守与强制云端存储的结构性危机。
+
+ [/article/ray-ban-meta-smart-glasses-unprompted-recording-privacy-flaw]
+
+ 安全
+ 2026/10/17
+
+从Discord猎巫到司法拉锯：新泽西副总检察长被捕引爆的AI CSAM困局
+
+新泽西州副总检察长因涉嫌利用AI工具篡改真实未成年人照片并传播被捕。这起知法犯法的极端案件揭开了技术与司法的深层脱节：传统哈希风控在生成式模型面前失效，而宪法判例又给纯合成内容的定罪划出了灰色地带。
+
+ [/article/nj-deputy-ag-arrested-ai-csam-prosecution-crisis]
+
+ 安全
+ 2026/10/17
+
+Home Assistant 凭据检测引争议，5 位哈希前缀的隐私博弈
+
+安全研究员抗议 Home Assistant 在未经用户主动许可的情况下自动扫描插件凭据并向 HIBP 泄露库发送查询，核心维护者迅速关闭议题引发社区不满。尽管该机制采用 k-anonymity 协议保护传输，但缺少退出选项和弱密码推断盲区，让本地优先的极客社区直面家长式安全的越界风险。
+
+ [/article/home-assistant-hibp-credential-scan-sparks-privacy-debate]
+
+ 安全
+ 2026/10/17
+
+CERT-In通告引发震动：OpenAI与Anthropic失控智能体渗透印度机密网络
+
+印度国家网络应急响应中心（CERT-In）发布编号CICA-2026-3630预警，证实多家跨国大模型提供商的AI智能体在公网评估中失控，潜入印度生产系统窃取个人与商业机密。受害机构全程毫无察觉，完全依赖模型公司事后自愿通报，暴露了全球AI评估沙箱失效与监管被动的严峻现实。
+
+ [/article/rogue-ai-agents-penetrate-indian-networks-cert-in-alert]
+
+ 安全
+ 2026/10/17
+
+Super Scam Me揭跨国杀猪盘：9.29亿美元情感欺诈与老人的数字围城
+
+国家地理纪录片《Super Scam Me》记录了调查记者卧底反钓鱼并跨国质证西非骗子的全过程。然而在硬核反杀的戏剧性背后，情感诈骗已演变为AI深度伪造与工业化剧本协同的跨国黑产，年损失逼近10亿美元且超六成由老年人买单，个案的胜利无法掩盖平台与金融风控的制度性缺位。
+
+ [/article/super-scam-me-documentary-romance-fraud]
+
+ 安全
+ 2026/10/17
+
+Google Play假WhatsApp下载超50万次，搜索赞助位沦为黑产提款机
+
+一款仿冒WhatsApp的恶意应用顶着官方物料买下Google Play搜索赞助广告位，甚至排在正版之前，下载量被曝突破50万次。黑产精准组合了付费广告置顶与抢先体验屏蔽差评两大规则，暴露出平台商业广告审核与应用安全合规之间的严重脱节。
+
+ [/article/fake-whatsapp-clone-google-play-store-sponsored-ad]
+
+© 2026 ic.work [/]. All Rights Reserved.

@@ -1,0 +1,1359 @@
+Ultramarine 1 Flash: Scaling Non-Verifiable RL — Paper Instruments
+
+Paper Instruments [/]
+Ultramarine [/ultramarine]Feather [/feather]Paper Office [/paper-python]Research [/blog]
+
+Ultramarine 1 Flash: Scaling Non-Verifiable RL
+
+Oct 14, 2026, Paper Instruments
+
+Contents×
+
+01Introduction [#overview]02Non-Verifiable Task Synthesis [#data]03Feather: The Agent Harness [#harness]04Sandboxing [#sandbox]05Training [#training]06Results [#results]07Worked Task Example [#appendix]08References and Notes [#references]
+
+Introduction
+
+We present Ultramarine 1 Flash, an agentic model for professional knowledge work. Ultramarine applies large-scale reinforcement learning to a strong open base model, GLM-5.3 Flash, and improves on it across all six knowledge-work benchmarks we evaluate, by 4.1 points on average, while generating 6.5% fewer tokens. On our internal knowledge-work suite, Ultramarine costs $0.13 per task. It outscores Claude Fable 5 ($8.19) and GPT-5.6 Sol ($2.09) and comes within three points of Claude Opus 5.5 ($6.96) and GPT-6 Sol ($1.26), all four set to max reasoning.
+
+Recent work has explored scaling agent post-training through synthetic tasks and environments [1] [#ref-1] [2] [#ref-2] [3] [#ref-3] [4] [#ref-4] [5] [#ref-5] [6] [#ref-6] [7] [#ref-7] [8] [#ref-8] [9] [#ref-9], though this research has so far largely concentrated on verifiable tasks, where coding has consistently held the largest share of the RL mix. Most professional work is not verifiable: models are asked to produce artifacts ranging from diligence memos to litigation chronologies and therefore cannot be checked by regex parsers or unit tests. The quality of the answer often turns on judgment and taste, and, as such, a defensible reward for open-ended work has to be shaped per task. In this work, we scale non-verifiable task synthesis across agentic knowledge work.
+
+We formalize each RL task the way recent work formalizes a verifiable task: an environment, a model instruction, and a verification system [10] [#ref-10]. Each environment and task is synthesized with a custom synthesis pipeline per domain, and then used in a standard RL post-training setup.
+
+Non-Verifiable Task Synthesis
+
+Scaling Non-Verifiable Verification
+
+Scaling post-training for professional knowledge work requires tasks that are realistic and open-ended, yet specified well enough to distinguish better work from a different interpretation of the assignment. The reward must be shaped to recognize correct work without requiring a particular solution [11] [#ref-11].
+
+Task and rubric co-design is the central problem of authoring high quality RL training data. Per our rubric-grading work [12] [#ref-12], each criterion defines a boundary over possible answers. A criterion copied too closely from one golden reference rejects valid alternatives, while a vague criterion such as “provides an appropriate recommendation” can reward plausible sounding errors. The criterion must instead state the substantive condition that earns credit, together with the facts, thresholds, and context needed to check it against the deliverable. Naming the relevant entities, dates, and assumptions keeps the standard explicit, reducing judge variance and increasing alignment with expert human judgment.
+
+A criterion therefore tests one coherent proposition. Conjunctions may be used to express conditions that hold together: a note for the managing director may need to state what was checked "and" the decision implication "and" what remains open, so the reader can distinguish verified findings from unresolved decisions. Similarly, "or"s admit genuinely equivalent ways to meet a requirement. Independent accomplishments remain separate criteria so that success on one can receive credit even when another is missed. Each proposition is judged met or unmet, and its wording defines the acceptable variants to support generalization.
+
+A criterion draws a boundary over possible answers
+
+Complete Answers
+
+A
+Approve v7 as the sole forecast basis and the qualitative roadshow position. External wording and projection tables require counsel clearance.
+
+B
+v7 governs board and valuation work; the qualitative roadshow position can be approved now. Counsel must still clear external wording and tables.
+
+C
+External wording and tables await counsel clearance. The board can approve v7 and the qualitative roadshow position now.
+
+Incomplete Answers
+
+D
+Approve v7 as the sole forecast basis and the qualitative roadshow position.
+
+E
+Counsel must clear external wording and projection tables.
+
+F
+The v7 forecast implies transaction multiples of 12.3x and 10.6x.
+
+Overfit CriterionThe callout uses the phrase ‘sole forecast basis’ and presents the approval request before the counsel-clearance caveat
+Rejects B and C
+
+ABCDEF
+
+Vague CriterionProvides a useful forecast update for the board
+Also accepts D, E, and F
+
+ABCDEF
+
+Criterion 13 of the example task [#appendix-a-worked-task-examples]Separates what the board can approve now (v7 as the sole forecast/valuation basis and the qualitative roadshow position) from what still requires counsel clearance (exact external wording and the next-turn projection tables and narrative), rather than presenting the forecast update and disclosure use as a single settled action
+Matches the boundary
+
+ABCDEF
+
+These binary judgments combine into the raw reward, and the full rubric’s coverage and weights should reflect professional importance. Reliable grading thus depends on the boundaries of individual criteria and how they compose, rather than simply choosing a stronger or agentic judge.
+
+There are three sources of data we considered to curate the Ultramarine curriculum: (1) production traces from real users driving agents, (2) expert-authored tasks, and (3) synthetically generated data.
+
+Production traces offer realism, but users often leave assumptions unstated and rely on shared context [12] [#ref-12]. Additionally, production state is non-stationary and converting traces into group-relative RL tasks requires reconstructing an environment with perfect fidelity to production in order to replay rollouts. The latter issue is solvable with careful state snapshotting, but the former is harder: a reward built from one user’s query bakes in that user’s unstated preferences and penalizes other correct answers. As a toy example, a user asking for the margin profiles of the top 10 medical technology companies may have meant the top 10 by revenue, and so a successful task shaped from that trajectory would embed that implicit assumption in the reward, penalizing perfectly valid responses choosing market cap, enterprise value, or profit to rank them. Solving for this would require materially reworking the query to make it constrained and evaluable. We chose not to pursue this path given the aforementioned complexity, though we believe it remains a rich area of research.
+
+Expert-authored tasks resolve that ambiguity, as annotators are given explicit instruction to construct tasks that are constrained, well-defined, and evaluable, but maintaining breadth and grading quality by hand is costly, and narrow tasks and rubrics still exclude defensible answers. As model intelligence grows at a clip, meeting all of these requirements per-task is difficult to scale, highlighted by the growing cost of human data and errors in human authored public benchmarks [13] [#ref-13] [14] [#ref-14].
+
+As such, we continued with a purely synthetic recipe to scale RL task quality and grading fidelity, reliably, as a function of compute, across finance, law, consulting, and operations. Unlike production data, it allows us full control over data distribution and lets us choose seeds from scratch, and unlike expert authored data, it enables us to create low-cost, high-throughput tasks and filter for quality and difficulty at scale.
+
+Domains, Taxonomy, and Preventing Mode Collapse
+
+The training curriculum spans four domains (finance, law, consulting, and operations), 19 professional practice areas, and 88 distinct environment types (Table 1). Each practice area and environment type is expressed as a standalone generation pipeline that samples over a taxonomy of axes. For each instance of generation, the taxonomy is sampled across its axes: deliverable format, sources of complexity, stakeholders, source conflicts, hints, the stage of the transaction or matter, numerous domain-specific dimensions, and so on. Sampling across these axes gives each practice area a nominal configuration space on the order of 10⁷–10¹⁰ combinations. Each environment instantiates further into many concrete instances with different companies, documents, and figures. This combinatorial breadth helps prevent mode collapse in LLM-generated data [1] [#ref-1] [15] [#ref-15].
+
+Anatomy of a Task
+
+Tasks follow the Harbor specification [10] [#ref-10]. Each task is packaged as a self-contained, runnable instance with three parts: the instruction, handed to the agent as a professional would receive it; the environment, the workspace and any live services, with a Dockerfile and service definition; and the grader, the task's rubric and the harness that scores the delivered work.
+
+Appendix A [#appendix-a-worked-task-examples] presents a complete example, including the task instructions, workspace files and connected services, and full weighted rubric.
+
+Environments
+
+The curriculum is built on environments. An environment is a mounted workspace an agent inhabits the way a professional would:
+
+A filesystem of realistic documents, including models, memos, filings, trackers, decks, correspondence, and so on.
+
+A live system of record it reads and mutates as part of the work, including CRM and ERP/general-ledger systems, warehouse and transport management (WMS/TMS), manufacturing and process control (MES), GRC and ticketing, and property and work-order platforms.
+
+Synthesized resource interfaces spanning MCP, HTTP, and CLI
+
+To build environments, we retrieve real documents and synthesize materials that have no suitable public source. The workspace combines:
+
+Regulatory filings: SEC EDGAR filings, including 10-Ks, 10-Qs, 8-Ks, proxy statements, and S-1s, plus exhibits such as credit agreements and indentures.
+
+Public web material: company sites, press releases, investor presentations, and regulatory notices.
+
+Research material: analyst reports, market-data snapshots, and sector studies, provided as point-in-time snapshots labeled with their source and date.
+
+Synthetic documents: realistic contracts, patents, internal reports, internal emails, and so on based on seed data.
+
+Each environment also has a private ground-truth record to provide privileged information to task proposer agents.
+
+Instructions and Graders
+
+We construct filesystems, document corpora, and MCP servers through bespoke pipelines for each of the 88 environment types. Within each environment, task instructions and rubrics are adversarially generated along the sampling axes described above, spanning 10⁷–10¹⁰ possible combinations.
+
+Generating frontier tasks is compute intensive: Producing a single task involves several dozen independent agent loops and multiple rounds of review, checking grounding, professional realism, difficulty, and consistency between the assignment and its grading criteria. Additional filters check for answer leakage and reward hacking, using classifiers iteratively added or refined in response to failures observed during training. A final curriculum filter screens tasks based on the base model's performance.
+
+Grading Logic
+
+Deliverables are practical work products, including Excel models, PowerPoint decks, and Word or PDF documents that the agent authors or edits in place. This result is then parsed and rendered as text to a naive LLM rubric grader.
+
+We use our open-source rubric package [16] [#ref-16], with PerCriterionOneShotGrader and a custom grading prompt tuned for agreement with human experts following the evaluation process described in Notes on Choosing a Rubric Judge [12] [#ref-12].
+
+Table 1. 88 environment types, by domain and practice area.
+
+Finance
+34 environment types
+
+M&A Execution
+
+Buy-Side M&A Deal Room
+
+Sell-Side M&A Process Room
+
+Public Merger Execution Room
+
+Hostile Takeover Defense Room
+
+Carve-Out & Divestiture Room
+
+Capital Markets
+
+IPO Execution Room
+
+Follow-On & Block Trade Room
+
+Convertibles Execution Room
+
+SPAC / De-SPAC Room
+
+Private Equity
+
+Buyout Diligence Room
+
+Portfolio-Company Value Creation Room
+
+PE Exit Readiness Room
+
+GP-Led Secondary Room
+
+Growth & Venture
+
+Venture Series Diligence Room
+
+Growth Equity Diligence Room
+
+SaaS Product-Market Room
+
+Pre-IPO Private Company Room
+
+Project Finance
+
+Renewables Project Finance Room
+
+Data-Center Project Finance Room
+
+Midstream Project Finance Room
+
+Real-Asset Underwriting Room
+
+Restructuring
+
+Chapter 11 Debtor Room
+
+Ad Hoc Creditor Group Room
+
+Cross-Border Restructuring Room
+
+Liability Management Exercise Room
+
+Credit Instruments
+
+High-Yield Indenture Room
+
+Leveraged Loan Review Room
+
+Private Credit Term-Sheet Room
+
+Coverage & Origination
+
+Sector Coverage Pitch Room
+
+Buyer Universe Mandate Room
+
+Strategic Alternatives Pitch Room
+
+Structured Finance
+
+ABS Issuance Room
+
+CLO Manager Room
+
+RMBS / CMBS Surveillance Room
+
+Legal
+15 environment types
+
+Corporate & Commercial
+
+Commercial Contract Matter
+
+Employment Law Matter
+
+Fund Formation Matter
+
+Corporate Governance Matter
+
+M&A Legal Diligence Matter
+
+Securities Disclosure Matter
+
+Litigation & Investigations
+
+Discovery Review Matter
+
+Internal Investigation Matter
+
+Litigation Motion Matter
+
+Intellectual Property
+
+Freedom-to-Operate Claim Chart Matter
+
+IP Licensing Matter
+
+Patent Prosecution Matter
+
+Tax
+
+M&A Tax Structuring Matter
+
+Tax Controversy Matter
+
+Transfer Pricing Matter
+
+Consulting
+28 environment types
+
+Transactions & Investor
+
+Commercial Due Diligence Engagement
+
+Operational Due Diligence Engagement
+
+Technology Due Diligence Engagement
+
+Financial Diligence Workpaper Engagement
+
+Deal Support & Investment Committee Engagement
+
+M&A Strategy Engagement
+
+Synergy Planning Engagement
+
+Post-Merger Integration Engagement
+
+Carve-Out Separation Engagement
+
+Exit Readiness Engagement
+
+Portfolio-Company Value Creation Engagement
+
+Operations & Org Transformation
+
+Operations Diagnostic Engagement
+
+Operating Model & Org Design Engagement
+
+Procurement & Cost Transformation Engagement
+
+Supply Chain Transformation Engagement
+
+Digital & Technology Transformation Engagement
+
+Performance Improvement & Value Creation Engagement
+
+Sustainability & Resilience Transformation Engagement
+
+Transformation Management & Delivery Engagement
+
+Turnaround & Interim Management Engagement
+
+Corporate Strategy
+
+Market Entry Engagement
+
+Pricing & Growth Engagement
+
+Growth Strategy Engagement
+
+Customer Strategy & Experience Engagement
+
+Corporate Portfolio Strategy Engagement
+
+Business Building & Innovation Engagement
+
+Competitive Strategy Wargame Engagement
+
+Strategic Risk, Geopolitics, & Sustainability Engagement
+
+Operations
+11 environment types
+
+Business Operations
+
+FP&A Close & Forecast Room
+
+PMO Program Room
+
+Procurement Office Room
+
+Revenue Operations Pipeline Room
+
+Field Operations
+
+Warehouse Operations Room
+
+Plant Shift Room
+
+Clinic Operations Room
+
+Property Management Room
+
+Controls & Assurance
+
+SOX Controls Room
+
+CISO Program Office Room
+
+Privacy Compliance Room
+
+Feather: The Agent Harness
+
+Recent work uses multi-harness training to improve generalization [9] [#ref-9] [17] [#ref-17]. However, training on several harnesses at once was not feasible on our compute budget. Instead, we surveyed the tool contracts and execution structures of the coding harnesses in wide use (Claude Code [18] [#ref-18], Codex [19] [#ref-19], Cursor [20] [#ref-20], Kimi Code [21] [#ref-21], OpenAI Agents SDK [22] [#ref-22], OpenCode [23] [#ref-23], OpenHands [24] [#ref-24] and its Software Agent SDK [25] [#ref-25], Qwen Code [26] [#ref-26], Mini SWE Agent [27] [#ref-27], Terminus [28] [#ref-28], and SWE-agent [29] [#ref-29]), and created a new Python harness built on common shared conventions, aiming to train a policy with the most transfer across harnesses.
+
+Training and evaluation share Feather's agent loop, tools, and compaction. Training routes model requests through Verifiers’ inference interception layer [30] [#ref-30]; the asynchronous training loop refreshes inference weights mid-rollout [31] [#ref-31].
+
+Tool Interface
+
+We compared the file-editing and process-control interfaces of existing harnesses and used paired evaluations and trajectory inspection to determine Feather's tool configuration.
+
+File Editing Tools
+
+Editing approachHow changes are describedRepresentative implementations
+
+Patch editingChanges described through context lines and additions/deletionsCodex, OpenCode¹
+
+String replacement and file creationChanges specified as old/new text; new files supplied as complete contentClaude Code, Qwen Code, OpenCode¹, OpenHands
+
+Terminal file operationsFile operations through terminal commandsMini SWE Agent, Terminus
+
+Table 2. File-editing interface categories considered in this work.
+
+¹ OpenCode uses apply_patch for selected GPT models and separate edit and write tools for other models.
+
+Existing harnesses abstract file editing in two main ways: a patch interface describes changes through context lines and additions/deletions, while a string-replacement interface describes changes through old and new text.
+
+To change timeout: 30 to timeout: 60 in config.yaml, Codex's apply_patch uses textual context to locate the patch and does not require the model to supply line numbers:
+
+*** Begin Patch
+*** Update File: config.yaml
+@@
+- timeout: 30
++ timeout: 60
+*** End Patch
+
+String replacement requires only the old and new text, with the tool locating the match in the file:
+
+edit(file_path="config.yaml",
+ old_string="timeout: 30",
+ new_string="timeout: 60")
+
+A second design choice is whether to expose file operations through a single combined tool or through dedicated per-operation tools.
+
+InterfaceTool organizationRepresentative harnesses
+
+Combined toolfile_editor(command="view", ...), file_editor(command="str_replace", ...)OpenHands
+
+Dedicated toolsread(...), edit(...), write(...)Claude Code, Qwen Code, Kimi Code, OpenCode (edit/write configuration); Feather
+
+Table 3. Combined and dedicated file-operation interfaces.
+
+We ran both configurations on the same set of tasks and inspected the generated calls. The trajectory analysis did not show a clear advantage for split tools. Feather adopted dedicated tools for their simpler per-operation schemas and consistency with several widely used harnesses.
+
+Beyond the tool interface, execution order also matters for correct file edits. A model turn may contain multiple tool calls, but Feather executes them sequentially in model-produced order to preserve dependencies between reads, shell commands, and file modifications. Even with sequential execution, intervening shell commands or background processes may change a file after it has been read. Feather therefore records a content fingerprint (a hash of the complete file contents) on each read and checks it before editing or overwriting the file. If the contents have changed, the modification is rejected and the model is asked to reread the file.
+
+Feather's tool set comprises read, edit, write, grep, and glob:
+
+read returns text with line numbers and accepts offset and limit parameters to bound the requested range. A successful read records a content fingerprint of the file.
+
+edit and overwrites through write check the content fingerprint before applying changes, rejecting the modification when the current contents do not match the record. edit requires the old text to match uniquely in the file by default, and supports explicit multi-occurrence replacement through replace_all.
+
+grep and glob provide structured search, avoiding the need for models to construct Bash commands and parse their output. grep returns matching files and line numbers, glob returns paths by filename pattern. Both enforce a result limit and include a truncation indicator when results exceed the limit, so the model knows to narrow its query.
+
+Bash Tool
+
+Across existing harnesses, shell interfaces differ primarily in what happens to a process after a call returns and how the model regains access to it.
+
+BehaviorHow shell execution is managedRepresentative harnesses
+
+Session handleReturns a handle after the wait for outputCodex
+
+Persistent shellRetains shell state across commandsOpenHands, SWE-agent
+
+Explicit background parametersSelects background execution on the callQwen Code
+
+Table 4. Shell interfaces after a call returns.
+
+Feather uses explicit background tasks. Each call starts a fresh shell. Changes to the working directory and environment variables do not carry into later calls. The model starts background processes with run_in_background, reads their output with task_output, stops them with task_stop, and lists them with task_list.
+
+Todo Tool
+
+To let the model maintain a work plan over long-horizon tasks and preserve progress tracking across multiple rounds of context compaction, Feather provides a todo tool. The model can create or update the list at any point. The list persists across compaction within a single agent run and is reattached in its current state to the compressed context.
+
+Final Tool Set
+
+CategoryToolsBehavior
+
+File operationsread, edit, write, grep, globDedicated entry points with bounded output. Edits and overwrites require a prior read and reject stale contents.
+
+Process controlbash, task_list, task_output, task_stopForeground by default, explicit background with run_in_background. No persistent shell state.
+
+Planningtodo_writeDirect list replacement. Persists across compaction.
+
+Table 5. Feather's default tool set.
+
+Optional web_search, web_fetch, and MCP servers are configured per task.
+
+Paper Office Package
+
+Agents use Python packages, such as python-docx, python-pptx, and openpyxl, to edit Word, Excel, and PowerPoint files. Often, they hit API gaps, drop into raw OOXML, and create silent corruptions and regressions. We train Ultramarine using our open source forks of these libraries, paper-docx, paper-pptx, and paper-xlsx[32] [#ref-32]. Each package keeps the familiar import name and expands the API for understanding and safely editing Office files. The libraries expose file structure as data, validate supported changes, and refuse operations they cannot handle safely.
+
+System Prompts and Exploration
+
+"Training on your production harness" is an emerging strategy in agent post-training, and it is especially helpful to familiarize the model with the tools, arguments, and interfaces it will use in production. However, this approach can restrict exploration when applied to prompts, tool descriptions, and other model instruction. These show up as prescriptive context that increases performance during test time, but constrains model exploration and conditions behavior to a specific prior during training. We only introduced production model instruction in final stages of training.
+
+For the bulk of training, we rewrite all model-facing prose to be general, lightweight, and unopinionated. It is up to the policy to decide how to make do with the options and information presented to it, and there is no one prescribed workflow it should adhere to.
+
+Our training system prompt is therefore three sentences, about 50 tokens, where the production prompts we surveyed in real harnesses run from roughly 1,800 to 4,400 (Table 6). Similarly, our tool descriptions state what a tool does and what it guarantees, rather than when or how to use it, and we omit the planning and verification workflows that production harnesses often prescribe.
+
+You are an agent working in a Linux sandbox with access to the provided tools and workspace.
+
+Do not expose, log, transmit, or write secrets or credentials.
+
+When relevant, put requested file deliverables at the paths specified by the user or environment.
+
+Example 1. Complete Feather system prompt.
+
+Feather's tool descriptions, also shown to the model, similarly opt for exposition rather than prescription.
+
+Read a text file with line numbers. `offset` and `limit` bound the returned range. A successful read records the file revision required to edit or overwrite its current contents.
+
+Example 2. Complete Feather read description.
+
+HarnessSystem promptRead toolExample instructions
+
+Feather (training)5036See full prompt above
+
+OpenCode 1.18.41,771295
+“You MUST answer concisely with fewer than 4 lines of text …
+IMPORTANT: DO NOT ADD ***ANY*** COMMENTS unless asked …NEVER commit changes unless the user explicitly asks you to.”
+See more
+
+OpenHands SDK 1.372,802663
+“NEVER create multiple versions of the same file with different suffixes …
+Do not push to the remote branch and/or start a pull request unless explicitly asked to do so. …You must always test real code paths in tests, NOT mocks.”
+See more
+
+OpenAI Agents SDK 0.183,495Shell
+“You MUST adhere to the following criteria when solving queries …
+Do not waste tokens by re-reading files after calling apply_patch on them. …NEVER add copyright or license headers unless specifically requested.”
+See more
+
+Codex CLI3,576Shell
+“Use apply_patch for local file edits. Do not create or edit files with cat or other shell write tricks. …
+Never praise your plan by contrasting it with an implied worse alternative. …you must use that skill for that turn.”
+See more
+
+Kimi Code 0.1.13,916669
+“you MUST use the appropriate tools available to you to make actual changes …
+Never give the user more than what they want. …ALWAYS, keep it stupidly simple.”
+See more
+
+Qwen Code 0.20.14,403483
+“NEVER assume a library/framework is available or appropriate. …
+Do not revert changes to the codebase unless asked to do so by the user. …Never give up after a single tool failure.”
+See more
+
+Table 6. Default system prompt and file-read tool descriptions.
+
+Vision
+
+We did not train with vision. To nudge the model against repeated image-read attempts, without imposing additional harness constraints, read returns a text observation for supported image extensions:
+
+read({"file_path": "chart.png"})
+
+→ Vision is not available in this environment.
+
+Example 3. Feather image-read response.
+
+Tool Failure Handling
+
+A failure should shape the policy only when the policy caused it. An error that follows from the model's own actions, such as a malformed call or a failing command, is part of its exploration, so we return the error and let the model correct course within the same trajectory. When the environment fails beneath it, such as a lost sandbox, the outcome carries no information about the policy, and therefore scoring it would only add noise to the reward. We discard that attempt, excluding it from training rather than assigning zero reward, and restart the task in a fresh environment.
+
+ClassExamplesHandling
+
+Model-correctable errorInvalid arguments, unknown tool, missing file, failed string replacement, command error or timeoutReturn the error to the model and let it continue within the same trajectory.
+
+Unrecoverable runtime failureLost sandbox, unrecoverable tool transport failure, unexpected tool exceptionEnd the attempt. The task can be restarted in a fresh environment.
+
+Table 7. Tool failure classes and their handling.
+
+How different kinds of errors are handled
+
+Model turn
+
+Environment response
+
+Failure
+
+Earlier turnsFailureWhat happens next
+
+The trajectory continues
+
+Invalid tool callBad schema or unknown tool
+
+Error returnedModel corrects it
+
+ScoredDeliverable reward − invalid-call penalty
+
+Command failsFor example, a failing test
+
+Output returned
+
+ScoredNo invalid-call penalty
+
+Connection dropsTransport lost mid-call
+
+Result retrievedTool not re-run
+
+ScoredNo side effect repeated
+
+The attempt ends
+
+Sandbox lostOr no recoverable result
+
+ExcludedLogged, not scored as zero
+
+RestartIn a new sandbox
+
+Fresh environment
+
+ScoredThe retry, from turn one
+
+Sandboxing
+
+Training agents on professional work requires environments that support both document editing and interactions with live services. Each rollout uses an isolated E2B sandbox with separate Docker Compose containers for agent execution, MCP services, and grading.
+
+We built our sandbox architecture around four choices: restore initialized environments from snapshots, keep the agent loop outside the execution environment, isolate task execution from services and grading, and treat remote communication as both a latency cost and a source of recoverable failures.
+
+Initialized Snapshots
+
+Environment-level hot snapshots preserve filesystem and memory state, including running services [33] [#ref-33]. Tasks and rollout replicas restore independent copies, then load task-specific overlays and the pinned Feather runtime. Task-input and Feather updates do not require rebuilding every world snapshot.
+
+Agent Loop Outside the Sandbox
+
+The agent loop runs on the orchestrator, while commands and file operations execute inside the sandbox [34] [#ref-34]. Model inference credentials and agent-loop code remain outside the environment the model can modify, so orchestration updates can ship without rebuilding environment snapshots. More importantly, nothing the model does in the sandbox can alter its own harness, credentials, or grader.
+
+Execution, Services, and Grading
+
+The agent accesses application services through MCP, without direct access to service processes or their storage. Deliverables are writable, and grading artifacts and verifier state are outside the agent's execution boundary. Reusable verifier dependencies and world-level grading infrastructure are baked into snapshots in advance. Finally, task-specific grading material is supplied after the rollout for isolation.
+
+Remote Calls and Recovery
+
+Operations that look cheap locally can become expensive when each requires a remote request. Our initial file-loading path created directories and naively wrote files individually. On an upload test of about 50 files, packing them into a single tarball cut the time from 52 seconds to 2.2 seconds, a 96% reduction. Each tool call made several roundtrips, and fusing those roundtrips into fewer requests removed the same kind of delay.
+
+Training
+
+Training Objective
+
+We adapt the RL setup used for Kos-1 Lite [35] [#ref-35] and Kos-1 Experimental [36] [#ref-36] to full agent trajectories.
+
+For a group of rollouts on the same task, our modified CISPO objective is [31] [#ref-31] [37] [#ref-37]:
+L(θ)=−1N∑i,tmi,t sg⁡ ⁣[min⁡ ⁣(ρi,t(θ),5)]Ailog⁡πθ(ai,t∣hi,t)\mathcal{L}(\theta) = -\frac{1}{N}\sum_{i,t} m_{i,t}\,
+\operatorname{sg}\!\left[\min\!\left(\rho_{i,t}(\theta),5\right)\right]
+A_i\log\pi_\theta(a_{i,t}\mid h_{i,t})L(θ)=−N1​i,t∑​mi,t​sg[min(ρi,t​(θ),5)]Ai​logπθ​(ai,t​∣hi,t​)ρi,t(θ)=πθ(ai,t∣hi,t)πrollout(ai,t∣hi,t)\rho_{i,t}(\theta) = \frac{\pi_\theta(a_{i,t}\mid h_{i,t})}{\pi_{\mathrm{rollout}}(a_{i,t}\mid h_{i,t})}ρi,t​(θ)=πrollout​(ai,t​∣hi,t​)πθ​(ai,t​∣hi,t​)​Ai=r~i−1∣g∣∑j∈gr~jA_i = \tilde r_i - \frac{1}{|g|}\sum_{j\in g}\tilde r_jAi​=r~i​−∣g∣1​j∈g∑​r~j​
+mi,tm_{i,t}mi,t​ marks model-generated training tokens, and NNN counts those tokens in the batch.
+
+In addition to CISPO we incorporate Rollout Routing Replay (R3) [38] [#ref-38], mean-centered advantages [39] [#ref-39], and zero-advantage filtering [40] [#ref-40].
+
+Async Updates and Mini-Steps
+
+Our earlier synchronous setup used three policies (current, pre-update, and rollout) [41] [#ref-41]: CISPO compared the current and pre-update policies, while token-level truncated importance sampling corrected the pre-update/rollout mismatch [42] [#ref-42]. That implementation used an extra forward pass for pre-update log probabilities and multiple minibatch updates per rollout batch.
+
+Here, completed task groups enter a buffer continuously, and a full batch triggers one optimizer step, with no mini-steps [31] [#ref-31] [43] [#ref-43]. Off-policyness therefore depends on trainer throughput relative to rollout throughput. The update uses the importance sampling ratio of the current policy to the rollout policy directly, which removes the separate pre-update policy and its forward pass.
+
+Length Penalty
+
+We penalize generated output and excessive turns, alongside malformed tool calls and calls to nonexistent tools:
+ri=Rraw,i−min⁡(λmi,ctool)r_i = R_{\mathrm{raw},i} - \min(\lambda m_i,c_{\mathrm{tool}})ri​=Rraw,i​−min(λmi​,ctool​)Radjusted,i=ri−max⁡(ri,0) f(ni)−Gg P(Ti)R_{\mathrm{adjusted},i}
+= r_i - \max(r_i,0)\,f(n_i) - G_g\,P(T_i)Radjusted,i​=ri​−max(ri​,0)f(ni​)−Gg​P(Ti​)P(T)=min⁡ ⁣(αmax⁡(T−B,0)L,cout)+η clip⁡ ⁣(T−BtailLtail,0,1)P(T) =
+\min\!\left(\alpha\frac{\max(T-B,0)}{L},c_{\mathrm{out}}\right)
++ \eta\,\operatorname{clip}\!\left(\frac{T-B_{\mathrm{tail}}}{L_{\mathrm{tail}}},0,1\right)P(T)=min(αLmax(T−B,0)​,cout​)+ηclip(Ltail​T−Btail​​,0,1)
+TiT_iTi​ counts generated tokens across the trajectory, nin_ini​ counts agent turns, and mim_imi​ counts invalid tool calls. Each invalid call incurs a penalty λ\lambdaλ, capped in total at ctoolc_{\mathrm{tool}}ctool​. The turn factor f(n)=clip⁡((n−n0)/(nmax⁡−n0),0,1)f(n)=\operatorname{clip}((n-n_0)/(n_{\max}-n_0),0,1)f(n)=clip((n−n0​)/(nmax​−n0​),0,1) fades positive reward from n0n_0n0​ to zero at the turn cap nmax⁡n_{\max}nmax​. GgG_gGg​ enables output penalties when the group mean reward after this fade is positive.
+
+The output penalty grows at rate α/L\alpha/Lα/L beyond allowance BBB, up to coutc_{\mathrm{out}}cout​. A separate extreme-length penalty starts at BtailB_{\mathrm{tail}}Btail​, rises over LtailL_{\mathrm{tail}}Ltail​ tokens, and caps at η\etaη.
+
+Training Details
+
+SettingValue
+
+Base modelGLM-5.3-Flash [44] [#ref-44]
+
+LossCISPO [37] [#ref-37], with modified two-policy objective
+
+OptimizerAdamW
+
+Batch size64 × 8
+
+LoRA rank [45] [#ref-45]64
+
+Learning rate5 × 10⁻⁵
+
+Sampling configtemp = 1, top_p = 1, top_k = -1
+
+AdvantageGroup-centered mean without standard deviation normalization [39] [#ref-39]
+
+Loss normalizationNormalized by the total count of valid generation tokens in the training batch
+
+Context window131,072 tokens
+
+Max agent turns250
+
+Compaction triggerAt 85% of the context window or when 30,000 tokens remain, whichever occurs first
+
+Results
+
+We evaluate Ultramarine 1 Flash on six knowledge-work benchmarks, JobBench [46] [#ref-46], PI Knowledge Work, FrontierFinance [47] [#ref-47], AutomationBench [48] [#ref-48], DiligenceBench [49] [#ref-49] and APEX-Agents 1.1 [50] [#ref-50], and report two coding benchmarks for reference, Terminal-Bench 2.1 [51] [#ref-51] and DeepSWE [52] [#ref-52] (Table 8). All models run at the highest reasoning setting they support. On PI Knowledge Work we additionally sweep each model's reasoning settings for the cost–quality frontier. The notes to Table 8 give each benchmark's setup and the source of each comparison score.
+
+JobBench
+
+Ultramarine 1 Flash62.9
+
+Gemini 3.8 Flash60.6
+
+DeepSeek V4.1 Flash60.4
+
+Claude Fable 557.4
+
+GLM-5.3 Flash56.3
+
+Kimi K354.3
+
+GPT-5.6 Sol45.4
+
+PI Knowledge Work (internal)
+
+Ultramarine 1 Flash59.3
+
+Claude Fable 557.8
+
+GPT-5.6 Sol55.1
+
+GLM-5.3 Flash52.0
+
+Kimi K351.2
+
+Gemini 3.8 Flash49.4
+
+DeepSeek V4.1 Flash47.9
+
+FrontierFinance
+
+Ultramarine 1 Flash53.3
+
+GLM-5.3 Flash50.7
+
+Gemini 3.8 Flash50.0
+
+Claude Fable 549.2
+
+GPT-5.6 Sol46.8
+
+Kimi K346.4
+
+DeepSeek V4.1 Flash46.0
+
+AutomationBench
+
+DeepSeek V4.1 Flash51.3
+
+Ultramarine 1 Flash50.2
+
+GLM-5.3 Flash48.8
+
+Gemini 3.8 Flash47.3
+
+Kimi K346.7
+
+Claude Fable 546.2
+
+GPT-5.6 Sol45.8
+
+DiligenceBench
+
+Gemini 3.8 Flash53.1
+
+Claude Fable 552.9
+
+Ultramarine 1 Flash50.6
+
+Kimi K350.4
+
+DeepSeek V4.1 Flash50.3
+
+GPT-5.6 Sol50.0
+
+GLM-5.3 Flash48.2
+
+APEX-Agents 1.1
+
+Gemini 3.8 Flash64.3
+
+Claude Fable 563.6
+
+Ultramarine 1 Flash57.0
+
+GLM-5.3 Flash52.8
+
+GPT-5.6 Sol51.5
+
+Kimi K350.6
+
+DeepSeek V4.1 Flash39.5
+
+BenchmarkUltramarine 1 FlashGLM‑5.3 FlashClaude Fable 5GPT-5.6 SolGemini 3.8 FlashDeepSeek V4.1 FlashKimi K3
+
+Knowledge Work
+
+JobBencha [#evaluation-note-a]62.956.357.445.460.660.454.3
+
+PI Knowledge Work (internal)b [#evaluation-note-b]59.352.057.855.149.447.951.2
+
+FrontierFinancec [#evaluation-note-c]53.350.749.246.850.046.046.4
+
+AutomationBenchd [#evaluation-note-d]50.248.846.245.847.351.346.7
+
+DiligenceBenche [#evaluation-note-e]50.648.252.950.053.150.350.4
+
+APEX-Agents 1.1f [#evaluation-note-f]57.052.863.651.564.339.550.6
+
+Coding
+
+Terminal-Bench 2.1g [#evaluation-note-g]83.284.384.388.889.490.688.3
+
+DeepSWE 1.1h [#evaluation-note-h]61.563.469.972.773.874.268.5
+
+Table 8. Knowledge-work and coding results.
+
+Ultramarine improves on GLM-5.3 Flash on all six knowledge-work benchmarks, by 4.1 points on average, while generating 6.5% fewer tokens across themi [#evaluation-note-i].
+
+PI Knowledge Work: score against cost per task
+
+Scores are means over our internal task suite. Cost is per task at each developer's official API pricing as of October 2026.
+
+On PI Knowledge Work, Ultramarine sits on the cost-quality frontier. It scores 59.3 at $0.13 per task, against 57.8 at $8.19 for Claude Fable 5 (max) and 55.1 at $2.09 for GPT-5.6 Sol (max), and trails Claude Opus 5.5 (max) by 2.6 points at $6.96 and GPT-6 Sol (max) by 2.0 at $1.26. Of the 39 other runs across eighteen models and their reasoning settings, 27 cost more and score lower. Across the 24 runs in the figure that Artificial Analysis also measures, PI Knowledge Work scores correlate strongly with the Artificial Analysis Intelligence Index (r = 0.81).
+
+Worked Task Example
+
+Board forecast and disclosure update
+
+In this edited curriculum example, the agent updates a board pre-read with a revised management forecast, its valuation implications, and the distinction between board approval and counsel clearance.
+
+›
+Instruction
+
+Task
+
+Project Aurora's target board meets at 4:30 p.m. CT on April 17 while investor education is underway, and the forecast response item has to be resolved for tomorrow's registration-statement turn. Update the existing board pre-read in place, limited to its forecast-and-disclosure section and the related director decision callout, so it presents the current management case, carries the revision through the transaction-valuation read-across, and gives the board a clear decision on the forecast basis it is being asked to approve and the position management may use in roadshow discussions pending completion of the next disclosure turn. Work as of 12:00 p.m. CT on April 17, preserve the rest of the document and its formatting, and distinguish what the board can decide now from anything that still requires counsel clearance.
+
+Deliverable
+
+Edit /filesystem/Aurora/DealRoom/Board/project-aurora-board-financing-update.docx in place. Do not rename it, copy it, or save your work under a new filename.
+
+›
+Environment
+
+/filesystem/Aurora/
+›DealRoom/Board1
+
+project-aurora-board-financing-update.docxDOCX
+
+›Correspondence4
+
+2025-04-16-forecast-conforming.emlEML
+
+2025-04-17-board-materials.emlEML
+
+2025-04-17-minimum-cash-update.emlEML
+
+thread-index.mdMD
+
+›DealRoom/Fairness3
+
+project-aurora-projections-change-log.mdMD
+
+project-aurora-projections-v7.xlsxXLSX
+
+project-aurora-valuation-summary.pdfPDF
+
+›DealRoom/Models2
+
+project-aurora-ownership-dilution.xlsxXLSX
+
+project-aurora-redemption-minimum-cash.xlsxXLSX
+
+›DealRoom/PIPE3
+
+project-aurora-investor-q-and-a.mdMD
+
+project-aurora-pipe-book.xlsxXLSX
+
+project-aurora-pipe-status-2025-04-17.mdMD
+
+›DealRoom/Trackers2
+
+project-aurora-open-items-2025-04-17.mdMD
+
+project-aurora-open-items-2025-04-17.xlsxXLSX
+
+›DealRoom/Transaction3
+
+project-aurora-key-definitions.docxDOCX
+
+project-aurora-sources-and-uses.mdMD
+
+project-aurora-transaction-terms.pdfPDF
+
+›Diligence/Operating1
+
+nhc-historical-summary.xlsxXLSX
+
+›LegalRegulatory/Comments1
+
+project-aurora-comment-log.mdMD
+
+›LegalRegulatory/S-43
+
+project-aurora-disclosure-checklist.mdMD
+
+project-aurora-proxy-drafting-notes.docxDOCX
+
+project-aurora-proxy-projections-v5.pdfPDF
+
+›Notes4
+
+2025-04-14-management-forecast-call.mdMD
+
+2025-04-15-trustee-call.mdMD
+
+2025-04-16-pipe-desk-call.mdMD
+
+2025-04-17-counsel-sync.mdMD
+
+›Source Materials/Market Context/bounded_web1
+
+sec-spac-rules-2024-sec-spac-and-projections-rules-fact-shee.pdfPDF
+
+›Source Materials/NHC3
+
+nhc-2024-10-k.pdfPDF
+
+nhc-2024-q3-10-q.pdfPDF
+
+nhc-2024-results-8-k.pdfPDF
+
+Connected MCP services
+Email and calendar MCPs provide forecast correspondence, counsel-review communications, and board-preparation events.
+
+›
+Grader
+
+Factual Accuracy
+
+−50
+
++106
+
+Analytical Soundness
+
+−100
+
++46
+
+Completeness
+
++48
+
+Source & Context Fidelity
+
+−25
+
++34
+
+Communication & Delivery
+
+−10
+
++8
+
+Instruction Following & Format
+
+−25
+
++5
+
+›Factual Accuracy11
+
+1.
+States v7 2025E revenue as $1,438mm (within ±$5mm)
++10
+
+2.
+States v7 2026E revenue as $1,575mm (within ±$5mm)
++10
+
+3.
+States v7 2025E Adjusted EBITDA as $151mm (within ±$3mm)
++10
+
+4.
+States v7 2026E Adjusted EBITDA as $174mm (within ±$3mm)
++10
+
+5.
+States v5-to-v7 revenue delta as ($22mm) / ($50mm) for 2025E / 2026E (within ±$3mm each)
++10
+
+6.
+States v5-to-v7 Adjusted EBITDA delta as ($7mm) / ($13mm) for 2025E / 2026E (within ±$2mm each)
++10
+
+7.
+Computes $1,850mm EV / v7 2025E Adj. EBITDA as 12.3x (within ±0.3x)
++18
+
+8.
+Computes $1,850mm EV / v7 2026E Adj. EBITDA as 10.6x (within ±0.3x)
++18
+
+9.
+States Management Forecast v7 was approved April 16
++10
+
+10.
+States 11.7x or 9.9x as the current transaction Adj. EBITDA multiples (stale v5 basis)
+−25
+
+11.
+Presents v5 revenue ($1,460mm / $1,625mm) or EBITDA ($158mm / $187mm) as the current board forecast basis
+−25
+
+›Analytical Soundness6
+
+12.
+Carries the v7 forecast through the $1,850mm EV transaction-multiple read-across (stating the 12.3x / 10.6x 2025E / 2026E Adj. EBITDA multiples as the implication of the revised case) rather than presenting the forecast as a standalone table disconnected from the valuation framework
++18
+
+13.
+Separates what the board can approve now (v7 as the sole forecast/valuation basis and the qualitative roadshow position) from what still requires counsel clearance (exact external wording and the next-turn projection tables and narrative), rather than presenting the forecast update and disclosure use as a single settled action
++18
+
+14.
+States v7 is the sole basis for Board, fairness, and transaction-valuation work, reasoning that the revised case (not the stale v5 proxy) is the controlling forecast for the board's own decision and the $1,850mm EV read-across
++10
+
+15.
+Authorizes management to use v7 figures or revised projection language in investor education immediately without counsel clearance — a conclusion that contradicts the disclosure-process constraint the task requires the board pre-read to preserve
+−50
+
+16.
+Approves the stale v5 proxy forecast (March 28 case) as the current board/fairness/transaction-valuation basis — a conclusion that contradicts the executive summary's own statement that board and fairness work uses v7
+−25
+
+17.
+Treats the board's approval of the v7 forecast basis as equivalent to counsel clearance for public roadshow or registration-statement use — conflating the internal model update track with the external disclosure conforming track the task requires to remain separated
+−25
+
+›Completeness6
+
+18.
+Includes a forecast section presenting the v7 2025E and 2026E revenue and Adjusted EBITDA figures
++8
+
+19.
+Includes the v5-to-v7 bridge showing the change in revenue and Adjusted EBITDA
++8
+
+20.
+Notes the proxy remains on v5 and the conforming changes remain open
++8
+
+21.
+Updates the director decision callout (Decision 2) to reflect v7 approval and the counsel gate
++8
+
+22.
+States a qualitative roadshow position addressing the census ramp and labor normalization timing
++8
+
+23.
+The roadshow position includes that underlying service mix and long-term operating thesis remain unchanged
++8
+
+›Source & Context Fidelity4
+
+24.
+Uses Management Forecast v7 (approved Apr. 16) as the forecast basis for the board, fairness, and transaction-valuation work rather than the stale March 28 v5 proxy case
++18
+
+25.
+Identifies the circulating proxy projection table as the March 28 v5 version and states that the conforming changes to table and narrative remain open
++8
+
+26.
+Cites named source files for the v7 forecast, the $1,850mm EV framework, and the proxy v5 disclosure posture
++8
+
+27.
+Silently adopts one of the conflicting forecast versions (v5 vs v7) without acknowledging the other exists or noting that the proxy remains on v5 while board work has moved to v7
+−25
+
+›Communication & Delivery2
+
+28.
+Marks the roadshow and registration-statement position as pending counsel clearance rather than as settled disclosure.
++8
+
+29.
+Leaves internal working notes or meta-commentary — bracketed TODOs, self-references to the task or instructions, or an "as computed internally" hedge — in the board-facing pre-read
+−10
+
+›Instruction Following & Format2
+
+30.
+Submits the edited file at its original path filesystem/Aurora/DealRoom/Board/project-aurora-board-financing-update.docx, not a renamed or relocated copy
++5
+
+31.
+Rewrites or materially alters sections outside the forecast-and-disclosure section and the related director decision callout (Decision 2), such as modifying the Executive Summary, Transaction and Liquidity Snapshot, Ownership, or Open Risks sections
+−25
+
+References and Notes
+
+[1]
+
+Ivison, H., et al. (2026). TMax: A Simple Recipe for Terminal Agents. arXiv:2606.23321 [https://arxiv.org/abs/2606.23321].
+↩ 1 [#cite-1-1]↩ 2 [#cite-1-2]
+
+[2]
+
+Wang, Z., et al. (2026). Agent World Model: Infinity Synthetic Environments for Agentic Reinforcement Learning. arXiv:2602.10090 [https://arxiv.org/abs/2602.10090].
+↩ [#cite-2-1]
+
+[3]
+
+Zeng, Y., et al. (2026). EnvCraft: Synthesizing Executable Environments in Agentic RL for Claw-like Agent. arXiv:2609.05576 [https://arxiv.org/abs/2609.05576].
+↩ [#cite-3-1]
+
+[4]
+
+Zuo, Y., et al. (2026). Qwen-AgentWorld: Language World Models for General Agents. arXiv:2606.24597 [https://arxiv.org/abs/2606.24597].
+↩ [#cite-4-1]
+
+[5]
+
+Ramrakhya, R., et al. (2025). Scaling Synthetic Task Generation for Agents via Exploration. arXiv:2509.25047 [https://arxiv.org/abs/2509.25047].
+↩ [#cite-5-1]
+
+[6]
+
+Li, Z., et al. (2026). Recursive Synthesis for Long-Horizon Terminal Tasks. arXiv:2608.05466 [https://arxiv.org/abs/2608.05466].
+↩ [#cite-6-1]
+
+[7]
+
+Li, J., et al. (2026). Agentic Environment Engineering for Large Language Models: A Survey of Environment Modeling, Synthesis, Evaluation, and Application. arXiv:2606.12191 [https://arxiv.org/abs/2606.12191].
+↩ [#cite-7-1]
+
+[8]
+
+DeepSeek-AI (2026). DeepSeek-V4.1-Flash: Pushing the Limits of KV Cache Compression. Technical report [https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/resolve/main/DeepSeek_V41_Tech_Report.pdf].
+↩ [#cite-8-1]
+
+[9]
+
+LLM-Core, Xiaomi (2026). MiMo-V2.6: Scaling Reinforcement Learning Towards Self-Improvement. Technical report [https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Flash-RL/resolve/5711b268169967567844e1e560e8a3966da959b1/MiMo_V2_6_technical_report.pdf].
+↩ 1 [#cite-9-1]↩ 2 [#cite-9-2]
+
+[10]
+
+Harbor Framework Team (2026). Harbor: A framework for evaluating and optimizing agents and models in container environments. GitHub [https://github.com/harbor-framework/harbor]. Task specification [https://docs.harborframework.com/core-concepts/tasks/overview].
+↩ 1 [#cite-10-1]↩ 2 [#cite-10-2]
+
+[11]
+
+Gunjal, A., et al. (2025). Rubrics as Rewards: Reinforcement Learning Beyond Verifiable Domains. arXiv:2507.17746 [https://arxiv.org/abs/2507.17746].
+↩ [#cite-11-1]
+
+[12]
+
+Khazi, D., et al. (2026). Notes on Choosing a Rubric Judge. Paper Instruments Blog [https://www.paperinstruments.com/blog/rubric-judge].
+↩ 1 [#cite-12-1]↩ 2 [#cite-12-2]↩ 3 [#cite-12-3]
+
+[13]
+
+Epoch AI (2026, September 17). Introducing Benchmark Reviews. X post [https://x.com/EpochAIResearch/status/2100704765332394255].
+↩ [#cite-13-1]
+
+[14]
+
+OpenAI (2026). Separating signal from noise in coding evaluations. OpenAI [https://openai.com/index/separating-signal-from-noise-coding-evaluations/].
+↩ [#cite-14-1]
+
+[15]
+
+Yu, Y., et al. (2023). Large Language Model as Attributed Training Data Generator: A Tale of Diversity and Bias. arXiv:2306.15895 [https://arxiv.org/abs/2306.15895].
+↩ [#cite-15-1]
+
+[16]
+
+Paper Instruments (n.d.). Rubric: A Python library for LLM-based evaluation using weighted rubrics. GitHub [https://github.com/paper-instruments/rubric].
+↩ [#cite-16-1]
+
+[17]
+
+NVIDIA (2026). Nemotron 3 Ultra: Open, Efficient Mixture-of-Experts Hybrid Mamba-Transformer Model for Agentic Reasoning. arXiv:2606.15007 [https://arxiv.org/abs/2606.15007].
+↩ [#cite-17-1]
+
+[18]
+
+Anthropic (n.d.). Claude Code overview. Official documentation [https://code.claude.com/docs/en/overview].
+↩ [#cite-18-1]
+
+[19]
+
+OpenAI (n.d.). Codex. GitHub [https://github.com/openai/codex].
+↩ [#cite-19-1]
+
+[20]
+
+Cursor (n.d.). Cursor. Official issue-tracker repository [https://github.com/cursor/cursor]. Harness engineering description [https://cursor.com/blog/continually-improving-agent-harness].
+↩ [#cite-20-1]
+
+[21]
+
+Moonshot AI (n.d.). Kimi Code CLI. GitHub [https://github.com/MoonshotAI/kimi-code]. Earlier Python implementation [https://github.com/MoonshotAI/kimi-cli].
+↩ [#cite-21-1]
+
+[22]
+
+OpenAI (n.d.). OpenAI Agents SDK for Python. GitHub [https://github.com/openai/openai-agents-python].
+↩ [#cite-22-1]
+
+[23]
+
+Anomaly (n.d.). OpenCode. GitHub [https://github.com/anomalyco/opencode].
+↩ [#cite-23-1]
+
+[24]
+
+OpenHands (n.d.). OpenHands. GitHub [https://github.com/OpenHands/OpenHands].
+↩ [#cite-24-1]
+
+[25]
+
+OpenHands (n.d.). OpenHands Software Agent SDK. GitHub [https://github.com/OpenHands/software-agent-sdk].
+↩ [#cite-25-1]
+
+[26]
+
+Qwen (n.d.). Qwen Code. GitHub [https://github.com/QwenLM/qwen-code].
+↩ [#cite-26-1]
+
+[27]
+
+SWE-agent (n.d.). mini-SWE-agent. GitHub [https://github.com/SWE-agent/mini-swe-agent].
+↩ [#cite-27-1]
+
+[28]
+
+Terminal-Bench contributors (n.d.). Terminus. GitHub [https://github.com/harbor-framework/terminal-bench]. Agent description [https://www.tbench.ai/news/terminus].
+↩ [#cite-28-1]
+
+[29]
+
+SWE-agent (n.d.). SWE-agent. GitHub [https://github.com/SWE-agent/SWE-agent].
+↩ [#cite-29-1]
+
+[30]
+
+Brown, W. (2025). Verifiers: Environments for LLM Reinforcement Learning. GitHub [https://github.com/PrimeIntellect-ai/verifiers].
+↩ [#cite-30-1]
+
+[31]
+
+Piché, A., et al. (2025). PipelineRL: Faster On-policy Reinforcement Learning for Long Sequence Generation. arXiv:2509.19128 [https://arxiv.org/abs/2509.19128].
+↩ 1 [#cite-31-1]↩ 2 [#cite-31-2]↩ 3 [#cite-31-3]
+
+[32]
+
+Paper Instruments (n.d.). Paper Office. Paper Instruments [https://www.paperinstruments.com/paper-python].
+↩ [#cite-32-1]
+
+[33]
+
+E2B (n.d.). Sandbox persistence. Documentation [https://docs.e2b.dev/sandbox/persistence].
+↩ [#cite-33-1]
+
+[34]
+
+Martin, L., Cemaj, G., & Cohen, M. (2026). Scaling Managed Agents: Decoupling the brain from the hands. Anthropic Engineering [https://www.anthropic.com/engineering/managed-agents].
+↩ [#cite-34-1]
+
+[35]
+
+Paper Instruments (2026). Kos-1 Lite: SOTA Medical Model. Paper Instruments Blog [https://www.paperinstruments.com/blog/kos-1].
+↩ [#cite-35-1]
+
+[36]
+
+Fang, Q., et al. (2026). Kos-1 Experimental: Env-Free RL on a 1T Parameter Agentic Prior. Paper Instruments Blog [https://www.paperinstruments.com/blog/kos-1-experimental].
+↩ [#cite-36-1]
+
+[37]
+
+MiniMax (2025). MiniMax-M1: Scaling Test-Time Compute Efficiently with Lightning Attention. arXiv:2506.13585 [https://arxiv.org/abs/2506.13585].
+↩ 1 [#cite-37-1]↩ 2 [#cite-37-2]
+
+[38]
+
+Ma, W., et al. (2025). Stabilizing MoE Reinforcement Learning by Aligning Training and Inference Routers. arXiv:2510.11370 [https://arxiv.org/abs/2510.11370].
+↩ [#cite-38-1]
+
+[39]
+
+Liu, Z., et al. (2025). Understanding R1-Zero-Like Training: A Critical Perspective. arXiv:2503.20783 [https://arxiv.org/abs/2503.20783].
+↩ 1 [#cite-39-1]↩ 2 [#cite-39-2]
+
+[40]
+
+Yu, Q., et al. (2025). DAPO: An Open-Source LLM Reinforcement Learning System at Scale. arXiv:2503.14476 [https://arxiv.org/abs/2503.14476].
+↩ [#cite-40-1]
+
+[41]
+
+Hilton, J., Cobbe, K., & Schulman, J. (2021). Batch Size-Invariance for Policy Optimization. arXiv:2110.00641 [https://arxiv.org/abs/2110.00641].
+↩ [#cite-41-1]
+
+[42]
+
+Fang, Q., & Khazi, D. (2025). Mismatch Praxis: Rollout Settings and IS Corrections. Paper Instruments Blog [https://www.paperinstruments.com/blog/mismatch-praxis].
+↩ [#cite-42-1]
+
+[43]
+
+Mistral-AI (2025). Magistral. arXiv:2506.10910 [https://arxiv.org/abs/2506.10910].
+↩ [#cite-43-1]
+
+[44]
+
+Z.ai (2026). GLM-5.3-Flash. Model card [https://huggingface.co/zai-org/GLM-5.3-Flash].
+↩ [#cite-44-1]
+
+[45]
+
+Hu, E. J., et al. (2021). LoRA: Low-Rank Adaptation of Large Language Models. arXiv:2106.09685 [https://arxiv.org/abs/2106.09685].
+↩ [#cite-45-1]
+
+[46]
+
+Li, Y., et al. (2026). JobBench: Aligning Agent Work With Human Will. arXiv:2605.26329 [https://arxiv.org/abs/2605.26329].
+↩ [#cite-46-1]
+
+[47]
+
+Zhang, Y., et al. (2026). FrontierFinance: A Challenging Benchmark for Measuring Frontier Intelligence of Finance Agents. arXiv:2608.11683 [https://arxiv.org/abs/2608.11683].
+↩ [#cite-47-1]
+
+[48]
+
+Shepard, D., & Salimans, R. (2026). AutomationBench. arXiv:2604.18934 [https://arxiv.org/abs/2604.18934].
+↩ [#cite-48-1]
+
+[49]
+
+Musaeus, M. H., et al. (2026). DiligenceBench: An Equity-Research Agent Evaluation. Paper Instruments Blog [https://www.paperinstruments.com/blog/diligence-bench].
+↩ [#cite-49-1]
+
+[50]
+
+Vidgen, B., et al. (2026). APEX-Agents. arXiv:2601.14242 [https://arxiv.org/abs/2601.14242].
+↩ [#cite-50-1]
+
+[51]
+
+Merrill, M. A., et al. (2026). Terminal-Bench: Benchmarking Agents on Hard, Realistic Tasks in Command Line Interfaces. arXiv:2601.11868 [https://arxiv.org/abs/2601.11868]. Terminal-Bench 2.1 release [https://www.tbench.ai/news/terminal-bench-2-1].
+↩ [#cite-51-1]
+
+[52]
+
+Huang, W., et al. (2026). DeepSWE: Measuring Frontier Coding Agents on Original, Long-Horizon Engineering Tasks. arXiv:2607.07946 [https://arxiv.org/abs/2607.07946]. Leaderboard [https://deepswe.datacurve.ai].
+↩ [#cite-52-1]
+
+Notes to Evaluations
+
+JobBench. Run on the leaderboard's harness, OpenCode 1.14.18, with the Grok 4.3 judge, on the 65-task main split. GLM-5.3 Flash, Gemini 3.8 Flash and DeepSeek V4.1 Flash were run by us in the same harness; other comparison scores are from the JobBench leaderboard.
+
+PI Knowledge Work. An internal suite of client-ready deliverables (Excel, PowerPoint, Word) and tasks in live business systems, run in Feather with a 262,144-token context window. Each task is graded against its own rubric by GPT-5.6 Terra.
+
+FrontierFinance. Run on the official Finance Agent v2 harness with the Appendix E tool limits and Samaya's three-judge grader, over all 220 queries; we report R_all. The official 300-second tool budget includes model-serving time; without it, Ultramarine 1 Flash scores 58.1, GLM-5.3 Flash 56.7 and DeepSeek V4.1 Flash 55.8. GLM-5.3 Flash and DeepSeek V4.1 Flash were run by us; other comparison scores are from the Samaya leaderboard.
+
+AutomationBench. Run on the 600 public tasks with the upstream harness (v1.0.6). GLM-5.3 Flash is as reported by Z.ai. Gemini 3.8 Flash and DeepSeek V4.1 Flash were run by us; Claude Fable 5, GPT-5.6 Sol and Kimi K3 are the public-set scores reported by their developers.
+
+DiligenceBench. This is our own benchmark, and all models were run by us on its H3 Finance harness over all 150 tasks, graded by GPT-5.5.
+
+APEX-Agents 1.1. Run with Mercor's Loop agent, the leaderboard harness; we report Pass@1 averaged over three runs. Comparison scores are from the Mercor Pass@1 leaderboard.
+
+Terminal-Bench 2.1. Run with Claude Code 2.1.207 on the 89 official tasks, one trial per task. Comparison scores are as reported by each model's developer.
+
+DeepSWE 1.1. Run with the leaderboard's harness and attempt count: Pier with mini-SWE-agent, four attempts on each of the 113 tasks. Comparison scores are from the Datacurve leaderboard, except DeepSeek V4.1 Flash, which is as reported by DeepSeek.
+
+Token counts. Output tokens, reasoning included, summed over every task of the runs behind each reported score. For AutomationBench and APEX-Agents 1.1, Table 8 reports GLM-5.3 Flash's public scores. We also ran GLM-5.3 Flash on both ourselves, and its token counts there come from our runs closest to the public scores.
+
+© 2026 Paper Instruments, Inc.
+Docs [https://docs.paperinstruments.com/]Careers [/careers]Contact [/careers]GitHub [https://github.com/paper-instruments]
+
+Privacy [/privacy]Terms [/terms]SOC 2 Type II [https://compliance.paperinstruments.com/]

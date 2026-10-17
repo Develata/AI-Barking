@@ -1,0 +1,276 @@
+使用 Anthropic API | DeepSeek API Docs
+
+跳到主要内容 [#__docusaurus_skipToContent_fallback]
+
+Search / Fetch API 已上线，使用自研搜索引擎，支持网页搜索与抓取，点此查看使用指南。 [/zh-cn/guides/search]
+
+DeepSeek API 文档 [/zh-cn/]
+
+更多资源 [#]
+
+实用集成 [https://github.com/deepseek-ai/awesome-deepseek-integration/tree/main]
+
+API 服务状态 [https://status.deepseek.com/]
+
+常见问题 [https://static.deepseek.com/faq/index.html?lang=zh#/category/4]
+
+中文（中国） [#]
+
+English [/guides/anthropic_api]
+
+中文（中国） [/zh-cn/guides/anthropic_api]
+
+开放平台 [https://platform.deepseek.com/]EN [/guides/anthropic_api]
+
+快速开始 [/zh-cn/]API 指南 [/zh-cn/guides/vision]API 文档 [/zh-cn/api/create-chat-completion]新闻 [/zh-cn/news/news261017]更新日志 [/zh-cn/updates]
+
+图像理解 [/zh-cn/guides/vision]
+
+思考模式 [/zh-cn/guides/thinking_mode]
+
+多轮对话 [/zh-cn/guides/multi_round_chat]
+
+对话前缀续写（Beta） [/zh-cn/guides/chat_prefix_completion]
+
+FIM 补全（Beta） [/zh-cn/guides/fim_completion]
+
+JSON Output [/zh-cn/guides/json_mode]
+
+Tool Calls [/zh-cn/guides/tool_calls]
+
+Files API [/zh-cn/guides/files_api]
+
+网页搜索与抓取 [/zh-cn/guides/search]
+
+上下文硬盘缓存 [/zh-cn/guides/kv_cache]
+
+使用 Responses API [/zh-cn/guides/responses_api]
+
+使用 Anthropic API [/zh-cn/guides/anthropic_api]
+
+ [/zh-cn/]
+
+使用 Anthropic API
+
+本页目录
+
+使用 Anthropic API
+
+为了满足大家对 Anthropic API 生态的使用需求，我们的 API 新增了对 Anthropic API 格式的支持，其 base_url 为 https://api.deepseek.com/anthropic。
+
+通过简单的配置，即可将 DeepSeek 的能力，接入到 Anthropic API 生态中。
+
+将 DeepSeek 模型接入 Claude Code​ [#将-deepseek-模型接入-claude-code]
+
+请参考接入 Claude Code [/zh-cn/quick_start/agent_integrations/claude_code]
+
+通过 Anthropic API 调用 DeepSeek 模型​ [#通过-anthropic-api-调用-deepseek-模型]
+
+安装 Anthropic SDK
+
+pip install anthropic
+
+配置环境变量
+
+export ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic
+export ANTHROPIC_API_KEY=${YOUR_API_KEY}
+
+调用 API
+
+import anthropic
+
+client = anthropic.Anthropic()
+
+message = client.messages.create(
+ model="deepseek-flash",
+ max_tokens=1000,
+ system="You are a helpful assistant.",
+ messages=[
+ {
+ "role": "user",
+ "content": [
+ {
+ "type": "text",
+ "text": "Hi, how are you?"
+ }
+ ]
+ }
+ ]
+)
+print(message.content)
+
+注意：以 claude 开头的不支持的模型名仍会被接受：claude-opus* 会映射到 deepseek-v4-pro，其它 claude* 模型名会映射到 deepseek-flash。不以 claude 开头的未知模型名会返回 400 错误。
+
+Anthropic 模型映射​ [#anthropic-模型映射]
+
+您在使用 Anthropic API 时，我们会对您传入的 claude 模型名进行映射：
+
+claude-opus 开头的模型，会映射到 deepseek-v4-pro
+
+claude-haiku、claude-sonnet 开头的模型，会映射到 deepseek-flash
+
+claude-opus 映射到的 deepseek-v4-pro 按 V4 Pro 价格计费。
+
+通过这样的映射，您在使用新版 Claude Desktop APP 的 developer 模式时，可以绕过 APP 对模型名的限制，只需改动 base_url 和 api_key，即可在其中接入 DeepSeek 模型。
+
+Anthropic API 兼容性细节​ [#anthropic-api-兼容性细节]
+
+本小节罗列了 DeepSeek API 对 Anthropic API 的兼容性细节。Anthropic API 完整格式定义，请参考 Anthropic 官方 API 手册 [https://platform.claude.com/docs/en/api/python/beta/messages/create]。
+
+HTTP Header​ [#http-header]
+
+字段支持情况
+
+anthropic-beta/messages 忽略；但 source.type 为 file 的图片必须携带（files-api-2025-04-14）；Files API 端点必须携带——见 Files API [/zh-cn/guides/files_api#anthropic-compatible-files-api]
+
+anthropic-version忽略
+
+x-api-key完全支持
+
+简单字段​ [#简单字段]
+
+字段支持情况
+
+model改为使用 DeepSeek 模型
+
+max_tokens完全支持
+
+container忽略
+
+mcp_servers忽略
+
+metadata支持 user_id，其它字段忽略
+关于 user_id 参数的更多信息，请参考 限速与隔离 [/zh-cn/quick_start/rate_limit]。
+
+service_tier忽略
+
+stop_sequences完全支持
+
+stream完全支持
+
+system完全支持
+
+temperature完全支持（范围 [0.0 ~ 2.0]）
+
+thinking支持（budget_tokens 被忽略）
+
+output_config仅支持 effort
+
+top_k忽略
+
+top_p因模型而异：
+deepseek-flash：思考模式下生效（下限 0.95），非思考模式下恒为 1.0。
+deepseek-v4-pro：思考模式下忽略传入值（有工具时固定为 0.95，否则为 1.0），非思考模式下生效
+
+Tool 字段​ [#tool-字段]
+
+tools​ [#tools]
+
+字段支持情况
+
+name完全支持
+
+input_schema完全支持
+
+description完全支持
+
+cache_control忽略
+
+tool_choice​ [#tool_choice]
+
+取值支持情况
+
+none完全支持
+
+auto支持（disable_parallel_tool_use 被忽略）
+
+any支持（disable_parallel_tool_use 被忽略）
+
+tool支持（disable_parallel_tool_use 被忽略）
+
+Message 字段​ [#message-字段]
+
+字段变体子字段支持情况
+
+ content string 完全支持
+
+array, type="text" text 完全支持 
+
+ cache_control 忽略 
+
+ citations 忽略 
+
+ array, type="image" source 支持。source.type 可为 base64（媒体类型：jpeg、png、gif、webp）、url 或 file（file 形式需带请求头 anthropic-beta: files-api-2025-04-14） 
+
+ array, type = "document" 不支持 
+
+ array, type = "search_result" 不支持 
+
+ array, type = "thinking" 支持 
+
+ array, type="redacted_thinking" 不支持 
+
+ array, type = "tool_use" id 完全支持 
+
+ input 完全支持 
+
+ name 完全支持 
+
+ cache_control 忽略 
+
+ array, type = "tool_result" tool_use_id 完全支持 
+
+ content 完全支持 
+
+ cache_control 忽略 
+
+ is_error 忽略 
+
+ array, type = "server_tool_use" 支持 
+
+ array, type = "web_search_tool_result" 支持 
+
+ array, type = "code_execution_tool_result" 不支持 
+
+ array, type = "mcp_tool_use" 不支持 
+
+ array, type = "mcp_tool_result" 不支持 
+
+ array, type = "container_upload" 不支持 
+
+上一页
+
+使用 Responses API
+ [/zh-cn/guides/responses_api]
+
+将 DeepSeek 模型接入 Claude Code [#将-deepseek-模型接入-claude-code]
+
+通过 Anthropic API 调用 DeepSeek 模型 [#通过-anthropic-api-调用-deepseek-模型]
+
+Anthropic 模型映射 [#anthropic-模型映射]
+
+Anthropic API 兼容性细节 [#anthropic-api-兼容性细节]
+
+HTTP Header [#http-header]
+
+简单字段 [#简单字段]
+
+Tool 字段 [#tool-字段]
+
+Message 字段 [#message-字段]
+
+微信公众号
+
+社区
+
+邮箱 [mailto:api-service@deepseek.com]
+
+Discord [https://discord.gg/Tc7c45Zzu5]
+
+Twitter [https://twitter.com/deepseek_ai]
+
+更多
+
+GitHub [https://github.com/deepseek-ai]
+
+Copyright © 2026 DeepSeek, Inc.

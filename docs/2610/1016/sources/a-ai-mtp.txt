@@ -1,0 +1,233 @@
+DeepSeek 发布 V4.1-Flash-1017，DeepSWE 得分 77.0 并开放 Search API · AIHOT
+
+跳到正文 [#main]
+ [/]
+
+内容
+
+精选 [/]全部 AI 动态 [/all]热点榜 [/hot]AI 日报 [/daily]主题 [/topics]收藏 [/starred]
+
+模型
+
+模型榜 [/leaderboard]Tibo 重置监控 [/codex-reset]
+
+更多
+
+Agent 接入 [/agent]关于 [/about]更新日志 [/changelog]反馈 [/feedback]
+
+GitHub 开源 [https://github.com/KKKKhazix/AIHOT]
+深色跟随系统浅色
+
+精选
+
+DeepSeek 发布 V4.1-Flash-1017，DeepSWE 得分 77.0 并开放 Search API
+
+ 返回
+
+来源
+
+MarkTechPost
+
+Asif Razzaq
+
+发布时间
+2026-10-17 16:53
+4 小时前
+
+本文目录
+
+TL;aDR [#sec-1]
+
+什么是 DeepSeek-V4.1-Flash-1017？ [#sec-2]
+
+V4.1-Flash 架构如何工作？ [#sec-3]
+
+DeepSeek-V4.1-Flash-1017 基准测试 [#sec-4]
+
+与开放权重竞品相比如何？ [#sec-5]
+
+DeepSeek 的 Search 和 Fetch API 是什么？ [#sec-6]
+
+部署与定价 [#sec-7]
+
+关键要点 [#sec-8]
+
+ 返回
+
+MarkTechPost· Asif Razzaq·2026-10-17 16:53· 4 小时前同事件AI 评分77
+
+DeepSeek 发布 V4.1-Flash-1017，DeepSWE 得分 77.0 并开放 Search API
+
+DeepSeek Just Released V4.1-Flash-1017, Scores 77.0 on DeepSWE, Opens Search API
+
+AI 导读
+
+DeepSeek 发布 V4.1-Flash-1017 检查点，已上线网站、App 和 API，官方称在全部 11 项基准上超过 9 月版 V4.1-Flash，提升 2.0 到 11.1 分，DeepSWE v1.1 达 77.0，但 Claude Opus 5 仍在 Terminal-Bench 4.0 和 HLE 等项目领先。
+
+同一件事，精选收录的是《DeepSeek-V4.1-Flash-1017 发布，多基准成绩提升且 API 价格不变》 [/items/w34qm27sedtziwxig5ub9wwhr]
+
+另外 11 家也报道了
+
+另外 11 家也报道了
+
+正文 · AI 翻译
+
+中文 [/items/lhyfe3xx4mdiws5597kmhc5w1]原文 [/items/lhyfe3xx4mdiws5597kmhc5w1/original]
+
+DeepSeek 刚刚发布了 DeepSeek-V4.1-Flash-1017，这是其 V4.1-Flash 模型的新检查点。它已在 DeepSeek 网站、应用和 API 上线 [https://x.com/deepseek_ai/status/2111375640717033777]。DeepSeek 声称，相比 9 月发布的 V4.1-Flash [https://api-docs.deepseek.com/updates]，它的分数更高、任务完成更快、输出更短。该公司称其在性能与成本上实现了帕累托改进。与此同时，DeepSeek 向所有开发者开放了其 Search 和 Fetch API [https://api-docs.deepseek.com/guides/search]。对于智能体构建者来说，这意味着一个更便宜的编码模型，加上一个第一方网络层，都通过同一个 API 密钥提供。
+
+TL;aDR
+
+规模：552B 骨干参数加 196B Engram 参数。预填充阶段每 token 激活 8B 参数，解码阶段激活 16B。上下文为 1M token，最多可输出 384K token。
+
+运行于：DeepSeek API，即 deepseek-flash。9 月 V4.1-Flash 权重（763B 参数，FP8）以 MIT 许可证在 Hugging Face 上发布。硬件要求和 1017 权重：未披露。
+
+性能：在 DeepSeek 报告的全部 11 项基准上均超过此前的 V4.1-Flash，提升 2.0 至 11.1 分。
+
+最佳：DeepSWE v1.1 上为 77.0，在 DeepSeek 的表格中高于 Claude Opus 5（74.0）。
+
+最差：无工具 HLE 上为 42.6，而 Claude Opus 5 为 56.3。
+
+什么是 DeepSeek-V4.1-Flash-1017？
+
+DeepSeek-V4.1-Flash-1017 是 DeepSeek-V4.1-Flash 的更新后训练检查点，通过 deepseek-flash 模型名提供服务。以下架构细节来自 V4.1-Flash 技术报告 [https://arxiv.org/abs/2609.19969]。
+
+DeepSeek 团队表示，DeepSeek-V4.1-Flash-1017 使用带自我反馈的强化学习来完成端到端项目工作。其示例从游戏创作到 3D 建模。它针对 DeepSeek Harness [https://deepseek-harness.github.io/deepseek-harness/en/guide/quickstart]、腾讯 CodeBuddy 和 WorkBuddy 进行了调优。DeepSeek 建议使用 DeepSeek Harness v0.2.1-rc.1 或更高版本。
+
+V4.1-Flash 架构如何工作？
+
+V4.1-Flash 是一个 多模态混合专家模型 [https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash]，有 40 层 Transformer。它们分为 20 层因果编码器和 20 层解码器。
+
+因果编码器-解码器（CED）：解码器全局 KV 由最终编码器隐藏状态投影而来。这几乎将预填充计算减半。
+
+压缩稀疏注意力 2（CSA2）：各层以 Full、Reindex 或 Reuse 模式运行。它们跨层共享主 KV 和索引器键。
+
+FP4 主 KV 缓存：全局 KV 降至每 token 890 字节，约为 V4-Flash 的 1/4。
+
+SWA 有界重放：持久 KV 缓存缩减至约 V4-Flash 的 1/8。
+
+推理力度：1 到 100 的标量。API 的 low、high 和 max 档分别映射到 50、75 和 100。
+
+DeepSeek-V4.1-Flash-1017 基准测试
+
+以下所有分数均为 DeepSeek 自己的数据 [https://x.com/deepseek_ai/status/2111375640717033777]。DeepSeek 在 Claude Code 中运行 Terminal-Bench 4.0，在 Mini-SWE-V2 中运行 DeepSWE。ZeroBench-main 使用 Pass@5。
+
+基准V4.1-Flash-1017V4.1-FlashKimi K3GLM 5.3GPT 5.6-SolClaude Opus 5
+
+DeepSWE v1.177.074.267.566.973.074.0
+
+Terminal-Bench 4.042.331.212.637.939.951.8
+
+Automation-Bench v1.0.660.554.846.748.845.850.3
+
+Agents’ Last Exam35.431.827.628.526.728.6
+
+Apex Bench v1.172.164.647.856.654.365.8
+
+ProgramBench29.120.317.519.023.037.0
+
+NL2Repo-Bench68.265.458.058.056.875.3
+
+HLE（无工具）42.6 / 44.0*36.8 / 39.1*43.542.0*44.556.3
+
+BabyVision（有工具）92.589.685.7未披露88.994.1
+
+*纯文本 HLE 子集。
+
+1017 检查点在 DeepSWE、Automation-Bench、Agents’ Last Exam 和 Apex Bench 上领先。Claude Opus 5 仍在 Terminal-Bench 4.0、ProgramBench、NL2Repo 和 HLE 上领先。
+
+与开放权重竞品相比如何？
+
+特性DeepSeek-V4.1-Flash-1017 [https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash]Kimi K3 [https://huggingface.co/moonshotai/Kimi-K3]GLM-5.3 [https://huggingface.co/zai-org/GLM-5.3]
+
+总参数552B 主干 + 196B Engram2.8T753B
+
+活跃参数8B 预填充 / 16B 解码104B未披露
+
+上下文1M1,048,576未披露
+
+许可证MIT（V4.1-Flash）；1017 权重未披露Kimi K3 许可证GLM-5.3 许可证
+
+模态文本、图像输入；文本输出文本、图像文本
+
+DeepSWE v1.177.067.566.9
+
+Agents’ Last Exam35.428.328.5
+
+API 价格（1M 输入未命中 / 输出，高峰）$0.30 / $1.20 [https://api-docs.deepseek.com/quick_start/pricing]未披露未披露
+
+DeepSeek 的 Search 和 Fetch API 是什么？
+
+Search API [https://api-docs.deepseek.com/guides/search] 返回按排名排序的网页结果。Fetch API 以 Markdown 形式返回单个页面。DeepSeek 表示其自研引擎每天处理数亿次请求。
+
+端点： POST /v1/tools/search 和 POST /v1/tools/fetch 位于 api.deepseek.com。
+
+搜索选项： 1 到 50 条结果，可选页面内容，以及 site:、lang:、after: 和 before: 等运算符。
+
+结果字段： 每条结果都有 0 到 3 的重排分数和 0 到 4 的权威等级。
+
+价格： 每个端点每 1,000 次成功请求 $0.75 [https://api-docs.deepseek.com/quick_start/pricing]。空结果和失败免费。
+
+速率限制： 每个 API 每账户 5 QPS。
+
+免费窗口： 通过 DeepSeek Harness、Claude Code 或 Codex 发起的服务端调用在 2026 年 11 月 1 日前保持免费。
+
+部署与定价
+
+通过 OpenAI 或 Anthropic 格式端点使用 deepseek-flash 调用该模型。高峰定价 [https://api-docs.deepseek.com/quick_start/pricing]为每 1M 缓存未命中输入 token $0.30，每 1M 输出 token $1.20。非高峰费率为半价。
+
+关键要点
+
+1017 在 DeepSWE v1.1 上得分 77.0，高于此前的 74.2。
+
+它在 Automation-Bench（60.5）和 Agents’ Last Exam（35.4）上领先。
+
+Claude Opus 5 仍在 HLE 和 Terminal-Bench 4.0 上胜出。
+
+Search 和 Fetch 各为每 1,000 次调用 $0.75。
+
+Agent harness 调用在 2026 年 11 月 1 日前保持免费。
+
+查看 DeepSeek 公告 [https://x.com/deepseek_ai/status/2111375640717033777]、Search 和 Fetch 文档 [https://api-docs.deepseek.com/guides/search]、技术报告 [https://arxiv.org/abs/2609.19969]以及模型卡 [https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash]。所有功劳归于该项目的研究者。另外，欢迎在 Twitter [https://x.com/intent/follow?screen_name=marktechpost] 上关注我们，别忘了加入我们的 150k+ ML SubReddit [https://www.reddit.com/r/machinelearningnews/] 并订阅我们的新闻通讯 [https://magic.beehiiv.com/v1/f5e63dd4-5653-4f09-83e2-321a8b1ba526?email={{email}}]。等等！你在 Telegram 上吗？现在你也可以在 Telegram 上加入我们。 [https://t.me/machinelearningresearchnews]
+
+文章 DeepSeek 刚刚发布 V4.1-Flash-1017，在 DeepSWE 上得分 77.0，并开放 Search API [https://www.marktechpost.com/2026/10/17/deepseek-just-released-v4-1-flash-1017-scores-77-0-on-deepswe-opens-search-api/] 首次出现在 MarkTechPost [https://www.marktechpost.com/]。
+
+来源：MarkTechPost [https://www.marktechpost.com/2026/10/17/deepseek-just-released-v4-1-flash-1017-scores-77-0-on-deepswe-opens-search-api/] · marktechpost.com
+
+DeepSeek [/topics/deepseek]Agent 智能体 [/topics/agent]AI 编码 [/topics/coding]模型发布 [/topics/model-releases]#模型发布 [/all?tag=%E6%A8%A1%E5%9E%8B%E5%8F%91%E5%B8%83]#DeepSeek [/all?tag=DeepSeek]#编码 [/all?tag=%E7%BC%96%E7%A0%81]#Agent [/all?tag=Agent]
+
+打开原文 [https://www.marktechpost.com/2026/10/17/deepseek-just-released-v4-1-flash-1017-scores-77-0-on-deepswe-opens-search-api/]
+
+AI 评分
+
+同事件AI 评分77
+
+主题
+
+DeepSeek [/topics/deepseek]Agent 智能体 [/topics/agent]AI 编码 [/topics/coding]模型发布 [/topics/model-releases]
+
+标签
+
+#模型发布 [/all?tag=%E6%A8%A1%E5%9E%8B%E5%8F%91%E5%B8%83]#DeepSeek [/all?tag=DeepSeek]#编码 [/all?tag=%E7%BC%96%E7%A0%81]#Agent [/all?tag=Agent]
+
+本文目录
+
+TL;aDR [#sec-1]
+
+什么是 DeepSeek-V4.1-Flash-1017？ [#sec-2]
+
+V4.1-Flash 架构如何工作？ [#sec-3]
+
+DeepSeek-V4.1-Flash-1017 基准测试 [#sec-4]
+
+与开放权重竞品相比如何？ [#sec-5]
+
+DeepSeek 的 Search 和 Fetch API 是什么？ [#sec-6]
+
+部署与定价 [#sec-7]
+
+关键要点 [#sec-8]
+
+收藏目录分享原文 [https://www.marktechpost.com/2026/10/17/deepseek-just-released-v4-1-flash-1017-scores-77-0-on-deepswe-opens-search-api/]
+
+京公网安备11010502063419号 [https://beian.mps.gov.cn/#/query/webSearch?code=11010502063419]京ICP备2026012723号-5 [https://beian.miit.gov.cn/]

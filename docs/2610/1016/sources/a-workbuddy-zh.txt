@@ -1,0 +1,172 @@
+接入 WorkBuddy/CodeBuddy | DeepSeek API Docs
+
+跳到主要内容 [#__docusaurus_skipToContent_fallback]
+
+Search / Fetch API 已上线，使用自研搜索引擎，支持网页搜索与抓取，点此查看使用指南。 [/zh-cn/guides/search]
+
+DeepSeek API 文档 [/zh-cn/]
+
+更多资源 [#]
+
+实用集成 [https://github.com/deepseek-ai/awesome-deepseek-integration/tree/main]
+
+API 服务状态 [https://status.deepseek.com/]
+
+常见问题 [https://static.deepseek.com/faq/index.html?lang=zh#/category/4]
+
+中文（中国） [#]
+
+English [/quick_start/agent_integrations/workbuddy]
+
+中文（中国） [/zh-cn/quick_start/agent_integrations/workbuddy]
+
+开放平台 [https://platform.deepseek.com/]EN [/quick_start/agent_integrations/workbuddy]
+
+快速开始 [/zh-cn/]API 指南 [/zh-cn/guides/vision]API 文档 [/zh-cn/api/create-chat-completion]新闻 [/zh-cn/news/news261017]更新日志 [/zh-cn/updates]
+
+首次调用 API [/zh-cn/]
+
+模型 & 价格 [/zh-cn/quick_start/pricing]
+
+Token 用量计算 [/zh-cn/quick_start/token_usage]
+
+限速与隔离 [/zh-cn/quick_start/rate_limit]
+
+错误码 [/zh-cn/quick_start/error_codes]
+
+接入 Agent 工具
+
+DeepSeek Harness [https://deepseek-harness.github.io/deepseek-harness/guide/quickstart]
+
+Claude Code [/zh-cn/quick_start/agent_integrations/claude_code]
+
+Codex [/zh-cn/quick_start/agent_integrations/codex]
+
+OpenCode [/zh-cn/quick_start/agent_integrations/opencode]
+
+OpenClaw [/zh-cn/quick_start/agent_integrations/openclaw]
+
+Hermes [/zh-cn/quick_start/agent_integrations/hermes]
+
+Reasonix [/zh-cn/quick_start/agent_integrations/reasonix]
+
+WorkBuddy/CodeBuddy [/zh-cn/quick_start/agent_integrations/workbuddy]
+
+Qoder [/zh-cn/quick_start/agent_integrations/qoder]
+
+贡献你的 Agent 接入 [https://github.com/deepseek-ai/awesome-deepseek-agent/tree/main]
+
+ [/zh-cn/]
+
+接入 Agent 工具
+
+WorkBuddy/CodeBuddy
+
+本页目录
+
+接入 WorkBuddy/CodeBuddy
+
+WorkBuddy/CodeBuddy 是 AI Agent 与编程助手工具。它支持通过本地模型配置文件添加自定义模型，可以使用 OpenAI 兼容的 Chat Completions API 接入 DeepSeek V4。
+
+1. 安装 WorkBuddy/CodeBuddy​ [#1-安装-workbuddycodebuddy]
+
+安装并登录 WorkBuddy/CodeBuddy。
+
+至少打开一次项目目录，让应用创建本地配置目录。
+
+前往 DeepSeek 开放平台 [https://platform.deepseek.com/api_keys] 获取 API Key。
+
+2. 配置本地模型​ [#2-配置本地模型]
+
+创建或编辑用户级配置文件：
+
+C:\Users\<你的用户名>\.codebuddy\models.json
+
+如果只想让配置对某个项目生效，也可以创建项目级配置文件：
+
+<你的项目>\.codebuddy\models.json
+
+先将 DeepSeek API Key 设置为环境变量：
+
+setx DEEPSEEK_API_KEY "<your DeepSeek API Key>"
+
+然后写入以下配置：
+
+{
+ "models": [
+ {
+ "id": "deepseek-flash",
+ "name": "DeepSeek Flash",
+ "vendor": "DeepSeek",
+ "url": "https://api.deepseek.com/v1/chat/completions",
+ "apiKey": "${DEEPSEEK_API_KEY}",
+ "maxInputTokens": 128000,
+ "maxOutputTokens": 8192,
+ "supportsToolCall": true,
+ "supportsImages": true
+ }
+ ],
+ "availableModels": [
+ "deepseek-flash"
+ ]
+}
+
+请将 models.json 保存为 UTF-8 无 BOM。部分桌面版本在读取带 UTF-8 BOM 文件头的 JSON 时，可能会读取本地模型配置失败。
+
+3. 重启并选择模型​ [#3-重启并选择模型]
+
+完全退出 WorkBuddy/CodeBuddy 后重新打开。
+
+在模型选择器中选择：
+
+DeepSeek Flash
+
+4. 可选：验证 API Key​ [#4-可选验证-api-key]
+
+Windows 用户可以在 PowerShell 中验证 API Key：
+
+$env:DEEPSEEK_API_KEY="<your DeepSeek API Key>"
+
+curl https://api.deepseek.com/v1/chat/completions `
+ -H "Content-Type: application/json" `
+ -H "Authorization: Bearer $env:DEEPSEEK_API_KEY" `
+ -d '{"model":"deepseek-flash","messages":[{"role":"user","content":"hi"}],"stream":false}'
+
+如果请求成功，说明 API Key 和模型名都可用。
+
+常见问题​ [#常见问题]
+
+Authentication Fails 或 401：检查 apiKey 是否为真实 DeepSeek API Key。不要把接口 URL 填到 API Key 字段。
+
+未找到模型 或 404：检查模型 id 是否严格写成 deepseek-flash。
+
+读取本地模型配置失败：检查 models.json 是否是合法 JSON，并保存为 UTF-8 无 BOM。
+
+模型选择器中不显示：完全重启 WorkBuddy/CodeBuddy，并确认文件放在 .codebuddy\models.json。
+
+UI 中直接显示 ${DEEPSEEK_API_KEY}：请从已设置 DEEPSEEK_API_KEY 的终端中重启 WorkBuddy/CodeBuddy。如果桌面端仍不展开环境变量，可以在 UI 或本地 models.json 中填入真实 API Key。
+
+上一页
+
+Reasonix
+ [/zh-cn/quick_start/agent_integrations/reasonix]
+下一页
+
+Qoder
+ [/zh-cn/quick_start/agent_integrations/qoder]
+
+微信公众号
+
+社区
+
+邮箱 [mailto:api-service@deepseek.com]
+
+Discord [https://discord.gg/Tc7c45Zzu5]
+
+Twitter [https://twitter.com/deepseek_ai]
+
+更多
+
+GitHub [https://github.com/deepseek-ai]
+
+Copyright © 2026 DeepSeek, Inc.
