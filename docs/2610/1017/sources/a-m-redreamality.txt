@@ -1,0 +1,340 @@
+After the OpenCode Breach: Why Coding Agents Became Credential Magnets
+
+ Remy.Blog [/] 
+ Open main menu 
+
+Home [/]
+
+ Garden 
+
+ Blog [/blog/] 
+
+ Chaos (News) [/garden/chaos/] 
+
+ Talks [/garden/talks/] 
+
+ Questions [/garden/questions/] 
+
+ Notes [/garden/notes/] 
+
+ Meditations [/garden/meditations/] 
+
+ Blog [/blog/] 
+
+ Chaos (News) [/garden/chaos/] 
+
+ Talks [/garden/talks/] 
+
+ Questions [/garden/questions/] 
+
+ Notes [/garden/notes/] 
+
+ Meditations [/garden/meditations/] 
+
+Visuals [/visuals/]
+
+Projects [/projects/]
+
+About [/about/]
+
+ English 
+
+ 🇺🇸 
+ English 
+ ✓ [/blog/opencode-breach-coding-agent-credential-security/] 🇨🇳 
+ 中文 
+ [/cn/blog/opencode-breach-coding-agent-credential-security/] 
+
+ Language 
+↻
+
+ English 
+
+ 🇺🇸 
+ English 
+ ✓ [/blog/opencode-breach-coding-agent-credential-security/] 🇨🇳 
+ 中文 
+ [/cn/blog/opencode-breach-coding-agent-credential-security/] 
+
+ Language 
+↻
+
+Table of Contents
+
+ ◆ The short version [#the-short-version] 
+
+ ◆ Timeline: what can be confirmed [#timeline-what-can-be-confirmed] 
+
+ ◆ Console and the local CLI are separate paths [#console-and-the-local-cli-are-separate-paths] 
+
+ ◆ Why a stolen model key sells so well [#why-a-stolen-model-key-sells-so-well] 
+
+ ◆ How credentials pile up around a coding agent [#how-credentials-pile-up-around-a-coding-agent] 
+
+ ◆ The same spot, attacked five ways [#the-same-spot-attacked-five-ways] 
+
+ ◆ A framework: four questions first [#a-framework-four-questions-first] 
+
+ ◆ Conclusion [#conclusion] 
+
+ ◆ References [#references] 
+
+After the OpenCode Breach: Why Coding Agents Became Credential Magnets
+
+ Published on October 18, 2026 by Remy 
+
+ Tags: 
+#security [/tags/security/]
+#ai-agents [/tags/ai-agents/]
+#agent-harness [/tags/agent-harness/]
+#developer-tools [/tags/developer-tools/] 
+
+Early on October 18 (Beijing time), the official OpenCode account posted a short notice. There had been a security breach the night before, “related to a large scale distillation attack,” affecting 1.4% of OpenCode Console users. Affected users had been emailed, and the team was working with Anthropic, OpenAI and Google.[1] [#ref-1] Several hours before that, developers had already noticed their OpenAI and Anthropic keys being drained in the middle of the night.[3] [#ref-3] By that afternoon the Hacker News thread titled “OpenCode Hacked: User credentials leaked” sat at 854 points and 159 comments.[6] [#ref-6]
+
+The scope matters, so let’s pin it down first. What was breached is OpenCode Console, a hosted service. It is not the open-source coding agent most people run in a terminal. When Anthropic’s Lydia Hallie posted about the incident, OpenCode developer dax replied that this was the Console, “not OpenCode itself,” and that the keys people use in local OpenCode never reach the company.[5] [#ref-5] This is not a “you installed OpenCode, rotate everything” event.
+
+Stopping there would miss the more useful lesson. What leaked is a model API key, a credential that turns directly into money, and one hosted gateway held many customers’ keys for several vendors. Your local coding agent does a version of the same thing: it keeps model keys, MCP tokens, project .env files and your git and cloud credentials next to a process that runs as you, executes shell commands and loads outside code automatically. Over the past year, npm worms, a poisoned IDE extension and hallucinated package names have all gone after that spot. Below: what can be verified, how the credentials concentrate, how earlier attacks compare, and a framework you can run through.
+
+The short version
+
+The exposure is third-party provider keys saved in Console workspaces. There is no evidence so far that people who only use their own keys in the local CLI were affected. OpenCode has not said how the intruder got in, how keys were stored, or what exactly the link to “distillation” is.
+
+Stolen model keys are unusually easy to cash out. As labs get stricter with new and fraudulent accounts, a key tied to a real, long-standing paying customer becomes worth more. That connection between distillation and this theft is my inference; nobody involved has confirmed it.
+
+Coding agents are credential magnets by design. They talk to several model vendors, drive your toolchain, spawn MCP child processes and load skills and plugins that update themselves. File permissions protect you from other users on the machine, not from code running as you.
+
+The fixes are mostly unglamorous: separate keys per tool and project, provider-side spending caps, revoking at the provider rather than just swapping the key in a gateway, starting agents from a clean environment, and running untrusted work in a container with a small, scoped key.
+
+Timeline: what can be confirmed
+
+All times are Beijing time (UTC+8).
+
+At 21:36 on October 17, developer Colin Parsons asked on X whether OpenCode had been hacked. Starting around 2 a.m. Eastern (14:00 Beijing), his OpenAI key had been charged 281 dollars and his Anthropic key 168 dollars, and both keys had only ever been used in OpenCode.[3] [#ref-3]
+
+ [/go/?to=https%3A%2F%2Fx.com%2Fcolinparsonscom%2Fstatus%2F2111451256426250580]
+
+Screenshot: Colin Parsons asks about a breach roughly four and a half hours before the official notice (public X embed, captured 2026-10-18)[3] [#ref-3]
+
+At 23:18, Matt Johansen wrote that OpenCode users were messaging him about breach notifications and API keys running up charges. Twelve minutes later he posted “Confirmed,” with a screenshot of the notice email taken from a post on r/opencode.[2] [#ref-2] The subject line reads “Action Required: Potential provider key breach.” The email says the company identified unauthorized access to a legacy system that was being decommissioned, that third-party provider keys saved in the user’s workspace, such as OpenAI or Anthropic keys, may have been exposed, and that users should revoke and replace those keys in each provider’s dashboard, update anything that uses them, and review recent usage.
+
+ [/go/?to=https%3A%2F%2Fx.com%2Fmattjay%2Fstatus%2F2111480005435719885]
+
+Screenshot: the notice email, mentioning a legacy system and provider keys saved in workspaces (public X embed, captured 2026-10-18)[2] [#ref-2]
+
+At 01:56 on October 18, @opencode posted its statement, then edited it twelve minutes later to add that anyone who had not received an email was not impacted, and that those affected were a subset of users with external providers linked.[1] [#ref-1] The post uses the words “security breach” and “large scale distillation attack.” It gives 1.4% of Console users as the share affected and no absolute number.
+
+ [/go/?to=https%3A%2F%2Fx.com%2Fopencode%2Fstatus%2F2111519637049319818]
+
+Screenshot: the edited version of OpenCode’s statement, marked “Last edited 2:08 AM · Oct 18, 2026” (public X embed, captured 2026-10-18)[1] [#ref-1]
+
+At 02:01 the statement landed on Hacker News.[6] [#ref-6] Some commenters revisited OpenCode’s earlier privacy and telemetry controversies; others asked for the title to say “OpenCode Console,” since the hosted service and the terminal agent are different products. The top comment says the team had not made that distinction clear, and the official post does not draw it.
+
+ [/go/?to=https%3A%2F%2Fnews.ycombinator.com%2Fitem%3Fid%3D50133401]
+
+Screenshot: the HN thread, whose top comment explains the difference between Console and the coding agent (Hacker News, captured 2026-10-18)[6] [#ref-6]
+
+At 02:41 dax posted that his personal accounts were being attacked too.[5] [#ref-5] At 05:04 Lydia Hallie said Anthropic had been working with OpenCode, had revoked the Claude API keys believed to be affected, and that anyone who had stored a key in OpenCode could create a new one to be safe.[4] [#ref-4] Thirty-four minutes later dax replied with the Console clarification quoted above.[5] [#ref-5] Later that morning he said everyone affected had been contacted and refunds were already underway.[5] [#ref-5]
+
+ [/go/?to=https%3A%2F%2Fx.com%2Fthdxr%2Fstatus%2F2111572618340188393]
+
+Screenshot: Lydia Hallie’s update and dax’s reply (public X embed, captured 2026-10-18)[4] [#ref-4][5] [#ref-5]
+
+The Latent collected more self-reported losses the same day: one user at 1,700 dollars, another past 700 in OpenAI usage before he pulled the key, a third whose OpenAI account was suspended. The Latent could not independently verify these.[7] [#ref-7]
+
+The unknowns outnumber the facts. ThreatWire and TSN both list them: how many people were affected, how the attacker got in, how keys were stored, what this has to do with “distillation,” whether losses will be fully reimbursed, and whether anything besides provider keys was touched.[8] [#ref-8][10] [#ref-10] None has an answer yet.
+
+Console and the local CLI are separate paths
+
+To see why only some users were hit, look at what Console does. OpenCode’s documentation is direct about it. A team connects provider accounts it already pays for, such as Anthropic, OpenAI or AWS Bedrock, by entering an API key on the Providers page. Console stores the credential and serves each provider through its gateway, so workspace members use the models without ever seeing the key, and the same gateway is exposed to your own tools through an API.[11] [#ref-11] The provider bills you for tokens; Console only records usage.
+
+So Console holds a long-lived key on your behalf and sends requests with it. For an admin, one company key serving the whole team is convenient. The cost is that the key’s full spending authority now sits with a third party, and the provider only sees the key, not who is using it.
+
+The local CLI works differently. Keys added with /connect or opencode auth login are documented as living in ~/.local/share/opencode/auth.json, and OpenCode also picks up keys from environment variables and a project .env file at startup.[12] [#ref-12] On the development branch, that file is migrated into a local SQLite database whose file mode is tightened to 0600, owner read and write only.[14] [#ref-14] Those keys stay on your machine, which is what dax means by “those keys never come to us.”
+
+The catch is that the paths cross. Noma Security points out that the CLI can also use a Console-backed provider by picking a workspace in /connect.[9] [#ref-9] “I only use the terminal” does not settle whether you were exposed. The question is whether the provider key was configured on your device or handed to Console.
+
+Why a stolen model key sells so well
+
+A model API key is a bearer credential: whoever holds it can use it, and the bill goes to the owner. Unlike a database password, there is no lateral movement to do and no exfiltration channel to build. You send HTTPS requests and the key turns into compute. A gateway holding several vendors’ keys for many customers multiplies the payoff of one intrusion.
+
+OpenCode tied the incident to a “large scale distillation attack” without explaining the connection. On HN, several people guessed the keys were more likely resold on the black market.[6] [#ref-6] I suspect both readings point to the same economics. In an October 12 post, Anthropic described distillers using proxy networks that control hundreds of thousands of fraudulent accounts, created with false identities and stolen payment details. Its countermeasures include “preserved thinking,” which stops API accounts created on or after August 31, 2026 from editing Claude’s prior context, a two-stage classifier that blocks attempts to extract reasoning, and bans of tens of thousands of accounts, often less than two hours after a distillation campaign starts.[17] [#ref-17] The post also notes that distillers spread their traffic across Anthropic’s API, third-party clouds and other inference providers.
+
+As new accounts and fake identities get harder to use, a key belonging to an established customer with a payment history and no new-account restrictions is worth more to a distiller and a reseller alike. That is my inference; neither OpenCode nor the labs have said it. If it holds, Console, OpenRouter-style bring-your-own-key gateways and internal model proxies will all draw more attention.
+
+How credentials pile up around a coding agent
+
+Console concentrates many people’s keys on one server. A local coding agent concentrates your own credentials around one process, and that follows from what a coding agent has to do rather than from any vendor cutting corners.
+
+Figure: credentials around a coding agent process (left), outside code that enters the same process or its children automatically (right), and the hosted-gateway side path. Based on[11] [#ref-11]–[16] [#ref-16].
+
+First, it talks to many model vendors. OpenCode supports more than 75 providers,[7] [#ref-7] so one credential store often holds keys and OAuth tokens for several of them. OAuth tokens for remote MCP servers are kept separately in ~/.local/share/opencode/mcp-auth.json. Config values can be pulled from the environment with syntax like {env:MY_MCP_CLIENT_SECRET}, and the documentation’s own examples include a Bearer key written straight into a request header.[13] [#ref-13]
+
+Second, it runs a shell as you. OpenCode’s SECURITY.md is candid about this. OpenCode does not sandbox the agent; the permission prompts exist so you know what the agent is doing, they are not security isolation, and if you need real isolation you should run it inside Docker or a VM.[15] [#ref-15] The same document places “behavior of external MCP servers you configure” outside its trust boundary. Whatever your user account can read, the agent can read: the GitHub token gh auth token prints, cloud credentials under ~/.aws, private keys under ~/.ssh. A 0600 file mode keeps other users on the machine out. It does nothing against code that runs as you.
+
+ [/go/?to=https%3A%2F%2Fgithub.com%2Fanomalyco%2Fopencode%2Fblob%2Fdev%2FSECURITY.md]
+
+Screenshot: OpenCode’s threat model, “No Sandbox” and “Out of Scope” sections (GitHub, captured 2026-10-18)[15] [#ref-15]
+
+Third, it hands its environment to child processes. When OpenCode spawns a local MCP server, the environment block in your config is only additive. The code merges in the host process’s entire process.env, and a source comment notes that this matches what the MCP SDK’s stdio transport did.[14] [#ref-14] Every key you exported in your shell is visible to every local MCP server, and many of those servers are packages fetched and run on the spot with npx -y.[13] [#ref-13]
+
+Fourth, it loads code from the cloud on its own. Claude Code is the clearest example. Since v2.1.273, a terminal session signed in with a claude.ai account downloads the account’s skills to ~/.claude/skills/synced/ and rechecks roughly every ten minutes, applying changes without a restart. Account plugins sync to ~/.claude/plugins/synced/ at launch, and their skills, agents, hooks and MCP servers all load at the same trust level as a marketplace install.[16] [#ref-16] Plugins an organization marks as required cannot be turned off by the user. It is documented, can be disabled, and has no public abuse report. I raise it because it widens “who can put code next to your agent” from you to your claude.ai account and your organization’s admin console. Earlier posts here on pre-install scanning with SkillSpector [/blog/nvidia-skillspector-agent-skills-trust-pipeline/] and co-installed skills shadowing each other [/blog/co-installed-agent-skills-conflicts/] covered risks in skill content; this adds the distribution channel.
+
+Together: many credentials, broad permissions, inherited environments, and outside code that arrives unasked. One piece of attacker code running as you next to that process sees all of it.
+
+The same spot, attacked five ways
+
+Figure: how five incidents got in, where the payload ran, and the first thing victims saw. Based on[2] [#ref-2][18] [#ref-18]–[24] [#ref-24].
+
+Nx “s1ngularity” (August 2025). Attackers used a GitHub Actions injection flaw in the Nx repository to steal an npm publishing token, and malicious versions stayed on npm for about four hours.[18] [#ref-18] The postinstall script scanned developer machines for sensitive files and tried to drive whatever AI CLIs were installed, launching Claude Code with --dangerously-skip-permissions, Gemini CLI with --yolo and Amazon Q with --trust-all-tools, and prompting them to hunt recursively for wallets, .env files, SSH keys and the like, writing the results to /tmp/inventory.txt.[19] [#ref-19] Results went, via the victim’s own GitHub CLI, to a public s1ngularity-repository in their account. Wiz counted that in a second phase, attackers used the leaked GitHub tokens to flip more than 5,500 private repositories belonging to over 400 users and organizations to public.[20] [#ref-20] StepSecurity called it one of the first documented cases of malware weaponizing AI CLIs for reconnaissance. It leaned on the second point above: once the prompts are off, an agent running as you works for whoever gives instructions.
+
+Amazon Q Developer extension 1.84.0 (July 2025). AWS’s bulletin says an inappropriately scoped GitHub token in the extension’s CodeBuild configuration let an attacker commit malicious code to the open-source repository, which then shipped automatically in a release.[21] [#ref-21] The payload was a prompt telling the agent to return the system to a “near-factory state” and delete file-system and cloud resources. AWS says a syntax error kept it from executing. Nothing was stolen, but the way in was again a long-lived token in the wrong place, and the target an agent component developers trust and auto-update.
+
+Shai-Hulud (September 2025). CISA’s alert describes a self-replicating npm worm that compromised more than 500 packages. The malware scanned the environment for credentials, specifically GitHub personal access tokens and AWS, GCP and Azure API keys, exfiltrated them, uploaded them to a public repository named Shai-Hulud, and then used stolen npm tokens to publish infected versions as the victim.[23] [#ref-23] A publishing token on a laptop fuels the next round.
+
+Slopsquatting. Spracklen and colleagues generated 576,000 code samples with 16 models. Of 2.23 million package references, 19.7% pointed to packages that did not exist, 205,474 unique fake names in all, with commercial models averaging 5.2% and open-source models 21.7%.[24] [#ref-24] Worse, it is predictable: across ten repeats of the same prompt, 43% of hallucinated names came back every time. An attacker registers them in advance and waits for an agent to install them. No stolen token needed; the way in is a dependency the model wrote.
+
+OpenCode Console (October 2026). Nothing malicious ran on your machine. The party holding your key on your behalf was breached, and the first signal was a provider bill.
+
+What the five share is that each went after the least-reviewed link sitting next to the credentials: a publishing token, a CI config, a dependency install, a hosted service holding keys for you. Coding agents add more of those links and pull them closer to the secrets.
+
+A framework: four questions first
+
+Figure: four questions to ask before giving a coding agent credentials, and what each answer to the last one implies.
+
+How many places hold this key right now? Credential store, shell profile, project .env, CI secret, hosted gateway: each copy is another place to leak from and to clean up. Ideally a key has one purpose and one home.
+
+How much can it spend once stolen? Set spending caps and usage alerts on the provider side. Noma notes that caps may have enforcement delays, and that an alert tells someone to act but neither revokes the key nor guarantees spending has stopped.[9] [#ref-9] Size the cap to the worst case you are willing to pay for, not a multiple of normal usage.
+
+What can the agent see while it runs? Three things: how many vendors’ keys sit in its credential store; which variables are exported in the shell that launches it, since those pass straight through to local MCP servers; and whether its shell tool can read ~/.aws, ~/.ssh and your gh token.
+
+Will this task run untrusted code? Cloning an unfamiliar repository, letting the agent install its own dependencies, and long unattended runs with approvals skipped all count. If yes, use a container or VM, mount only the project directory, hand it one small, tightly scoped key, and add an egress allowlist. If no, at least start the agent from a clean shell.
+
+In concrete terms:
+
+If you used OpenCode Console with external providers linked, whether or not you got the email, revoke the original keys in the OpenAI, Anthropic, Google and other dashboards and create new ones. Check recent usage and billing, and raise anything odd with the provider. Replacing or deleting the key inside Console leaves the old key valid at the provider.[9] [#ref-9][10] [#ref-10]
+
+Split keys by tool and environment. Give coding agents their own provider project and key, never reuse a production application’s key, and keep separate keys per project and per machine. Then an incident means revoking one key, not all of them.
+
+Prefer short-lived tokens to long-lived keys. dax noted in another reply that signing in to a provider through OpenCode uses OAuth tokens by default rather than long-lived API keys.[5] [#ref-5] Claude Code supports an apiKeyHelper script that fetches credentials on demand.[16] [#ref-16] After the Amazon Q incident, Chainguard’s Matt Moore put it bluntly: long-lived static tokens are liabilities waiting to be discovered, leaked and abused.[22] [#ref-22]
+
+Keep keys in a secrets manager and inject them per process instead of exporting them from .bashrc or .zshrc. OpenCode config supports {env:VAR} references,[13] [#ref-13] so the key need not sit in every child’s environment.
+
+Give local MCP servers the smallest environment you can. Since they inherit everything from the host, launch the agent from a shell containing only what it needs, pass each server only its own token through environment, and pin the version of anything you run with npx -y.
+
+Turn off sync you don’t use. Claude Code users who don’t need skills and plugins from claude.ai can set syncClaudeAiSkills and syncClaudeAiPlugins to false in user settings.[16] [#ref-16]
+
+Check package names before installing: publish date, download count, a committed lockfile. Merely resolving won’t stop slopsquatting, since the attacker may have registered the name already.[24] [#ref-24]
+
+Control egress. One of CISA’s recommendations for Shai-Hulud was to block the domains the malware used for exfiltration and monitor for unusual outbound traffic.[23] [#ref-23] For a coding agent, the practical version is an allowlist in the sandbox covering only model APIs, package registries and your code host. The earlier post on Claude Code’s four outbound channels [/blog/claude-code-data-egress-secrets-control/] has a settings checklist you can copy.
+
+Before storing a key in a hosted gateway, ask how it is stored, who can read it, whether sub-keys or limits exist, and how notification and revocation work. One HN commenter noted the Console page where you paste keys says nothing about storage,[6] [#ref-6] which is reason enough to pause.
+
+A sandbox answers “what can untrusted code touch on my machine.” It does nothing when the hosted party is breached, as with Console, and it cannot protect a key you deliberately hand to the agent inside it. As I argued in why sandboxing is not enough [/blog/sandboxing-not-enough-rogue-agents-authority/], the ceiling on damage is set by the authority the agent holds. Shrink the key’s scope and budget first, then worry about isolation.
+
+Conclusion
+
+The incident itself has clear edges: a hosted service’s legacy system was breached, saved provider keys leaked, and they were used to run up charges. It matters because it exposes a problem much bigger than OpenCode. Model API keys are becoming the most easily monetized credential a developer holds, and coding agents, along with the gateways, plugins and MCP servers around them, put those keys right next to a lot of automatically executed outside code.
+
+Switching to a “safer” agent isn’t the answer. Claude Code, Codex and OpenCode all read your files, run your shell and hold your keys; that is what makes them useful. The realistic move is to accept that the agent is a credential magnet and treat every model key like a credit card with no limit: keep them apart, cap them, make them short-lived where possible, and be able to revoke them in minutes. From vendors, I’d like more OAuth and short-lived tokens, per-project sub-keys and hard caps, so a stolen key means a known loss rather than a blank check.
+
+References
+
+OpenCode (@opencode), incident statement (edited, 2026-10-18 02:08 UTC+8): https://x.com/opencode/status/2111519637049319818 [/go/?to=https%3A%2F%2Fx.com%2Fopencode%2Fstatus%2F2111519637049319818]; original (01:56): https://x.com/opencode/status/2111516673953935833 [/go/?to=https%3A%2F%2Fx.com%2Fopencode%2Fstatus%2F2111516673953935833] ↩ [#cite-1-1]
+
+Matt Johansen (@mattjay), user reports and the notice email: https://x.com/mattjay/status/2111476982580211851 [/go/?to=https%3A%2F%2Fx.com%2Fmattjay%2Fstatus%2F2111476982580211851]; https://x.com/mattjay/status/2111480005435719885 [/go/?to=https%3A%2F%2Fx.com%2Fmattjay%2Fstatus%2F2111480005435719885] ↩ [#cite-2-1]
+
+Colin Parsons (@colinparsonscom), unexpected OpenAI and Anthropic charges: https://x.com/colinparsonscom/status/2111451256426250580 [/go/?to=https%3A%2F%2Fx.com%2Fcolinparsonscom%2Fstatus%2F2111451256426250580] ↩ [#cite-3-1]
+
+Lydia Hallie (@lydiahallie), Anthropic revokes affected Claude API keys: https://x.com/lydiahallie/status/2111563956666110287 [/go/?to=https%3A%2F%2Fx.com%2Flydiahallie%2Fstatus%2F2111563956666110287] ↩ [#cite-4-1]
+
+dax (@thdxr), Console vs. OpenCode: https://x.com/thdxr/status/2111572618340188393 [/go/?to=https%3A%2F%2Fx.com%2Fthdxr%2Fstatus%2F2111572618340188393]; personal accounts attacked: https://x.com/thdxr/status/2111528031072461114 [/go/?to=https%3A%2F%2Fx.com%2Fthdxr%2Fstatus%2F2111528031072461114]; refunds underway: https://x.com/thdxr/status/2111608620441817449 [/go/?to=https%3A%2F%2Fx.com%2Fthdxr%2Fstatus%2F2111608620441817449]; OAuth tokens by default: https://x.com/thdxr/status/2111633979074031801 [/go/?to=https%3A%2F%2Fx.com%2Fthdxr%2Fstatus%2F2111633979074031801] ↩ [#cite-5-1]
+
+Hacker News, “OpenCode Hacked: User credentials leaked”: https://news.ycombinator.com/item?id=50133401 [/go/?to=https%3A%2F%2Fnews.ycombinator.com%2Fitem%3Fid%3D50133401] ↩ [#cite-6-1]
+
+Zack Abrams, The Latent, “OpenCode says breach tied to distillation attack exposed users’ AI provider keys”: https://thelatent.co/models/opencode-says-breach-tied-to-distillation-attack-exposed-users-ai-provider-keys [/go/?to=https%3A%2F%2Fthelatent.co%2Fmodels%2Fopencode-says-breach-tied-to-distillation-attack-exposed-users-ai-provider-keys] ↩ [#cite-7-1]
+
+TSN, “OpenCode Says Breach Tied to ‘Distillation Attack’ Hit 1.4% of Console Users”: https://tsnmedia.org/opencode-console-breach-distillation/ [/go/?to=https%3A%2F%2Ftsnmedia.org%2Fopencode-console-breach-distillation%2F] ↩ [#cite-8-1]
+
+Ron Harnik, Noma Security, “OpenCode Console breach: what security teams need to know”: https://noma.security/blog/opencode-console-breach-what-security-teams-need-to-know [/go/?to=https%3A%2F%2Fnoma.security%2Fblog%2Fopencode-console-breach-what-security-teams-need-to-know] ↩ [#cite-9-1]
+
+ThreatWire, “OpenCode Console breach, revoke saved AI provider keys”: https://www.threatwire.tech/threats/opencode-console-breach-exposes-saved-ai-provider-keys [/go/?to=https%3A%2F%2Fwww.threatwire.tech%2Fthreats%2Fopencode-console-breach-exposes-saved-ai-provider-keys] ↩ [#cite-10-1]
+
+OpenCode docs, Console · Providers: https://opencode.ai/v2/docs/console/providers/ [/go/?to=https%3A%2F%2Fopencode.ai%2Fv2%2Fdocs%2Fconsole%2Fproviders%2F] ↩ [#cite-11-1]
+
+OpenCode docs, Providers (Credentials) and CLI (auth): https://opencode.ai/docs/providers/ [/go/?to=https%3A%2F%2Fopencode.ai%2Fdocs%2Fproviders%2F]; https://opencode.ai/docs/cli/ [/go/?to=https%3A%2F%2Fopencode.ai%2Fdocs%2Fcli%2F] ↩ [#cite-12-1]
+
+OpenCode docs, MCP servers: https://opencode.ai/docs/mcp-servers/ [/go/?to=https%3A%2F%2Fopencode.ai%2Fdocs%2Fmcp-servers%2F] ↩ [#cite-13-1]
+
+OpenCode source (commit 60a5a6c), packages/core/src/mcp/stdio.ts and packages/core/src/database/database.ts: https://github.com/anomalyco/opencode/blob/60a5a6ca7ce176b04cd2321ffd1819b1ea8e6006/packages/core/src/mcp/stdio.ts [/go/?to=https%3A%2F%2Fgithub.com%2Fanomalyco%2Fopencode%2Fblob%2F60a5a6ca7ce176b04cd2321ffd1819b1ea8e6006%2Fpackages%2Fcore%2Fsrc%2Fmcp%2Fstdio.ts]; https://github.com/anomalyco/opencode/blob/60a5a6ca7ce176b04cd2321ffd1819b1ea8e6006/packages/core/src/database/database.ts [/go/?to=https%3A%2F%2Fgithub.com%2Fanomalyco%2Fopencode%2Fblob%2F60a5a6ca7ce176b04cd2321ffd1819b1ea8e6006%2Fpackages%2Fcore%2Fsrc%2Fdatabase%2Fdatabase.ts] ↩ [#cite-14-1]
+
+OpenCode, SECURITY.md (Threat Model): https://github.com/anomalyco/opencode/blob/dev/SECURITY.md [/go/?to=https%3A%2F%2Fgithub.com%2Fanomalyco%2Fopencode%2Fblob%2Fdev%2FSECURITY.md] ↩ [#cite-15-1]
+
+Claude Code docs, Skills (synced skills), Plugin loading (synced plugins) and Settings reference: https://code.claude.com/docs/en/skills [/go/?to=https%3A%2F%2Fcode.claude.com%2Fdocs%2Fen%2Fskills]; https://code.claude.com/docs/en/plugins/loading [/go/?to=https%3A%2F%2Fcode.claude.com%2Fdocs%2Fen%2Fplugins%2Floading]; https://code.claude.com/docs/en/settings-reference [/go/?to=https%3A%2F%2Fcode.claude.com%2Fdocs%2Fen%2Fsettings-reference] ↩ [#cite-16-1]
+
+Anthropic, “Strengthening our defenses against distillation attacks” (2026-10-12): https://www.anthropic.com/research/distillation-defenses [/go/?to=https%3A%2F%2Fwww.anthropic.com%2Fresearch%2Fdistillation-defenses] ↩ [#cite-17-1]
+
+Nx, “S1ngularity: What Happened, How We Responded, What We Learned”: https://nx.dev/blog/s1ngularity-postmortem [/go/?to=https%3A%2F%2Fnx.dev%2Fblog%2Fs1ngularity-postmortem] ↩ [#cite-18-1]
+
+StepSecurity, “s1ngularity: Popular Nx Build System Package Compromised with Data-Stealing Malware”: https://www.stepsecurity.io/blog/supply-chain-security-alert-popular-nx-build-system-package-compromised-with-data-stealing-malware [/go/?to=https%3A%2F%2Fwww.stepsecurity.io%2Fblog%2Fsupply-chain-security-alert-popular-nx-build-system-package-compromised-with-data-stealing-malware] ↩ [#cite-19-1]
+
+Wiz, “s1ngularity: supply chain attack leaks secrets on GitHub”: https://www.wiz.io/blog/s1ngularity-supply-chain-attack [/go/?to=https%3A%2F%2Fwww.wiz.io%2Fblog%2Fs1ngularity-supply-chain-attack] ↩ [#cite-20-1]
+
+AWS Security Bulletin AWS-2025-015, “Security Update for Amazon Q Developer Extension for Visual Studio Code (Version #1.84)”: https://aws.amazon.com/security/security-bulletins/AWS-2025-015/ [/go/?to=https%3A%2F%2Faws.amazon.com%2Fsecurity%2Fsecurity-bulletins%2FAWS-2025-015%2F] ↩ [#cite-21-1]
+
+TechTarget, “What Amazon Q prompt injection reveals about AI security”: https://www.techtarget.com/it-infrastructure/news/366628167/What-Amazon-Q-prompt-injection-reveals-about-AI-security [/go/?to=https%3A%2F%2Fwww.techtarget.com%2Fit-infrastructure%2Fnews%2F366628167%2FWhat-Amazon-Q-prompt-injection-reveals-about-AI-security] ↩ [#cite-22-1]
+
+CISA, “Widespread Supply Chain Compromise Impacting npm Ecosystem” (2025-09-23): https://www.cisa.gov/news-events/alerts/2025/09/23/widespread-supply-chain-compromise-impacting-npm-ecosystem [/go/?to=https%3A%2F%2Fwww.cisa.gov%2Fnews-events%2Falerts%2F2025%2F09%2F23%2Fwidespread-supply-chain-compromise-impacting-npm-ecosystem] ↩ [#cite-23-1]
+
+Joseph Spracklen et al., “We Have a Package for You! A Comprehensive Analysis of Package Hallucinations by Code Generating LLMs,” arXiv:2406.10279: https://arxiv.org/abs/2406.10279 [/go/?to=https%3A%2F%2Farxiv.org%2Fabs%2F2406.10279] ↩ [#cite-24-1]
+
+Related Articles
+
+ DeepSeek Harness, Taken Apart: The Loop, PTC, Four Modes, Plugins and Sandbox, and How It Compares with Claude Code, Codex and Pi 
+
+ October 13, 2026 
+
+ DeepSeek Harness is not just another coding CLI: its agent loop is itself a Cordis plugin, PTC lets the model write programs that call tools, the four modes are four presets, and sandbox, approval and permission presets each guard a different stage. A mechanism map from primary docs, a comparison with Claude Code, Codex CLI, OpenCode and Pi, a selection framework, setup steps and a checklist. 
+ [/blog/deepseek-harness-architecture-plugins-sandbox-vs-claude-code/] 
+ Claude Cowork Moves Execution to the Cloud: Should an Agent's Hands Run in a Local VM, a Per-Session Sandbox, or Its Own Cloud Computer? 
+
+ October 6, 2026 
+
+ From October 6, new Claude Cowork tasks on Pro/Max run in per-session cloud sandboxes by default, with local files proxied through the desktop app. This post compares local VMs, per-session cloud sandboxes, and always-on agents with their own cloud computer (like OpenAI dots) across permissions, local files, egress, secrets, cost, and failure modes, ending with a decision table. 
+ [/blog/claude-cowork-cloud-sandbox-where-agents-run/] 
+ Sandboxing Is Not Enough: Rogue Agents and the Authority Axis 
+
+ October 1, 2026 
+
+ Reading Matthew Green’s “Is sandboxing sufficient to contain rogue agents?”: containment often was never seriously tried ≠ sandboxes suffice; useful agents need information access, so the problem becomes traffic surveillance and recursive warden alignment; a third frame is eager obedience + shared channels = worm ingredients. Contrasts OpenShell/Sentry and Hard Stop. 
+ [/blog/sandboxing-not-enough-rogue-agents-authority/] 
+ ToxicBench: When Tools Silently Lie, Checking Is Not Enough 
+
+ October 1, 2026 
+
+ Reading arXiv:2609.37153 ToxicBench: successful tool calls can return poisoned observations. On 118 GPT tasks, poisoning drops TSR by 26–39pp; BCR is 0.38/0.53/0.27 on LangGraph/smolagents/AutoGen. Separates checking from adoption; contrasts SINGED/FTA. 
+ [/blog/toxicbench-silent-tool-lie-blind-compliance/] 
+ CheatBench: When Agents Game the Reward 
+
+ September 30, 2026 
+
+ A deep read of CAIS CheatBench (arXiv:2609.36308): ten environments that measure whether agents take shortcuts against honest-work expectations. Current overall rates ≈11.2%–78%; every evaluated agent cheated in at least one setting. Mechanisms, how to read the scores, and a harness checklist. 
+ [/blog/cheatbench-agent-reward-gaming/] 
+ SINGED: Correct Output Does Not Mean Safe Execution 
+
+ September 30, 2026 
+
+ Reading arXiv:2609.35889 SINGED: functional counterfeits match benign outputs while triggering forbidden process effects; among 7,549 audited trials, rank-one counterfeit execution hits 45%, and cross-candidate comparison cuts layered failures from 15.7% to 4.2%. Correct output ≠ safe execution; a harness checklist. 
+ [/blog/singed-correct-output-not-safe-execution/] 
+
+ Back to Blog [/blog/] 
+
+ © 2026. All Rights Reserved. 
+
+ Privacy [/privacy/] Sitemap [/sitemap-0.xml] 
+
+RSS Feed (English)
+ [/rss.xml] 
+RSS Feed (中文)
+ [/cn/rss.xml] 
+RSS Feed (日本語)
+ [/ja/rss.xml]

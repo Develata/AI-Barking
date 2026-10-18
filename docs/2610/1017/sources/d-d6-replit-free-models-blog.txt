@@ -1,0 +1,451 @@
+Free the models: Harness design at the frontier | Replit
+
+ [/]
+
+Products
+
+CREATE
+Design [/design]
+
+Apps & Websites [/products/deployments]
+
+Slides [/slides]
+
+PLATFORM
+Agents [/products/agent]
+
+Databases [/products/database]
+
+Integrations [/integrations]
+
+Security [/security]
+
+Solutions
+
+BY ROLE
+Founders [/usecases/founders]
+
+Product Managers [/usecases/product-managers]
+
+Designers [/usecases/designers]
+
+Engineers [/usecases/software-engineers]
+
+Operations [/usecases/operations]
+
+IT [/usecases/it]
+
+BY USE CASE
+Apps [/usecases/ai-app-builder]
+
+Websites [/usecases/ai-website-builder]
+
+Landing Pages [/usecases/landing-page-builder]
+
+Dashboards [/usecases/dashboards-data-visualization]
+
+Prototypes [/usecases/rapid-prototyping]
+
+Chatbots [/usecases/chatbot-builder]
+
+Pricing [/pricing]Enterprise [/enterprise]
+Resources
+
+LEARN & SUPPORT
+Docs [https://docs.replit.com/getting-started/intro-replit]
+
+Community [/community]
+
+Support [/help]
+
+Replit Experts [https://contra.com/replit]
+
+Partners [/partners]
+
+DISCOVER
+Customer Stories [/customers]
+
+Gallery [/gallery]
+
+Blog [https://blog.replit.com/]
+
+Newsroom [/news]
+
+Contact sales [https://replit.com/enterprise]Log in [/login]Sign up [/signup]
+
+Products
+
+CREATE
+Design [/design]
+
+Apps & Websites [/products/deployments]
+
+Slides [/slides]
+
+PLATFORM
+Agents [/products/agent]
+
+Databases [/products/database]
+
+Integrations [/integrations]
+
+Security [/security]
+
+Solutions
+
+BY ROLE
+Founders [/usecases/founders]
+
+Product Managers [/usecases/product-managers]
+
+Designers [/usecases/designers]
+
+Engineers [/usecases/software-engineers]
+
+Operations [/usecases/operations]
+
+IT [/usecases/it]
+
+BY USE CASE
+Apps [/usecases/ai-app-builder]
+
+Websites [/usecases/ai-website-builder]
+
+Landing Pages [/usecases/landing-page-builder]
+
+Dashboards [/usecases/dashboards-data-visualization]
+
+Prototypes [/usecases/rapid-prototyping]
+
+Chatbots [/usecases/chatbot-builder]
+
+Pricing [/pricing]
+
+Enterprise [/enterprise]
+
+Resources
+
+LEARN & SUPPORT
+Docs [https://docs.replit.com/getting-started/intro-replit]
+
+Community [/community]
+
+Support [/help]
+
+Replit Experts [https://contra.com/replit]
+
+Partners [/partners]
+
+DISCOVER
+Customer Stories [/customers]
+
+Gallery [/gallery]
+
+Blog [https://blog.replit.com/]
+
+Newsroom [/news]
+
+Log in [/login]Sign up [/signup]
+
+Blog
+ [/blog]
+
+Engineering [/blog/category/eng]
+
+AI [/blog/category/ai]
+
+Free the models: Harness design at the frontier
+
+Published:
+Sep 29, 2026
+
+Daniel Furman
+
+ [/blog/author/daniel-furman]
+
+Jacky Zhao
+
+ [/blog/author/jacky-zhao]
+
+Vaibhav Kumar
+
+ [/blog/author/vaibhav-kumar]
+
+Ed Sioufi
+
+ [/blog/author/edsioufi]
+
+Michele Catasta
+
+ [/blog/author/pirroh]
+
+Model routers are everywhere right now, but they have a fundamental limitation. No matter if based on advanced heuristics or a small model that reads each turn and picks which LLM to use, a router will always be less capable than the model it’s choosing for. Replit Agent lets the model decide instead.
+
+The main agent, or core loop, chooses its subagents’ tier and effort, and adjusts its own as the task unfolds. Given that freedom, GPT-6 Astra hands routine implementation to less costly subagents and decides for itself where its tokens are worth spending. On both DeepSWE and Terminal-Bench, Replit Agent is Pareto-efficient against Astra on its own: no published Astra baseline costs less and scores higher. It also beats a sidekick architecture, the same setup with one long-lived worker, by 11 and 16 points.
+
+Why we scaffold less
+
+Every model release invalidates assumptions baked into the harness.
+
+As models become stronger at long-horizon tasks, they don’t need as much scaffolding at the harness layer. In practice, we’ve observed them lean more towards delegation on their own: using subagents for context management and parallelism. Recent breakthroughs, Navier–Stokes among them, came in part from coordinating swarms of agents powered by frontier models [1] [https://openai.com/index/navier-stokes-solution/].
+
+But the frontier is jagged. The strongest coding model is not necessarily the strongest at designing UIs or making slides, nor the best at writing emails.Coding agents write in a compressed, jargon-heavy register nicknamed “Claudish”; each frontier model’s prose is distinct enough to identify from text alone [7] [https://arxiv.org/abs/2502.12150]. So we design our harness to let each model work its own way, with the guardrails it still needs and quality at minimum cost as the goal.
+
+Each new model sends us back to re-test what we held firmly, and to experiment fast with techniques that build on emergent behaviors. Freeing the model, then, means letting it decide how hard to think, when to hand work off, and who to hand it to.
+
+Freeing the model
+
+The harness offers the options and keeps the guardrails; at every step, the core loop decides.
+
+1How hard to think
+
+Effort is set step by step and, on the latest models, changes mid-turn without a cache miss.
+
+2When to hand work off
+
+Hand-offs buy context management and parallelism; a small task spawns nothing at all.
+
+3Who to hand it to
+
+The frontier is jagged, so each specialist runs on the model strongest at its job.
+
+Figure 1: Freeing the model: the three decisions the core loop makes at every step.
+
+Composable primitives for delegation
+
+When we started experimenting with GPT-6 Astra [2] [https://openai.com/index/gpt-6-astra], we found that the model delegates well. The GPT-6 family is also the first from OpenAI to support effort changes mid-turn without breaking the cache.
+
+To use these capabilities, we refined four harness primitives. They give the core loop a small set of choices at each step: what kind of subagent to dispatch, at what size and effort, whether to return to one it has already briefed, and how hard to think:
+
+Domain-aware subagents. Alongside a general worker, the harness offers specialists: read-only explorers, browser testers, reviewers, and a design subagent for slides and UI,As of September 2026, Replit Design leads the Builders leaderboard on Design Arena [8] [https://www.designarena.ai/leaderboard?tab=builders]. each with its own model and tooling. For now, the harness still decides which specialists exist; the core loop decides when and how to use them.
+
+Subagent tiers and effort. Small, standard, and large, each a step up in cost and capability, and an effort level within the tier. Both apply to every subagent, and the core loop picks them at each dispatch. For example, a mechanical rename goes to small at low effort, while generating hypotheses for a stubborn bug goes to large at high effort.
+
+Reusable subagents. The core loop can return to a subagent it has already briefed instead of starting over. There is no single sidekick kept alive for the session: any number of subagents stay warm across kinds and tiers, and it picks which to wake. A longer cache lifetime on OpenAI’s newer models keeps the cost of doing so down.
+
+Dynamic effort tuning. Now that changing effort mid-turn preserves the cache on some modelsEffort changes preserve cache on the GPT-6 family [2] [https://openai.com/index/gpt-6-astra], Fable 5.1 [3] [https://www.anthropic.com/claude-fable-and-mythos-5-1], and these providers’ models released since. Elsewhere, effort changes and model switches rebuild the cache., we trained an escalation system that checks the trajectory at each step and matches effort to task difficulty. Unlike a router, it acts mid-turn on the work in progress, not once on the request.
+
+The code quality of Astra and Fable 5.1 [3] [https://www.anthropic.com/claude-fable-and-mythos-5-1] also let us use our code-review subagent less, with no drop in our eval scores. We’ve not seen this level of engineering quality from any model before.
+
+Newer models delegate on their own
+
+Frontier models like Astra and Fable cost more per token, which makes them look uneconomical next to smaller ones. We’ve observed them naturally delegate to less costly subagents, keeping their own tokens for the decisions that need them.
+
+Replit Agent never forces the core loop to spawn subagents. Table 1Replit Agent production, one week per model: Fable 5 in August 2026, Fable 5.1 and Astra in September. shows how three models handle that decision in production:
+
+Fable 5Fable 5.1GPT-6 Astra
+
+Turns that dispatch a subagent32%21%36%
+
+Turns that hand work to a general worker0.9%2.3%20%
+
+Dispatches that return to an existing subagent17%29%42%
+
+Table 1: Delegation in Replit Agent production, each model at medium reasoning effort.
+
+All three models delegate, but each in its own way. At medium effort, Fable models rarely hand work to a general worker: they send out read-only explorers and reviewers and keep the implementation for themselves. Astra is the first model we’ve seen routinely delegate to general workers without being told to, and once it has briefed one it tends to go back to it rather than start over. This return rate has risen with every model generation.
+
+When I add a service from a vendor's page, it never brings me back to the vendor. Can we fix this?
+
+Agent
+
+Explorer
+
+Worker A
+
+Worker B
+
+Tester
+
+Figure 2: A production turn on September 17, 2026, drawn from the trace. The core loop dispatched an explorer, two workers, and a tester; of its five worker dispatches, three were returns to a worker it had already briefed.
+
+Results
+
+We evaluated Replit Agent in Max mode, our highest-quality setting with Astra as the core loop, on two software engineering benchmarks: DeepSWE and Terminal-Bench.Our runs are means of four repetitions; whiskers are 95% intervals, mean ± 1.96 SE, as on the DeepSWE leaderboard [4] [https://deepswe.datacurve.ai/]. Astra’s figures are the published mini-swe-agent baselines [4] [https://deepswe.datacurve.ai/] [9] [https://artificialanalysis.ai/evaluations/terminalbench-4-0], with intervals where the leaderboard reports them. We compare against two baselines: Astra on its own in mini-swe-agent, as published on each leaderboard, and a sidekick architecture, the same configuration with one change: its subagent primitives replaced by a single long-lived worker. Each chart plots score against cost per task, so the most efficient configurations sit toward the top left.
+
+On DeepSWE v1.1 [4] [https://deepswe.datacurve.ai/], which tests long-horizon changes to active open-source repositories, Replit Agent scores 72% at $2.11 per task. Astra in mini-swe-agent at low effort scores 67% at $1.60, and at xhigh effort 74% at $4.43; the sidekick architecture scores 61% at $1.34. Terminal-Bench 4.0 [5] [https://www.tbench.ai/] tests multi-step work done entirely from a shell.Three GPU tasks are excluded from our runs. Replit Agent reaches 49% at $2.53 per task, against 42% at $2.25 for Astra at low effort and 60% at $5.86 at xhigh. The sidekick architecture manages 33% at $1.84.
+
+DeepSWE: score against cost per task
+
+Mean of 4 repetitions over 113 tasks. GPT-6 Astra alone in mini-swe-agent, public v1.1 leaderboard.
+
+Terminal-Bench 4.0: score against cost per task
+
+Mean of 4 repetitions over 63 tasks, GPU tasks excluded. GPT-6 Astra alone in mini-swe-agent, Artificial Analysis leaderboard.
+
+Replit Agent beats the sidekick architecture on both benchmarks, by 11 and 16 points. The sidekick costs less, and gives up a sixth to a third of the score for it. Astra on its own scores higher only by spending more: its best settings sit 2 and 11 points above Replit Agent at more than twice the cost. Neither baseline wins on both cost and score. We ran Replit Agent exactly as it ships to users, with no changes to the prompting or harness.
+
+The bitter lesson of harness design
+
+We read these results as an instance of Sutton’s bitter lesson [6] [http://www.incompleteideas.net/IncIdeas/BitterLesson.html]. Baking human knowledge into an agent helps in the short term, plateaus in the long run, and is eventually overtaken by general methods that scale with computation. A rigid harness forces the model into one way of working; a composable one lets it choose. The smarter models get, the less the harness should decide for them.
+
+Compared with a more prescribed architecture, this approach buys us three things:
+
+It bets on model scaling laws. Delegation that relies on the taste of the model improves with every release. Early previews of next-generation models continue the trend.
+
+It fits the task. The model spawns nothing for a small task, one explorer for a search, and a team when a build breaks into independent pieces.
+
+It reuses without persisting. A subagent keeps its context in case the model wants it back, and nothing persists unless it does.
+
+In Sutton’s terms, the harness should let the model discover how to execute the work, not prescribe how we would have done it. Free the models.
+
+Acknowledgements
+
+Written by Daniel Furman, Jacky Zhao, Vaibhav Kumar, Ed Sioufi, and Michele Catasta. Thanks to James Austin, Toby Ho, Preeya Kirani, Zhen Li, Robin Newhouse, Devanshu Sen Pandey, Ibrahim Sheikh, Samuel Spitz, Peter Zhong, and the rest of the AI team at Replit for their contributions to this work. If you want to work on Replit Agent, our team is hiring; reach out to [email protected] [/cdn-cgi/l/email-protection#43332a31312c2b033126332f6d2a37].
+
+References
+
+On the Navier–Stokes Millennium Prize Problem [https://openai.com/index/navier-stokes-solution/]
+
+Introducing GPT-6 Astra [https://openai.com/index/gpt-6-astra]
+
+Introducing Claude Fable 5.1 and Claude Mythos 5.1 [https://www.anthropic.com/claude-fable-and-mythos-5-1]
+
+DeepSWE v1.1 [https://deepswe.datacurve.ai/]
+
+Terminal-Bench 4.0 [https://www.tbench.ai/]
+
+The Bitter Lesson [http://www.incompleteideas.net/IncIdeas/BitterLesson.html]
+
+Idiosyncrasies in Large Language Models [https://arxiv.org/abs/2502.12150]
+
+Design Arena [https://www.designarena.ai/leaderboard?tab=builders]
+
+Terminal-Bench 4.0 results, Artificial Analysis [https://artificialanalysis.ai/evaluations/terminalbench-4-0]
+
+Footnotes
+
+1 [#1c4422762960-ref]
+
+Coding agents write in a compressed, jargon-heavy register nicknamed “Claudish”; each frontier model’s prose is distinct enough to identify from text alone [7] [https://arxiv.org/abs/2502.12150].
+
+2 [#fn_designarena-ref]
+
+As of September 2026, Replit Design leads the Builders leaderboard on Design Arena [8] [https://www.designarena.ai/leaderboard?tab=builders].
+
+3 [#3c3a641eacb3-ref]
+
+Effort changes preserve cache on the GPT-6 family [2] [https://openai.com/index/gpt-6-astra], Fable 5.1 [3] [https://www.anthropic.com/claude-fable-and-mythos-5-1], and these providers’ models released since. Elsewhere, effort changes and model switches rebuild the cache.
+
+4 [#e9bd0580c72f-ref]
+
+Replit Agent production, one week per model: Fable 5 in August 2026, Fable 5.1 and Astra in September.
+
+5 [#c9b7f8a519f3-ref]
+
+Our runs are means of four repetitions; whiskers are 95% intervals, mean ± 1.96 SE, as on the DeepSWE leaderboard [4] [https://deepswe.datacurve.ai/]. Astra’s figures are the published mini-swe-agent baselines [4] [https://deepswe.datacurve.ai/] [9] [https://artificialanalysis.ai/evaluations/terminalbench-4-0], with intervals where the leaderboard reports them.
+
+6 [#fn_tbench_gpu-ref]
+
+Three GPU tasks are excluded from our runs.
+
+Follow @Replit
+ [https://x.com/replit]
+ [https://x.com/intent/tweet?url=https%3A%2F%2Freplit.com%2Fblog%2Ffree-the-models] [https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Freplit.com%2Fblog%2Ffree-the-models] [https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Freplit.com%2Fblog%2Ffree-the-models]
+
+More
+
+Oct 16, 2026
+Bring Your Own Cloud to Replit
+
+Enterprise isolation and control. The same simple experience for users.
+
+ [/blog/bring-your-own-cloud]
+
+Aug 3, 2026
+AI adoption starts with truth
+
+The semantic layer is the foundation
+
+AI adoption is limited by trust. A user who gets burned by a confidently wrong answer will double-check the next one, eventually routing consequential work around the system entirely. Once that happens, AI remains a tool at the edges rather than infrastructure at the center… useful, but never trusted with the workflows where its value compounds. Before a company can benefit from more capable agents, those agents need a reliable way to know what the company considers true.
+
+A semantic layer tells an agent which tables are sources of truth and how they relate. That's the floor. It is necessary, and it isn't sufficient.
+
+A semantic layer is not plumbing. It is the first act of governance for an AI-native company: the shared definitions of the business, the canonical metrics, the sources of truth, and the relationships an agent is allowed to rely on. Without it, an agent does not have a data problem. It has a language problem: several tables can each look plausible, and the model has no grounded way to know which one means "revenue," "active user," or "customer."
+
+Getting that floor right changes the shape of everything above it. A semantic layer is not the product; it is the shared contract that lets a company safely add a system of specialized capabilities instead of one generic chatbot. Once an agent can ground itself in the right entities, metrics, and relationships, it can reliably run multi-step workflows, call focused tools, retain reviewed knowledge across runs, reuse validation and analysis code, and operate through durable services where work already happens.
+
+ [/blog/ai-adoption]
+
+Jul 29, 2026
+Introducing Replit Design
+
+The next era of design, for everyone
+
+ [/blog/introducing-replit-design]
+
+Replit is the AI platform that helps you turn your ideas into real outcomes. Describe what you want in natural language, then create, launch, and grow apps, sites, tools, and businesses in one place.
+
+Replit on X [https://x.com/replit]Replit on YouTube [https://www.youtube.com/@replit]Replit on LinkedIn [https://www.linkedin.com/company/repl-it/]Replit on Instagram [https://www.instagram.com/replit]Replit on Facebook [https://www.facebook.com/replit/]Replit on TikTok [https://www.tiktok.com/@replit]
+
+Product
+
+Design [/design]
+
+Slides [/slides]
+
+Agents [/products/agent]
+
+Databases [/products/database]
+
+Integrations [/integrations]
+
+Security [/security]
+
+Enterprise [/enterprise]
+
+Pricing [/pricing]
+
+Resources
+
+Templates [/build]
+
+Gallery [/gallery]
+
+Customer stories [/customers]
+
+Docs [https://docs.replit.com/]
+
+Blog [/blog]
+
+Community [/community]
+
+Support [/help]
+
+Status [https://status.replit.com/]
+
+Company
+
+About [/about]
+
+Careers [/careers]
+
+Newsroom [/news]
+
+Partners [/partners]
+
+Certifications [/certifications]
+
+Brand kit [/brand]
+
+Contact us [/enterprise]
+
+Legal
+
+Terms of service [/terms-of-service]
+
+Privacy policy [/privacy-policy]
+
+Pro agreement [/pro-agreement]
+
+Enterprise agreement [/enterprise-agreement]
+
+Data processing agreement [/dpa]
+
+Subprocessors [/subprocessors]
+
+Report abuse [https://docs.replit.com/legal-and-security-info/abuse-report]
+
+Your privacy choices
+
+All rights reserved. Copyright © 2026 Replit, Inc.
