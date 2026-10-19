@@ -21,7 +21,7 @@ use crate::repo::Issue;
 
 const VISUAL_TEMPLATE: &str = include_str!("../../../templates/cards/visual-review.md");
 const REVERSE_TEMPLATE: &str = include_str!("../../../templates/reverse-review.md");
-const USAGE: &str = "用法：barking review <期次目录> (--visual | --reverse) [--effort medium|high|xhigh|max] [--run]";
+const USAGE: &str = "用法：barking review <期次目录> (--visual | --reverse [--full]) [--effort medium|high|xhigh|max] [--run]";
 
 /// The strongest GPT model; the reviewer must be a different family from the
 /// drafting model (~/.claude/agents/codex-reviewer.md).
@@ -74,6 +74,20 @@ struct Opts {
     mode: Mode,
     effort: String,
     run: bool,
+    /// `--reverse` only: list every tracked text file instead of the focused
+    /// set (see [`focus_files`]).
+    full: bool,
+}
+
+/// How much of the issue the reverse reviewer is told to read.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Scope {
+    /// Every tracked text file of the issue (`--full`).
+    Full,
+    /// The files that carry or back the public text; `rest` more tracked
+    /// files exist and may only be grepped. The 1018 second round read all
+    /// ~190 archives and ran past the 20-minute `medium` cap with no report.
+    Focused { rest: usize },
 }
 
 pub fn run(args: &[String]) -> ExitCode {
@@ -94,7 +108,7 @@ pub fn run(args: &[String]) -> ExitCode {
 }
 
 fn parse_args(args: &[String]) -> Result<Opts, String> {
-    let (mut visual, mut reverse, mut run) = (false, false, false);
+    let (mut visual, mut reverse, mut run, mut full) = (false, false, false, false);
     let mut effort = String::from("medium");
     let mut dir: Option<PathBuf> = None;
     let mut it = args.iter();
@@ -103,6 +117,7 @@ fn parse_args(args: &[String]) -> Result<Opts, String> {
             "--visual" => visual = true,
             "--reverse" => reverse = true,
             "--run" => run = true,
+            "--full" => full = true,
             "--effort" => effort = it.next().ok_or("--effort 缺少取值")?.clone(),
             s if s.starts_with("--effort=") => effort = s["--effort=".len()..].to_string(),
             s if s.starts_with("--") => return Err(format!("未知选项 {s}")),
@@ -119,6 +134,9 @@ fn parse_args(args: &[String]) -> Result<Opts, String> {
         (false, false) => return Err("须指定 --visual 或 --reverse 之一".into()),
         (true, true) => return Err("--visual 与 --reverse 不能同时用，分两次运行".into()),
     };
+    if full && mode != Mode::Reverse {
+        return Err("--full 只用于 --reverse".into());
+    }
     if !EFFORTS.contains(&effort.as_str()) {
         return Err(format!(
             "--effort 须为 {}，得到「{effort}」",
@@ -131,6 +149,7 @@ fn parse_args(args: &[String]) -> Result<Opts, String> {
         mode,
         effort,
         run,
+        full,
     })
 }
 
@@ -160,7 +179,7 @@ fn execute(opts: &Opts) -> Result<ExitCode, String> {
     let issue = Issue::resolve(&opts.dir)?;
     let review = match opts.mode {
         Mode::Visual => plan_visual(&issue)?,
-        Mode::Reverse => plan_reverse(&issue)?,
+        Mode::Reverse => plan_reverse(&issue, opts.full)?,
     };
     for img in &review.images {
         if !safe_arg(img) {
@@ -322,7 +341,7 @@ fn plan_visual(issue: &Issue) -> Result<Review, String> {
     })
 }
 
-fn plan_reverse(issue: &Issue) -> Result<Review, String> {
+fn plan_reverse(issue: &Issue, full: bool) -> Result<Review, String> {
     let files = text_files(issue)?;
     if files.is_empty() {
         return Err(format!("{} 下没有可审的文本文件", issue.dir.display()));
@@ -336,10 +355,30 @@ fn plan_reverse(issue: &Issue) -> Result<Review, String> {
             warnings.push(format!("{required} 不存在，复核者会找不到它"));
         }
     }
-    let prompt = reverse_prompt(&issue.rel(), &issue.mmdd, &files)?;
+    let (listed, scope) = if full {
+        (files.clone(), Scope::Full)
+    } else {
+        // A missing fact list was warned about above; the focused set then
+        // holds only the core files.
+        let fact_check = read_lf(&issue.dir.join("sources/fact-check.md")).unwrap_or_default();
+        let focus = focus_files(&files, &issue.mmdd, &fact_check);
+        let rest = files.len() - focus.len();
+        (focus, Scope::Focused { rest })
+    };
+    let prompt = reverse_prompt(&issue.rel(), &issue.mmdd, &listed, scope)?;
+    let scope_line = match scope {
+        Scope::Full => format!(
+            "审查范围：全部 {} 个文本文件（--full），不带图片",
+            listed.len()
+        ),
+        Scope::Focused { rest } => format!(
+            "审查范围：重点 {} 个文本文件（正文、卡片、清单、README 及清单点名的存档），另 {rest} 个只按需 grep；不带图片；--full 改为全量",
+            listed.len()
+        ),
+    };
     Ok(Review {
         prompt,
-        scope: format!("审查范围：{} 个文本文件，不带图片", files.len()),
+        scope: scope_line,
         images: Vec::new(),
         cwd: issue.root.clone(),
         search: true,
@@ -367,7 +406,13 @@ fn template_body(template: &str) -> Result<String, String> {
 
 /// Placeholders the templates may use; a leftover after filling means the
 /// template grew a placeholder this code does not know.
-const PLACEHOLDERS: [&str; 4] = ["{期次目录}", "{附图清单", "{MMDD}", "{文件清单}"];
+const PLACEHOLDERS: [&str; 5] = [
+    "{期次目录}",
+    "{附图清单",
+    "{MMDD}",
+    "{文件清单}",
+    "{范围说明}",
+];
 
 fn check_filled(body: &str) -> Result<(), String> {
     if let Some(p) = PLACEHOLDERS.iter().find(|p| body.contains(*p)) {
@@ -418,14 +463,77 @@ fn visual_prompt(
     Ok(out)
 }
 
-fn reverse_prompt(issue_rel: &str, mmdd: &str, files: &[String]) -> Result<String, String> {
+fn reverse_prompt(
+    issue_rel: &str,
+    mmdd: &str,
+    files: &[String],
+    scope: Scope,
+) -> Result<String, String> {
     let list: String = files.iter().map(|f| format!("- {f}\n")).collect();
     let body = template_body(REVERSE_TEMPLATE)?
+        .replace("{范围说明}", &scope_note(issue_rel, scope))
         .replace("{期次目录}", issue_rel)
         .replace("{MMDD}", mmdd)
         .replace("{文件清单}", list.trim_end());
     check_filled(&body)?;
     Ok(format!("{body}\n"))
+}
+
+/// The paragraph that introduces the file list in the reverse prompt. The
+/// focused one overrides the template's broader "审查对象" list on purpose.
+fn scope_note(issue_rel: &str, scope: Scope) -> String {
+    match scope {
+        Scope::Full => {
+            format!("本期入库的文本文件（路径相对 `{issue_rel}`），全部在审查范围内：")
+        }
+        Scope::Focused { rest } => format!(
+            "审查范围（本段优先于上文“审查对象”）：只读下列文件——发布正文、`images/cards.toml`、`sources/fact-check.md`、两份 README，以及事实清单各行“一手来源”列点名的 `sources/` 存档。核对引文时在点名的文件里 grep 原句定点查找，不要通读；某行没有点名存档，或点名存档里找不到原句时，再在 `sources/` 下 grep 该原句，仍找不到就按“要核的”第 2 条记为问题。`sources/` 下另有 {rest} 个入库文本文件（取证记录 `evidence*.md`、`capture-log*.md` 与其他存档）未列出，只在上述情形下 grep。来不及核的行写进报告的“未覆盖”。\n\n下列路径相对 `{issue_rel}`："
+        ),
+    }
+}
+
+/// Files the focused reverse review reads: the published text, the card
+/// text, the fact list, the two READMEs, and every `sources/` file whose
+/// name the fact list mentions. Order follows `files`.
+fn focus_files(files: &[String], mmdd: &str, fact_check: &str) -> Vec<String> {
+    let core = [
+        format!("doc_{mmdd}_publish.txt"),
+        "images/cards.toml".to_string(),
+        "images/README.md".to_string(),
+        "sources/README.md".to_string(),
+        "sources/fact-check.md".to_string(),
+    ];
+    files
+        .iter()
+        .filter(|f| {
+            core.contains(f)
+                || f.strip_prefix("sources/")
+                    .is_some_and(|rest| names_file(fact_check, rest))
+        })
+        .cloned()
+        .collect()
+}
+
+/// Whether `text` mentions the file `name` as a whole token: the characters
+/// around it cannot extend a file name (`a.txt` does not match `ba.txt` or
+/// `a.txt.bak`, but does match `a.txt。`, `sources/a.txt` and a
+/// sentence-final `a.txt.`).
+fn names_file(text: &str, name: &str) -> bool {
+    if name.is_empty() {
+        return false;
+    }
+    let name_char = |c: char| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-');
+    text.match_indices(name).any(|(i, _)| {
+        let extends_before = text[..i].chars().next_back().is_some_and(name_char);
+        let mut after = text[i + name.len()..].chars();
+        let extends_after = match after.next() {
+            // A dot only extends the name when more name follows it.
+            Some('.') => after.next().is_some_and(|c| c.is_ascii_alphanumeric()),
+            Some(c) => name_char(c),
+            None => false,
+        };
+        !extends_before && !extends_after
+    })
 }
 
 fn attachment_list(attachments: &[Attachment]) -> String {
@@ -783,6 +891,71 @@ gloss = "g"
         assert!(a(&["d", "--visual", "--effort", "low"]).is_err());
         assert!(a(&["d", "--visual", "--effort"]).is_err());
         assert!(a(&["d", "--visual", "--frobnicate"]).is_err());
+        assert!(a(&["d", "--reverse", "--full"]).unwrap().full);
+        assert!(!a(&["d", "--reverse"]).unwrap().full);
+        assert!(a(&["d", "--visual", "--full"]).is_err());
+    }
+
+    #[test]
+    fn focused_scope_keeps_core_and_cited_files() {
+        let files: Vec<String> = [
+            "doc_1018_publish.txt",
+            "images/README.md",
+            "images/cards.toml",
+            "sources/README.md",
+            "sources/a-pbf.txt",
+            "sources/a-pbf.txt.bak",
+            "sources/b-aa.txt",
+            "sources/c-pdf.txt",
+            "sources/capture-log-a.md",
+            "sources/evidence-a.md",
+            "sources/fact-check.md",
+            "sources/xa-pbf.txt",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        let fc = "| 事实 | L1 | ✅ | 公告（`a-pbf.txt`；`../images/01`） | 见 sources/b-aa.txt。另见 c-pdf.txt.\n";
+        assert_eq!(
+            focus_files(&files, "1018", fc),
+            [
+                "doc_1018_publish.txt",
+                "images/README.md",
+                "images/cards.toml",
+                "sources/README.md",
+                "sources/a-pbf.txt",
+                "sources/b-aa.txt",
+                "sources/c-pdf.txt",
+                "sources/fact-check.md",
+            ]
+        );
+        assert!(names_file("x a.txt。", "a.txt"));
+        assert!(names_file("sources/a.txt", "a.txt"));
+        assert!(!names_file("ba.txt", "a.txt"));
+        assert!(!names_file("a.txt.bak", "a.txt"));
+        assert!(!names_file("a.txts", "a.txt"));
+        assert!(!names_file("anything", ""));
+    }
+
+    #[test]
+    fn focused_prompt_says_what_to_skip() {
+        let files = vec![
+            "doc_1018_publish.txt".to_string(),
+            "sources/fact-check.md".to_string(),
+        ];
+        let p =
+            reverse_prompt("docs/2610/1018", "1018", &files, Scope::Focused { rest: 7 }).unwrap();
+        assert!(p.contains("本段优先于上文“审查对象”"));
+        assert!(p.contains("另有 7 个入库文本文件"));
+        assert!(p.contains(
+            "下列路径相对 `docs/2610/1018`：\n\n- doc_1018_publish.txt\n- sources/fact-check.md\n"
+        ));
+        assert!(!p.contains("全部在审查范围内"));
+        assert!(!p.contains('{'), "{p}");
+        let full = reverse_prompt("docs/2610/1018", "1018", &files, Scope::Full).unwrap();
+        assert!(full.contains(
+            "本期入库的文本文件（路径相对 `docs/2610/1018`），全部在审查范围内：\n\n- doc_1018_publish.txt"
+        ));
     }
 
     #[test]
@@ -952,7 +1125,7 @@ text = "a"
             "images/cards.toml".to_string(),
             "sources/fact-check.md".to_string(),
         ];
-        let p = reverse_prompt("docs/2610/1009", "1009", &files).unwrap();
+        let p = reverse_prompt("docs/2610/1009", "1009", &files, Scope::Full).unwrap();
         for ph in PLACEHOLDERS {
             assert!(!p.contains(ph), "{ph} left in prompt");
         }

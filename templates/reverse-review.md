@@ -1,6 +1,6 @@
 # 反向核验提示词
 
-`barking review <期次目录> --reverse` 填好占位符后交给跨模型复核者（WSL Codex，`gpt-6-astra`，只读，联网）。规则见 `EDITORIAL.md`“核验流程”第 5 条；视觉复核另用 `templates/cards/visual-review.md`。下面 `---` 以下是提示词，占位符由 barking 填：`{期次目录}`（`docs/<YYMM>/<MMDD>`）、`{MMDD}`、`{文件清单}`（期次目录下入库文本文件的相对路径）。开头三段 charter 与 `~/.claude/agents/codex-reviewer.md` 的 charter 一字不差，那边改了这里同步。提示词里不写期望结论，也不写作者对稿件的自评。
+`barking review <期次目录> --reverse` 填好占位符后交给跨模型复核者（WSL Codex，`gpt-6-astra`，只读，联网）。规则见 `EDITORIAL.md`“核验流程”第 5 条；视觉复核另用 `templates/cards/visual-review.md`。下面 `---` 以下是提示词，占位符由 barking 填：`{期次目录}`（`docs/<YYMM>/<MMDD>`）、`{MMDD}`、`{范围说明}`（文件清单前的一段：默认只列正文、卡片、事实清单、两份 README 与清单点名的 `sources/` 存档，并要求其余存档只按需 grep；加 `--full` 改为列出全部入库文本文件）、`{文件清单}`（期次目录下入库文本文件的相对路径，范围同上）。开头三段 charter 与 `~/.claude/agents/codex-reviewer.md` 的 charter 一字不差，那边改了这里同步。提示词里不写期望结论，也不写作者对稿件的自评。
 
 ---
 
@@ -22,7 +22,7 @@ If you find no blocker, say `PASS / no blocker` and state what you did not cover
 - 取证记录 `sources/evidence*.md`、`sources/capture-log*.md`，来源入口 `sources/README.md`，配图说明 `images/README.md`。
 - `sources/` 下的文本存档（页面文本、JSON、jsonl 日志、脚本）。PDF、HTML、截图等原件不入库，只在 `sources/offsite.tsv` 登记；本机若有就读，读不到就以文本存档为准，并在报告里写明哪些没核到。
 
-本期入库的文本文件（路径相对 `{期次目录}`）：
+{范围说明}
 
 {文件清单}
 

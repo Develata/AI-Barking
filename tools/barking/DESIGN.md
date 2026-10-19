@@ -127,7 +127,7 @@ barking heat <期次目录> <组前缀> [--hn "<查询>"]... [--reddit "<查询>
 ## 7. `review`（模块 `review.rs` + 模板 `templates/reverse-review.md`）
 
 ```
-barking review <期次目录> (--visual | --reverse) [--effort medium|high|xhigh|max] [--run]
+barking review <期次目录> (--visual | --reverse [--full]) [--effort medium|high|xhigh|max] [--run]
 ```
 拼出跨模型复核的 WSL Codex 命令（规则：`templates/cards/README.md` 第 5 步、`EDITORIAL.md`“核验流程”第 5 条、`~/.claude/agents/codex-reviewer.md`——后者在主工作树外：`C:\Users\QQ\.claude\agents\codex-reviewer.md`，只读）。
 
@@ -135,6 +135,7 @@ barking review <期次目录> (--visual | --reverse) [--effort medium|high|xhigh
 - `--visual`：附图清单 = `Spec::outputs()` 中实际存在的文件 + 每张批注图的 `<stem>-raw.png` + 存在的 `00-cover.png`、`00-cover-wide.png`；用 `templates/cards/visual-review.md`（`---` 之后的正文）填占位符：`{期次目录}` → `docs/<YYMM>/<MMDD>`；`{附图清单…}` → `images/00-tldr.png（省流卡）；images/00-roundup.png（速览聚合图）；images/00-cover.png（封面）；images/41-x.png（批注图）；images/41-x-raw.png（该批注图的原始底图）…`；末尾附上 `EDITORIAL.md` 的“## 省流卡与批注截图”与“## 速览”两节原文。命令形如（`-C` 为期次目录，`--image=` 每图一个，相对期次目录）：
   `MSYS_NO_PATHCONV=1 wsl -d Debian -e bash -lc 'cd "$1" && exec timeout "$5" "$0" exec -m gpt-6-astra -c "model_reasoning_effort=\"$4\"" -s read-only --skip-git-repo-check --ephemeral -C "$1" -o "$2" --image=… - < "$3"' /home/deve/.bun/bin/codex "<期次 WSL 路径>" "<报告 WSL 路径>" "<提示词 WSL 路径>" "<effort>" "<秒数>"`
 - `--reverse`：新建模板 `templates/reverse-review.md`：先写 codex-reviewer.md 里的 charter 段（“You are an independent adversarial reviewer…”原文照抄），再写本仓库的审查范围（按 EDITORIAL.md 第 5 条：正文 `doc_<MMDD>_publish.txt`、`images/cards.toml` 的省流卡/速览/译注文字、`sources/fact-check.md`、`sources/evidence*.md`、`images/README.md`、`sources/README.md` 与 `sources/` 存档；核对每个数字与判断能否在事实清单与存档中找到、限定词有无丢失、有无夸大、卡片文字是否逐字出自正文、平台名风控；输出格式 `BLOCKER | SHOULD_FIX | NICE_TO_HAVE | NEEDS_VERIFICATION`）；占位符 `{期次目录}`、`{MMDD}`、`{文件清单}`（期次目录下入库文本文件的相对路径清单）。命令同上但 `-C` 为仓库根、加 `--search`、不带 `--image`。
+- `--reverse` 的审查范围（2026-10-19 起）：默认只在文件清单里列正文、`images/cards.toml`、`images/README.md`、`sources/README.md`、`sources/fact-check.md`，以及 fact-check.md 里按文件名（整词）点名的 `sources/` 文件，模板占位符 `{范围说明}` 写明其余存档只按需 grep、来不及的写进“未覆盖”；`--full` 恢复列出全部入库文本文件。原因：1018 期第二轮通读约 190 个存档，超过 medium 档 1200 秒限时，没出报告。
 - 路径转换：`wsl -d <distro> -e wslpath -a <Windows 绝对路径>`（传 Windows 形式如 `E:\…`，不要传 `/e/…` 或 `/mnt/…`）。环境变量：`BARKING_WSL_DISTRO`（默认 `Debian`）、`BARKING_WSL_CODEX`（默认 `/home/deve/.bun/bin/codex`）。超时：effort `medium` 为 1200 秒，其余 0（不限）。
 - 默认只打印：提示词路径、报告路径、附图数、完整命令（可直接粘到 Git Bash 运行）、以及提醒“结论记入 sources/fact-check.md 的“视觉复核”/“反向核验”节”。`--run` 则同步执行该命令（stdout/stderr 直通），结束后打印退出码（124 = 超时）、用时、报告路径与报告首 40 行。
 - 单元测试：占位符替换、附图清单生成（给定 Spec 与存在文件集合）、命令字符串拼装（不实际调用 wsl）。

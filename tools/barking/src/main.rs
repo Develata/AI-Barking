@@ -30,7 +30,7 @@ const USAGE: &str = "\
   barking fetch <期次目录> <组前缀> <清单|-> [--jobs 6] [--force]  按 name<TAB>url 清单批量存档网页与 PDF（.html/.pdf、.headers、.txt），限时、并发，日志记入 sources/<组前缀>-fetch-log.jsonl
   barking html2txt <in> <out> [--force]     把保存的网页转成纯文本：去 script/style，保留链接目标
   barking heat <期次目录> <组前缀> [选项]   取 HN / Reddit 热度存入 sources/<组前缀>-heat.json（--hn --reddit --item --since）
-  barking review <期次目录> --visual|--reverse [--effort 档位] [--run]  拼出跨模型复核（WSL Codex）的提示词与命令；--run 同步执行
+  barking review <期次目录> --visual|--reverse [--full] [--effort 档位] [--run]  拼出跨模型复核（WSL Codex）的提示词与命令；--reverse 默认只审正文、卡片、清单及清单点名的存档，--full 全量；--run 同步执行
 
 退出码：0 无错误；1 有错误；2 用法错误";
 
