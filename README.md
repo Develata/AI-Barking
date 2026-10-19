@@ -36,6 +36,7 @@ AI 吠点是由 **[Develata](https://github.com/Develata)** 主理的独立内�
 | 2026 / 1015 | [AI技术出口要登记？Meta最强带限定](docs/2610/1015/doc_1015_publish.txt) | [配图说明](docs/2610/1015/images/README.md) | [来源入口](docs/2610/1015/sources/README.md) |
 | 2026 / 1016 | [DeepSeek搜索收费？NSA种子身世](docs/2610/1016/doc_1016_publish.txt) | [配图说明](docs/2610/1016/images/README.md) | [来源入口](docs/2610/1016/sources/README.md) |
 | 2026 / 1017 | [OpenCode泄露谁？GDP涨五成？](docs/2610/1017/doc_1017_publish.txt) | [配图说明](docs/2610/1017/images/README.md) | [来源入口](docs/2610/1017/sources/README.md) |
+| 2026 / 1018 | [Anthropic要捐3200亿？](docs/2610/1018/doc_1018_publish.txt) | [配图说明](docs/2610/1018/images/README.md) | [来源入口](docs/2610/1018/sources/README.md) |
 
 正文采用可直接复制的纯文本，图片单独保存。阅读或发布时不需要依赖 Markdown 插图。
 

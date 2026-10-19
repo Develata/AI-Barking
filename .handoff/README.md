@@ -2,6 +2,7 @@
 
 本目录随仓库保存，供回看制作过程。文件中的任务要求、路径、模型安排与“未完成”状态属于当时的工作上下文，不自动代表当前状态。
 
+- [取证任务：1018 期（A Anthropic 公共利益基金：5% 股份需股东批准、全资 LLC 非 501(c)(3)、追加 2% 由董事会酌情｜B DeepSeek-V4.1-Flash-1017 第三方评测跟进：Arena WebDev 与 AA 两套口径｜C HybridAgent 潜在空间推理：token、延迟、成本是三个指标｜D 速览）](2026-10-18-1018-evidence.md)
 - [取证任务：1017 期（A OpenCode Console 泄露：1.4% 没给分母、“蒸馏攻击”未见证据｜B Jack Clark 称 2030 年美国 GDP 可达 44 万亿美元：极端情景、比无 AI 路径高 32.4%｜C Meta 商业条款：美国英语版删了 train、英国英语版仍保留｜D 速览）](2026-10-17-1017-evidence.md)
 - [取证任务：1016 期（A DeepSeek 1017 更新与搜索 API：11 月起 Agent 里的搜索开始收费｜B Claude 还原 NIST 椭圆曲线种子：半小时解开 NSA 参数之谜？｜C Anthropic 内部就业报告：初级技术岗招聘占比 27%→9%｜D 速览（产品与硬件）｜E 速览（研究与评测））](2026-10-16-1016-evidence.md)
 - [取证任务：1015 期（A 两部门拟管 23 项 AI 技术出口｜B Meta Muse Spark Open：美国最强开源权重？｜C ARC-AGI-3 上 Gemini-4-Argon 换 harness 分数翻倍【跟进】｜D 速览（产品与公司）｜E 速览（研究与模型））](2026-10-15-1015-evidence.md)
