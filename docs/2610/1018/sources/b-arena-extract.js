@@ -1,0 +1,1 @@
+(()=>{const rows=[...document.querySelectorAll('tr')].map(r=>[...r.children].map(c=>c.textContent.trim().replace(/\s+/g,' ')).join(' | '));return 'READ_AT '+new Date().toISOString()+'\nURL '+location.href+'\nTITLE '+document.title+'\n'+rows.join('\n')+'\nTOTAL '+rows.length})()

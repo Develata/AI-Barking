@@ -1,0 +1,3347 @@
+Hybrid Reasoning Agents
+
+Report GitHub Issue
+
+ ×
+
+ Title:
+
+Content selection saved. Describe the issue below:
+
+ Description:
+
+ Submit without GitHub
+ Submit in GitHub
+
+ arXiv is now an independent nonprofit!
+ Learn more [https://info.arxiv.org/about]
+ ×
+
+ Back to arXiv
+ [/]
+
+ Why HTML? [https://info.arxiv.org/about/accessible_HTML.html]
+
+ Report Issue [#]
+
+ Back to Abstract
+ [/abs/2610.18861v1]
+
+ Download PDF [/pdf/2610.18861v1]
+
+ [javascript:toggleNavTOC();]
+
+ [javascript:toggleReadingMode();]
+
+Abstract [#abstract1]
+
+1 Introduction [#S1]
+
+2 Preliminary [#S2]
+
+3 Building a Hybrid Reasoning Agent [#S3]
+
+3.1 Hybrid Mode Interface [#S3.SS1]
+
+3.2 Multi-Turn Hybrid Generation over Working Memory [#S3.SS2]
+
+4 Learning to Perform Hybrid Reasoning [#S4]
+
+4.1 Stabilize Generation via Hybrid Supervised Fine-tuning [#S4.SS1]
+
+4.2 Scale Reasoning via Hybrid Reinforcement Learning [#S4.SS2]
+
+5 Empirical Evaluations [#S5]
+
+5.1 Scaling Performance via Hybrid Reasoning [#S5.SS1]
+
+5.2 Efficiency Advantage on Hybrid Generation [#S5.SS2]
+
+6 In-depth Analyses [#S6]
+
+6.1 Training Dynamics on HybridSFT and HybridRL [#S6.SS1]
+
+6.2 Causal Reliance and HybridLink Design in Latent Mode [#S6.SS2]
+
+6.3 Tool Use and Reasoning Auditability in Text Mode [#S6.SS3]
+
+7 Related Work [#S7]
+
+8 Discussion and Future Directions [#S8]
+
+9 Conclusion [#S9]
+
+References [#bib]
+
+A Multi-turn Continuation over Working Memory [#A1]
+
+B Design and Analyses of Hybrid Supervised Fine-tuning [#A2]
+
+B.1 Why Self-Conditioned Training? [#A2.SS1]
+
+B.2 Learning When to Enter and Exit Latent Mode [#A2.SS2]
+
+C Theoretical Analyses of Hybrid Reinforcement Learning [#A3]
+
+C.1 Formulation of Hybrid Policy Factorization [#A3.SS1]
+
+C.2 Hybrid Policy Optimization [#A3.SS2]
+
+D Extended Related Work [#A4]
+
+E Hybrid Data Curation [#A5]
+
+F Latent Interpretability Evaluation (Figures and ) [#A6]
+
+G Additional Experiments [#A7]
+
+G.1 Experiments on 4B-Scale HybridAgent [#A7.SS1]
+
+G.2 Cost Analyses on HybridAgent [#A7.SS2]
+
+H Experiment Setups [#A8]
+
+H.1 Benchmark and Evaluation Details [#A8.SS1]
+
+H.2 Baseline Details [#A8.SS2]
+
+H.3 Implementation Details [#A8.SS3]
+
+I Prompt Template [#A9]
+
+J Case Study of HybridAgent [#A10]
+
+ License: CC BY 4.0
+ [https://info.arxiv.org/help/license/index.html#licenses-available]
+
+arXiv:2610.18861v1 [cs.CL] 13 Oct 2026
+
+Hybrid Reasoning Agents
+
+Jiaru Zou
+
+Affiliation: Stanford University 
+
+Yunzhe Qi
+
+Affiliation: UIUC 
+
+Sirui Chen
+
+Federico Bianchi
+
+Affiliation: Together AI 
+
+Shang Zhu
+
+Affiliation: Together AI 
+
+Pan Lu
+
+Affiliation: Stanford University 
+
+Jingrui He
+
+Affiliation: UIUC 
+
+James Zou
+
+Affiliation: Stanford University 
+
+Affiliation: Together AI 
+
+Affiliation: Meta
+
+Affiliation: Project Lead 
+
+Affiliation: Core Contributor
+
+Abstract
+
+How can we build an agent that thinks beyond human language, yet still acts through it in the external environment? Modern LLM agents still reason and interact through text, while latent reasoning offers an efficient internal medium but lacks native tool access and reasoning transparency.
+We bridge these two directions with Hybrid Reasoning Agents (HybridAgents), which dynamically navigate between latent reasoning and text-based interaction throughout a unified generation process.
+Architecturally, a lightweight HybridLink enables seamless transitions between text and latent modes, while the agent’s continuous working memory preserves lossless hybrid context across multiple turns.
+These designs preserve tool-integrated agentic capabilities while making latent thoughts directly inspectable.
+Building on this architecture, we further develop dedicated post-training algorithms for hybrid reasoning: HybridSFT stabilizes tool-integrated hybrid generation by teaching the backbone to coordinate with HybridLink, then HybridRL scales reasoning by learning when to think in latent space and when to act through text.
+We evaluate HybridAgent at 3 model scales across 11 benchmarks covering mathematics, science, medicine, search, and agentic reasoning. Compared with frontier LLM Agents and agentic frameworks spanning both text-based and latent methods, HybridAgent consistently improves performance by 10.4%, while delivering 35.5%–54.7% token reduction, 1.8×\times–2.6×\times faster inference, and 2.7×\times–3.7×\times cost savings.
+
+Figure 1: 
+HybridAgent Architecture Overview.
+Left: A HybridLink maps last-layer hidden states back into the input embedding space, letting the agent enter latent mode for recurrent, fast, inspectable inner thinking and return to text mode for tool calls and external monitoring.
+Right: HybridAgent performs hybrid reasoning that thinks in latent space and acts through text within a single generation process.
+Building on this architecture, HybridAgent (i) achieves multi-turn hybrid generation by carrying the entire hybrid context through its own working memory (Section 3 [#S3]), and (ii) can be converted from any standard pre-trained LLM through a dedicated post-training pipeline (Section 4 [#S4]).
+
+1 Introduction
+
+Frontier intelligence no longer scales through the model’s reasoning alone, but depends increasingly on its ability to interact with the external world (Team, 2026 [#bib.bib44]; Kwa et al., 2026 [#bib.bib21]; Sun et al., 2026 [#bib.bib14]).
+To solve a hard problem, an LLM agent must reach beyond the model itself by continually invoking specialized tools, observing feedback from the environment, and adapting its next move (Qu et al., 2025 [#bib.bib17]; Silver and Sutton, 2025 [#bib.bib20]; Feng et al., 2026 [#bib.bib19]).
+Beneath this expanding repertoire of agent harnesses lies a single lingua franca: text, the common medium of both the agent’s autoregressive generation and its environment interaction (Sumers et al., 2024 [#bib.bib18]; Zhang et al., 2026b [#bib.bib16]).
+All intermediate reasoning trajectories are generated token by token as text before the agent can act on the environment.
+
+A separate line of work on latent reasoning points in a different direction (Zhu et al., 2025b [#bib.bib13]; Chen et al., 2025 [#bib.bib31]).
+By unfolding computation directly in continuous hidden space, latent models bypass the need to decode and verbalize every intermediate step, providing more efficient internal reasoning within the model’s “own language" (Hao et al., 2024 [#bib.bib28]; Wang et al., 2025 [#bib.bib40]; Yu et al., 2026 [#bib.bib41]).
+However, today’s latent reasoners remain largely sealed behind the model boundary.
+Unlike decoded text, continuous latent vectors (i) lack native pathways for tool invocation across multi-turn agentic reasoning (Chang et al., 2026 [#bib.bib22]), and (ii) do not readily expose human-interpretable semantics, leaving them difficult to supervise during training (Chen et al., 2026 [#bib.bib15]) and to audit or debug at inference (Korbak et al., 2025 [#bib.bib24]).
+These constraints keep latent reasoning models from operating as capable agents in their own right.
+
+Taken together, agentic interaction and efficient inner reasoning have so far required a different medium each, leaving the two lines of work apart in the development of next-generation agents.
+We believe this division can be closed by building a new type of agent that combines both strengths to think beyond text while still acting through it. We call this unified design HybridAgent, one that dynamically navigates between latent reasoning and text-based interaction within a single generation.
+
+Building such an agent is hard, since it needs to handle both dense continuous vectors and sparse discrete tokens as hybrid inputs, and determine when to transition between text and latent modes to balance agentic actions and reasoning efficiency.
+To offset the hardness, we first revisit the model architecture and extend its autoregressive generation interface to support hybrid inputs.
+At the heart of this design is HybridLink, a lightweight residual adapter that bridges latent thoughts from the last-layer hidden space back into the input embedding space and enables sequence-wise recurrence within latent mode.
+Then, we realize multi-turn hybrid generation through the agent’s own working memory, carrying complete hybrid trajectories of text, latent thoughts, and tool observations across turns.
+Surprisingly, we find that HybridAgent can render its thoughts in latent mode as human-readable pseudo-text, making latent reasoning transparent and directly inspectable rather than opaque.
+
+To further unlock the potential of hybrid reasoning, we equip HybridAgent with dedicated post-training algorithms.
+HybridSFT first stabilizes tool-integrated hybrid generation through activation and self-conditioned training, which adapts the backbone to reason over latent thoughts produced by its own HybridLink, enabling reliable coordination between the two components and closing the train-inference mismatch.
+Then, HybridRL scales agentic reasoning capabilities by training HybridAgent to adaptively balance latent reasoning and text-based interaction. To realize this, we enable policy optimization over hybrid trajectories through hybrid policy factorization and exact rollout replay.
+
+We provide theoretical grounding for HybridAgent through complementary analyses of multi-turn context continuation and hybrid policy optimization. From an architectural standpoint, we show that continuous working memory losslessly preserves the entire hybrid context across different turns. From a learning perspective, the hybrid policy factorization and exact latent-context replay in HybridRL provide a well-founded basis for policy updates over complete hybrid trajectories.
+
+Empirically, we evaluate HybridAgent on 11 benchmarks spanning mathematics, science, medicine, knowledge-intensive search, and challenging agentic reasoning.
+We instantiate and train HybridAgent with Qwen3-Base models (Yang et al., 2025a [#bib.bib29]) across 4B, 8B, and 14B scales.
+Compared with frontier LLM agents and agentic frameworks spanning both text-based and latent reasoning, HybridAgent achieves an average performance improvement of 10.4% and exhibits strong test-time scalability. In terms of efficiency, HybridAgent reduces token usage by 35.5%–54.7%, delivers 1.8×\times–2.6×\times inference speedup, and lowers computational cost by 2.7×\times–3.7×\times.
+Additional in-depth analyses of training dynamics, reasoning auditability, and agentic tool-use reliability reveal a clear division of labor between the two reasoning modes: HybridAgent shifts more internal reasoning into semantically rich and interpretable latent thoughts, while reserving text for external inspection and tool interaction.
+
+2 Preliminary
+
+Hybrid Generation in LLMs. We consider an LLM agent fθf_{\theta} built upon a standard Transformer parameterized by θ\theta. To enable hybrid generation, the agent operates autoregressively in two modes: (i) text, which performs explicit generation in the token space, and (ii) latent, which performs implicit generation in the continuous representation space. Formally, given an input context xx with corresponding input embeddings E=[e1,…,et]∈ℝt×dhE=[e_{1},\dots,e_{t}]\in\mathbb{R}^{t\times d_{h}}, the agent computes the last-layer hidden state hth_{t} through a forward pass, and the hybrid input representation for the next step t+1t+1 is:
+
+et+1={Emb⁡(yt+1),yt+1∼Softmax⁡(Wout​ht),if text mode,ht,if latent mode,\displaystyle e_{t+1}=\begin{cases}\operatorname{Emb}(y_{t+1}),\quad y_{t+1}\sim\operatorname{Softmax}(W_{\mathrm{out}}h_{t}),&\text{if }{\color[rgb]{0.2695,0.4102,0.4922}\texttt{text}}\text{ mode},\\[2.0pt]
+h_{t},&\text{if }{\color[rgb]{0.7852,0.4727,0.2695}\texttt{latent}}\text{ mode},\end{cases}
+
+(1)
+
+where WoutW_{\mathrm{out}} is the vocabulary projection matrix, Emb⁡(⋅)\operatorname{Emb}(\cdot) is the token embedding function, and hth_{t} is directly reused as the next latent input in standard latent reasoning (Hao et al., 2024 [#bib.bib28]; Cheng and Van Durme, 2024 [#bib.bib64]; Coda-Forno et al., 2025 [#bib.bib32]).
+The next hidden state of fθf_{\theta} is then computed as:
+
+ht+1=fθ​([E≤t;et+1]).\displaystyle h_{t+1}=f_{\theta}([E_{\leq t};e_{t+1}]).
+
+(2)
+
+Throughout inference, the hybrid agent dynamically switches between the two generation modes, producing a hybrid trajectory that balances the model’s inner reasoning with external interaction.
+
+Tool-Integrated Agentic Reasoning. A hybrid agent can leverage its text mode to interact with external environments.
+Similar to standard LLM agents, the hybrid agent generates a tool call as a sequence of text, invokes the corresponding tool (e.g., Python, Search), and receives the resulting observations. A complete single-turn hybrid reasoning trajectory τ\tau can be represented as:
+
+(3)
+
+where [⋅][\cdot] and ⟨⋅⟩\langle\cdot\rangle denote text chunks and latent vectors, respectively.
+The whole trace is then appended as input for the next generation turn, and the process continues until a final text answer is produced.
+
+3 Building a Hybrid Reasoning Agent
+
+We introduce HybridAgent, a hybrid framework that dynamically navigates between explicit text and continuous latent reasoning within a single unified generation process.
+As illustrated in Figure 1 [#S0.F1], the architecture preserves an LLM agent’s autoregressive generation and tool-calling interfaces while accommodating both text and latent inputs.
+Below, we first present the hybrid interface for seamless text-latent mode transition (Section 3.1 [#S3.SS1]), followed by multi-turn hybrid generation (Section 3.2 [#S3.SS2]).
+
+3.1 Hybrid Mode Interface
+
+Existing latent reasoning models typically feed the last-layer hidden state hth_{t} directly back as the next-step input et+1e_{t+1}.
+This design is not well suited to hybrid generation, as substituting hth_{t} for a token embedding creates a representation mismatch with the pretrained input space, making transitions between continuous latent states and discrete tokens difficult.
+To support both latent and text modes in a shared input interface, we add a lightweight adapter HybridLink to work alongside the backbone.
+
+HybridLink as a Bridge. An LLM agent’s last-layer hidden states naturally encode the semantics of its current generation, so the HybridLink ℛ\mathcal{R} is designed to carry this information from the hidden representation space back into the input embedding space.
+Formally, given any last-layer hidden state hth_{t}, HybridLink simulates its corresponding next-step input embedding as:
+
+et+1=ℛ⁡(ht)=ht+W2​σ​(W1​ht),\displaystyle e_{t+1}=\mathcal{R}(h_{t})=h_{t}+W_{2}\,\sigma\!\left(W_{1}h_{t}\right),
+
+(4)
+
+where W1,W2W_{1},W_{2} are standard linear projections, σ\sigma is an activation function (e.g., GELU).
+As the residual connection largely preserves the original semantics of hth_{t}, HybridLink only needs to align the distributional difference rather than learn the entire projection from scratch.
+Accordingly, the link module is lightweight, with approximately 2​dh22d_{h}^{2} parameters (e.g., ∼\sim10M parameters for a 4B LLM).
+
+Dynamic Text-Latent Mode Transition.
+Next, we describe how HybridAgent transitions between text and latent modes during generation, together with the entry and exit decisions for each mode.
+
+In text mode, HybridAgent behaves exactly as a standard LLM, sampling the next token from the vocabulary at each step. The process continues until the agent generates one special token <latent>, which serves as the entry anchor for the latent mode. For the next forward pass, the agent uses HybridLink for latent reasoning in place of the LM head and token embedding layer.
+
+Figure 2: 
+Interpretable Latent Mode in HybridAgent. All latent steps can be expressed as readable pseudo-text carrying their semantics for external inspection.
+Left: Quantitatively, latent thoughts are highly readable and context-specific (see Appendix F [#A6]).
+Right: Qualitatively, latent pseudo-text stays semantically aligned with surrounding text reasoning and tool calls. (“Steps” counts forward passes).
+
+In latent mode, each step’s last-layer hidden state is passed through HybridLink via Eq. 4 [#S3.E4], allowing HybridAgent to continue its generation flow entirely in latent space without token decoding and re-embedding.
+This sequence-wise recurrent computation over continuous representations extends the agent’s effective reasoning depth, enabling more expressive internal reasoning.
+The latent reasoning span terminates when the semantics of the last-layer hidden state hth_{t} align with the exit anchor </latent>. Specifically, at any latent step tt, the latent mode closes by satisfying the condition:
+
+arg​maxv∈𝒱cos(ℛ(ht),Emb(v))=</latent>.\operatorname*{arg\,max}_{v\in\mathcal{V}}\;\cos\bigl(\mathcal{R}(h_{t}),\,\operatorname{Emb}(v)\bigr)=\texttt{</latent>}.
+
+(5)
+
+HybridAgent then returns to its text mode, and this transition continues during generation.
+At each step, the agent adaptively decides whether to remain in its current mode or switch, allowing the length and frequency of text and latent spans to emerge dynamically rather than follow preset configurations.
+
+Interpretable Latent Mode. During hybrid generation, a useful property of HybridAgent is that its latent mode remains decoding-free yet directly interpretable.
+To inspect any latent reasoning span, one can easily recover its semantics by mapping each latent step produced by HybridLink to its nearest token embedding, as in Eq. 5 [#S3.E5]. We illustrate this interpretability property clearly in Figure 2 [#S3.F2].
+
+3.2 Multi-Turn Hybrid Generation over Working Memory
+
+In standard LLM agents, each turn’s generated content and tool outputs are appended to the textual context and re-encoded as the next turn’s input prefix.
+Hybrid trajectories, however, interleave text tokens with latent vectors and can’t be reconstructed through conventional tokenization alone. Instead, HybridAgent carries the complete context across turns through its continuous working memory.
+
+Figure 3: Multi-Turn Hybrid Generation over HybridAgent’s Own Working Memory. HybridAgent accumulates key-value (KV) entries from text, latent thoughts, and tool observations in continuous working memory, directly reusing and updating it across turns to preserve the full hybrid context.
+
+Cross-Turn Working Memory.
+Recall that a single-turn hybrid trajectory τ\tau in Eq. 3 [#S2.E3] consists of model-generated text, latent thoughts, and external tool interactions.
+During input construction, all contents are mapped into the same input space through either the input embedding layer or HybridLink.
+This shared space allows the Transformer to process all three components uniformly and collect their KV entries throughout generation.
+We leverage these accumulated KV entries as the HybridAgent’s continuous working memory to achieve multi-turn hybrid generation.
+
+As illustrated in Figure 3 [#S3.F3], HybridAgent first initializes its working memory ℳ\mathcal{M} from the input context xx and then accumulates the KV entries generated throughout the first-turn trajectory τ(1)\tau^{(1)}, i.e.,
+
+ℳ(0)\displaystyle\mathcal{M}^{(0)}
+=[K≤|x|,V≤|x|],\displaystyle=\bigl[K_{\leq|x|},\,V_{\leq|x|}\bigr],
+
+(6)
+
+ℳ(1)\displaystyle\mathcal{M}^{(1)}
+=ℳ(0)⊕[K≤t,V≤t],t=1,…,|τ(1)|.\displaystyle=\mathcal{M}^{(0)}\oplus\bigl[K_{\leq t},V_{\leq t}\bigr],\quad t=1,\dots,|\tau^{(1)}|.
+
+Here, ℳ(1)\mathcal{M}^{(1)} preserves the complete first-turn hybrid context in positional order across all Transformer layers.
+For each subsequent turn, the agent directly resumes generation from the current working memory and updates it by appending newly generated KV entries at each step.
+This process continues across the sequence of hybrid trajectories {τ(1),τ(2),…,τ(n)}\{\tau^{(1)},\tau^{(2)},\dots,\tau^{(n)}\} until the final answer is produced.
+We further provide a formal justification for this continuation process in Appendix A [#A1].
+Overall, multi-turn hybrid generation proceeds over one continuous working memory flow, preserving the complete hybrid context across turns without requiring intermediate token-space reconstruction.
+
+4 Learning to Perform Hybrid Reasoning
+
+With the overall framework in place, we now turn to training.
+As HybridAgent leaves the backbone architecture intact, no pre-training from scratch is required. Instead, we adapt the standard agentic post-training pipeline of supervised fine-tuning and reinforcement learning to the hybrid setting. The two training stages serve complementary roles: SFT teaches the agent to coordinate with HybridLink and instantiate reliable tool use for stable hybrid generation (Section 4.1 [#S4.SS1]), while RL further scales reasoning by learning when to think in latent space and when to act through text (Section 4.2 [#S4.SS2]).
+
+Figure 4: 
+Self-Conditioned HybridSFT.
+A teacher-forced first pass produces next-step latent inputs via HybridLink. A second pass replaces ground-truth latent embeddings Emb(⋅)(\cdot) with the predictions ℛ⁡(h)\mathcal{R}(h) and jointly trains the backbone and HybridLink using CE at text and regression at latent positions.
+
+4.1 Stabilize Generation via Hybrid Supervised Fine-tuning
+
+As a first step toward stabilizing hybrid reasoning in HybridAgent, we design the entire HybridSFT stage through a hybrid data curation pipeline and a staged training procedure.
+
+Hybrid Data Recipe. To curate high-quality training data, we filter existing text-based agentic SFT datasets from multiple sources and convert them into hybrid trajectories through automatic annotation.
+We assign reasoning steps to latent mode based on both LLM Experts’ judgments and target models’ own prediction entropy, while retaining a small set of key steps for tool interactions and external debugging/auditing in text mode (see Appendix E [#A5] for data curation details).
+
+Format and HybridLink Activation.
+As a warm start, we adapt the backbone to the hybrid data format and initialize the HybridLink.
+For format activation, we perform standard text SFT to teach the backbone when to enter and exit latent mode by emitting the two special anchor tokens.
+We then freeze the backbone and train HybridLink to align last-layer hidden states at latent positions with their target input embeddings. For a training instance (x,y)∈𝒟SFT(x,y)\in\mathcal{D}_{\text{SFT}}, the activation objectives are:
+
+ℒBackbone=CE⁡(fθ​(x),y),\displaystyle\mathcal{L}_{\text{Backbone}}=\mathrm{CE}\bigl(f_{\theta}(x),\,y\bigr),
+
+(7)
+
+ℒHybridLink =λcos(1−cos(ℛ(hlat),Emb(ylat)))+λmse∥ℛ(hlat)−Emb(ylat)∥22,\displaystyle\mathcal{L}_{\text{HybridLink }}=\lambda_{\cos}\Bigl(1-\cos\bigl(\mathcal{R}(h_{\text{lat}}),\,\operatorname{Emb}(y_{\text{lat}})\bigr)\Bigr)+\lambda_{\mathrm{mse}}\bigl\lVert\mathcal{R}(h_{\text{lat}})-\operatorname{Emb}(y_{\text{lat}})\bigr\rVert_{2}^{2},
+
+where hlath_{\mathrm{lat}} is the last-layer hidden states at latent positions, ylaty_{\mathrm{lat}} is the corresponding ground-truth text tokens, and λcos,λmse\lambda_{\cos},\lambda_{\mathrm{mse}} balance directional and magnitude alignment, respectively.
+
+Self-Conditioned HybridSFT.
+The activation provides a well-aligned initialization, but the backbone has not yet learned to reason over latent thoughts produced by its own HybridLink (see Appendix B.1 [#A2.SS1] for details on this train-inference mismatch).
+We therefore adopt a two-pass self-conditioned training scheme as illustrated in Figure 4 [#S4.F4].
+In the first pass, HybridAgent is teacher-forced on the ground-truth hybrid sequence. HybridLink maps the generated last-layer hidden states at latent positions one step ahead to form latent inputs for the next pass.
+In the second pass, HybridAgent processes the same sequence but replaces the ground-truth latent embeddings with its own latent inputs. We jointly supervise text and latent positions on the second pass as:
+
+ℒHybridSFT=ℒBackbone+ℒHybridLink ,\mathcal{L}_{\text{HybridSFT}}=\mathcal{L}_{\text{Backbone}}+\mathcal{L}_{\text{HybridLink }},
+
+(8)
+
+where the CE loss ℒBackbone\mathcal{L}_{\text{Backbone}} and regression loss ℒHybridLink \mathcal{L}_{\text{HybridLink }} are applied only at text and latent positions, respectively.
+Overall, HybridSFT trains the agent to coordinate its backbone with HybridLink for coherent reasoning across text and latent modes, supporting stable hybrid generation at inference.
+
+4.2 Scale Reasoning via Hybrid Reinforcement Learning
+
+Algorithm 1 Hybrid Reinforcement Learning (HybridRL)
+
+ 1:
+
+ Agent fθf_{\theta} (SFT initialized in Section 4.1 [#S4.SS1]), HybridLink ℛ\mathcal{R}, task set 𝒟RL\mathcal{D}_{\text{RL}}, group size GG, η\eta
+
+ 2:
+
+ for each training step do
+
+ 3:
+
+   Sample x∼𝒟RLx\sim\mathcal{D}_{\mathrm{RL}};
+Collect {τi}i=1G←fθ​(x)\{\tau_{i}\}_{i=1}^{G}\leftarrow f_{\theta}(x)
+⊳\triangleright Hybrid Policy Rollout
+
+ 4:
+
+   Record τi\tau_{i} with latent zi=ℛ⁡(Hi)z_{i}=\mathcal{R}(H_{i}) (Eq. 4 [#S3.E4]), text yiy_{i}, and tool observations oio_{i}
+
+ 5:
+
+   Compute rewards rir_{i} (Eq. 11 [#S4.E11]) and group-normalized advantages AiA_{i}
+
+ 6:
+
+   Replay τi\tau_{i} with (zi,yi,oi)(z_{i},y_{i},o_{i}) to obtain πθ​(yi,t∣τi,<t)\pi_{\theta}(y_{i,t}\mid\tau_{i,<t})
+⊳\triangleright Exact Rollout Replay
+
+ 7:
+
+   Compute ρi,t\rho_{i,t} via Eq. 9 [#S4.E9] and Eq. 10 [#S4.E10]
+⊳\triangleright Hybrid Policy Factorization
+
+ 8:
+
+   Update θ←θ−η​∇θℒRL\theta\leftarrow\theta-\eta\nabla_{\theta}\mathcal{L}_{\mathrm{RL}} (standard RL objective)
+⊳\triangleright Hybrid Policy Update
+
+ 9:
+
+ end for
+
+A HybridAgent cannot straightforwardly adopt popular RL algorithms such as PPO (Schulman et al., 2017 [#bib.bib27]) or GRPO (Shao et al., 2024 [#bib.bib7]), as they assume every generated position carries a token-level likelihood.
+Specifically, at each position tt, standard RL computes the per-token importance ratio as:
+
+ρt=πθ​(yt∣y<t)πθold​(yt∣y<t),\displaystyle\rho_{t}=\frac{\pi_{\theta}\bigl(y_{t}\mid y_{<t}\bigr)}{\pi_{\theta_{\mathrm{old}}}\bigl(y_{t}\mid y_{<t}\bigr)},
+
+(9)
+
+where πθ,πθold\pi_{\theta},\pi_{\theta_{\mathrm{old}}} denote the current and rollout policies.
+At latent positions, however, HybridAgent generates continuous vectors rather than sampled tokens, leaving no token-level likelihood. Thus, the importance ratio ρt\rho_{t} is undefined.
+We address this incompatibility with two simple components.
+
+Hybrid Policy Factorization.
+Recall that, in a hybrid trajectory, latent thoughts are computed entirely in the continuous latent space through HybridLink, and tool responses are the masked observations from the environment.
+Thus, policy sampling during rollout is confined to model-generated text positions.
+To justify why policy optimization needs only to operate over these sampled positions, we formalize the hybrid policy factorization below with detailed theoretical analyses.
+
+Proposition 4.1 (Hybrid Policy Factorization).
+
+Let τ\tau be a hybrid trajectory generated by the policy πθ\pi_{\theta} (induced by fθf_{\theta}) with fixed HybridLink ℛ\mathcal{R}. Then the hybrid policy factorizes as:
+
+πθ​(τ∣x)=∏t∈𝒯πθ​(yt∣x,τ<t),\displaystyle\pi_{\theta}(\tau\mid x)\;=\;\prod_{t\in\mathcal{T}}\pi_{\theta}\bigl(y_{t}\mid x,\,\tau_{<t}\bigr),
+
+(10)
+
+where 𝒯\mathcal{T} is the set of sampled text positions of trajectory τ\tau.
+
+The proof and additional theoretical justifications are provided in Appendix C [#A3].
+Proposition 4.1 [#S4.Thmtheorem1] shows that likelihood-ratio updates over sampled text positions are sufficient to optimize the full hybrid trajectory, making the importance ratio in Eq. 9 [#S4.E9] well-defined for the HybridAgent policy.
+
+Policy Update via Exact Rollout Replay.
+Policy optimization generally involves rebuilding a differentiable computation graph for the rollouts.
+Applying this to HybridAgent further requires recomputing sampled text-token likelihoods conditioned on the same preceding latent thoughts used during rollout.
+We satisfy this requirement via exact latent-context replay.
+During hybrid rollout, we record latent thoughts alongside sampled text tokens and tool observations.
+During policy updates, we replay the full hybrid trajectory in embedding space with a single differentiable forward pass, keeping the recorded latent inputs unchanged while recomputing the sampled likelihoods in Eq. 10 [#S4.E10].
+
+Algorithm 1 [#alg1] outlines the full HybridRL training procedure. We keep the HybridLink fixed to preserve deterministic latent transitions.
+For the reward design, we simply formulate it as:
+
+r⁡(τ)=rcorrect+rformat+rtool,r(\tau)=r_{\mathrm{correct}}+r_{\mathrm{format}}+r_{\mathrm{tool}},
+
+(11)
+
+where rcorrectr_{\mathrm{correct}} measures answer correctness, rformatr_{\mathrm{format}} penalizes invalid formatting, and rtoolr_{\mathrm{tool}} encourages multi-tool use.
+We impose no explicit reward for mode usage, allowing HybridAgent to adaptively balance text and latent generation and discover effective hybrid reasoning strategies during RL.
+
+5 Empirical Evaluations
+
+Table 1: 
+Main Results of HybridAgent over Agentic Reasoning Tasks. We report GAIA and WebWalker by difficulty level, HLE by category (NS/CE/SF), SealQA on the Seal-0 (“S-0") and Seal-Hard (“Hard") splits, and DSQA by full-correct rate (“Acc.") and F1 score. Across 5 independent runs, the average standard deviations of HybridAgent are ±\pm0.014 in accuracy, with a corresponding 95% CI of ±\pm0.017. At 8B and 14B scales, HybridAgent consistently outperforms advanced LLM agents, agentic frameworks, and matched text and latent baselines. Best performance is highlighted.
+
+Method
+GAIA
+WebWalker
+HLE
+SealQA
+DSQA
+
+Lv.1
+Lv.2
+Lv.3
+Avg.
+Easy
+Med.
+Hard
+Avg.
+NS
+CE
+SF
+Avg.
+S-0
+Hard
+Acc.
+F1
+
+Frontier LLM Agents
+
+QwQ-32B
+30.9
+6.5
+5.2
+18.9
+7.5
+2.1
+4.6
+4.3
+11.5
+7.3
+5.2
+9.6
+1.8
+10.6
+11.3
+23.9
+
+GLM-5.3-Flash
+38.5
+28.8
+8.3
+30.1
+8.9
+8.3
+9.9
+9.0
+13.3
+14.7
+16.8
+14.2
+9.0
+22.0
+16.0
+38.5
+
+DeepSeekV4.1-Flash
+43.6
+42.3
+16.7
+39.8
+22.2
+16.7
+12.7
+16.5
+28.5
+25.3
+30.5
+28.4
+14.4
+33.5
+19.3
+38.6
+
+Kimi-K3
+46.2
+42.3
+25.0
+41.7
+11.1
+11.9
+7.0
+10.0
+29.4
+32.0
+37.9
+31.4
+11.7
+28.0
+21.7
+46.0
+
+GPT-5.6-Luna
+48.7
+32.7
+25.0
+37.9
+15.6
+8.3
+11.3
+11.0
+30.9
+25.3
+25.3
+29.0
+11.7
+29.1
+23.3
+49.4
+
+Agentic Frameworks
+
+Search-o1
+46.2
+23.1
+0.0
+29.1
+11.1
+21.4
+16.9
+17.5
+6.4
+4.0
+10.5
+6.8
+3.6
+11.8
+12.3
+25.3
+
+WebThinker
+48.7
+26.9
+8.3
+33.0
+13.3
+23.8
+18.3
+19.5
+7.0
+4.0
+9.5
+7.0
+4.5
+12.6
+11.7
+24.7
+
+ReAct
+48.7
+25.0
+8.3
+32.0
+11.1
+20.2
+12.7
+15.5
+5.8
+5.3
+10.5
+6.6
+7.2
+15.0
+14.6
+32.3
+
+8B-level Latent & Text Methods
+
+Qwen3-8B (thinking)
+28.1
+15.4
+16.7
+20.4
+0.0
+2.4
+2.8
+2.0
+3.9
+2.7
+8.4
+4.6
+2.7
+5.9
+3.3
+14.6
+
+Coconut
+7.7
+1.9
+0.0
+3.9
+0.0
+1.2
+0.0
+0.5
+1.5
+0.0
+1.1
+1.2
+0.0
+1.6
+1.7
+6.1
+
+SoftThinking
+23.1
+9.6
+8.3
+14.6
+0.0
+1.2
+1.4
+1.0
+3.6
+2.7
+6.3
+4.0
+0.0
+3.9
+2.3
+11.2
+
+GRPO
+48.7
+25.0
+8.3
+32.0
+28.9
+32.1
+28.2
+30.0
+7.9
+4.0
+10.5
+7.8
+15.3
+23.6
+17.3
+33.8
+
+ARPO
+53.9
+32.7
+16.7
+38.8
+31.1
+35.7
+28.2
+32.0
+7.3
+6.7
+15.8
+8.8
+18.9
+26.0
+18.0
+37.2
+
+HybridAgent (8B)
+51.3
+44.2
+25.0
+43.7
+48.9
+45.2
+35.2
+42.5
+14.2
+8.0
+20.0
+14.4
+22.5
+35.8
+20.0
+40.7
+
+14B-level Latent & Text Methods
+
+Qwen3-14B (thinking)
+33.3
+13.5
+0.0
+19.4
+6.7
+2.4
+4.2
+4.0
+5.5
+6.7
+11.6
+6.8
+3.6
+7.9
+4.0
+15.1
+
+Coconut
+10.3
+5.8
+0.0
+6.8
+2.2
+2.4
+1.4
+2.0
+3.9
+4.0
+5.3
+4.2
+0.0
+2.8
+2.0
+7.5
+
+SoftThinking
+23.1
+11.5
+8.3
+15.5
+6.7
+3.6
+7.0
+5.5
+3.9
+5.3
+9.5
+5.2
+2.7
+6.3
+5.7
+15.4
+
+GRPO
+51.3
+34.6
+0.0
+36.9
+35.6
+42.9
+35.2
+38.5
+7.9
+6.7
+12.6
+8.6
+17.1
+24.4
+18.6
+43.9
+
+ARPO
+56.4
+40.4
+16.7
+43.7
+40.0
+44.1
+36.6
+40.5
+10.3
+10.7
+13.7
+10.0
+17.1
+22.8
+16.3
+38.2
+
+HybridAgent (14B)
+53.8
+55.8
+33.3
+52.4
+48.9
+52.4
+46.5
+49.5
+16.1
+13.3
+17.9
+16.0
+24.3
+37.8
+21.7
+46.8
+
+Tasks and Datasets. We conduct comprehensive evaluations of HybridAgent on 11 benchmarks across various domains:
+(i) Mathematical Reasoning, including AIME 25 (math-ai, 2025 [#bib.bib34]), AIME 26 (MathArena, 2026 [#bib.bib35]), and MATH500 (HuggingFaceH4, 2023 [#bib.bib36]);
+(ii) Knowledge-Intensive Reasoning, including GPQA-Diamond (Rein et al., 2023 [#bib.bib37]), MedQA (Yang et al., 2024 [#bib.bib38]), and MuSiQue (Trivedi et al., 2022 [#bib.bib9]);
+and (iii) Agentic Reasoning, including General AI Assistants (GAIA) (Mialon et al., 2024 [#bib.bib26]), Humanity’s Last Exam (HLE) (Center for AI Safety et al., 2026 [#bib.bib25]), WebWalker (Wu et al., 2025 [#bib.bib11]), SealQA (Pham et al., 2026 [#bib.bib23]), and DeepSearchQA (DSQA) (Gupta et al., 2026 [#bib.bib12]). We adopt the standard evaluation metric for each dataset. Additional benchmark details are in Appendix H.1 [#A8.SS1].
+
+Baselines.
+For baseline comparisons, we evaluate HybridAgent against
+(i) Text-based Agentic Methods, covering standard text SFT (with tools) and multi-turn tool-integrated RL methods such as GRPO (Shao et al., 2024 [#bib.bib7]) and ARPO (Dong et al., 2025b [#bib.bib43]);
+(ii) Latent Reasoning Methods, including SoftThinking (Zhang et al., 2025 [#bib.bib2]), Coconut (Hao et al., 2024 [#bib.bib28]), and SoftCoT (Xu et al., 2025b [#bib.bib6]);
+(iii) Frontier LLM Agents, including GPT-5.6-Luna (OpenAI, 2026 [#bib.bib48]), Kimi-K3 (Team, 2026 [#bib.bib44]), GLM-5.3-Flash (GLM-5-Team and others, 2026 [#bib.bib47]), DeepSeek-V4.1-Flash (DeepSeek-AI, 2026 [#bib.bib46]), QwQ-32B (Team, 2025 [#bib.bib45]);
+and (iv) Agentic Frameworks, including ReAct (Yao et al., 2023 [#bib.bib49]), Search-o1 (Li et al., 2025a [#bib.bib50]), and WebThinker (Li et al., 2025b [#bib.bib51]).
+Additional baseline details are provided in Appendix H.2 [#A8.SS2].
+
+Models and Training Setups. We instantiate HybridAgent with Qwen3-Base backbones (Yang et al., 2025a [#bib.bib29]) at three scales of 4B, 8B, and 14B. We then apply HybridSFT with 54K hybrid trajectories curated through our automatic annotation pipeline, followed by HybridRL with 12K deep reasoning examples (Yu et al., 2025 [#bib.bib10]) and 1K agentic search examples (Dong et al., 2025b [#bib.bib43]). During RL, we set rollout batches of 512 trajectories (64×864\times 8), followed by one optimization pass over 8 minibatches.
+
+Implementation Details. HybridAgent interacts with external environments primarily through two types of tools: a Python interpreter within sandbox environments and a live search engine (e.g., Tavily). We cap tool usage at 10 calls per trajectory and retrieve the top 10 snippets for each search query.
+As current serving engines do not support multi-turn hybrid generation,
+we extend the training and inference infrastructure to enable text, latent, and tool-calling transitions and persistent KV working-memory transfer.
+RL rollouts use a sampling temperature of 1.0, and evaluation uses temperature 0.6, top-p 0.95, and top-k 20.
+We conduct experiments on H100 GPUs using five independent seeds.
+Additional training/inference details and hyperparameter setups are provided in Appendix H.3 [#A8.SS3].
+
+Table 2: 
+Main Results of HybridAgent on Math and Knowledge-Intensive Search. We evaluate performance across both SFT and RL stages. Small-size benchmarks like AIME25/26 are reported on avg@16 accuracy. Across all tasks, HybridAgent yields an average std. of ±\pm0.031 (math) and ±\pm0.018 (search), with corresponding 95% CI of ±\pm0.038 and ±\pm0.022.
+Under the same training budgets and model setups, HybridSFT and HybridRL improve both text-based and latent reasoning methods.
+
+Method
+AIME25
+AIME26
+MATH500
+GPQA-D
+MedQA
+MuSiQue
+
+Qwen3-8B-Base
+
+Coconut
+13.1
+9.6
+51.4
+26.8
+61.7
+14.0
+
+SoftCoT
+16.5
+17.9
+63.6
+28.9
+62.0
+19.5
+
+Standard Text SFT
+30.0
+28.3
+78.2
+32.3
+69.7
+23.5
+
+HybridAgent (SFT)
+30.8
+29.2
+78.4
+31.8
+70.0
+26.5
+
+GRPO
+36.3
+39.4
+82.0
+43.9
+74.3
+27.5
+
+ARPO
+37.1
+41.5
+82.8
+46.5
+74.7
+28.5
+
+HybridAgent (RL)
+39.2
+43.3
+84.6
+48.0
+75.3
+32.0
+
+Qwen3-14B-Base
+
+Coconut
+16.3
+15.2
+61.2
+29.3
+65.3
+17.5
+
+SoftCoT
+22.7
+23.8
+74.0
+36.4
+67.7
+20.0
+
+Standard Text SFT
+30.8
+31.7
+83.8
+43.9
+78.0
+28.0
+
+HybridAgent (SFT)
+32.5
+31.7
+84.2
+45.5
+78.7
+29.5
+
+GRPO
+40.8
+42.5
+87.4
+52.5
+81.0
+32.0
+
+ARPO
+42.1
+43.3
+87.0
+54.0
+80.3
+31.5
+
+HybridAgent (RL)
+43.3
+45.8
+88.2
+55.1
+81.7
+34.5
+
+Figure 5: Scalability of HybridAgent at Test-time. We evaluate pass@k (4,8,16,32,644,8,16,32,64) performance on 100 hard math and science questions and compare with text agents trained with GRPO.
+
+5.1 Scaling Performance via Hybrid Reasoning
+
+Main Results.
+Tables 1 [#S5.T1] and 2 [#S5.T2] report the overall performance of HybridAgent across 11 benchmarks spanning math, science, medicine, and knowledge search domains.
+On challenging agentic reasoning benchmarks, HybridAgent delivers competitive performance over larger frontier LLM agents and specialized tool-use frameworks, with HybridAgent (14B) improving over the strongest agentic baseline by an average of 17.4%.
+In addition, under matched model sizes and training budgets, HybridSFT and HybridRL demonstrate consistent training effectiveness and improve over corresponding text/latent baselines by 18.5% at the SFT stage and 10.4% at the RL stage.
+Together, HybridAgent combines the strengths of text-based agentic tool use with faster and more expressive latent reasoning, allowing the agent to interact externally while achieving deeper thinking depth internally.
+
+Figure 6: 
+Efficient Hybrid Generation of HybridAgent across Model Scales. HybridAgent reduces both text-token usage and total generation steps compared with matched text-based LLM agents.
+
+Scaling Hybrid Reasoning at Test Time.
+To further examine the test-time scalability of our hybrid reasoning paradigm, we increase inference compute budgets through additional sampling and evaluate pass@k performance.
+Figure 5 [#S5.F5] shows that HybridAgent exhibits a clear upward trend as sampling increases across all model scales, while benefiting more from increased test-time compute than agents with text-only RL. Additional 4B-scale experiments and case studies are in Appendix G [#A7] and J [#A10].
+
+5.2 Efficiency Advantage on Hybrid Generation
+
+Figure 7: Inference time speedup of HybridAgent across all model scales.
+
+Beyond performance effectiveness, a key architectural advantage of HybridAgent is that latent mode enables efficient generation without costly explicit token decoding.
+We evaluate this property empirically along three complementary dimensions: (i) token throughput, (ii) wall-clock inference time, and (iii) actual computation cost.
+As shown in Figures 6 [#S5.F6] and 7 [#S5.F7], HybridAgent adaptively balances its hybrid reasoning across text and latent modes by using 2.7×2.7\times fewer text tokens, reducing total generation steps by up to 54%, and achieving 2.1×2.1\times faster inference than text-based baselines.
+Together with the cost analyses in Table 9 [#A7.T9] (see Appendix G.2 [#A7.SS2]), HybridAgent generates more concise and refined reasoning trajectories, reducing inference overhead and cost.
+
+6 In-depth Analyses
+
+RoadMap.
+We further analyze HybridAgent from 3 complementary perspectives to assess the method design and better understand its hybrid reasoning behavior.
+(i) Training Dynamics: We study how self-conditioning in HybridSFT improves reasoning performance (Table 8 [#S6.F8]) and latent interpretability (Figure 8 [#S6.F8]), and how HybridRL shifts more reasoning into latent mode while strengthening tool interaction (Figure 9 [#S6.F9]).
+(ii) Latent-Mode: We intervene on latent content, ordering, and reasoning depth to examine HybridAgent’s causal reliance on latent thoughts (Table 5 [#S6.T5]), and ablate HybridLink architectures to assess the benefits of residual alignment (Table 6 [#S6.T6]).
+(iii) Text-Mode: We evaluate text-based agentic tool use (Figure 10 [#S6.F10]) and auditability of HybridAgent (Table 7 [#S6.T7]) to verify that text-mode supports reliable environment interaction and remains informative for external monitoring/debugging.
+
+6.1 Training Dynamics on HybridSFT and HybridRL
+
+Method
+AIME25
+AIME26
+MATH500
+
+Coconut
+16.3
+15.2
+61.2
+
+Standard Text SFT
+30.8
+31.7
+83.8
+
+Qwen3-14B-Base
+4.9
+3.0
+47.0
+
++ Format Activation
+20.6
+19.8
+62.4
+
++ HybridLink Activation
+23.8
+22.5
+73.8
+
++ Self-Condition (HybridSFT)
+32.5
+31.7
+84.2
+
+Table 3 and Figure 8: 
+Effectiveness and Interpretability of Self-Conditioned HybridSFT.
+Left: We compare successive HybridSFT stages with latent and text training baselines using the same Qwen3-14B-Base backbone.
+Right: We evaluate the readability and context-specificity across 200 downstream questions, showing how self-conditioning improves latent transparency.
+
+Self-Conditioning Enables Effective and Interpretable HybridSFT.
+To understand why self-conditioned training is necessary for HybridAgent during SFT, we compare HybridSFT against variants with only format and HybridLink activations as well as latent SFT baselines like Coconut, from both performance and interpretability perspectives.
+As shown in Table 8 [#S6.F8], although all SFT variants improve the original shared Qwen3-14B-Base backbone, activation alone remains insufficient. Self-conditioned supervision further improves performance by an average of 30.5% over HybridLink activation, bringing HybridSFT to parity with standard text SFT across all three math benchmarks.
+
+We further probe the semantics of the latent thoughts produced by each method over 200 questions spanning all downstream domains.
+Figure 8 [#S6.F8] reveals a clear progression, where HybridLink activation first makes latent contents more interpretable, and the additional self-conditioned training sharpens the latent readability and semantic informativeness.
+We then take a closer look to examine individual test instances through detailed case studies in Appendix J [#A10].
+Specifically, methods with low faithfulness and specificity generally produce largely unreadable artifacts of the embedding geometry, whereas the complete HybridSFT yields clear and semantically coherent latent readouts.
+Overall, these analyses reveal that self-conditioned training is essential to HybridSFT for making the latent reasoning traces in HybridAgent fully transparent and directly interpretable.
+
+Figure 9: Training Dynamics of HybridRL. As training progresses, HybridAgent shifts more generation from text to latent mode while increasing reward and tool use. These trends reflect how HybridAgent adaptively learns to allocate its reasoning and tool calling efforts across the two modes.
+
+Training Dynamics of HybridRL. We analyze HybridAgent’s training behaviors to examine how it dynamically shifts and allocates reasoning effort across text/latent modes under HybridRL.
+In Figure 9 [#S6.F9], as the training step increases, our 14B agent progressively allocates more generation to latent mode while simultaneously strengthening its tool-invocation capability.
+Through training, HybridAgent adaptively learns to better utilize its two modes, shifting more reasoning into faster latent thinking while selectively exposing only key steps for external auditing and tool use through the text interface.
+
+Table 4: Ablation on HybridRL rewards.
+
+Reward Design
+MATH500
+GAIA
+WebWalker
+
+HybridRL (8B)
+84.6
+43.7
+42.5
+
+w/o rcorrectr_{\text{correct}}
+79.2
+35.9
+37.5
+
+w/o rformatr_{\text{format}}
+80.6
+40.7
+40.5
+
+w/o rtoolr_{\text{tool}}
+84.2
+38.8
+41.0
+
+Reward Shaping in HybridRL.
+We ablate each reward component in Eq. 11 [#S4.E11] using HybridAgent (8B), removing one term at a time under otherwise identical setups.
+In Table 4 [#S6.T4], all three components provide complementary supervision. Excluding rcorrectr_{\text{correct}} causes the largest overall degradation, reducing performance by 6.4%-17.8%, while removing rformatr_{\text{format}} consistently lowers performance by 4.7%-6.9%.
+The benefit of rtoolr_{\text{tool}} is most pronounced on agentic benchmarks such as GAIA and WebWalker. Since the reward is granted only to trajectories that invoke both Python and search tools, removing rtoolr_{\text{tool}} has a minor effect on MATH500, where Python alone is typically sufficient, but reduces GAIA and WebWalker by 11.2% and 3.5%.
+Overall, each reward component provides complementary supervision for answer correctness, format structure, and effective multi-tool use.
+
+6.2 Causal Reliance and HybridLink Design in Latent Mode
+
+Table 5: Causal Interventions on HybridAgent Latent Mode.
+We report MATH500 accuracy (%) for 8B and 14B scales under different interventions on latent-mode thoughts generated by HybridAgent.
+Performance drops substantially when latent semantics or structure are disrupted, indicating that HybridAgent causally relies on semantically meaningful latent-mode thoughts.
+Here, vv denotes the original latent vector and v′v^{\prime} denotes the intervened
+counterpart. The relative perturbation strength dd is computed as
+‖v′−v‖/‖v‖\|v^{\prime}-v\|/\|v\|, averaged over latent steps, where d=0d=0 means no intervention.
+
+Latent-Mode Intervention
+
+Setup Description
+
+Strength dd
+
+8B-Scale
+
+14B-Scale
+
+Noise Perturbation
+
+Gaussian Noise (σ=0.5\sigma=0.5)
+
+Add perturbation with random noise of magnitude 0.5​‖v‖0.5\|v\| before latent feedback.
+
+0.5
+
+72.6
+
+75.0
+
+Gaussian Noise (σ=2.0\sigma=2.0)
+
+Add perturbation with random noise of magnitude 2.0​‖v‖2.0\|v\| before latent feedback.
+
+2.0
+
+66.4
+
+70.2
+
+Latent Replacement
+
+Random-token Replacement
+
+Replace vv with a uniformly sampled token embedding, rescaled to ‖v‖\|v\|.
+
+1.6
+
+41.2
+
+44.6
+
+Cross-problem Replacement
+
+Replace each latent span with the corresponding latents from a different partner problem.
+
+1.4
+
+44.8
+
+48.6
+
+Mean-latent Replacement
+
+Replace every vv with the mean latent vector from the original HybridAgent trajectories.
+
+1.0
+
+53.6
+
+58.4
+
+Nearest-token Replacement
+
+Replace vv with its nearest token embedding, rescaled to ‖v‖\|v\|.
+
+0.2
+
+82.6
+
+87.2
+
+Latent Permutation
+
+Within-block Permutation
+
+Randomly permute latent vectors within each block; Preserve content but disrupt order.
+
+0.8
+
+73.2
+
+76.4
+
+Latent Computation Restriction
+
+One-step Only for Latent Span
+
+Force each latent span to terminate after one generation step.
+
+–
+
+72.2
+
+75.0
+
+Block Latent-Mode Entry
+
+Prevent entry into latent mode, forcing the agent to reason entirely in text.
+
+–
+
+80.4
+
+78.8
+
+HybridAgent (ours)
+
+No intervention; the agent feeds back its own generated latent vector vv at every latent step.
+
+0.0
+
+84.6
+
+88.2
+
+Does HybridAgent Causally Rely on its Latent Mode Thoughts?
+To examine whether latent thoughts are functionally used during hybrid reasoning, we intervene on the latent vectors generated by 8B and 14B HybridAgent on the MATH500 downstream task. We perturb their content, ordering, and reasoning duration through 4 different types of controlled interventions, including (i) noise perturbation, (ii) latent replacement, (iii) latent permutation, and (iv) latent computation restriction. Table 5 [#S6.T5] details the intervention setups and reports performance under each scenario.
+
+As shown in the table, disrupting latent thoughts consistently degrades performance across both scales. Specifically, cross-problem and random-token replacement reduce accuracy by 44.9-47.0% and 49.4-51.3%, while disrupting their ordering or restricting each latent span to one step leads to 13.4-15.0% degradation. Notably, cross-problem replacement causes substantially greater degradation than even stronger Gaussian perturbations, suggesting that performance depends on the semantic content of latent thoughts rather than perturbation magnitude alone.
+These analysis results on causal interventions indicate that HybridAgent functionally relies on the semantics, ordering, and sufficient reasoning depth of its latent thoughts during hybrid reasoning.
+
+HybridLink Design. We next validate the effectiveness of HybridLink and its residual connection by comparing our adopted 2-layer residual design against 4 alternative architectures: (i) direct hidden-state reuse (i.e., et+1e_{t+1}==hth_{t}) without learned alignment, (ii) 1-layer projection, (iii) 1-layer projection with residual connection, and (iv) 2-layer projection without residual connection. We end-to-end train each HybridLink variant with the 14B backbone under the same setup and evaluate across tasks.
+
+Table 6: Effectiveness of HybridLink.
+We compare accuracy across alternative architectural designs.
+
+HybridLink Design
+MATH500
+MedQA
+MuSiQue
+
+Identity (No Alignment)
+71.4
+73.7
+24.5
+
+1-Layer
+83.6
+79.7
+28.5
+
+1-Layer+Res.
+86.4
+80.3
+31.0
+
+2-Layer
+85.8
+81.0
+31.5
+
+2-Layer+Res. (ours)
+88.2
+81.7
+34.5
+
+As shown in Table 6 [#S6.T6], the full two-layer residual design of HybridLink yields consistent gains across all three downstream benchmarks, with the residual branch benefiting both one- and two-layer projection networks.
+Specifically, incorporating the residual connection contributes an average improvement of 4.3% across different layer depths.
+This observed trend aligns with our design motivation in Section 3.1 [#S3.SS1], where the residual connection preserves the semantics of input last-layer hidden states while the learned projection aligns these representations with the input embedding space.
+Together, these two components make HybridLink a more effective and stable interface for hybrid training and generation.
+
+6.3 Tool Use and Reasoning Auditability in Text Mode
+
+Figure 10: Agentic Tool-Use Analysis on HybridAgent.
+Left: Valid tool-call rate across 8B and 14B scales; "Execute Success" measures error-free execution among valid tool calls.
+Middle: Final-answer accuracy on questions where the agent performs at least one tool call.
+Right: Useful tool-call rate, measuring the fraction of tool calls whose execution results contain the final answer.
+
+Does HybridAgent Text-Mode Preserve Agentic Tool Use?
+In Figure 10 [#S6.F10], we analyze agentic tool-calling capabilities by comparing HybridAgent with normal LLM agents trained on GRPO, examining whether hybrid reasoning preserves reliable external interactions through its text mode.
+Across 8B and 14B scales, HybridAgent achieves higher valid tool-call rates while matching the 99.7% execution success of valid calls, showing that hybrid reasoning preserves a reliable text-mode tool interface. More importantly, the gains extend beyond call validity, as HybridAgent improves final-answer accuracy by 2.2%-44.1% on questions where tools are invoked. The 4.5%-7.7% higher useful tool-call rate further indicates that HybridAgent not only invokes tools correctly, but also retrieves evidence that more directly contributes to solving the task.
+These findings suggest that HybridAgent preserves the reliable and effective agentic tool use of standard LLM agents through its text mode, while exposing fewer text tokens with interleaved latent reasoning.
+
+Does HybridAgent Text-Mode Preserve External Auditability?
+A natural question of hybrid reasoning is whether shifting computation into latent mode might potentially compromise the external auditability provided by text. To examine this, we evaluate HybridAgent against matched text agents on MATH500 and AIME25/26, covering 560 problems under identical setups. For each question, an external observer sees only the exposed text steps, tool calls, and tool outputs, while latent spans remain hidden behind their boundary markers. We evaluate four complementary dimensions following commonly adopted evaluation protocols.
+
+• 
+
+Monitoring: Measure whether a blind external monitor can predict rollout correctness from the input problem and visible trace generated by each agent, following Baker et al. (2025) [#bib.bib52]. We report AUROC using GPT-4o-mini (Hurst et al., 2024 [#bib.bib56]) as a weak monitor, which relies primarily on the visible trace rather than solving the problem independently, and GPT-5.6-Luna (OpenAI, 2026 [#bib.bib48]) as a strong monitor with more powerful task-solving capability.
+
+• 
+
+Debugging: Following first-error localization (Zheng et al., 2025a [#bib.bib53]), a judge model (GPT-5.6-Luna) is deployed to identify the first erroneous visible step from a failed rollout and produces a corrective hint, with the diagnosis verified against the reference ground-truth solution.
+
+• 
+
+Correction: Each failed problem is re-attempted using the corrective hint generated during debugging, and compared against a generic correctness-only feedback baseline (Huang et al., 2024 [#bib.bib54]) that simply tells the agent its previous answer was incorrect and asks it to retry.
+
+• 
+
+Rationale Sufficiency: Following sufficiency evaluation in DeYoung et al. (2020) [#bib.bib55], a weak reader (GPT-4o-mini) predicts the agent’s own answer from the exposed text steps alone after removing the final answer, measuring whether the visible trace retains sufficient decision-relevant information.
+
+Table 7: Monitorability and Debuggability through HybridAgent Text-Mode.
+We compare HybridAgent with matched same-size text agents to examine whether its exposed text remains sufficient for external monitoring, debugging, correction, and rationale-based inspection under hybrid reasoning. All comparisons are evaluated using paired bootstrap 95% confidence intervals.
+
+Metric
+Measurement
+8B Scale
+14B Scale
+
+HybridAgent
+Text Agent
+HybridAgent
+Text Agent
+
+Text-Mode tokens per instance
+302
+596
+284
+497
+
+Latent-Mode steps per instance
+170
+–
+183
+–
+
+Visible Trace
+Key reasoning steps per 100 visible tokens ↑\uparrow
+0.72
+0.57
+0.86
+0.67
+
+Weak-monitor AUROC (MATH500) ↑\uparrow
+0.840
+0.772
+0.860
+0.818
+
+Monitoring
+Strong-monitor AUROC (all tasks) ↑\uparrow
+0.961
+0.935
+0.989
+0.990
+
+First error correctly localized (%) ↑\uparrow
+99.2
+94.2
+98.1
+100.0
+
+Error diagnosis matches reference (%) ↑\uparrow
+97.6
+93.5
+97.2
+96.3
+
+Debugging
+Useful corrective hint / Answer leakage (%) ↑/↓\uparrow/\downarrow
+97.6 / 0.8
+98.7 / 0.0
+100.0 / 0.9
+98.2 / 0.9
+
+Correction
+Fix-rate gain from targeted hint vs. generic retry (Δ\Delta) ↑\uparrow
++9.1
++3.4
++5.4
++3.5
+
+Sufficiency
+Answer-agreement gain from visible text only (Δ\Delta) ↑\uparrow
++0.25
++0.17
++0.30
++0.28
+
+As shown in Table 7 [#S6.T7], HybridAgent exposes 43%-49% fewer text-mode tokens while performing 170-183 reasoning steps in latent mode, yet the visible trace contains 26%-28% more key reasoning steps per 100 tokens. This reduction preserves external monitorability, with AUROC remaining within 0.022 of matched text agents across both weak and strong monitors. The exposed text also remains debuggable, localizing the first error in 98%-99% of failed rollouts and yielding reference-consistent diagnoses in 97%-98% of cases with below 1% answer leakage. Moreover, text-derived corrective hints produce significant fix-rate gains of 5.4 and 9.1 points at 14B and 8B, while rationale sufficiency remains comparable to or higher than text agents.
+As shown by the analyses above, HybridAgent uses its text mode to maintain a compact yet informative textual interface for external monitoring, debugging, and correction.
+This provides an important safeguard for agent generation, facilitating human auditing and intervention while preserving efficient internal reasoning.
+
+7 Related Work
+
+Latent Reasoning Beyond Text.
+Recent works have explored applying intermediate reasoning beyond discrete language tokens into continuous hidden spaces (Hao et al., 2024 [#bib.bib28]; Zhu et al., 2025a [#bib.bib57]; Yu et al., 2026 [#bib.bib41]), allowing models to perform internal computation without explicitly verbalizing every reasoning step (Geiping et al., 2026 [#bib.bib59]; Shen et al., 2026 [#bib.bib58]; Zhu et al., 2025b [#bib.bib13]).
+Existing approaches broadly realize this idea by inputting last-layer hidden states (Saunshi et al., 2025 [#bib.bib62]; Tack et al., 2026 [#bib.bib61]), compressing textual chains of thought into latent representations (Cheng and Van Durme, 2024 [#bib.bib64]; Zhang et al., 2026a [#bib.bib60]), or directly optimizing continuous reasoning trajectories (Tan et al., 2026 [#bib.bib63]; Chen et al., 2024 [#bib.bib65]).
+These methods improve reasoning efficiency and depth but make direct inspection and external interaction difficult (Korbak et al., 2025 [#bib.bib24]; Chen et al., 2026 [#bib.bib15]).
+HybridAgent builds on this direction by integrating directly inspectable latent reasoning as a native built-in mode within the agentic generation process, while preserving direct text-based auditing and tool interaction.
+
+Agentic Reasoning and Tool Use.
+Frontier LLM agents (Team, 2026 [#bib.bib44]; GLM-5-Team and others, 2026 [#bib.bib47]; DeepSeek-AI, 2026 [#bib.bib46]) extend reasoning beyond static generation by interacting with external environments through tools (Shen, 2024 [#bib.bib66]; Qu et al., 2025 [#bib.bib17]), such as search engines (Jin et al., 2025 [#bib.bib30]; Zheng et al., 2025b [#bib.bib71]), code interpreters (Feng et al., 2026 [#bib.bib19]; Bianchi et al., 2026 [#bib.bib67]), and APIs (Qin et al., 2024 [#bib.bib69]; Patil et al., 2025 [#bib.bib68]).
+A growing line of work further improves these capabilities through post-training over multi-turn tool-use trajectories (Dong et al., 2025a [#bib.bib8]; Qian et al., 2025 [#bib.bib70]), enabling agents to plan, act, observe, and revise their reasoning (Su et al., 2025 [#bib.bib42]; Li et al., 2025c [#bib.bib33]).
+Despite this progress, existing agentic frameworks remain text-centric for both model-side reasoning and environment-side interaction, incurring large generation overhead from verbalizing every intermediate step (Cuadron et al., 2025 [#bib.bib72]; Xu et al., 2025a [#bib.bib73]).
+HybridAgent decouples these roles by interleaving continuous thoughts for internal reasoning and retaining text only where explicit interaction and monitoring are required.
+
+We discuss additional related work and its relation to HybridAgent in Appendix D [#A4].
+
+8 Discussion and Future Directions
+
+Implications for Frontier Agent Safety and Secure Deployment.
+Frontier labs (e.g., OpenAI, Anthropic) provide API-based access to reasoning models while hiding the chain-of-thought from customers to protect intellectual property and limit information leakage, yet Panfilov et al. (2026) [#bib.bib1] show that the encrypted traces returned to clients can be replayed into a sibling model and transcribed verbatim.
+HybridAgent places proprietary reasoning on a different footing. Latent thoughts exist only as backbone hidden states that are readable solely through the provider-owned HybridLink (Section 3 [#S3]), so no text exists to leak.
+The same property aids monitoring. Because the latent trace is held by the provider rather than the client, providers can assess the safety of reasoning and actions over the full readout, including the portion users never see, while the agent benefits from faster inner thinking. Text mode is then reserved for what users legitimately need, such as tool calls, key decisions, and the final answer, preserving an auditable trace without exposing the full reasoning.
+
+Future Directions on Hybrid Agent Harness and Efficient Post-Training.
+Future work can build a new type of agent harness around HybridAgent, where latent working memory is a first-class component. Context management can then operate on KV entries directly, workflows can schedule steps by mode, keeping tool calls and human-facing checkpoints in text while routine computation stays latent, and one agent’s hybrid trajectory can serve as its message to another. Hybrid generation can also make post-training more efficient. Because latent thoughts remain auditable during rollout, an external critic can assign step-level credit to latent spans, branch promising trajectories, or terminate ones whose latent reasoning has already gone wrong, before any text or tool call is produced.
+
+9 Conclusion
+
+We introduce HybridAgent, a unified hybrid reasoning framework that combines efficient latent reasoning with text-based inspection and tool interaction.
+HybridAgent enables multi-turn hybrid generation through both architectural designs and dedicated post-training algorithms on SFT and RL stages.
+Across 11 benchmarks and 3 model scales, HybridAgent achieves strong performance against advanced LLM agents and agentic frameworks spanning text-based and latent reasoning methods, while substantially reducing inference time, token usage, and computational cost.
+Overall, HybridAgent provides a scalable and efficient framework for next-generation agents that can reason beyond human language while retaining agentic interaction in environments and external inspectability.
+
+Acknowledgments
+
+The authors thank the members of the Zou Lab and the iDEA-iSAIL Lab for helpful discussions and feedback. Jiaru also thanks Jiuding Sun, Weiyan Shi, Martijn Bartelds, Yongchan Kwon, and many others in the Stanford NLP Group and the Together Agent Team for their support and discussions.
+
+\nobibliography
+
+*
+
+References
+
+Baker et al. (2025)
+B. Baker, J. Huizinga, L. Gao, Z. Dou, M. Y. Guan, A. Madry, W. Zaremba, J. Pachocki, and D. Farhi
+
+Monitoring reasoning models for misbehavior and the risks of promoting obfuscation.
+
+External Links: 2503.11926,
+Link [https://arxiv.org/abs/2503.11926]
+
+Cited by: 1st item [#S6.I1.i1.p1.1].
+
+Bengio et al. (2015)
+S. Bengio, O. Vinyals, N. Jaitly, and N. Shazeer
+
+Scheduled sampling for sequence prediction with recurrent neural networks.
+
+Advances in neural information processing systems 28.
+
+Cited by: §B.1 [#A2.SS1.p1.1].
+
+Bianchi et al. (2026)
+F. Bianchi, Y. Kwon, A. Pappu, and J. Zou
+
+Harnessing the collective intelligence of ai agents in the wild for new discoveries.
+
+External Links: 2606.10402,
+Link [https://arxiv.org/abs/2606.10402]
+
+Cited by: §7 [#S7.p2.1].
+
+Bigverdi et al. (2024)
+M. Bigverdi, Z. Luo, C. Hsieh, E. Shen, D. Chen, L. G. Shapiro, and R. Krishna
+
+Perception tokens enhance visual reasoning in multimodal language models.
+
+External Links: 2412.03548,
+Link [https://arxiv.org/abs/2412.03548]
+
+Cited by: Appendix D [#A4.p1.1].
+
+Brito and Baquero (2026)
+L. Brito and C. Baquero
+
+When latent agents lie: kv-cache integrity in multi-agent llm collaboration.
+
+External Links: 2606.28958,
+Link [https://arxiv.org/abs/2606.28958]
+
+Cited by: Appendix D [#A4.p2.1].
+
+Center for AI Safety et al. (2026)
+Center for AI Safety, Scale AI, and HLE Contributors Consortium
+
+A benchmark of expert-level academic questions to assess AI capabilities.
+
+Nature 649, pp. 1139–1146.
+
+External Links: Document [https://dx.doi.org/10.1038/s41586-025-09962-4],
+2501.14249,
+Link [https://arxiv.org/abs/2501.14249]
+
+Cited by: §H.1 [#A8.SS1.p12.1],
+§5 [#S5.p1.1].
+
+Chang et al. (2026)
+S. Chang, T. Bai, X. Zhang, Q. Ma, Q. Liu, Z. Liao, Y. Miao, and L. Niu
+
+Unlocking the black box of latent reasoning: an interpretability-guided approach to intervention.
+
+In Proceedings of the 64th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers),
+
+pp. 34019–34032.
+
+Cited by: §1 [#S1.p2.1].
+
+Chen et al. (2024)
+H. Chen, Y. Feng, Z. Liu, W. Yao, A. Prabhakar, S. Heinecke, R. Ho, P. Mui, S. Savarese, C. Xiong, et al.
+
+Language models are hidden reasoners: unlocking latent reasoning capabilities via self-rewarding.
+
+arXiv preprint arXiv:2411.04282.
+
+Cited by: §7 [#S7.p1.1].
+
+Chen et al. (2026)
+X. Chen, C. T. Leong, G. Wenjin, J. Wang, W. Li, and X. Shen
+
+What makes effective supervision in latent chain-of-thought: an information-theoretic analysis.
+
+In Forty-third International Conference on Machine Learning,
+
+External Links: Link [https://openreview.net/forum?id=x21YkF1UfR]
+
+Cited by: §1 [#S1.p2.1],
+§7 [#S7.p1.1].
+
+Chen et al. (2025)
+X. Chen, A. Zhao, H. Xia, X. Lu, H. Wang, Y. Chen, W. Zhang, J. Wang, W. Li, and X. Shen
+
+Reasoning beyond language: a comprehensive survey on latent chain-of-thought reasoning.
+
+arXiv preprint arXiv:2505.16782.
+
+Cited by: §1 [#S1.p2.1].
+
+Cheng and Van Durme (2024)
+J. Cheng and B. Van Durme
+
+Compressed chain of thought: efficient reasoning through dense representations.
+
+arXiv preprint arXiv:2412.13171.
+
+Cited by: §2 [#S2.p1.2],
+§7 [#S7.p1.1].
+
+Coda-Forno et al. (2025)
+J. Coda-Forno, Z. Zhao, Q. Zhang, D. Tamboli, W. Li, X. Fan, L. Zhang, E. Schulz, and H. Tseng
+
+Exploring system 1 and 2 communication for latent reasoning in llms.
+
+arXiv preprint arXiv:2510.00494.
+
+Cited by: §2 [#S2.p1.2].
+
+Cuadron et al. (2025)
+A. Cuadron, D. Li, W. Ma, X. Wang, Y. Wang, S. Zhuang, S. Liu, L. G. Schroeder, T. Xia, H. Mao, et al.
+
+The danger of overthinking: examining the reasoning-action dilemma in agentic tasks.
+
+arXiv preprint arXiv:2502.08235.
+
+Cited by: §7 [#S7.p2.1].
+
+Dai et al. (2026)
+L. Dai, L. Xiang, and K. Yang
+
+A token/kv-cache communication media selection and resource allocation strategy for multi-agent collaboration.
+
+Science China Information Sciences 69 (10), pp. 200306.
+
+Cited by: Appendix D [#A4.p2.1].
+
+DeepSeek-AI (2026)
+DeepSeek-AI
+
+DeepSeek-v4.1-flash: pushing the limits of kv cache compression.
+
+Cited by: §H.2 [#A8.SS2.p11.1],
+§5 [#S5.p2.1],
+§7 [#S7.p2.1].
+
+DeYoung et al. (2020)
+J. DeYoung, S. Jain, N. F. Rajani, E. Lehman, C. Xiong, R. Socher, and B. C. Wallace
+
+ERASER: A benchmark to evaluate rationalized NLP models.
+
+In Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics, D. Jurafsky, J. Chai, N. Schluter, and J. Tetreault (Eds.),
+
+Online, pp. 4443–4458.
+
+External Links: Link [https://aclanthology.org/2020.acl-main.408/],
+Document [https://dx.doi.org/10.18653/v1/2020.acl-main.408]
+
+Cited by: 4th item [#S6.I1.i4.p1.1].
+
+Dong et al. (2025a)
+G. Dong, Y. Chen, X. Li, J. Jin, H. Qian, Y. Zhu, H. Mao, G. Zhou, Z. Dou, and J. Wen
+
+Tool-star: empowering llm-brained multi-tool reasoner via reinforcement learning.
+
+CoRR abs/2505.16410.
+
+External Links: Link [https://doi.org/10.48550/arXiv.2505.16410],
+Document [https://dx.doi.org/10.48550/ARXIV.2505.16410],
+2505.16410
+
+Cited by: §H.3 [#A8.SS3.p1.1],
+§7 [#S7.p2.1].
+
+Dong et al. (2025b)
+G. Dong, H. Mao, K. Ma, L. Bao, Y. Chen, Z. Wang, Z. Chen, J. Du, H. Wang, F. Zhang, et al.
+
+Agentic reinforced policy optimization.
+
+arXiv preprint arXiv:2507.19849.
+
+Cited by: Appendix E [#A5.p1.1],
+§H.1 [#A8.SS1.p1.1],
+§H.1 [#A8.SS1.p9.1],
+§H.2 [#A8.SS2.p4.1],
+§H.3 [#A8.SS3.p1.1],
+§H.3 [#A8.SS3.p2.1],
+§5 [#S5.p2.1],
+§5 [#S5.p3.1].
+
+Feng et al. (2026)
+J. Feng, S. Huang, X. Qu, G. Zhang, Y. Qin, B. Zhong, C. Jiang, J. Chi, and W. Zhong
+
+ReTool: reinforcement learning for strategic tool use in LLMs.
+
+In The Fourteenth International Conference on Learning Representations,
+
+External Links: Link [https://openreview.net/forum?id=tRk1nofSmz]
+
+Cited by: §1 [#S1.p1.1],
+§7 [#S7.p2.1].
+
+Fu and Luo (2026)
+R. Fu and G. Luo
+
+Selar: selective latent reasoning in large language models.
+
+In Proceedings of the 64th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers),
+
+pp. 7073–7087.
+
+Cited by: Appendix D [#A4.p1.1].
+
+Geiping et al. (2026)
+J. Geiping, S. McLeish, N. Jain, J. Kirchenbauer, S. Singh, B. Bartoldson, B. Kailkhura, A. Bhatele, and T. Goldstein
+
+Scaling up test-time compute with latent reasoning: a recurrent depth approach.
+
+Advances in Neural Information Processing Systems 38, pp. 41340–41391.
+
+Cited by: §7 [#S7.p1.1].
+
+Gim et al. (2024)
+I. Gim, G. Chen, S. Lee, N. Sarda, A. Khandelwal, and L. Zhong
+
+Prompt cache: modular attention reuse for low-latency inference.
+
+Proceedings of Machine Learning and Systems 6, pp. 325–338.
+
+Cited by: Appendix D [#A4.p3.1].
+
+GLM-5-Team et al. (2026)
+GLM-5-Team et al.
+
+GLM-5: from vibe coding to agentic engineering.
+
+External Links: 2602.15763,
+Link [https://arxiv.org/abs/2602.15763]
+
+Cited by: §H.2 [#A8.SS2.p11.1],
+§5 [#S5.p2.1],
+§7 [#S7.p2.1].
+
+Gupta et al. (2026)
+N. Gupta, R. Chatterjee, L. Haas, C. Tao, A. Wang, C. Liu, H. Oiwa, E. Gribovskaya, J. Ackermann, J. Blitzer, S. Goldshtein, and D. Das
+
+DeepSearchQA: bridging the comprehensiveness gap for deep research agents.
+
+External Links: 2601.20975,
+Link [https://arxiv.org/abs/2601.20975]
+
+Cited by: Appendix F [#A6.p2.1],
+§H.1 [#A8.SS1.p15.1],
+§5 [#S5.p1.1].
+
+Hao et al. (2024)
+S. Hao, S. Sukhbaatar, D. Su, X. Li, Z. Hu, J. Weston, and Y. Tian
+
+Training large language models to reason in a continuous latent space.
+
+arXiv preprint arXiv:2412.06769.
+
+Cited by: §H.2 [#A8.SS2.p6.1],
+§1 [#S1.p2.1],
+§2 [#S2.p1.2],
+§5 [#S5.p2.1],
+§7 [#S7.p1.1].
+
+Hu et al. (2025)
+J. Hu, W. Huang, W. Wang, H. Wang, tiancheng hu, zhang qin, H. Feng, X. Chen, Y. Shan, and T. Xie
+
+EPIC: efficient position-independent caching for serving large language models.
+
+In Forty-second International Conference on Machine Learning,
+
+External Links: Link [https://openreview.net/forum?id=qjd3ZUiHRT]
+
+Cited by: Appendix D [#A4.p3.1].
+
+Huang et al. (2024)
+J. Huang, X. Chen, S. Mishra, H. S. Zheng, A. W. Yu, X. Song, and D. Zhou
+
+Large language models cannot self-correct reasoning yet.
+
+In The Twelfth International Conference on Learning Representations,
+
+External Links: Link [https://openreview.net/forum?id=IkmD3fKBPQ]
+
+Cited by: 3rd item [#S6.I1.i3.p1.1].
+
+HuggingFaceH4 (2023)
+HuggingFaceH4
+
+MATH-500 dataset.
+
+ Hugging Face.
+
+Note: https://huggingface.co/datasets/HuggingFaceH4/MATH-500 [https://huggingface.co/datasets/HuggingFaceH4/MATH-500]
+
+Cited by: Appendix F [#A6.p2.1],
+§H.1 [#A8.SS1.p5.1],
+§5 [#S5.p1.1].
+
+Hurst et al. (2024)
+A. Hurst, A. Lerer, A. P. Goucher, A. Perelman, A. Ramesh, A. Clark, A. Ostrow, A. Welihinda, A. Hayes, A. Radford, et al.
+
+Gpt-4o system card.
+
+arXiv preprint arXiv:2410.21276.
+
+Cited by: 1st item [#S6.I1.i1.p1.1].
+
+Jin et al. (2025)
+B. Jin, H. Zeng, Z. Yue, J. Yoon, S. Arik, D. Wang, H. Zamani, and J. Han
+
+Search-r1: training llms to reason and leverage search engines with reinforcement learning.
+
+arXiv preprint arXiv:2503.09516.
+
+Cited by: §7 [#S7.p2.1].
+
+Juravsky et al. (2024)
+J. Juravsky, B. Brown, R. S. Ehrlich, D. Y. Fu, C. Re, and A. Mirhoseini
+
+Hydragen: high-throughput LLM inference with shared prefixes.
+
+In Workshop on Efficient Systems for Foundation Models II @ ICML2024,
+
+External Links: Link [https://openreview.net/forum?id=Ye3ia34Fpp]
+
+Cited by: Appendix D [#A4.p3.1].
+
+Korbak et al. (2025)
+T. Korbak, M. Balesni, E. Barnes, Y. Bengio, J. Benton, J. Bloom, M. Chen, A. Cooney, A. Dafoe, A. Dragan, et al.
+
+Chain of thought monitorability: a new and fragile opportunity for ai safety.
+
+arXiv preprint arXiv:2507.11473.
+
+Cited by: §1 [#S1.p2.1],
+§7 [#S7.p1.1].
+
+Kwa et al. (2026)
+T. Kwa, B. West, J. Becker, A. Deng, K. Garcia, M. Hasin, S. Jawhar, M. Kinniment, N. Rush, S. Von Arx, et al.
+
+Measuring ai ability to complete long software tasks.
+
+Advances in Neural Information Processing Systems 38, pp. 92213–92266.
+
+Cited by: §1 [#S1.p1.1].
+
+Kwon et al. (2023)
+W. Kwon, Z. Li, S. Zhuang, Y. Sheng, L. Zheng, C. H. Yu, J. Gonzalez, H. Zhang, and I. Stoica
+
+Efficient memory management for large language model serving with pagedattention.
+
+In Proceedings of the 29th symposium on operating systems principles,
+
+pp. 611–626.
+
+Cited by: Appendix D [#A4.p3.1],
+§H.3 [#A8.SS3.p4.1].
+
+Li et al. (2025a)
+X. Li, G. Dong, J. Jin, Y. Zhang, Y. Zhou, Y. Zhu, P. Zhang, and Z. Dou
+
+Search-o1: agentic search-enhanced large reasoning models.
+
+In Proceedings of the 2025 Conference on Empirical Methods in Natural Language Processing, C. Christodoulopoulos, T. Chakraborty, C. Rose, and V. Peng (Eds.),
+
+Suzhou, China, pp. 5420–5438.
+
+External Links: Link [https://aclanthology.org/2025.emnlp-main.276/],
+Document [https://dx.doi.org/10.18653/v1/2025.emnlp-main.276],
+ISBN 979-8-89176-332-6
+
+Cited by: §H.2 [#A8.SS2.p15.1],
+§5 [#S5.p2.1].
+
+Li et al. (2025b)
+X. Li, J. Jin, G. Dong, H. Qian, Y. Wu, J. Wen, Y. Zhu, and Z. Dou
+
+WebThinker: empowering large reasoning models with deep research capability.
+
+In The Thirty-ninth Annual Conference on Neural Information Processing Systems,
+
+External Links: Link [https://openreview.net/forum?id=7LKKHBAMzH]
+
+Cited by: §H.2 [#A8.SS2.p16.1],
+§5 [#S5.p2.1].
+
+Li et al. (2025c)
+Z. Li, H. Zhang, S. Han, S. Liu, J. Xie, Y. Zhang, Y. Choi, J. Zou, and P. Lu
+
+In-the-flow agentic system optimization for effective planning and tool use.
+
+arXiv preprint arXiv:2510.05592.
+
+Cited by: §7 [#S7.p2.1].
+
+Liu (2026)
+Y. Liu
+
+Beyond tokens: a unified framework for latent communication in llm-based multi-agent systems.
+
+External Links: 2606.05711,
+Link [https://arxiv.org/abs/2606.05711]
+
+Cited by: Appendix D [#A4.p2.1].
+
+Lv et al. (2026)
+F. Lv, L. Wang, R. Hong, Y. Du, X. Wu, T. Gao, G. Zhou, and C. Zhang
+
+Beyond tokens: dynamic latent reasoning via semantic residual refinement.
+
+In Fortieth AAAI Conference on Artificial Intelligence, Thirty-Eighth
+Conference on Innovative Applications of Artificial Intelligence,
+Sixteenth Symposium on Educational Advances in Artificial Intelligence,
+AAAI 2026, Singapore, January 20-27, 2026, S. Koenig, C. Jenkins, and M. E. Taylor (Eds.),
+
+pp. 32383–32391.
+
+External Links: Link [https://doi.org/10.1609/aaai.v40i38.40513],
+Document [https://dx.doi.org/10.1609/AAAI.V40I38.40513]
+
+Cited by: Appendix D [#A4.p1.1].
+
+Ma et al. (2025)
+D. Ma, Y. Wang, and T. Lan
+
+Block-attention for efficient prefilling.
+
+In The Thirteenth International Conference on Learning Representations,
+
+External Links: Link [https://openreview.net/forum?id=7zNYY1E2fq]
+
+Cited by: Appendix D [#A4.p3.1].
+
+math-ai (2025)
+math-ai
+
+AIME 2025 dataset.
+
+ Hugging Face.
+
+Note: https://huggingface.co/datasets/math-ai/aime25 [https://huggingface.co/datasets/math-ai/aime25]
+
+Cited by: Appendix F [#A6.p2.1],
+§H.1 [#A8.SS1.p3.1],
+§5 [#S5.p1.1].
+
+MathArena (2026)
+MathArena
+
+AIME 2026 dataset.
+
+ Hugging Face.
+
+Note: https://huggingface.co/datasets/MathArena/aime_2026 [https://huggingface.co/datasets/MathArena/aime_2026]
+
+Cited by: Appendix F [#A6.p2.1],
+§H.1 [#A8.SS1.p4.1],
+§5 [#S5.p1.1].
+
+Mialon et al. (2024)
+G. Mialon, C. Fourrier, T. Wolf, Y. LeCun, and T. Scialom
+
+GAIA: a benchmark for general AI assistants.
+
+In The Twelfth International Conference on Learning Representations,
+
+External Links: Link [https://openreview.net/forum?id=fibxvahvs3]
+
+Cited by: Appendix F [#A6.p2.1],
+§H.1 [#A8.SS1.p11.1],
+§5 [#S5.p1.1].
+
+Mou et al. (2026)
+X. Mou, S. Wang, Z. Li, Y. He, and Z. Wei
+
+HyLaT: efficient multi-agent communication via hybrid latent-text protocol.
+
+arXiv preprint arXiv:2605.25421.
+
+Cited by: Appendix D [#A4.p2.1].
+
+Ning et al. (2025)
+A. Ning, Y. Kuo, and G. Gomes
+
+Learning when to stop: adaptive latent reasoning via reinforcement learning.
+
+arXiv preprint arXiv:2511.21581.
+
+Cited by: Appendix D [#A4.p1.1].
+
+OpenAI (2026)
+OpenAI
+
+GPT-5.6 Luna.
+
+Note: OpenAI API model documentationAccessed: 2026-09-16
+
+External Links: Link [https://developers.openai.com/api/docs/models/gpt-5.6-luna]
+
+Cited by: §H.2 [#A8.SS2.p11.1],
+§5 [#S5.p2.1],
+1st item [#S6.I1.i1.p1.1].
+
+Panfilov et al. (2026)
+A. Panfilov, D. Schmotz, I. Shumailov, L. Beurer-Kellner, J. Schaeffer, A. Prabhu, J. Geiping, and M. Andriushchenko
+
+Stealing reasoning traces from proprietary llm apis.
+
+External Links: 2608.09867,
+Link [https://arxiv.org/abs/2608.09867]
+
+Cited by: §8 [#S8.p1.1].
+
+Patil et al. (2025)
+S. G. Patil, H. Mao, F. Yan, C. C. Ji, V. Suresh, I. Stoica, and J. E. Gonzalez
+
+The berkeley function calling leaderboard (BFCL): from tool use to agentic evaluation of large language models.
+
+In Forty-second International Conference on Machine Learning,
+
+External Links: Link [https://openreview.net/forum?id=2GmDdhBdDk]
+
+Cited by: §7 [#S7.p2.1].
+
+Pham et al. (2026)
+T. Pham, N. P. Nguyen, P. Zunjare, W. Chen, Y. Tseng, and T. Vu
+
+SealQA: raising the bar for reasoning in search-augmented language models.
+
+In The Fourteenth International Conference on Learning Representations,
+
+External Links: Link [https://openreview.net/forum?id=zWb7ueH16c]
+
+Cited by: §H.1 [#A8.SS1.p14.1],
+§5 [#S5.p1.1].
+
+Qian et al. (2025)
+C. Qian, E. C. Acikgoz, Q. He, H. WANG, X. Chen, D. Hakkani-Tür, G. Tur, and H. Ji
+
+ToolRL: reward is all tool learning needs.
+
+In The Thirty-ninth Annual Conference on Neural Information Processing Systems,
+
+External Links: Link [https://openreview.net/forum?id=eOLdGbXT6t]
+
+Cited by: §7 [#S7.p2.1].
+
+Qin et al. (2024)
+Y. Qin, S. Liang, Y. Ye, K. Zhu, L. Yan, Y. Lu, Y. Lin, X. Cong, X. Tang, B. Qian, S. Zhao, L. Hong, R. Tian, R. Xie, J. Zhou, M. Gerstein, dahai li, Z. Liu, and M. Sun
+
+ToolLLM: facilitating large language models to master 16000+ real-world APIs.
+
+In The Twelfth International Conference on Learning Representations,
+
+External Links: Link [https://openreview.net/forum?id=dHng2O0Jjr]
+
+Cited by: §7 [#S7.p2.1].
+
+Qu et al. (2025)
+C. Qu, S. Dai, X. Wei, H. Cai, S. Wang, D. Yin, J. Xu, and J. Wen
+
+Tool learning with large language models: a survey.
+
+Frontiers of Computer Science 19 (8).
+
+External Links: ISSN 2095-2236,
+Link [http://dx.doi.org/10.1007/s11704-024-40678-2],
+Document [https://dx.doi.org/10.1007/s11704-024-40678-2]
+
+Cited by: §1 [#S1.p1.1],
+§7 [#S7.p2.1].
+
+Ranzato et al. (2015)
+M. Ranzato, S. Chopra, M. Auli, and W. Zaremba
+
+Sequence level training with recurrent neural networks.
+
+arXiv preprint arXiv:1511.06732.
+
+Cited by: §B.1 [#A2.SS1.p1.1].
+
+Rein et al. (2023)
+D. Rein, B. L. Hou, A. C. Stickland, J. Petty, R. Y. Pang, J. Dirani, J. Michael, and S. R. Bowman
+
+GPQA: a graduate-level google-proof q&a benchmark.
+
+External Links: 2311.12022,
+Link [https://arxiv.org/abs/2311.12022]
+
+Cited by: §H.1 [#A8.SS1.p7.1],
+§5 [#S5.p1.1].
+
+Saunshi et al. (2025)
+N. Saunshi, N. Dikkala, Z. Li, S. Kumar, and S. J Reddi
+
+Reasoning with latent thoughts: on the power of looped transformers.
+
+In International Conference on Learning Representations,
+
+Vol. 2025, pp. 14855–14881.
+
+Cited by: §7 [#S7.p1.1].
+
+Schulman et al. (2017)
+J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov
+
+Proximal policy optimization algorithms.
+
+arXiv preprint arXiv:1707.06347.
+
+Cited by: §4.2 [#S4.SS2.p1.2].
+
+Shao et al. (2024)
+Z. Shao, P. Wang, Q. Zhu, R. Xu, J. Song, X. Bi, H. Zhang, M. Zhang, Y. K. Li, Y. Wu, and D. Guo
+
+DeepSeekMath: pushing the limits of mathematical reasoning in open language models.
+
+External Links: 2402.03300,
+Link [https://arxiv.org/abs/2402.03300]
+
+Cited by: §H.2 [#A8.SS2.p4.1],
+§4.2 [#S4.SS2.p1.2],
+§5 [#S5.p2.1].
+
+Shen et al. (2026)
+X. Shen, Y. Wang, Y. Zhou, X. Shi, P. Zhao, Y. Wang, and J. Gu
+
+Efficient reasoning with hidden thinking.
+
+In Forty-third International Conference on Machine Learning,
+
+External Links: Link [https://openreview.net/forum?id=Hn81xuLaXY]
+
+Cited by: §7 [#S7.p1.1].
+
+Shen (2024)
+Z. Shen
+
+LLM with tools: a survey.
+
+External Links: 2409.18807,
+Link [https://arxiv.org/abs/2409.18807]
+
+Cited by: §7 [#S7.p2.1].
+
+Sheng et al. (2025)
+G. Sheng, C. Zhang, Z. Ye, X. Wu, W. Zhang, R. Zhang, Y. Peng, H. Lin, and C. Wu
+
+Hybridflow: a flexible and efficient rlhf framework.
+
+In Proceedings of the Twentieth European Conference on Computer Systems,
+
+pp. 1279–1297.
+
+Cited by: §H.3 [#A8.SS3.p4.1].
+
+Shi et al. (2026)
+D. Shi, A. Asi, K. Li, X. Yuan, L. Pan, W. Lee, and W. Xiao
+
+SwiReasoning: switch-thinking in latent and explicit for pareto-superior reasoning LLMs.
+
+In The Fourteenth International Conference on Learning Representations,
+
+External Links: Link [https://openreview.net/forum?id=t33kMzEAg8]
+
+Cited by: Appendix D [#A4.p1.1].
+
+Silver and Sutton (2025)
+D. Silver and R. S. Sutton
+
+Welcome to the era of experience.
+
+Google AI 1 (11), pp. 6.
+
+Cited by: §1 [#S1.p1.1].
+
+Su et al. (2025)
+H. Su, S. Diao, X. Lu, M. Liu, J. Xu, X. Dong, Y. Fu, P. Belcak, H. Ye, H. Yin, Y. Dong, E. Bakhturina, T. Yu, Y. Choi, J. Kautz, and P. Molchanov
+
+ToolOrchestra: elevating intelligence via efficient model and tool orchestration.
+
+External Links: 2511.21689,
+Link [https://arxiv.org/abs/2511.21689]
+
+Cited by: §7 [#S7.p2.1].
+
+Sumers et al. (2024)
+T. Sumers, S. Yao, K. R. Narasimhan, and T. L. Griffiths
+
+Cognitive architectures for language agents.
+
+Transactions on Machine Learning Research.
+
+Note: Survey Certification, Featured Certification
+
+External Links: ISSN 2835-8856,
+Link [https://openreview.net/forum?id=1i6ZCvflQJ]
+
+Cited by: §1 [#S1.p1.1].
+
+Sun et al. (2026)
+Y. Sun, X. Han, W. Zhang, Y. Pang, T. Wang, Y. Cao, Y. Huang, C. Duroiu, H. Zhang, J. Lin, et al.
+
+Agents’ last exam.
+
+arXiv preprint arXiv:2606.05405.
+
+Cited by: §1 [#S1.p1.1].
+
+Tack et al. (2026)
+J. Tack, J. Lanchantin, J. Dwivedi-Yu, A. Cohen, I. Kulikov, J. Lan, S. Hao, Y. Tian, J. E. Weston, and X. Li
+
+Llm pretraining with continuous concepts.
+
+In International Conference on Learning Representations,
+
+Vol. 2026, pp. 54214–54231.
+
+Cited by: §7 [#S7.p1.1].
+
+Tan et al. (2026)
+W. Tan, J. Li, J. Ju, Z. Luo, R. Song, and J. Luan
+
+Think silently, think fast: dynamic latent compression of llm reasoning chains.
+
+Advances in Neural Information Processing Systems 38, pp. 4646–4668.
+
+Cited by: §7 [#S7.p1.1].
+
+Tang et al. (2025)
+Y. Tang, W. Su, Y. Zhou, Y. Liu, M. Zhang, S. Ma, and Q. Ai
+
+Augmenting multi-agent communication with state delta trajectory.
+
+In Proceedings of the 2025 Conference on Empirical Methods in Natural Language Processing, C. Christodoulopoulos, T. Chakraborty, C. Rose, and V. Peng (Eds.),
+
+Suzhou, China, pp. 10219–10240.
+
+External Links: Link [https://aclanthology.org/2025.emnlp-main.518/],
+Document [https://dx.doi.org/10.18653/v1/2025.emnlp-main.518],
+ISBN 979-8-89176-332-6
+
+Cited by: Appendix D [#A4.p2.1].
+
+Team (2026)
+K. Team
+
+Kimi K3: open frontier intelligence.
+
+CoRR abs/2607.24653.
+
+External Links: Link [https://doi.org/10.48550/arXiv.2607.24653],
+Document [https://dx.doi.org/10.48550/ARXIV.2607.24653],
+2607.24653
+
+Cited by: §H.2 [#A8.SS2.p11.1],
+§1 [#S1.p1.1],
+§5 [#S5.p2.1],
+§7 [#S7.p2.1].
+
+Team (2025)
+Q. Team
+
+QwQ-32b: embracing the power of reinforcement learning.
+
+External Links: Link [https://qwenlm.github.io/blog/qwq-32b/]
+
+Cited by: §H.2 [#A8.SS2.p11.1],
+§5 [#S5.p2.1].
+
+Trivedi et al. (2022)
+H. Trivedi, N. Balasubramanian, T. Khot, and A. Sabharwal
+
+MuSiQue: multihop questions via single-hop question composition.
+
+Transactions of the Association for Computational Linguistics.
+
+Cited by: Appendix F [#A6.p2.1],
+§H.1 [#A8.SS1.p9.1],
+§5 [#S5.p1.1].
+
+Wang et al. (2025)
+Q. Wang, Y. Shi, Y. Wang, Y. Zhang, P. Wan, K. Gai, X. Ying, and Y. Wang
+
+Monet: reasoning in latent visual space beyond images and language.
+
+arXiv preprint arXiv:2511.21395.
+
+Cited by: §1 [#S1.p2.1].
+
+Wu et al. (2025)
+J. Wu, W. Yin, Y. Jiang, Z. Wang, Z. Xi, R. Fang, L. Zhang, Y. He, D. Zhou, P. Xie, and F. Huang
+
+WebWalker: benchmarking LLMs in web traversal.
+
+In Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), W. Che, J. Nabende, E. Shutova, and M. T. Pilehvar (Eds.),
+
+Vienna, Austria, pp. 10290–10305.
+
+External Links: Link [https://aclanthology.org/2025.acl-long.508/],
+Document [https://dx.doi.org/10.18653/v1/2025.acl-long.508],
+ISBN 979-8-89176-251-0
+
+Cited by: §H.1 [#A8.SS1.p13.1],
+§5 [#S5.p1.1].
+
+Xu et al. (2025a)
+S. Xu, W. Xie, L. Zhao, and P. He
+
+Chain of draft: thinking faster by writing less.
+
+External Links: 2502.18600,
+Link [https://arxiv.org/abs/2502.18600]
+
+Cited by: §7 [#S7.p2.1].
+
+Xu et al. (2026)
+X. Xu, T. Yu, X. Chen, H. Wang, J. McAuley, and S. Mitra
+
+Thinkrouter: efficient reasoning via routing thinking between latent and discrete spaces.
+
+arXiv preprint arXiv:2602.11683.
+
+Cited by: Appendix D [#A4.p1.1].
+
+Xu et al. (2025b)
+Y. Xu, X. Guo, Z. Zeng, and C. Miao
+
+SoftCoT: soft chain-of-thought for efficient reasoning with LLMs.
+
+In Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), W. Che, J. Nabende, E. Shutova, and M. T. Pilehvar (Eds.),
+
+Vienna, Austria, pp. 23336–23351.
+
+External Links: Link [https://aclanthology.org/2025.acl-long.1137/],
+Document [https://dx.doi.org/10.18653/v1/2025.acl-long.1137],
+ISBN 979-8-89176-251-0
+
+Cited by: §H.2 [#A8.SS2.p7.1],
+§5 [#S5.p2.1].
+
+Yang et al. (2025a)
+A. Yang, A. Li, B. Yang, B. Zhang, B. Hui, B. Zheng, B. Yu, C. Gao, C. Huang, C. Lv, et al.
+
+Qwen3 technical report.
+
+arXiv preprint arXiv:2505.09388.
+
+Cited by: §H.3 [#A8.SS3.p1.1],
+§1 [#S1.p7.1],
+§5 [#S5.p3.1].
+
+Yang et al. (2024)
+H. Yang, H. Chen, H. Guo, Y. Chen, C. Lin, S. Hu, J. Hu, X. Wu, and X. Wang
+
+Llm-medqa: enhancing medical question answering through case studies in large language models.
+
+arXiv preprint arXiv:2501.05464.
+
+Cited by: §H.1 [#A8.SS1.p8.1],
+§5 [#S5.p1.1].
+
+Yang et al. (2026)
+J. Yang, C. Chen, S. Wu, Y. Liu, Y. Fan, L. Li, S. Lai, C. Qin, and Z. Guo
+
+Demystifying hidden-state recurrence: switchable latent reasoning with on-policy reinforcement learning.
+
+arXiv preprint arXiv:2606.13106.
+
+Cited by: Appendix D [#A4.p1.1].
+
+Yang et al. (2025b)
+J. Yang, B. Hou, W. Wei, Y. Bao, and S. Chang
+
+KVLink: accelerating large language models via efficient KV cache reuse.
+
+In The Thirty-ninth Annual Conference on Neural Information Processing Systems,
+
+External Links: Link [https://openreview.net/forum?id=oDcAGSXZZP]
+
+Cited by: Appendix D [#A4.p3.1].
+
+Yao et al. (2023)
+S. Yao, J. Zhao, D. Yu, N. Du, I. Shafran, K. R. Narasimhan, and Y. Cao
+
+ReAct: synergizing reasoning and acting in language models.
+
+In The Eleventh International Conference on Learning Representations,
+
+External Links: Link [https://openreview.net/forum?id=WE_vluYUL-X]
+
+Cited by: §H.2 [#A8.SS2.p14.1],
+§5 [#S5.p2.1].
+
+Ye et al. (2024)
+L. Ye, Z. Tao, Y. Huang, and Y. Li
+
+ChunkAttention: efficient self-attention with prefix-aware KV cache and two-phase partition.
+
+In Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), L. Ku, A. Martins, and V. Srikumar (Eds.),
+
+Bangkok, Thailand, pp. 11608–11620.
+
+External Links: Link [https://aclanthology.org/2024.acl-long.623/],
+Document [https://dx.doi.org/10.18653/v1/2024.acl-long.623]
+
+Cited by: Appendix D [#A4.p3.1].
+
+Ye et al. (2026)
+X. Ye, Y. Mao, J. Zhang, Y. Liu, L. Hao, F. Wu, Z. Li, Y. Liao, Z. Wang, Z. Liu, Z. Yin, L. Yuan, P. Torr, H. Sun, xiangxiang Zeng, M. Wang, L. Cong, S. Gao, and X. Tang
+
+LatentChem: from textual cot to latent thinking in chemical reasoning.
+
+In Workshop on Latent & Implicit Thinking – Going Beyond CoT Reasoning,
+
+External Links: Link [https://openreview.net/forum?id=ToCIS6xUwF]
+
+Cited by: Appendix D [#A4.p1.1].
+
+Yu et al. (2025)
+Q. Yu, Z. Zhang, R. Zhu, Y. Yuan, X. Zuo, Y. Yue, W. Dai, T. Fan, G. Liu, J. Liu, L. Liu, X. Liu, H. Lin, et al.
+
+DAPO: an open-source LLM reinforcement learning system at scale.
+
+In The Thirty-ninth Annual Conference on Neural Information Processing Systems,
+
+External Links: Link [https://openreview.net/forum?id=2a36EMSSTp]
+
+Cited by: Appendix E [#A5.p1.1],
+§H.3 [#A8.SS3.p1.1],
+§H.3 [#A8.SS3.p2.1],
+§5 [#S5.p3.1].
+
+Yu et al. (2026)
+X. Yu, Z. Chen, Y. He, T. Fu, G. Dong, C. Yang, C. Xu, Y. Ma, X. Hu, Z. Cao, et al.
+
+The latent space: foundation, evolution, mechanism, ability, and outlook.
+
+arXiv preprint arXiv:2604.02029.
+
+Cited by: §1 [#S1.p2.1],
+§7 [#S7.p1.1].
+
+Yue et al. (2025)
+Z. Yue, B. Jin, H. Zeng, H. Zhuang, Z. Qin, J. Yoon, L. Shang, J. Han, and D. Wang
+
+Hybrid latent reasoning via reinforcement learning.
+
+In The Thirty-ninth Annual Conference on Neural Information Processing Systems,
+
+External Links: Link [https://openreview.net/forum?id=LjtgTpWH71]
+
+Cited by: Appendix D [#A4.p1.1].
+
+Zhang et al. (2026a)
+G. Zhang, M. Fu, and S. Yan
+
+Memgen: weaving generative latent memory for self-evolving agents.
+
+In International Conference on Learning Representations,
+
+Vol. 2026, pp. 22555–22588.
+
+Cited by: §7 [#S7.p1.1].
+
+Zhang et al. (2026b)
+J. Zhang, S. Hu, C. Lu, R. Lange, and J. Clune
+
+Darwin gödel machine: open-ended evolution of self-improving agents.
+
+In International Conference on Learning Representations,
+
+Vol. 2026, pp. 104223–104294.
+
+Cited by: §1 [#S1.p1.1].
+
+Zhang et al. (2025)
+Z. Zhang, X. He, W. Yan, A. Shen, C. Zhao, and X. E. Wang
+
+Soft thinking: unlocking the reasoning potential of LLMs in continuous concept space.
+
+In The Thirty-ninth Annual Conference on Neural Information Processing Systems,
+
+External Links: Link [https://openreview.net/forum?id=ByQdHPGKgU]
+
+Cited by: §H.2 [#A8.SS2.p8.1],
+§5 [#S5.p2.1].
+
+Zheng et al. (2025a)
+C. Zheng, Z. Zhang, B. Zhang, R. Lin, K. Lu, B. Yu, D. Liu, J. Zhou, and J. Lin
+
+Processbench: identifying process errors in mathematical reasoning.
+
+In Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers),
+
+pp. 1009–1024.
+
+Cited by: 2nd item [#S6.I1.i2.p1.1].
+
+Zheng et al. (2024)
+L. Zheng, L. Yin, Z. Xie, C. Sun, J. Huang, C. H. Yu, S. Cao, C. Kozyrakis, I. Stoica, J. E. Gonzalez, C. Barrett, and Y. Sheng
+
+SGLang: efficient execution of structured language model programs.
+
+In The Thirty-eighth Annual Conference on Neural Information Processing Systems,
+
+External Links: Link [https://openreview.net/forum?id=VqkAKQibpq]
+
+Cited by: Appendix D [#A4.p3.1].
+
+Zheng et al. (2025b)
+Y. Zheng, D. Fu, X. Hu, X. Cai, L. Ye, P. Lu, and P. Liu
+
+Deepresearcher: scaling deep research via reinforcement learning in real-world environments.
+
+In Proceedings of the 2025 Conference on Empirical Methods in Natural Language Processing,
+
+pp. 414–431.
+
+Cited by: §7 [#S7.p2.1].
+
+Zhu et al. (2025a)
+H. Zhu, S. Hao, Z. Hu, J. Jiao, S. Russell, and Y. Tian
+
+Reasoning by superposition: a theoretical perspective on chain of continuous thought.
+
+In ICML 2025 Workshop on Methods and Opportunities at Small Scale,
+
+External Links: Link [https://openreview.net/forum?id=1cD9iO5Isv]
+
+Cited by: §7 [#S7.p1.1].
+
+Zhu et al. (2025b)
+R. Zhu, T. Peng, T. Cheng, X. Qu, J. Huang, D. Zhu, H. Wang, K. Xue, X. Zhang, Y. Shan, et al.
+
+A survey on latent reasoning.
+
+arXiv preprint arXiv:2507.06203.
+
+Cited by: §1 [#S1.p2.1],
+§7 [#S7.p1.1].
+
+Table of Contents
+
+1 Introduction [#S1]
+
+2 Preliminary [#S2]
+
+3 Building a Hybrid Reasoning Agent [#S3]
+
+3.1 Hybrid Mode Interface [#S3.SS1]
+
+3.2 Multi-Turn Hybrid Generation over Working Memory [#S3.SS2]
+
+4 Learning to Perform Hybrid Reasoning [#S4]
+
+4.1 Stabilize Generation via Hybrid Supervised Fine-tuning [#S4.SS1]
+
+4.2 Scale Reasoning via Hybrid Reinforcement Learning [#S4.SS2]
+
+5 Empirical Evaluations [#S5]
+
+5.1 Scaling Performance via Hybrid Reasoning [#S5.SS1]
+
+5.2 Efficiency Advantage on Hybrid Generation [#S5.SS2]
+
+6 In-depth Analyses [#S6]
+
+6.1 Training Dynamics on HybridSFT and HybridRL [#S6.SS1]
+
+6.2 Causal Reliance and HybridLink Design in Latent Mode [#S6.SS2]
+
+6.3 Tool Use and Reasoning Auditability in Text Mode [#S6.SS3]
+
+7 Related Work [#S7]
+
+8 Discussion and Future Directions [#S8]
+
+9 Conclusion [#S9]
+
+References [#bib]
+
+A Multi-turn Continuation over Working Memory [#A1]
+
+B Design and Analyses of Hybrid Supervised Fine-tuning [#A2]
+
+B.1 Why Self-Conditioned Training? [#A2.SS1]
+
+B.2 Learning When to Enter and Exit Latent Mode [#A2.SS2]
+
+C Theoretical Analyses of Hybrid Reinforcement Learning [#A3]
+
+C.1 Formulation of Hybrid Policy Factorization [#A3.SS1]
+
+C.2 Hybrid Policy Optimization [#A3.SS2]
+
+D Extended Related Work [#A4]
+
+E Hybrid Data Curation [#A5]
+
+F Latent Interpretability Evaluation (Figures and ) [#A6]
+
+G Additional Experiments [#A7]
+
+G.1 Experiments on 4B-Scale HybridAgent [#A7.SS1]
+
+G.2 Cost Analyses on HybridAgent [#A7.SS2]
+
+H Experiment Setups [#A8]
+
+H.1 Benchmark and Evaluation Details [#A8.SS1]
+
+H.2 Baseline Details [#A8.SS2]
+
+H.3 Implementation Details [#A8.SS3]
+
+I Prompt Template [#A9]
+
+J Case Study of HybridAgent [#A10]
+
+Appendix
+
+Appendix A Multi-turn Continuation over Working Memory
+
+Following our notation in Section 2 [#S2], denote the input sequence E≤t=[e1,…,et]E_{\leq t}=[e_{1},\ldots,e_{t}] and working memory ℳt=[K≤t,V≤t]\mathcal{M}_{t}=[K_{\leq t},V_{\leq t}] at step tt, where KK and VV collect the keys and values across all layers.
+
+Theorem A.1 (Lossless Multi-Turn Working Memory).
+
+Given the multi-turn generation process in Section 3.2 [#S3.SS2], consider the fixed HybridAgent fθf_{\theta} and HybridLink ℛ\mathcal{R} under consistent inference settings.
+At step tt, let ht+1h_{t+1} be the hidden output obtained by processing et+1e_{t+1} with the complete working memory ℳt\mathcal{M}_{t}. Then,
+
+ht+1⏟process ​et+1​ using ​ℳt=fθ​([E≤t;et+1])⏟apply the complete hybrid prefix.\underbrace{h_{t+1}}_{\text{process }e_{t+1}\text{ using }\mathcal{M}_{t}}=\underbrace{f_{\theta}([E_{\leq t};e_{t+1}])}_{\text{apply the complete hybrid prefix}}.
+
+(12)
+
+Thus, working memory preserves the text, latent, and tool observations for continued reasoning, without converting latent thoughts into text.
+
+Remark A.2.
+
+Theorem A.1 [#A1.Thmtheorem1] shows that retaining complete working memory preserves the effect of the full hybrid history on subsequent generation across turns.
+This justifies resuming HybridAgent after tool interactions without reconstructing earlier turns or converting latent thoughts into text.
+
+Proof.
+
+Fix fθf_{\theta} and HybridLink ℛ\mathcal{R}, and use the same deterministic causal operations, masks, and positional encoding, preserving all existing KV entries. Each cached forward run produces both a hidden output and an updated memory:
+
+(et+1,ℳt)⏟next input and preceding context→cached forward run(ht+1,ℳt+1)⏟hidden output and updated memory.\underbrace{(e_{t+1},\mathcal{M}_{t})}_{\text{next input and preceding context}}\xrightarrow{\text{cached forward run}}\underbrace{(h_{t+1},\mathcal{M}_{t+1})}_{\text{hidden output and updated memory}}.
+
+The hidden output determines the next text distribution or latent input, while the updated memory provides the context for the following forward run. Here, layer and head indices are omitted for notation simplicity.
+We compare a memory-based forward run with a full-prefix forward run under the same model and inference settings.
+
+Base case (t=1t=1).
+Both forward runs start with empty memory and the same input e1e_{1}. At the first layer, they produce the same queries, keys, values, and attention outputs. The remaining token-wise operations produce the same input to the next layer. Repeating this argument through all layers gives
+
+ℳ1=[K1,V1].\mathcal{M}_{1}=[K_{1},V_{1}].
+
+Both forward runs also produce the same final hidden output,
+h1=fθ​([e1])h_{1}=f_{\theta}([e_{1}]).
+
+Induction hypothesis.
+Suppose that, after processing step tt, the stored keys and values are equal to those computed by a full-prefix forward run:
+
+ℳt⏟stored KV memory=[K≤t,V≤t]⏟KV computed from the complete prefix ​E≤t.\underbrace{\mathcal{M}_{t}}_{\text{stored KV memory}}=\underbrace{[K_{\leq t},V_{\leq t}]}_{\text{KV computed from the complete prefix }E_{\leq t}}.
+
+Induction step (t→t+1t\to t+1).
+Causality and unchanged positional encoding preserve the earlier keys and values when et+1e_{t+1} is appended. Both forward runs start the first layer with the same input et+1e_{t+1}.
+
+If their inputs to the current layer are equal, each head computes the same query, new keys and values. The earlier KV entries are equal by the induction hypothesis. With the same attention mask, each head therefore produces the same attention output. The remaining token-wise operations produce the same input to the following layer.
+
+Repeating this implication through all layers gives the same final hidden output:
+
+ht+1=fθ​([E≤t;et+1]).h_{t+1}=f_{\theta}([E_{\leq t};e_{t+1}]).
+
+It also gives the same new keys and values, Kt+1,Vt+1K_{t+1},V_{t+1}. Appending them to the stored memory and substituting the induction hypothesis yields
+
+ℳt+1\displaystyle\mathcal{M}_{t+1}
+=ℳt⊕[Kt+1,Vt+1]\displaystyle=\mathcal{M}_{t}\oplus[K_{t+1},V_{t+1}]
+
+=[K≤t,V≤t]⊕[Kt+1,Vt+1]\displaystyle=[K_{\leq t},V_{\leq t}]\oplus[K_{t+1},V_{t+1}]
+
+=[K≤t+1,V≤t+1].\displaystyle=[K_{\leq t+1},V_{\leq t+1}].
+
+Thus, the updated memory satisfies the induction hypothesis at t+1t+1, while the hidden-output equality establishes Eq. 12 [#A1.E12]. By induction, at every input position, the cached forward run produces the same hidden output and updated KV memory as the full-prefix forward run.
+
+At the end of each turn j∈{1,…,n}j\in\{1,\ldots,n\}, let t=|x|+∑i=1j|τ(i)|t=|x|+\sum_{i=1}^{j}|\tau^{(i)}| count all input slots
+processed so far, including the initial context and all text,
+latent, and tool-observation inputs. Starting from ℳ(0)=[K≤|x|,V≤|x|]\mathcal{M}^{(0)}=[K_{\leq|x|},V_{\leq|x|}], repeated concatenation gives
+
+ℳ(j)\displaystyle\mathcal{M}^{(j)}
+=ℳ(0)⊕[K|x|+1:t,V|x|+1:t]\displaystyle=\mathcal{M}^{(0)}\oplus[K_{|x|+1:t},V_{|x|+1:t}]
+
+=[K≤|x|,V≤|x|]⊕[K|x|+1:t,V|x|+1:t]\displaystyle=[K_{\leq|x|},V_{\leq|x|}]\oplus[K_{|x|+1:t},V_{|x|+1:t}]
+
+=[K≤t,V≤t].\displaystyle=[K_{\leq t},V_{\leq t}].
+
+Each new entry is appended exactly once, so turn boundaries do not change the memory used by subsequent forward runs.
+
+Finally, the established hidden-state equality gives
+
+Softmax⁡(Wout​ht)\displaystyle\operatorname{Softmax}(W_{\mathrm{out}}h_{t})
+=Softmax⁡(Wout​fθ​(E≤t)),\displaystyle=\operatorname{Softmax}(W_{\mathrm{out}}f_{\theta}(E_{\leq t})),
+
+ℛ⁡(ht)\displaystyle\mathcal{R}(h_{t})
+=ℛ⁡(fθ​(E≤t)).\displaystyle=\mathcal{R}(f_{\theta}(E_{\leq t})).
+
+where we retain the corresponding hidden states and tool observations, while using
+the same random draws for sampling and tool execution in both runs.
+Then, both runs process the same next input with the same memory and reasoning mode, producing the same hidden output and updated KV memory.
+Repeating this argument step by step gives identical subsequent hybrid sequences under the shared random draws, and hence identical generation probabilities.
+Therefore, working memory preserves the effect of the complete hybrid history across turns, without reconstructing latent thoughts as text.
+
+∎
+
+Appendix B Design and Analyses of Hybrid Supervised Fine-tuning
+
+We expand on the method description of HybridSFT (Section 4.1 [#S4.SS1]), providing additional design justifications and implementation details for the overall training scheme.
+
+B.1 Why Self-Conditioned Training?
+
+Figure 11: Train-Inference Mismatch in Latent Reasoning. We illustrate the exposure bias that arises when teacher-forced training meets free-running inference. Left: During activation, the backbone consumes ground-truth embeddings Emb⁡(y)\mathrm{Emb}(y) at latent positions, while HybridLink outputs ℛ⁡(h)\mathcal{R}(h) are only trained to match their targets and never fed back as inputs. Right: At inference, every latent input is the model’s own ℛ⁡(h)\mathcal{R}(h), so deviations from the target embeddings accumulate across the span.
+
+The format and HybridLink activation provide a well-aligned initialization, but both are teacher-forced (Figure 11 [#A2.F11], left). At every latent position, the backbone consumes the ground-truth embedding Emb⁡(y)\mathrm{Emb}(y), and HybridLink is trained only to match its output ℛ⁡(h)\mathcal{R}(h) to that target; the prediction itself is never fed back as an input. At inference, the agent instead runs free (Figure 11 [#A2.F11], right). Once it enters latent mode, every subsequent input is its own ℛ⁡(h)\mathcal{R}(h), which neither the backbone nor HybridLink has been conditioned on. This train-inference mismatch is akin to exposure bias (Ranzato et al., 2015 [#bib.bib5]; Bengio et al., 2015 [#bib.bib4]), a standard issue in autoregressive sequence models that are trained on ground-truth prefixes but consume their own predictions at inference.
+
+It is worth noting that exposure bias is present in both text and latent modes, since both feed the model’s own outputs back as inputs.
+In text mode (as in standard LLM SFT), each fed-back input is sampled and re-embedded, and thus always corresponds to a token in the discrete vocabulary. A prediction error, where the sampled token differs from the ground-truth target, only changes which token is fed back; the input representation itself never leaves the set seen in training, so errors cannot compound in the input space.
+Latent mode, in contrast, has no such projection. ℛ⁡(h)\mathcal{R}(h) is continuous and fed back unquantized, so even a small deviation from the target embedding becomes an input the backbone has never seen in training. This deviation propagates to the next hidden state and hence the next latent input, compounding over the tens to hundreds of steps in a latent span and gradually eroding the semantic coherence of the latent trace.
+
+Self-conditioned HybridSFT closes this gap by training both components on the model’s own generated latent inputs. As in Figure 4 [#S4.F4], the teacher-forced first pass applies HybridLink to the last-layer hidden state at each latent position, yielding the model’s own prediction of the next latent input. The second pass then replaces the ground-truth latent embeddings with these predictions and trains the backbone and HybridLink jointly, so both parts learn under the same latent inputs they encounter at inference.
+
+Under this training scheme, the backbone learns to read, and HybridLink learns to produce, latent inputs under the same conditions they encounter at inference. Thus, HybridAgent is trained as an integrated whole rather than two separately activated components.
+
+B.2 Learning When to Enter and Exit Latent Mode
+
+As stated in Section 3 [#S3], HybridAgent transitions between modes through two special tokens, the entry anchor <latent> and the exit anchor </latent>. Within a latent span, these anchors are the only positions supervised by ℒBackbone\mathcal{L}_{\text{Backbone}}, while every other latent position is supervised by ℒHybridLink \mathcal{L}_{\text{HybridLink }} alone. The two transitions are not symmetric, however. Entering latent mode is decided in text mode, where the backbone samples the next token from the vocabulary as usual, whereas exiting must be decided from a continuous latent state through the readout in Eq. 5 [#S3.E5]. HybridSFT therefore treats the entry anchor as an ordinary token and gives the exit anchor dedicated supervision.
+
+Entry as a Text-Mode Decision.
+Since entering is a text mode decision, <latent> is simply a cross-entropy target, and the backbone learns from the preceding context when to switch. The anchor position then serves as the first latent step, with its last-layer hidden state passed through HybridLink to produce the next latent input, so the span begins without any additional mechanism.
+
+Exit as a Latent-Mode Decision. Exiting takes place in latent mode, where no token is sampled. By Eq. 5 [#S3.E5], a span closes when the HybridLink’s output ℛ⁡(h)\mathcal{R}(h) is nearest to Emb⁡(</latent>)\mathrm{Emb}(\texttt{</latent>}), a decision depending on both components, where the backbone produces a hidden state that encodes the exit and HybridLink maps it onto the anchor embedding. HybridSFT therefore supervises the last latent step of each span from both sides.
+On the HybridLink side, the regression target at this step is Emb⁡(</latent>)\mathrm{Emb}(\texttt{</latent>}), given slightly more weight than the span interior so that the single exit signal is not diluted. On the backbone side, </latent> is also a cross-entropy target predicted from the same hidden state, so the backbone itself learns to signal the exit.
+
+Appendix C Theoretical Analyses of Hybrid Reinforcement Learning
+
+C.1 Formulation of Hybrid Policy Factorization
+
+Following our notation in Algorithm 1 [#alg1], denote τ=(z,y,o)\tau=(z,y,o) as a hybrid trajectory, where 𝒯\mathcal{T} is the set of sampled text positions.
+Here, πθ​(τ∣x)\pi_{\theta}(\tau\mid x) denotes the likelihood of the agent’s outputs along trajectory τ\tau, given input xx.
+Meanwhile, tool observations are generated by the environment and serve as context for subsequent model decisions. We formalize the factorization of the hybrid policy below.
+
+Proposition C.1 (Restatement of Hybrid Policy Factorization).
+
+Let τ\tau be a hybrid trajectory generated by the policy πθ\pi_{\theta} (induced by fθf_{\theta}) with fixed ℛ\mathcal{R}. Then the hybrid policy factorizes as:
+
+πθ​(τ∣x)=∏t∈𝒯πθ​(yt∣x,τ<t),\pi_{\theta}(\tau\mid x)\;=\;\prod_{t\in\mathcal{T}}\pi_{\theta}\bigl(y_{t}\mid x,\,\tau_{<t}\bigr),
+
+(13)
+
+where 𝒯\mathcal{T} is the set of sampled text positions of trajectory τ\tau.
+
+Proof.
+
+Fix θ\theta and a realized trajectory τ\tau. At a latent continuation,
+we have Pr⁡(et=ℛ⁡(ht−1)∣x,τ<t)=1\Pr(e_{t}=\mathcal{R}(h_{t-1})\mid x,\tau_{<t})=1 with a fixed HybridLink ℛ\mathcal{R}.
+Deterministic reasoning mode transitions (without sampling) also have conditional mass 11. The probability chain rule thus gives
+
+πθ(τ∣x)=[∏t∈𝒯πθ(yt∣x,τ<t)][∏t:deterministicsteps1]=∏t∈𝒯πθ(yt∣x,τ<t),\pi_{\theta}(\tau\mid x)=\left[\prod_{t\in\mathcal{T}}\pi_{\theta}(y_{t}\mid x,\tau_{<t})\right]\left[\prod_{\begin{subarray}{c}t:\,\text{deterministic}\\
+\text{steps}\end{subarray}}1\right]=\prod_{t\in\mathcal{T}}\pi_{\theta}(y_{t}\mid x,\tau_{<t}),
+
+where deterministic steps receive the probability of 11.
+
+∎
+
+Remark C.2.
+
+Proposition C.1 [#A3.Thmtheorem1] shows that the hybrid policy factorizes over sampled text positions, with each text-token probability conditioned on the complete preceding hybrid context, including text, latent thoughts, and tool observations.
+Building on this factorization formulation, we show in the next subsection (Theorem C.3 [#A3.Thmtheorem3]) how exact rollout replay enables HybridRL’s policy updates to assign credit to complete recorded hybrid trajectories.
+
+C.2 Hybrid Policy Optimization
+
+Recall that we collect {τi=(zi,yi,oi)}i=1G\{\tau_{i}=(z_{i},y_{i},o_{i})\}_{i=1}^{G}, with group size G≥2G\geq 2, using the rollout policy πθold\pi_{\theta_{\mathrm{old}}}.
+During replay, πθ​(yi,t∣x,τi,<t)\pi_{\theta}(y_{i,t}\mid x,\tau_{i,<t}) scores the recorded prefix
+with the current model across step tt; πθ​(τi∣x)\pi_{\theta}(\tau_{i}\mid x) is the product
+in Eq. 13 [#A3.E13] under this same evaluation.
+Let ri=r⁡(τi)r_{i}=r(\tau_{i}) be the reward, and AiA_{i} be the fixed group-normalized advantage.
+Let 𝒯i\mathcal{T}_{i} denote the sampled text positions of τi\tau_{i}. Define
+
+ρi,t​(θ)\displaystyle\rho_{i,t}(\theta)
+=πθ​(yi,t∣x,τi,<t)πθold​(yi,t∣x,τi,<t),\displaystyle=\frac{\pi_{\theta}(y_{i,t}\mid x,\tau_{i,<t})}{\pi_{\theta_{\mathrm{old}}}(y_{i,t}\mid x,\tau_{i,<t})},
+
+(14)
+
+ℒRL​(θ)\displaystyle\mathcal{L}_{\mathrm{RL}}(\theta)
+=−1∑i|𝒯i|∑i∑t∈𝒯imin{ρi,t(θ)Ai,clip(ρi,t(θ))Ai}.\displaystyle=-\frac{1}{\sum_{i}|\mathcal{T}_{i}|}\sum_{i}\sum_{t\in\mathcal{T}_{i}}\min\!\left\{\rho_{i,t}(\theta)A_{i},\operatorname{clip}(\rho_{i,t}(\theta))A_{i}\right\}.
+
+(15)
+
+Here, clip⁡(ρ)\operatorname{clip}(\rho) restricts ρ\rho to [1−ϵ,1+ϵ][1-\epsilon,1+\epsilon], where 0<ϵ<10<\epsilon<1. Thus, ratios sufficiently close to 11 are unchanged: clip⁡(ρ)=ρ\operatorname{clip}(\rho)=\rho whenever |ρ−1|<ϵ|\rho-1|<\epsilon.
+In the following theorem, we connect this objective to our hybrid policy optimization over complete recorded hybrid trajectories.
+
+Theorem C.3 (Gradient Equivalence in Hybrid Policy Optimization).
+
+Based on the rollout replay (Section 4.2 [#S4.SS2]), record each trajectory’s latent inputs and tool observations.
+Under Theorem A.1 [#A1.Thmtheorem1] and the replay conditions in Algorithm 1 [#alg1], the accumulated text-token gradient is equivalent to the advantage-weighted likelihood gradient for the complete hybrid trajectories:
+
+−∇θℒRL​(θold)=1∑i|𝒯i|​∑iAi​∇θ​log⁡πθ​(τi∣x)|θ=θold.-\nabla_{\theta}\mathcal{L}_{\mathrm{RL}}(\theta_{\mathrm{old}})=\left.\frac{1}{\sum_{i}|\mathcal{T}_{i}|}\sum_{i}A_{i}\nabla_{\theta}\log\pi_{\theta}(\tau_{i}\mid x)\right|_{\theta=\theta_{\mathrm{old}}}.
+
+(16)
+
+Therefore, the text-token update assigns advantage-weighted policy credit to optimize the complete recorded hybrid trajectories.
+
+Remark C.4.
+
+At θ=θold\theta=\theta_{\mathrm{old}}, HybridRL produces the same policy update as optimizing the advantage-weighted recorded-trajectory objective.
+By preserving the context that produced each reward, exact rollout replay enables the backbone to learn from complete recorded hybrid trajectories.
+
+Proof.
+
+For trajectory τi\tau_{i}, we omit the sample index on EE and ee for notation simplicity. At step tt of the ii-th hybrid trajectory τi\tau_{i}, the subsequent input can be denoted by
+
+et={Emb⁡(yi,t),generated text token,zi,t,recorded latent input,Emb⁡(oi,t),tool observation.e_{t}=\begin{cases}\operatorname{Emb}(y_{i,t}),&\text{generated text token},\\
+z_{i,t},&\text{recorded latent input},\\
+\operatorname{Emb}(o_{i,t}),&\text{tool observation}.\end{cases}
+
+During replay, zi,tz_{i,t} denotes the latent input recorded under θold\theta_{\mathrm{old}} and is fixed when differentiating with respect to the current parameters θ\theta, leading to ∂zi,t∂θ=0\frac{\partial z_{i,t}}{\partial\theta}=0.
+Here, although the latent inputs are fixed, ht−1=fθ​(E≤t−1)h_{t-1}=f_{\theta}(E_{\leq t-1}) remains parameter-dependent and retains the chain-rule contribution
+(∂ht−1∂θ)⊤​∇ht−1​log⁡πθ​(yi,t∣x,τi,<t),\left(\frac{\partial h_{t-1}}{\partial\theta}\right)^{\!\top}\nabla_{h_{t-1}}\log\pi_{\theta}(y_{i,t}\mid x,\tau_{i,<t}),
+allowing trajectory-level rewards to optimize the backbone’s processing of the complete recorded hybrid context, while keeping the latent inputs fixed.
+
+Then, by causality and Theorem A.1 [#A1.Thmtheorem1], full-sequence replay scores each sampled text token at position t∈𝒯it\in\mathcal{T}_{i} using the hidden state ht−1=fθ​(E≤t−1)h_{t-1}=f_{\theta}(E_{\leq t-1}) computed from the recorded hybrid prefix.
+With this prefix, taking the logarithm and differentiating
+Eq. 13 [#A3.E13] gives
+
+∇θ​log​πθ​(τi∣x)=∑t∈𝒯i∇θ​log​πθ​(yi,t∣x,τi,<t),\nabla_{\theta}\log\pi_{\theta}(\tau_{i}\mid x)=\sum_{t\in\mathcal{T}_{i}}\nabla_{\theta}\log\pi_{\theta}(y_{i,t}\mid x,\tau_{i,<t}),
+
+(17)
+
+which expresses the complete recorded-trajectory score as a sum of text-token scores. To connect this equality to the implemented loss, we next show that each token-ratio gradient equals its text-token score at the rollout policy θold\theta_{\mathrm{old}}.
+
+The rollout probability in the denominator of Eq. 14 [#A3.E14] is fixed during differentiation. Therefore,
+
+∇θρi,t​(θ)\displaystyle\nabla_{\theta}\rho_{i,t}(\theta)
+=∇θπθ​(yi,t∣x,τi,<t)πθold​(yi,t∣x,τi,<t)\displaystyle=\frac{\nabla_{\theta}\pi_{\theta}(y_{i,t}\mid x,\tau_{i,<t})}{\pi_{\theta_{\mathrm{old}}}(y_{i,t}\mid x,\tau_{i,<t})}
+
+=πθ​(yi,t∣x,τi,<t)πθold​(yi,t∣x,τi,<t)​∇θπθ​(yi,t∣x,τi,<t)πθ​(yi,t∣x,τi,<t)\displaystyle=\frac{\pi_{\theta}(y_{i,t}\mid x,\tau_{i,<t})}{\pi_{\theta_{\mathrm{old}}}(y_{i,t}\mid x,\tau_{i,<t})}\frac{\nabla_{\theta}\pi_{\theta}(y_{i,t}\mid x,\tau_{i,<t})}{\pi_{\theta}(y_{i,t}\mid x,\tau_{i,<t})}
+
+=ρi,t​(θ)​∇θ​log⁡πθ​(yi,t∣x,τi,<t),\displaystyle=\rho_{i,t}(\theta)\,\nabla_{\theta}\log\pi_{\theta}(y_{i,t}\mid x,\tau_{i,<t}),
+
+where the last equality uses
+∇θ​log​p=(∇θp)/p\nabla_{\theta}\log p=(\nabla_{\theta}p)/p.
+At θ=θold\theta=\theta_{\mathrm{old}}, exact replay reproduces the rollout probability, giving ρi,t​(θold)=1\rho_{i,t}(\theta_{\mathrm{old}})=1.
+Therefore, evaluating the derivative yields
+
+∇θρi,t​(θ)|θ=θold=∇θ​log​πθ​(yi,t∣x,τi,<t)|θ=θold.\left.\nabla_{\theta}\rho_{i,t}(\theta)\right|_{\theta=\theta_{\mathrm{old}}}=\left.\nabla_{\theta}\log\pi_{\theta}(y_{i,t}\mid x,\tau_{i,<t})\right|_{\theta=\theta_{\mathrm{old}}}.
+
+Since clipping leaves ratios near 11 unchanged, each summand in Eq. 15 [#A3.E15] equals ρi,t​(θ)​Ai\rho_{i,t}(\theta)A_{i} locally, leading to
+
+−∇θℒRL​(θ)|θ=θold\displaystyle-\left.\nabla_{\theta}\mathcal{L}_{\mathrm{RL}}(\theta)\right|_{\theta=\theta_{\mathrm{old}}}
+=1∑i|𝒯i|​∑iAi​∑t∈𝒯i∇θρi,t​(θ)|θ=θold\displaystyle=\left.\frac{1}{\sum_{i}|\mathcal{T}_{i}|}\sum_{i}A_{i}\sum_{t\in\mathcal{T}_{i}}\nabla_{\theta}\rho_{i,t}(\theta)\right|_{\theta=\theta_{\mathrm{old}}}
+
+=1∑i|𝒯i|​∑iAi​∑t∈𝒯i∇θ​log​πθ​(yi,t∣x,τi,<t)|θ=θold\displaystyle=\left.\frac{1}{\sum_{i}|\mathcal{T}_{i}|}\sum_{i}A_{i}\sum_{t\in\mathcal{T}_{i}}\nabla_{\theta}\log\pi_{\theta}(y_{i,t}\mid x,\tau_{i,<t})\right|_{\theta=\theta_{\mathrm{old}}}
+
+=1∑i|𝒯i|​∑iAi​∇θ​log⁡πθ​(τi∣x)|θ=θold,\displaystyle=\left.\frac{1}{\sum_{i}|\mathcal{T}_{i}|}\sum_{i}A_{i}\nabla_{\theta}\log\pi_{\theta}(\tau_{i}\mid x)\right|_{\theta=\theta_{\mathrm{old}}},
+
+where the second equality uses the token-ratio derivative at θold\theta_{\mathrm{old}}, and the final equality uses Eq. 17 [#A3.E17].
+
+∎
+
+Appendix D Extended Related Work
+
+Adaptive Reasoning on Text and Latent Space.
+Beyond fixed-length chains of thought, recent work lets LLMs adapt how long and in which medium they reason (Bigverdi et al., 2024 [#bib.bib82]; Lv et al., 2026 [#bib.bib81]; Yang et al., 2026 [#bib.bib75]; Ye et al., 2026 [#bib.bib80]), for example by learning when to stop latent reasoning or deciding whether explicit deliberation is needed (Ning et al., 2025 [#bib.bib77]).
+Several methods interleave latent reasoning with text decoding (Yue et al., 2025 [#bib.bib74]), using confidence or entropy signals (Xu et al., 2026 [#bib.bib78]) to shift into continuous representations at uncertain steps and explore alternative reasoning paths (Fu and Luo, 2026 [#bib.bib79]; Shi et al., 2026 [#bib.bib76]).
+However, existing methods largely operate within one reasoning pass or switch modes only at single-turn granularity, and their latent states remain largely opaque to inspect directly. Orthogonal to this line, HybridAgent uses latent mode for efficient deeper reasoning, carries latent context across multiple turns through continuous working memory, keeps latent thoughts directly readable, and preserves the agentic tool-use abilities for long-horizon tasks.
+
+Hybrid Communication among Agents.
+A recent line of work in multi-agent systems (MAS) parallel to HybridAgent studies hybrid-protocol communication, in which each inter-agent message combines two media. A latent channel carries dense intermediate signals such as hidden states or KV entries, while a text channel carries concise commitments that remain inspectable.
+Early instances augment each natural-language message with the sender’s internal state trajectory (Tang et al., 2025 [#bib.bib84]), and later work formalizes the dual-channel design by routing elaborate reasoning through latent vectors while keeping answers and decisions in text (Mou et al., 2026 [#bib.bib85]; Dai et al., 2026 [#bib.bib87]).
+More recent works take the same view from the deployment side, pairing every latent payload with a visible text commitment wherever oversight is required (Liu, 2026 [#bib.bib86]) and evaluating the security of latent transfer alongside visible text (Brito and Baquero, 2026 [#bib.bib83]). Complementary to these inter-agent protocols in the MAS setting, HybridAgent decides the medium at the level of each generation step within a single agent, switching between latent reasoning and text-based tool interaction over multi-turn trajectories.
+
+KV-Cache Reuse.
+Reusing key–value (KV) entries across generation steps is standard practice for efficient serving (Kwon et al., 2023 [#bib.bib39]; Zheng et al., 2024 [#bib.bib88]), and recent work extends it across requests, caching shared prefixes and prompt modules (Gim et al., 2024 [#bib.bib89]; Ye et al., 2024 [#bib.bib90]; Juravsky et al., 2024 [#bib.bib91]) and composing independently encoded caches so that repeated context need not be prefilled again (Yang et al., 2025b [#bib.bib92]; Ma et al., 2025 [#bib.bib93]; Hu et al., 2025 [#bib.bib94]). These methods treat the KV cache as an optimization over a context that could in principle be re-encoded from text. HybridAgent likewise builds on the backbone’s own KV entries, using them as a unified working memory that stores and propagates both latent and text information across multi-turn hybrid generation.
+
+Appendix E Hybrid Data Curation
+
+Figure 12: Hybrid Data Curation Pipeline. We convert text-based demonstrations into multi-turn hybrid trajectories using complementary signals from LLM judgments and model entropy to assign reasoning modes, followed by a visibility audit that preserves decision-critical steps in text mode.
+
+We curate the hybrid training data by converting existing multi-turn agentic demonstrations (Yu et al., 2025 [#bib.bib10]; Dong et al., 2025b [#bib.bib43]) into 54k hybrid trajectories for text and latent supervision.
+Specifically, an automatic annotation pipeline is designed to assign each source CoT step to either text or latent mode, based on complementary signals from external LLM judges and the target model’s entropy-based confidence, with no human labeling needed.
+Accordingly, high-confidence reasoning steps that the model can handle reliably are assigned as latent targets, while audit-critical reasoning and tool-interaction steps are retained as text targets. We describe the detailed curation pipeline below.
+
+Step Segmentation.
+We first split each source trajectory into atomic reasoning steps using a deterministic procedure, recording their exact character offsets. These offsets allow subsequent annotations to identify and group steps while preserving the original content and ordering.
+
+Mode Assignment.
+We then leverage external LLM experts (GPT-6.1-Sol/GPT-5.6-Luna) to assign each reasoning step to text or latent mode, with tool interactions and key steps needed for external inspection retained in text mode (See Prompts in Appendix I [#A9]). Meanwhile, we complement the external selection with the target model’s prediction entropy. We teacher-force the original textual trajectory through a frozen base model and compute the mean token-level entropy for each step ss:
+
+Hs=−1|ℐs|∑t∈ℐs∑v∈𝒱fθ(v∣x,τ<t)logfθ(v∣x,τ<t),H_{s}=-\frac{1}{|\mathcal{I}_{s}|}\sum_{t\in\mathcal{I}_{s}}\sum_{v\in\mathcal{V}}f_{\theta}(v\mid x,\tau_{<t})\log f_{\theta}(v\mid x,\tau_{<t}),
+
+(18)
+
+where fθ​(v∣x,τ<t)f_{\theta}(v\mid x,\tau_{<t}) denotes the frozen base model’s next-token probability after the vocabulary projection and softmax. Here, xx is the input question, τ<t\tau_{<t} contains preceding reasoning and tool observations, ℐs\mathcal{I}_{s} indexes the tokens in step ss, and 𝒱\mathcal{V} is the vocabulary. Low-entropy steps become latent candidates, while high-entropy steps remain in text mode. Initial mode assignments combining the two complementary signals are then refined through the visibility audit below.
+
+Visibility Audit.
+An independent LLM critic next examines the visible version of each annotated trajectory, with candidate latent spans hidden. The critic assesses whether the remaining text and tool interactions provide sufficient information to follow the agent’s decisions. When decision-critical information is missing, the corresponding source steps are restored to text mode. This audit helps preserve the key information needed for external debugging and inspection.
+
+Hybrid Trajectory Construction.
+We merge adjacent latent-assigned steps into continuous spans and programmatically insert the special anchors <latent> and </latent>. Tool calls and observations remain in text form. Finally, we verify that removing the inserted anchors recovers the original trajectory byte for byte. This consistency check ensures that the pipeline annotates reasoning modes without rewriting or altering the source demonstrations.
+
+Appendix F Latent Interpretability Evaluation (Figures 2 [#S3.F2] and 8 [#S6.F8])
+
+In this section, we describe the evaluation setup and metrics used to measure the readability and context specificity of latent readouts in Figures 2 [#S3.F2] and 8 [#S6.F8].
+
+Probe Setup.
+We evaluate HybridAgent across 200 questions spanning downstream tasks, including AIME25/26 (math-ai, 2025 [#bib.bib34]; MathArena, 2026 [#bib.bib35]), MATH-500 (HuggingFaceH4, 2023 [#bib.bib36]), MuSiQue (Trivedi et al., 2022 [#bib.bib9]), GAIA (Mialon et al., 2024 [#bib.bib26]), and DSQA (Gupta et al., 2026 [#bib.bib12]). Figure 2 [#S3.F2] compares the final HybridRL checkpoints of HybridAgent at 4B, 8B, and 14B scales. Figure 8 [#S6.F8] compares format activation, HybridLink activation, self-conditioned HybridSFT, and Coconut on the shared Qwen3-14B-Base backbone. Generation uses temperature 0.6, top-p 0.95, top-k 20, and a fixed random seed. Each unit inside the plots is a latent span: a maximal sequence of consecutive latent steps. Each plotted point represents one span, and rings mark the means of per-span scores for each model or variant. The annotation n=200n=200 refers to total number of questions.
+
+Readability.
+For a latent span bb containing LbL_{b} latent inputs zb,tz_{b,t}, we measure readability score through their average nearest-token alignment, following Eq. 5 [#S3.E5]:
+
+Read⁡(b)=1Lb​∑t=1Lbmaxv∈𝒱⁡cos⁡(zb,t,Emb⁡(v)),\mathrm{Read}(b)=\frac{1}{L_{b}}\sum_{t=1}^{L_{b}}\max_{v\in\mathcal{V}}\cos\!\left(z_{b,t},\mathrm{Emb}(v)\right),
+
+(19)
+
+where 𝒱\mathcal{V} is the vocabulary and Emb⁡(v)\mathrm{Emb}(v) is the input embedding of token vv. A score of 11 indicates that every latent input shares the direction of a vocabulary embedding, corresponding to the “exact token” reference. This alignment serves as a geometric proxy for readability. To calibrate the noise reference, we apply the same readout to 2,000 Gaussian random vectors and use their mean nearest-token similarity as the threshold τnoise\tau_{\mathrm{noise}}. Spans above this threshold exhibit stronger average token alignment than the Gaussian reference.
+
+Context Specificity.
+Context specificity measures whether a span’s pseudo-text is more relevant to its originating question than to other questions from the same task. Let PbP_{b} denote the pseudo-text obtained by nearest-token readout of span bb, as in Eq. 5 [#S3.E5]. Let W⁡(s)W(s) extract the content words from string ss: lower-cased alphanumeric tokens longer than two characters, with stop words removed. We use Jaccard overlap,
+J⁡(A,B)=|A∩B|/|A∪B|J(A,B)=|A\cap B|/|A\cup B|.
+For a task-specific question set {q1,…,qM}\{q_{1},\ldots,q_{M}\} with M≥2M\geq 2, let i⁡(b)i(b) identify the question that produced span bb. We define the context specificity score as:
+
+Spec⁡(b)=J⁡(W⁡(Pb),W⁡(qi⁡(b)))1M−1​∑j=1j≠i⁡(b)MJ⁡(W⁡(Pb),W⁡(qj)),\mathrm{Spec}(b)=\frac{J\!\left(W(P_{b}),W(q_{i(b)})\right)}{\dfrac{1}{M-1}\displaystyle\sum_{\begin{subarray}{c}j=1\\
+j\neq i(b)\end{subarray}}^{M}J\!\left(W(P_{b}),W(q_{j})\right)},
+
+(20)
+
+when the denominator is positive. A score of 1×1\times indicates equal overlap, while higher scores above 1×1\times indicate greater lexical relevance to the originating question. We exclude readouts without content words and plot positive scores on a logarithmic axis.
+
+Meaningful Region.
+The shaded region contains spans whose readability exceeds τnoise\tau_{\mathrm{noise}} and whose context specificity exceeds 11. The two axes are complementary: readability measures alignment with token embeddings, while context specificity measures relevance to the originating question. Together, they provide evidence of readable, question-specific latent readouts that support external inspection.
+
+Appendix G Additional Experiments
+
+G.1 Experiments on 4B-Scale HybridAgent
+
+Table 8: 
+4B-Scale HybridAgent on Math and Knowledge-Intensive Search. We evaluate performance across both SFT and RL stages. AIME25/26 are reported on avg@16 accuracy.
+
+Method
+AIME25
+AIME26
+MATH500
+GPQA-D
+
+Qwen3-4B-Base
+
+Coconut
+10.6
+13.3
+40.6
+17.2
+
+SoftCoT
+14.8
+18.5
+55.2
+26.3
+
+Standard Text SFT
+19.0
+22.7
+77.4
+31.8
+
+HybridAgent (SFT)
+22.5
+23.3
+76.8
+30.8
+
+GRPO
+28.1
+35.6
+80.6
+36.9
+
+ARPO
+31.3
+36.3
+81.8
+38.4
+
+HybridAgent (RL)
+35.2
+37.5
+82.2
+40.9
+
+To examine the effectiveness of hybrid reasoning at smaller model scales, we evaluate HybridAgent and corresponding text-based and latent baselines on Qwen3-4B-Base.
+As shown in Table 8 [#A7.T8], HybridSFT outperforms both latent baselines across all four benchmarks and improves over standard text SFT on AIME25 and AIME26.
+HybridRL further improves performance across all four benchmarks, achieving the best results and exceeding ARPO by an average of 2.0 percentage points.
+Together with 8B and 14B comparisons in Table 1 [#S5.T1] and 2 [#S5.T2], these results show that the benefits of hybrid reasoning can extend to different model scales of HybridAgent across downstream reasoning tasks.
+
+G.2 Cost Analyses on HybridAgent
+
+Table 9: 
+Cost Analyses on HybridAgent.
+We compare HybridAgent with text agents under the same backbones, reporting compute per question and estimated monetary cost per 1M questions.
+Each text or latent generation step is charged as one full backbone forward pass.
+Monetary costs assume $2.50 per H100-hour and 10% utilization of peak BF16 throughput (approximately $0.007 per PFLOP).
+
+Model Backbone
+Text Agent
+HybridAgent
+Cost / 1M questions
+Cheaper by
+
+(TFLOP)
+(TFLOP)
+(Text Agent →\rightarrow HybridAgent)
+
+Qwen3-4B-Base
+51.2
+13.9
+$359 →\rightarrow $98
+3.7×\times
+
+Qwen3-8B-Base
+62.5
+17.2
+$439 →\rightarrow $121
+3.6×\times
+
+Qwen3-14B-Base
+66.9
+25.1
+$470 →\rightarrow $176
+2.7×\times
+
+Cost Analyses on HybridAgent. To examine whether the efficiency of hybrid generation translates into lower computational cost, we compare HybridAgent with matched text agents across 4B, 8B, and 14B backbones. We estimate decoding compute by charging every text or latent step a full backbone forward pass, together with the cost of vocabulary projection or the HybridLink adapter, respectively. Step counts are averaged over matched evaluations with the same questions, generation budgets, and tool-call limits. We further estimate monetary costs assuming $2.50 per H100-hour and 10% utilization of peak BF16 throughput. These estimates cover generation compute and exclude prompt prefill, context-dependent attention, and external tool execution.
+As shown in Table 9 [#A7.T9], HybridAgent consistently reduces estimated decoding compute across all three model scales, from 51.2–66.9 TFLOP to 13.9–25.1 TFLOP per question, corresponding to reductions of 62.5%–72.9%. Under the stated pricing and utilization assumptions, the estimated cost of answering one million questions decreases from $359 to $98 at 4B, from $439 to $121 at 8B, and from $470 to $176 at 14B, yielding cost reduction factors of 3.7×3.7\times, 3.6×3.6\times, and 2.7×2.7\times, respectively. Together with the shorter generation trajectories in Figure 6 [#S5.F6], these results demonstrate that hybrid reasoning reduces overall decoding compute while explicitly accounting for the backbone computation incurred by latent steps.
+
+Appendix H Experiment Setups
+
+H.1 Benchmark and Evaluation Details
+
+We evaluate HybridAgent on 11 benchmarks spanning mathematical, knowledge-intensive, and agentic reasoning.
+Together, these benchmarks assess complementary capabilities in multi-step problem solving, specialized knowledge application, evidence integration, and tool-assisted information seeking. We follow the setup of Dong et al. (2025b) [#bib.bib43] and describe each benchmark in detail below.
+
+(i) Mathematical Reasoning Tasks
+
+AIME 25 (math-ai, 2025 [#bib.bib34]):
+AIME 25 comprises 30 problems from the 2025 American Invitational Mathematics Examination, covering algebra, geometry, number theory, and combinatorics.
+Its integer-answer problems evaluate competition-level mathematical reasoning, requiring models to combine mathematical insights with precise multi-step calculations.
+
+AIME 26 (MathArena, 2026 [#bib.bib35]):
+AIME 26 contains 30 problems from the 2026 American Invitational Mathematics Examination, following the same competition format as AIME 25.
+It provides a complementary assessment of mathematical problem solving across a separate annual problem set, testing sustained reasoning and accurate numerical derivation.
+
+MATH500 (HuggingFaceH4, 2023 [#bib.bib36]):
+MATH500 is a 500-problem subset of the MATH test set, spanning 7 mathematical subjects and 5 difficulty levels.
+It evaluates math reasoning across diverse problem types, including symbolic manipulation, geometric deduction, and numerical computation.
+
+(ii) Knowledge-Intensive Reasoning Tasks
+
+GPQA-Diamond (Rein et al., 2023 [#bib.bib37]):
+GPQA-Diamond is a curated subset of 198 expert-written multiple-choice questions in biology, physics, and chemistry.
+Selected through expert and non-expert validation, these questions assess advanced scientific knowledge and reasoning that remain challenging for non-experts even with web access.
+
+MedQA (Yang et al., 2024 [#bib.bib38]):
+MedQA is a multiple-choice question-answering benchmark derived from professional medical licensing examinations. The dataset contains 300 questions in total.
+Its questions assess medical knowledge and clinical reasoning, requiring models to interpret patient information and identify appropriate diagnoses, investigations, or treatments.
+
+MuSiQue (Trivedi et al., 2022 [#bib.bib9]):
+MuSiQue is a multi-hop question-answering benchmark constructed by composing single-hop questions into connected reasoning chains of two to four hops.
+It evaluates the ability to combine evidence across multiple passages, with question construction designed to reduce shortcuts that bypass intermediate reasoning steps. Following Dong et al. (2025b) [#bib.bib43], we use 200 test-set questions for downstream evaluation across all methods.
+
+(iii) Agentic Reasoning Tasks
+
+General AI Assistants (GAIA) (Mialon et al., 2024 [#bib.bib26]):
+GAIA evaluates general-purpose assistants on real-world questions involving reasoning, web browsing, information processing, and external tool use.
+Its three difficulty levels reflect increasingly demanding combinations of reasoning steps and tool interactions, assessing the ability to coordinate these capabilities toward a verifiable answer.
+
+Humanity’s Last Exam (HLE) (Center for AI Safety et al., 2026 [#bib.bib25]):
+HLE comprises expert-authored questions across a broad range of academic disciplines, including mathematics, natural sciences, and the humanities.
+Its multiple-choice and short-answer problems assess advanced subject knowledge and reasoning on questions designed to resist quick answers through direct web retrieval.
+
+WebWalker (Wu et al., 2025 [#bib.bib11]):
+WebWalkerQA, referred to as WebWalker in our evaluations, is an agentic search benchmark requiring exploration of website subpages and integration of information from one or multiple sources.
+Its easy, medium, and hard categories reflect increasing traversal depth, testing the ability to locate and synthesize evidence beyond surface-level search results.
+
+SealQA (Pham et al., 2026 [#bib.bib23]):
+SealQA evaluates search-augmented question answering on factual questions for which retrieved information may be noisy, conflicting, or unhelpful.
+We evaluate on Seal-0 and Seal-Hard, which test factual accuracy and reasoning under challenging retrieval conditions.
+Seal-0 targets questions selected for near-zero accuracy among the non-reasoning models used during benchmark construction; Seal-Hard includes a broader collection of difficult questions.
+
+DeepSearchQA (DSQA) (Gupta et al., 2026 [#bib.bib12]):
+DeepSearchQA evaluates multi-step web research through tasks that require assembling complete answer sets from information distributed across sources.
+It tests search planning, evidence aggregation, entity disambiguation, and the ability to determine when sufficient information has been collected.
+We report both full-correct rate and F1 score to assess complete task success and the balance between answer precision and coverage.
+
+H.2 Baseline Details
+
+To evaluate the effectiveness and efficiency of HybridAgent, we compare with 4 categories of methods, including (i) Text-based Agentic Methods, (ii) Latent Reasoning Methods, (iii) Frontier LLM Agents, and (iv) Agentic Frameworks. We describe the implementation details of each baseline below.
+
+(i) Text-based Agentic Methods
+
+Standard Text SFT: We apply standard SFT using the same training data and backbone models as HybridAgent. During evaluation, the models can invoke tools and incorporate the returned observations into subsequent reasoning. We use this baseline mostly to compare with the HybridSFT.
+
+Agentic RL (GRPO/ARPO): We apply commonly adopted agentic RL methods after standard text SFT to further train the text agent baselines. GRPO (Shao et al., 2024 [#bib.bib7]) optimizes the policy using group-normalized rewards from sampled responses without requiring a separate critic. ARPO (Dong et al., 2025b [#bib.bib43]): ARPO combines entropy-guided adaptive rollouts with step-level advantage attribution to improve multi-turn tool use. We train these methods using the same RL training data and backbone models as HybridAgent, primarily to evaluate the effectiveness of HybridRL.
+
+(ii) Latent Reasoning Methods
+
+Coconut (Hao et al., 2024 [#bib.bib28]): Coconut performs continuous latent reasoning by directly feeding the model’s last hidden state back as the next input embedding. A staged training curriculum progressively replaces textual reasoning steps with latent thoughts, teaching the model to reason in continuous space before generating a textual answer.
+
+SoftCoT (Xu et al., 2025b [#bib.bib6]): SoftCoT uses a lightweight frozen assistant model to generate question-dependent soft thought representations, which a trainable projection maps into the target LLM’s representation space. These representations guide subsequent generation, enabling latent reasoning while keeping the assistant and target LLM frozen.
+
+SoftThinking (Zhang et al., 2025 [#bib.bib2]): SoftThinking is a context-based method that represents intermediate reasoning as probability-weighted mixtures of vocabulary embeddings. Feeding these hidden continuous representations back into the model preserves alternatives from the next-token distribution.
+
+We implement all latent reasoning baselines using the same backbone models and, where applicable, training settings and budgets as HybridAgent to ensure a fair comparison.
+
+(iii) Frontier LLM Agents
+
+To evaluate HybridAgent in a broader context, we compare it with current leading closed-source and open-source LLM agents, including GPT-5.6-Luna (OpenAI, 2026 [#bib.bib48]), Kimi-K3 (Team, 2026 [#bib.bib44]), GLM-5.3-Flash (GLM-5-Team and others, 2026 [#bib.bib47]), DeepSeek-V4.1-Flash (DeepSeek-AI, 2026 [#bib.bib46]), and QwQ-32B (Team, 2025 [#bib.bib45]), to assess both performance and inference efficiency of HybridAgent.
+
+(iv) Agentic Frameworks
+
+We further compare HybridAgent with established agentic frameworks that integrate multi-step reasoning with external tool calling and environmental interactions. We apply Qwen3-14B as the backbone for all these frameworks, with the same tool access and usage budgets as HybridAgent.
+
+ReAct (Yao et al., 2023 [#bib.bib49]): ReAct interleaves natural-language reasoning with actions and observations from an external environment. This interaction loop allows an agent to gather information, revise its reasoning, and determine subsequent actions based on tool feedback.
+
+Search-o1 (Li et al., 2025a [#bib.bib50]): Search-o1 augments large reasoning models with adaptive search to address knowledge gaps encountered during reasoning. Its Reason-in-Documents module analyzes retrieved documents and extracts relevant evidence before incorporating it into ongoing reasoning.
+
+WebThinker (Li et al., 2025b [#bib.bib51]): WebThinker equips LLMs with a Deep Web Explorer that supports iterative search, webpage navigation, and information extraction. Its Think-Search-and-Draft strategy interleaves reasoning, evidence collection, and report generation to support complex research tasks.
+
+Overall, these baseline methods provide complementary comparisons across training stages, text-based and latent-space reasoning, and tool-integrated agentic settings.
+
+H.3 Implementation Details
+
+Models and Training Details. We instantiate HybridAgent with Qwen3-Base backbones (Yang et al., 2025a [#bib.bib29]) at three scales of 4B, 8B, and 14B.
+For HybridLink, we use the same two-layer design across all three backbones. The HybridSFT training data is constructed by converting 54K text-only sources (Dong et al., 2025a [#bib.bib8]; Dong et al., 2025b [#bib.bib43]) into hybrid trajectories. We apply format and HybridLink activation for one epoch each, followed by one additional epoch of self-conditioned training. HybridRL training utilizes 12K deep reasoning examples (Yu et al., 2025 [#bib.bib10]) for math and 1K agentic reasoning and search examples (Dong et al., 2025b [#bib.bib43]) for deep search.
+We train HybridAgent with the GRPO objective and set rollout batches of 512 trajectories (64×864\times 8), followed by one optimization pass over 8 minibatches.
+
+Training Hyperparameters. Table 10 [#A8.T10], 11 [#A8.T11], and 12 [#A8.T12] provide detailed parameter setups on HybridSFT and HybridRL. Following Dong et al. (2025b) [#bib.bib43]; Yu et al. (2025) [#bib.bib10], we use HybridAgent checkpoints from deep reasoning training for mathematical evaluations and the checkpoint from agentic search training for knowledge-intensive search and agentic reasoning evaluations, as detailed in Appendix H.1 [#A8.SS1].
+
+Table 10: Hyperparameter Setups of HybridSFT.
+
+Hyperparameter
+Value
+
+Base model
+Qwen3-4B/8B/14B-Base
+
+Maximum sequence length
+16,888
+
+Effective batch size
+16
+
+Backbone learning rate
+7×10−67\times 10^{-6}
+
+HybridLink learning rate (Activation / Self-conditioning)
+2×10−42\times 10^{-4} / 5×10−55\times 10^{-5}
+
+Weight decay
+0.0
+
+Warmup ratio
+0.1
+
+Learning rate scheduler
+Cosine
+
+Latent regression weights (λcos\lambda_{\text{cos}} / λmse\lambda_{\text{mse}})
+1.0 / 0.2
+
+Number of training epochs
+3 (1 / 1 / 1)
+
+Table 11: Hyperparameter Setups of HybridRL on Agentic Search.
+
+Hyperparameter
+Value
+
+Initialization
+8B/14B HybridSFT checkpoint
+
+Unique prompts per rollout batch
+64
+
+Rollouts per prompt (group size)
+8
+
+Minibatches per rollout batch
+8
+
+Optimization epochs per rollout batch
+1
+
+Total rollout batch size
+512 trajectories (6464 ×\times 88)
+
+Optimization per rollout batch
+1 pass over 8 minibatches
+
+Rollout sampling temperature
+1.0
+
+Rollout sampling top-p
+1.0
+
+Reward rcorrectr_{\text{correct}}
+token-level F1 ∈[0,1]\in[0,1]
+
+Reward rformatr_{\text{format}}
+0 / -1
+
+Reward rtoolr_{\text{tool}}
+0.1
+
+Latent steps per latent block (min/max)
+16 / 256
+
+Max tool calls per rollout
+10
+
+Weight decay
+0.01
+
+KL penalty coefficient
+0
+
+Learning rate schedule
+constant
+
+Training steps
+150
+
+Maximum sequence length
+16,888
+
+Backbone learning rate
+1×10−61\times 10^{-6}
+
+Optimizer
+AdamW, β=(0.9, 0.95)\beta=(0.9,\,0.95)
+
+Search API Setup (per call)
+top-10, 1000 characters each
+
+Table 12: Hyperparameter Setups of HybridRL on Deep Reasoning.
+
+Hyperparameter
+Value
+
+Initialization
+4B/8B/14B HybridSFT checkpoint
+
+Unique prompts per rollout batch
+64
+
+Rollouts per prompt (group size)
+8
+
+Minibatches per rollout batch
+8
+
+Optimization epochs per rollout batch
+1
+
+Total rollout batch size
+512 trajectories (64×864\times 8)
+
+Optimization per rollout batch
+1 pass over 8 minibatches
+
+Rollout sampling temperature
+1.0
+
+Rollout sampling top-pp
+1.0
+
+Reward rcorrectr_{\text{correct}}
+Math Verify (00 / 11)
+
+Reward rformatr_{\text{format}}
+00 / −1-1
+
+Reward rtoolr_{\text{tool}}
++0.1+0.1
+
+Latent steps per latent span (min/max)
+16 / 256
+
+Max tool calls per rollout
+5
+
+Weight decay
+0.01
+
+KL penalty coefficient
+0
+
+Learning rate schedule
+Constant
+
+Training steps
+200
+
+Maximum sequence length
+16,888
+
+Backbone learning rate
+1×10−61\times 10^{-6}
+
+Optimizer
+AdamW, β=(0.9, 0.95)\beta=(0.9,\,0.95)
+
+Inference Setups.
+During inference, we set the temperature, top-p, and top-k to 0.6, 0.95, and 20, respectively. The generation budget is adjusted for each task based on its relative difficulty and counts both text tokens and latent steps, with limits of 4,096 for mathematical reasoning and knowledge-intensive search tasks, and 24,000 for challenging agentic reasoning tasks.
+For each latent span, we enforce a minimum of 16 and a maximum of 256 steps to ensure sustained and semantically rich latent reasoning.
+HybridAgent interacts with external environments primarily through two types of tools: a Python interpreter within sandbox environments and a live search engine (e.g., Tavily).
+We cap tool usage at 10 calls per trajectory and retrieve the top 10 snippets for each search query.
+We utilize GPT-5.6-Luna as both the search-page summarizer and LLM judge.
+All training and inference are conducted on 32 H100 GPUs. We also provide detailed prompt templates in Appendix I [#A9].
+
+Infrastructure and Configurations.
+As existing training and inference frameworks such as verl (Sheng et al., 2025 [#bib.bib3]) and vLLM (Kwon et al., 2023 [#bib.bib39]) do not directly support multi-turn hybrid generation, we extend their infrastructure to enable hybrid training and generation in HybridAgent.
+A shared generation loop coordinates text mode, latent mode, and tool interaction while maintaining each trajectory’s persistent KV cache as continuous working memory across turns.
+The agent enters latent mode through the special entry anchor <latent>, feeds HybridLink-generated latent inputs back into the backbone, and returns to text mode when the nearest-token readout matches the exit anchor </latent>, as in Eq. 5 [#S3.E5]. Tool observations are tokenized and processed against the existing working memory, appending new KV entries without reconstructing or re-prefilling earlier context.
+
+The engine also supports batched rollouts with per-sequence state tracking, allowing trajectories to occupy different generation states within the same batch. Pending tool calls execute concurrently, with waiting and completed sequences masked from further generation. Per-sequence attention masks and position tracking preserve each trajectory’s causal context as generation proceeds. For HybridRL, exact latent-context replay recomputes sampled text-token likelihoods in a single differentiable forward pass while keeping recorded latent inputs unchanged. We check rollout–replay agreement of log-probabilities at unchanged policy parameters. Multi-node data parallelism, sharded optimizer states, mixed precision, gradient checkpointing, and resumable checkpoints support full-parameter backbone optimization. Overall, the same engine supports RL rollouts, training-time validation, and downstream evaluation, ensuring consistent mode transitions and working-memory handling across configurable sampling settings, generation budgets, and tool-call setups.
+
+Appendix I Prompt Template
+
+Appendix J Case Study of HybridAgent
+
+ Experimental support, please
+ view the build logs [./2610.18861v1/__stdout.txt]
+ for errors. Generated by
+
+ L
+ A
+ T
+ E
+
+ xml
+
+ [https://math.nist.gov/~BMiller/LaTeXML/].
+
+Instructions for reporting errors
+
+We are continuing to improve HTML versions of papers, and your feedback helps enhance accessibility and mobile
+ support. To report errors in the HTML that will help us improve conversion and rendering, choose any of the
+ methods listed below:
+
+Click the "Report Issue" () button, located in the page header.
+
+Tip: You can select the relevant text first, to include it in your report.
+
+Our team has already identified the following issues [https://github.com/arXiv/html_feedback/issues]. We appreciate your time reviewing and reporting rendering errors we
+ may not have found yet. Your efforts will help us improve the HTML versions for all readers, because disability
+ should not be a barrier to accessing research. Thank you for your continued support in championing open access for
+ all.
+
+Have a free development cycle? Help support accessibility at arXiv! Our collaborators at LaTeXML maintain a list of packages that need conversion [https://github.com/brucemiller/LaTeXML/wiki/Porting-LaTeX-packages-for-LaTeXML], and welcome developer contributions [https://github.com/brucemiller/LaTeXML/issues].
+
+ We gratefully acknowledge support from
+ our major funders,
+ member institutions [https://info.arxiv.org/about/ourmembers.html], ,
+ and all contributors.
+
+ About [https://info.arxiv.org/about]
+ ·
+ Help [https://info.arxiv.org/help]
+ ·
+ Contact [https://info.arxiv.org/help/contact.html]
+ ·
+ Subscribe [https://info.arxiv.org/help/subscribe]
+ ·
+ Copyright [https://info.arxiv.org/help/license/index.html]
+ ·
+ Privacy [https://info.arxiv.org/help/policies/privacy_policy.html]
+ ·
+ Accessibility [https://info.arxiv.org/help/web_accessibility.html]
+ ·
+ Operational Status (opens in new tab) [https://status.arxiv.org]
+
+Major funding support from
+
+ [https://www.simonsfoundation.org/]
+
+ [https://www.sfi.org.bm/]
+
+ [https://www.schmidtsciences.org/]
+
+ [javascript:toggleReadingMode();]

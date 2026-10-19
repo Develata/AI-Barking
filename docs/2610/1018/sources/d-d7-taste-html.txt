@@ -1,0 +1,2674 @@
+Introduction
+
+Report GitHub Issue
+
+ ×
+
+ Title:
+
+Content selection saved. Describe the issue below:
+
+ Description:
+
+ Submit without GitHub
+ Submit in GitHub
+
+ arXiv is now an independent nonprofit!
+ Learn more [https://info.arxiv.org/about]
+ ×
+
+ Back to arXiv
+ [/]
+
+ Why HTML? [https://info.arxiv.org/about/accessible_HTML.html]
+
+ Report Issue [#]
+
+ Back to Abstract
+ [/abs/2609.25804v2]
+
+ Download PDF [/pdf/2609.25804v2]
+
+ [javascript:toggleNavTOC();]
+
+ [javascript:toggleReadingMode();]
+
+Abstract [#abstract1]
+
+1 Introduction [#S1]
+
+2 Measuring Taste via Long-Horizon Judgment [#S2]
+
+3 Taste-Bench [#S3]
+
+3.1 Forks from parallel trajectories [#S3.SS1]
+
+3.2 Forks from detour trajectories [#S3.SS2]
+
+3.3 Mining, filtering, and composition [#S3.SS3]
+
+3.4 Evaluation protocol [#S3.SS4]
+
+4 Experimental Results [#S4]
+
+4.1 Setup [#S4.SS1]
+
+4.2 Accuracy of current models [#S4.SS2]
+
+4.3 Effect of the time horizon [#S4.SS3]
+
+4.4 Effect of the reasoning budget [#S4.SS4]
+
+4.5 Comparison with end-to-end benchmarks [#S4.SS5]
+
+5 Generalizing Taste through Distillation [#S5]
+
+5.1 Distillation recipe [#S5.SS1]
+
+5.2 Transfer to unseen tasks [#S5.SS2]
+
+5.3 End-to-end evaluation [#S5.SS3]
+
+6 Related Work [#S6]
+
+Long-horizon agent evaluation. [#S6.SS0.SSS0.Px1]
+
+Judging research directions before the outcome. [#S6.SS0.SSS0.Px2]
+
+Process evaluation and step-level judgment. [#S6.SS0.SSS0.Px3]
+
+Distillation and internalizing context. [#S6.SS0.SSS0.Px4]
+
+7 Conclusion [#S7]
+
+References [#bib]
+
+A Benchmark Construction Details [#A1]
+
+A.1 Source trajectories [#A1.SS1]
+
+A.2 Statistics of the mined forks [#A1.SS2]
+
+A.3 Prompts of the generator and the judges [#A1.SS3]
+
+A.4 Counts at each stage [#A1.SS4]
+
+B Example Questions [#A2]
+
+C Evaluation Protocol Details [#A3]
+
+D Full Results [#A4]
+
+D.1 Results per model and per cell [#A4.SS1]
+
+D.2 Comparison with SWE-bench Verified [#A4.SS2]
+
+D.3 Time horizon annotation [#A4.SS3]
+
+D.4 Reasoning budget [#A4.SS4]
+
+E Agreement of the Judges [#A5]
+
+F Human Review [#A6]
+
+F.1 Sampling and annotation [#A6.SS1]
+
+G Distillation Details [#A7]
+
+G.1 Recipe [#A7.SS1]
+
+G.2 Folds [#A7.SS2]
+
+G.3 Transfer results [#A7.SS3]
+
+H End-to-End Experiment Details [#A8]
+
+ License: arXiv.org perpetual non-exclusive license
+ [https://info.arxiv.org/help/license/index.html#licenses-available]
+
+arXiv:2609.25804v2 [cs.AI] 23 Sep 2026
+
+Preprint
+
+September 2026
+
+The Tasteful Agent: Measuring and Improving
+
+Taste in Long-Horizon Tasks
+
+Wenbo Pan1,†   
+Zhichao Liu2   
+Shujie Liu3   
+Jingying Zeng3   
+Chin-Yew Lin3
+
+Xianfeng Tang3   
+Yan Lu3   
+Qi He3   
+Xiaohua Jia1
+
+1 City University of Hong Kong  2 Independent Researcher  3 Microsoft
+
+Abstract
+
+LLM agents increasingly work on long-horizon tasks, and the decisions they make along the way, such as which hypothesis to test or which implementation to build on, determine the outcome of the whole run.
+Making these decisions well is becoming a key capability for both engineering and research agents.
+We refer to the ability to make good long-horizon decisions as the taste of an agent.
+While existing benchmarks measure the end-to-end success of agents on long-horizon tasks, none of them measures the taste of an agent.
+To address this problem, we build Taste-Bench, a benchmark of taste questions constructed automatically from trajectories that agents produced in engineering and research tasks.
+Each question presents a decision fork, a point in a trajectory where multiple directions are available and one of them leads to a better outcome, and the evaluated model chooses among these directions without seeing what happens after the fork.
+We mine these forks automatically from parallel attempts at the same task and from detours inside a single trajectory, without needing human annotation.
+We evaluate frontier models on Taste-Bench and find that the best model answers only 59.7% of the questions correctly.
+We further find that forks whose deciding evidence appears later in the trajectory are much harder for every model, and that a larger reasoning budget does not improve the accuracy.
+Finally, we show that taste can be trained.
+We distill the judgment of a teacher that has seen the outcome into a student model, and the student makes better decisions on unseen tasks and improves end-to-end success on held-out SWE-bench Pro tasks.
+
+Introduction
+
+LLM agents increasingly work on long-horizon tasks, and the length of the tasks they can complete keeps increasing [1 [#bib.bib8], 2 [#bib.bib22]].
+For instance, recent systems conduct machine-learning research from idea to paper [3 [#bib.bib14], 4 [#bib.bib15]], evolve large software projects across releases [5 [#bib.bib16]], and refine their own scaffolds during deployment [6 [#bib.bib17]].
+In these tasks, the agent makes many decisions whose influence is not limited to the current step, such as which hypothesis to test, which implementation to build on, or which experiment to run next.
+Making these decisions well is becoming a key capability for agents [7 [#bib.bib18], 8 [#bib.bib19]].
+However, a wrong decision often looks reasonable at the moment, and its cost appears only much later, after the agent has spent a large part of its budget.
+
+We refer to the ability to make good long-horizon decisions as the taste of an agent.
+While previous research has measured the end-to-end performance of agents on long-horizon tasks [9 [#bib.bib7], 10 [#bib.bib1], 11 [#bib.bib2], 12 [#bib.bib6], 13 [#bib.bib5]], these benchmarks only report whether the agent finishes the task and provide no measure of the quality of the decisions made along the way.
+However, measuring these decisions directly is difficult, because the result of a long-horizon decision is not immediately visible, so a good choice and a bad choice can look equally reasonable at the decision point.
+Judging decision quality also requires deep domain expertise, so using human annotation is expensive and hard to scale across new domains.
+This work asks whether the taste of an agent can be measured automatically, without expert annotation.
+
+Figure 1: A decision fork from a machine-learning trajectory. The evaluated model chooses before the later losses reveal that candidate A is the better direction.
+
+Our key observation is that the later part of a trajectory provides hindsight evidence for its earlier decisions.
+In practice, agent systems routinely make several attempts at the same task, and the attempts often diverge into different directions in the middle of the run.
+When this happens, the recorded outcome of each attempt identifies the better direction, so the trajectories themselves provide a labeled comparison.
+We call such a divergence point a decision fork.
+To measure taste automatically, we freeze the trajectory at the fork, hide all later work, and ask a model to choose between the two directions.
+Figure 1 [#S1.F1] shows one such fork from a machine-learning trajectory.
+
+We collect decision forks from both software engineering and machine-learning research trajectories, and we build Taste-Bench, a benchmark of 502 taste questions.
+Each question contains the original task, the trajectory prefix up to the fork, and the two directions at the fork, where the hidden later work identifies the better one.
+The forks are mined in two ways, from parallel trajectories, where independent attempts at the same task diverge, and from detour trajectories, where an agent corrects itself inside a single run, and Section 3 [#S3] describes the two constructions.
+Because the supervision is mined from work that agents already performed, the benchmark scales with the trajectories that agent systems produce.
+We further assess the mined labels through a human review, which shows close agreement with the labels when reviewers identify a better direction after seeing the recorded outcomes.
+
+Our core contributions are summarized as follows:
+
+• 
+
+We formalize the taste of an agent as its ability to choose the better direction at a decision fork, and we show that this ability can be measured from hindsight over existing trajectories.
+
+• 
+
+We build and release Taste-Bench,11
+ 1
+
+ Dataset: https://huggingface.co/datasets/wenbopan/taste-bench [https://huggingface.co/datasets/wenbopan/taste-bench]; 
+
+ Code: https://github.com/wbopan/tastebench [https://github.com/wbopan/tastebench]. a benchmark of such taste questions covering software engineering and machine-learning research, and we show that questions become harder as the time horizon of the fork increases.
+
+• 
+
+We show that taste is trainable.
+Distilling the reasoning of a teacher given the correct direction improves judgments on unseen tasks and produces end-to-end gains on held-out agent tasks.
+
+Measuring Taste via Long-Horizon Judgment
+
+We view taste as a form of long-horizon judgment, where the outcome of the better direction is not visible at decision time and appears only in the later work.
+For instance, a clean implementation passes the same tests as a hasty one at the time of writing, and its advantage appears only when every later change becomes easier.
+Under this view, measuring taste means testing whether the direction a model chooses at decision time is the one whose advantage appears in the later work.
+
+To run this test without expert annotation, we mine hindsight from existing agent trajectories.
+A trajectory records both the judgments made along the way and the later work after them, so we can use the outcome of a trajectory to estimate the quality of its judgments.
+
+However, the outcome of a single trajectory does not directly show whether a judgment was good or bad.
+This is because, besides the judgment, execution quality and the environment also determine the outcome.
+To separate the effect of the judgment from these factors, we look for comparisons across trajectories in which everything except the judgment is the same.
+Such comparisons are common when an agent tries the same task multiple times, because the attempts sometimes share an equivalent prefix up to some point and then diverge into different judgments at that point.
+Such a point is a decision fork, and we refer to the parts of the attempts after the fork as its branches.
+Because the attempts share an equivalent prefix before the fork and sampling randomness assigns the judgments to the branches, the outcomes of the branches differ mainly because of the judgments at the fork.
+The later work on each branch also affects its outcome, so we keep only the forks whose outcomes clearly follow from the judgments, as Section 3 [#S3] describes.
+
+Formally, every decision fork defines one taste question.
+Consider attempts at a task qq that share the trajectory prefix ht=(o0,a0,…,ot)h_{t}=(o_{0},a_{0},\ldots,o_{t}), where oo denotes an observation and aa an action, and diverge into two candidate directions c1c_{1} and c2c_{2} at the fork time tt.
+Each branch ii then runs to completion and produces evidence EiE_{i}, such as test results or research scores, and an outcome measure UU maps this evidence to a scalar.
+Under this setup, a model with good taste picks the candidate with the higher expected outcome 𝔼[U∣ht,ci]\mathbb{E}[U\mid h_{t},c_{i}] before any evidence is available.
+The realized outcomes therefore estimate these expectations under identical conditions, so we label the fork with the supported candidate, the candidate whose branch produces the better outcome,
+
+y=arg⁡maxi∈{1,2}⁡U⁡(Ei).y=\arg\max_{i\in\{1,2\}}U(E_{i}).
+
+(1)
+
+The question is then x=(q,ht,c1,c2)x=(q,h_{t},c_{1},c_{2}), where everything after the fork time tt is hidden from the evaluated model.
+The evaluated model π\pi receives xx and returns one choice π⁡(x)\pi(x), and over a set of questions we estimate its taste T^​(π)\widehat{T}(\pi) as the fraction of questions on which π⁡(x)=y\pi(x)=y.
+
+Taste-Bench
+
+In this section, we apply the hindsight measurement of Section 2 [#S2] to real agent trajectories and present Taste-Bench, a benchmark of 502 taste questions.
+
+Turning a raw trajectory into a question means recovering the task qq, the trajectory prefix hth_{t}, the candidate directions, and the label yy from an unstructured record.
+We recover them through two constructions, one from parallel trajectories and one from detour trajectories.
+Moreover, the two constructions are complementary, because parallel trajectories contain wrong judgments that the agent never notices, while detour trajectories contain wrong judgments that the agent corrects later.
+
+Forks from parallel trajectories
+
+In the first construction, we use parallel trajectories, exactly the situation that Section 2 [#S2] describes, where attempts at the same task diverge at the same fork and the realized outcomes identify the supported candidate.
+In such attempts, the agent does not notice the wrong direction, and the attempt still runs to completion.
+To construct one question, we align a pair of attempts with opposite outcomes at the fork where they diverge.
+The part before the fork is equivalent on both sides and becomes the prefix, and the two directions at the fork, each written as a short neutral description, become the candidates.
+The recorded outcome of each attempt then determines the supported candidate, so the branch that passes the tests or achieves the experimental objective provides the label.
+This construction captures the wrong directions that an agent never notices, and the second construction captures the wrong directions that an agent takes and corrects inside a single trajectory.
+
+Forks from detour trajectories
+
+In the second construction, we use detour trajectories, where an agent corrects itself inside a single run, and the abandoned direction and the later recovery form the two candidates.
+Here, the record itself marks the mistake, because the agent abandons the direction.
+To identify a detour, a generator model reads one complete trajectory together with its outcome, and it locates three events in order: the step where the agent takes a direction, the observed failure that ends this direction, and the step where the agent takes a different direction that completes the task.
+The generator then writes the two directions as two candidates in parallel wording, and it rejects the trajectory when the better direction is only nameable after seeing the failure or when either direction is not a plausible choice at the fork (Appendix A.3 [#A1.SS3]).
+To construct one question, we place the fork at the step right before the agent takes the abandoned direction.
+The part before the fork becomes the prefix, which both candidates then extend, and the generator checks that the prefix does not reveal the failure or the later fix.
+The recorded outcome again determines the supported candidate, because the abandoned direction produces an observed failure and the recovery produces task completion.
+The question therefore tests whether the evaluated model can recognize the failure earlier than the acting agent did.
+
+Figure 2: Construction and filtering of Taste-Bench. The parallel construction contrasts branches of the same task, while the detour construction contrasts an abandoned direction with the later recovery. The filtering stage removes trivial questions, whose answer can be guessed from the wording of the candidates alone, and undecidable questions, whose label is not clearly consistent with the full record of the task.
+
+Mining, filtering, and composition
+
+We mine both kinds of forks from trajectory pools in two domains, and we keep only the forks that form valid questions.
+Figure 2 [#S3.F2] summarizes the pipeline.
+
+Mining. The trajectory pools cover two domains.
+The engineering pool contains 2,677 graded rollouts that we collect by running GPT-5.4 and GPT-5.5 agents on 517 SWE-bench Pro tasks [11 [#bib.bib2]].
+The research pool contains 1,132 agent runs on 47 AI R&D tasks from RE-Bench and the research subset of HCAST [13 [#bib.bib5], 14 [#bib.bib4]], and we download these runs from MALT, the public transcript release of METR [15 [#bib.bib3]].22
+ 2
+
+ https://huggingface.co/datasets/metr-evals/malt-public [https://huggingface.co/datasets/metr-evals/malt-public]
+A generator model reads these trajectories and proposes candidate forks of the two kinds above.
+The generator applies a rubric and keeps only the candidate forks from which a valid question can be extracted, and Appendix A.2 [#A1.SS2] lists the checks of this rubric.
+
+Filtering. A candidate fork that passes the rubric can still fail as a question in two ways.
+(1) Trivial. The answer can be guessed from the wording of the two candidates alone, so the question does not test judgment over the trajectory.
+(2) Undecidable. The recorded outcome is not clearly consistent with the label.
+We remove both kinds with a set of judge models that does not include the generator.
+Each judge first answers the question given only the two candidates without the trajectory, and a question is discarded as trivial when every judge answers it correctly.
+Each judge then reads the full record of the task, the trajectory, and the outcome, and a question is included in the release only when every judge agrees with its label.
+In this way, every released question is answered incorrectly by at least one judge when the trajectory is hidden, and its label is confirmed by every judge when the full record of the task is visible.
+
+Composition. The generator proposes 4,657 candidate forks from the two pools, and 10.8% of them pass all filters.
+We organize the resulting 502 questions in a 2×22\times 2 design that crosses the construction (parallel or detour) with the domain (engineering or research), where engineering provides 390 questions and research provides 112.
+Appendix A.4 [#A1.SS4] gives the counts at each stage per cell.
+
+Human review. We assess the quality of the mined labels through a human review of 100 sampled questions, where two reviewers separately choose a direction for each question, then see summaries of the recorded continuations and outcomes and judge which decision was better.
+We exclude judgments without a clear A/B preference from the agreement analysis.
+Of the 172 explicit A/B judgments, 170 agree with the mined label, yielding 98.8% agreement, and on the 74 questions where both reviewers choose A or B, they agree with each other on 98.6%, with Cohen’s κ=0.973\kappa=0.973{}, and Appendix F [#A6] reports the results for each reviewer.
+
+Evaluation protocol
+
+The questions of Section 3.3 [#S3.SS3] are instances of the question xx defined in Section 2 [#S2], so we present each question to the evaluated model, and the answers over the release estimate the taste T^​(π)\widehat{T}(\pi).
+
+However, two-choice questions suffer from position bias [16 [#bib.bib9]], and merely swapping the order of the two candidates changes the answers of many models.
+To address this, each question is evaluated twice, once in a deterministic seeded order and once in the exact reverse order.
+Throughout the paper, accuracy refers to this estimate, where a question counts as correct only when both orders are answered correctly, so an answer that flips with the order does not count as taste.
+We also report the mean accuracy over the two orders.
+
+Experimental Results
+
+Setup
+
+Models. To measure the taste of current LLM agents, we evaluate 14 contemporary models on the 502 questions of Taste-Bench.
+The models cover the major frontier families, including Claude [17 [#bib.bib23], 18 [#bib.bib24]], GPT [19 [#bib.bib27], 20 [#bib.bib26], 21 [#bib.bib25]], Grok [22 [#bib.bib29], 23 [#bib.bib28]], DeepSeek [24 [#bib.bib30]], GLM [25 [#bib.bib31], 26 [#bib.bib32]], MiniMax [27 [#bib.bib33]], and Mistral [28 [#bib.bib34]], and they all answer under the same interface and token budget.
+
+Reporting. The primary metric is the accuracy defined in Section 3.4 [#S3.SS4], and headline numbers report the Average, the 1:1 mean of the research and engineering subset accuracies.
+Because a question counts as correct only when both orders are answered correctly, the accuracy of random guessing is 25%, the product of one half per order, and a model that always prefers the same position scores 0%.
+
+Accuracy of current models
+
+Figure 3: Model performance on Taste-Bench. The first column reports the Average defined in Section 4 [#S4], followed by the research and engineering subsets. Each column shows the model names again and is sorted independently from highest to lowest within that split. Solid bars show accuracy when both candidate orders are answered correctly. The dotted extension shows the mean accuracy over the two orders. Whiskers show 95% item-bootstrap intervals for the solid-bar endpoint, and the printed values report that endpoint. Unparseable responses count as incorrect.
+
+As Figure 3 [#S4.F3] shows, the models differ widely on Taste-Bench, and none of them is close to solving it.
+Specifically, GPT-5.6 Sol is the best model, with an Average accuracy of 59.7%, and GPT-5.5 is close behind at 59.5%, while the accuracies of the remaining models are widely dispersed below them, with additional variation between the research and engineering subsets.
+
+Across the four cells of the release, detour forks are harder than parallel forks in both domains, and this gap exceeds the gap between the two domains (Appendix D.1 [#A4.SS1]).
+
+Effect of the time horizon
+
+Figure 4: Accuracy by time horizon and by reasoning budget. Each fork is annotated with a time horizon on four levels, from in prefix to more work. Left. The dark line is the mean over the 14 models, with 95% tt-intervals of that mean, and the faint lines show the individual models. Right. Accuracy at the same levels under three reasoning-effort settings per model, where the whisker is the 95% bootstrap interval of one setting of one model.
+
+Forks whose deciding evidence appears late in the trajectory should be harder.
+To turn this intuition into a measurable quantity, we annotate every fork with a time horizon, which is how far into the future an observer at the fork must see before the supported candidate is clearly justified.
+A judge model reads the task, the prefix, the two candidates, and the supported label, and it assigns one of four ordinal levels according to which part of the record justifies the supported candidate: in prefix, where a decisive fact that excludes one candidate is already visible in the prefix, inferable, where no single decisive fact is visible but the hints in the prefix together justify the supported candidate, next step, where the first observation after the fork justifies it, and more work, where the justification requires a completed local check or more substantial later work.
+Appendix D.3 [#A4.SS3] gives the judge prompt and the number of questions per level.
+
+The left panel of Figure 4 [#S4.F4] plots accuracy over the four levels, and accuracy falls on average across models as the time horizon increases.
+Specifically, the mean over the 14 models falls from 62.3% at the in-prefix level to 21.0% at the more-work level, near the 25% score of random guessing.
+
+Effect of the reasoning budget
+
+However, the falling accuracy of Figure 4 [#S4.F4] may be an effect of the reasoning budget, because a model that reasons longer at the fork may predict more of the later work.
+To test this, we rerun Taste-Bench under three reasoning-effort settings for two models, and we keep the questions, the prompt, the token limit, and the protocol of Section 3.4 [#S3.SS4] unchanged, which produces six conditions and 6,024 responses in total across the two models.
+
+The additional reasoning does not change the accuracy.
+Specifically, moving from the lowest to the highest reasoning-effort setting changes the accuracy of GPT-5.6 Sol by −0.2-0.2 points and that of GPT-5.6 Luna by +2.2+2.2 points.
+The right panel of Figure 4 [#S4.F4] repeats the comparison at every time horizon, where the settings of each model overlap at every level.
+
+We also record where the models spend this budget.
+At every setting with reasoning enabled, the two models produce the most reasoning tokens at the more-work level, which is also the level with the lowest accuracy (Appendix D.4 [#A4.SS4]).
+This suggests that the models recognize the hard forks and reason longest on them, and that the deciding evidence at these forks appears only in the later work.
+
+Comparison with end-to-end benchmarks
+
+Figure 5: Taste-Bench against SWE-bench Verified. Each point is one model. The dashed line is the least-squares fit, red points deviate most from it, and the band marks the four highest SWE-bench Verified scores.
+
+Finally, we compare the ranking of Figure 3 [#S4.F3] against an end-to-end agent benchmark, because the taste measurement is useful only when it is not a restatement of end-to-end ability.
+We compare the Average of each model with its public score on SWE-bench Verified [10 [#bib.bib1], 29 [#bib.bib20]], and we take the public scores from the Vals AI leaderboard [30 [#bib.bib21]], which reports every model of Figure 3 [#S4.F3] under one shared harness.
+We exclude three models whose responses are unparsable on more than 9% of the presentations, so 11 models remain in the comparison.
+
+Figure 5 [#S4.F5] shows the comparison, and the two benchmarks are only partly correlated.
+Specifically, the Pearson correlation between the Average and SWE-bench Verified is r=+0.63r=+0.63, so SWE-bench Verified explains R2=0.39R^{2}=0.39 of the variance between the models.
+However, the correlation on the engineering subset is only r=+0.37r=+0.37, although this subset is mined from SWE-bench Pro tasks and is therefore the closest comparison.
+Moreover, the models at the top of SWE-bench Verified are clearly separated on Taste-Bench.
+The four highest models on SWE-bench Verified are within 4.0 points of each other there, while their Averages are 10.7 points apart (Appendix D.2 [#A4.SS2]).
+
+Generalizing Taste through Distillation
+
+The results above show that current models judge these forks poorly.
+We therefore ask whether we can also train taste from the trajectories that measure it.
+The questions of Section 3 [#S3] already contain the needed supervision, because each question contains two candidate directions together with the outcome that determines the supported candidate.
+In this section, we distill this judgment into the weights of a model and test whether it transfers to unseen tasks and improves end-to-end task success (Figure 6 [#S5.F6]).
+Throughout this section, the base model is Qwen3.6-27B, and training updates LoRA adapters [31 [#bib.bib12]].
+
+Figure 6: Overview of distillation and advice injection. Left. We distill the reasoning of a teacher that has seen the supported candidate into a student that sees only the question. Right. At evaluation time, the student’s judgment at each fork is written as advice into the task context, and a fixed executor completes the task independently.
+
+Distillation recipe
+
+Task-disjoint folds. The training pool contains the 390 engineering questions of Section 3 [#S3], split into two task-disjoint folds.
+Each student trains on one fold and is evaluated on the other fold, so no student sees the source task of any evaluation question during training.
+
+Distilling reasoning instead of fitting labels. Fine-tuning directly on the supported labels is the obvious objective, but each question provides a single binary label and no intermediate reasoning, so a model fitted on the labels memorizes the answers without learning the judgment.
+We therefore distill outputs that contain a complete reasoning sequence, which a privileged teacher produces.
+The teacher and the student are the same frozen base model with different contexts.
+The teacher context contains the question together with a demonstration, a short description of the supported candidate.
+Because the teacher already knows the answer, it reliably selects the supported candidate in its freely generated reasoning.
+Training then aligns the same teacher-generated tokens under the student context, which contains only what the benchmark shows an evaluated model, namely the task, the trajectory prefix, and the two shuffled candidates.
+The loss is an SDPO-style token-level distillation with a forward KL [32 [#bib.bib13]], computed over the reasoning tokens and the final choice.
+We compute this KL on continuations sampled from the teacher rather than from the student, and Appendix G.1 [#A7.SS1] explains this choice and the leakage control of the recipe.
+
+Transfer to unseen tasks
+
+Figure 7: Distillation results. Left. On the 390 held-out engineering questions, scored on both orders as in Figure 3 [#S4.F3], the distilled student reaches a higher accuracy than the base model. Whiskers are 95% item-bootstrap intervals, and the dashed line marks the accuracy of GPT-5.6 Sol on the same questions (56.9%). Right. On held-out SWE-bench Pro tasks, the executor’s success rate with student advice reaches most of the upper bound, the dashed bar, where the advice at every fork is correct.
+
+On the training fold, distillation raises the fraction of questions that the student answers correctly in a single order from 48.6% to 92.9%, but this gain does not show whether the student learns the judgment or memorizes the answers, and the task-disjoint evaluation separates the two (Figure 7 [#S5.F7.fig1], left).
+On the held-out fold, we score the student and the base model with the protocol of Section 3.4 [#S3.SS4].
+Under this protocol, the student reaches an accuracy of 47.9% and the base model 30.0%, while the mean accuracy over the two orders rises from 42.7% to 62.4%.
+The student therefore gains 17.9 percentage points on questions from tasks that it never saw in training, so the judgment transfers to unseen tasks.
+Appendix G.3 [#A7.SS3] places the student in the engineering ranking of Figure 3 [#S4.F3] and gives the rule that combines the two orders into one decision per question, which Section 5.3 [#S5.SS3] needs.
+
+End-to-end evaluation
+
+We now let the student advise an agent and measure task success on held-out SWE-bench Pro tasks.
+
+For each held-out task, we write the judgment at each fork as one note of advice, which contains the situation at that fork, the candidate to avoid, and the candidate to take.
+The pipeline of Section 3 [#S3] mined these forks from earlier runs on these tasks, so the advice is available before the new run starts.
+We then place advice into the task context, and a fixed Qwen3.6-27B executor agent completes the task independently of the student.
+
+We evaluate three settings on the same 41 held-out SWE-bench Pro tasks: no advice, correct advice, where the advice at every fork specifies the supported candidate, and student advice, where the distilled student answers the taste question of every fork, and the advice recommends the candidate that the student selects.
+The executor completes the tasks under each setting, and we measure its success rate using the official SWE-bench Pro evaluation.
+
+Figure 7 [#S5.F7.fig1] (right) summarizes the outcomes. With correct advice, the success rate rises from 14.6% to 39.0%, a gain of 24.4 percentage points.
+Because the advice at every fork is correct in this setting, this gain is the upper bound of what the advice can provide.
+
+The student achieves most of this bound: the executor reaches a success rate of 33.7% with student advice, a gain of 19.1 percentage points over no advice.
+Appendix H [#A8] gives the executor configuration and advice format.
+These 41 tasks are unseen during training, so the better judgment of the student also improves task success outside its training distribution.
+
+Related Work
+
+Long-horizon agent evaluation.
+
+AgentBench evaluates multi-step interaction [9 [#bib.bib7]], SWE-bench and SWE-bench Pro evaluate software agents on repository tasks [10 [#bib.bib1], 11 [#bib.bib2]], and MLAgentBench and RE-Bench extend evaluation to ML experimentation and AI R&D [12 [#bib.bib6], 13 [#bib.bib5]].
+These benchmarks test whether an agent completes a long task, whereas Taste-Bench tests whether the agent chooses the better direction inside the task.
+
+Judging research directions before the outcome.
+
+Recent work asks whether a model can judge a research direction before its outcome is known, by predicting which of two ideas performs better [33 [#bib.bib35]], preferring one of two ML solutions before executing them [34 [#bib.bib36]], or choosing the better of two AI-safety research proposals against expert ratings [35 [#bib.bib37]], and judgments of ideas before execution often flip after execution [36 [#bib.bib38]].
+These works judge standalone ideas or solutions, whereas Taste-Bench judges forks inside executed trajectories, so each question carries the situation of the agent and the recorded outcome labels it.
+
+Process evaluation and step-level judgment.
+
+Process supervision scores steps with human labels [37 [#bib.bib10]] or with the outcomes of rollouts from each step [38 [#bib.bib39]].
+For agents, preferences between explored and expert trajectories [39 [#bib.bib40]] and between verified alternatives at critical steps [40 [#bib.bib42]] have trained policies, and a process reward model scores candidate actions at test time [41 [#bib.bib41]].
+Agent-as-a-Judge and AgentRewardBench judge whole trajectories [42 [#bib.bib43], 43 [#bib.bib44]], and Who&When and AgenTracer attribute a failure to its decisive step, which models localize poorly [44 [#bib.bib45], 45 [#bib.bib46]].
+Taste-Bench instead labels the better direction with the outcome the trajectory later records, and the evaluated model chooses before seeing it.
+
+Distillation and internalizing context.
+
+Knowledge distillation trains a student to match a teacher’s output distribution [46 [#bib.bib11]], and context distillation uses the same model conditioned on extra context as the teacher [47 [#bib.bib47], 48 [#bib.bib48]], as do STaR with the correct answer [49 [#bib.bib49]], LEAP with privileged state [50 [#bib.bib50]], and SDPO with environment feedback [32 [#bib.bib13]].
+Our recipe follows SDPO but replaces the feedback with a demonstration of the supported candidate and samples the targets from the teacher rather than from the student [51 [#bib.bib51]], so it transfers in-context judgment into the weights.
+Advisor models similarly steer an executor with advice from a small trained model [52 [#bib.bib52]].
+
+Conclusion
+
+In this work, we study taste, the ability of an agent to choose the better direction before the outcome is visible.
+We show that this ability can be measured from existing trajectories, and we build Taste-Bench, a benchmark of 502 taste questions labeled by recorded outcomes.
+Distilling the reasoning of a teacher given the supported candidate transfers judgment to questions from unseen tasks, and injecting the student’s judgment as advice improves end-to-end success.
+We hope Taste-Bench provides a practical basis for measuring and training the judgment of long-horizon agents.
+
+Reproducibility Statement
+
+All reported results use one fixed version of the benchmark, and the appendix specifies the constructions, the prompts, the handling of over-long trajectories, and the scoring.
+Every figure is generated directly from the recorded results, and every reported run is complete over the released questions.
+For the distillation experiments, we fix the version of the base model, the random seeds, the fold splits, and the inference settings.
+The benchmark is released at https://huggingface.co/datasets/wenbopan/taste-bench [https://huggingface.co/datasets/wenbopan/taste-bench], and the evaluation code, the protocol, and the recorded results of every evaluated model are released at https://github.com/wbopan/tastebench [https://github.com/wbopan/tastebench].
+
+Ethics Statement
+
+The benchmark consists of technical agent trajectories, and a separate human review collects judgments from two reviewers.
+We remove credential strings from the trajectories before sending them to any model.
+Measuring long-horizon judgment has dual-use risk.
+We report aggregate capability results and no domain-specific harmful instructions.
+
+AI Use Statement
+
+We used generative AI tools to assist with synthetic data generation, experimental and methodological design, method implementation, and interpretation of results.
+We also used these tools for translation, language editing, manuscript drafting, figure creation, code editing, and literature searches.
+The authors take full responsibility for the final content of this work.
+The research designs, conclusions, and artifacts introduced in this work are original contributions of the authors.
+
+References
+
+[1]
+T. Kwa, B. West, J. Becker, A. Deng, K. Garcia, M. Hasin, S. Jawhar, M. Kinniment, N. Rush, S. Von Arx, et al. (2025)
+
+Measuring AI ability to complete long software tasks.
+
+In Advances in Neural Information Processing Systems,
+
+Cited by: §1 [#S1.p1.1].
+
+[2]
+METR (2026)
+
+Time Horizon 1.1.
+
+Note: https://metr.org/blog/2026-1-29-time-horizon-1-1/ [https://metr.org/blog/2026-1-29-time-horizon-1-1/]Blog post
+
+Cited by: §1 [#S1.p1.1].
+
+[3]
+C. Lu, C. Lu, R. T. Lange, Y. Yamada, S. Hu, J. Foerster, D. Ha, and J. Clune (2026)
+
+Towards end-to-end automation of AI research.
+
+Nature 651 (8107), pp. 914–919.
+
+External Links: Document [https://dx.doi.org/10.1038/s41586-026-10265-5]
+
+Cited by: §1 [#S1.p1.1].
+
+[4]
+L. Mitchener, A. Yiu, B. Chang, M. Bourdenx, T. Nadolski, et al. (2025)
+
+Kosmos: an AI scientist for autonomous discovery.
+
+arXiv preprint arXiv:2511.02824.
+
+Cited by: §1 [#S1.p1.1].
+
+[5]
+T. Le, M. V. T. Thai, D. Nguyen Manh, H. Phan Nhat, and N. D. Q. Bui (2025)
+
+SWE-EVO: benchmarking coding agents in long-horizon software evolution scenarios.
+
+arXiv preprint arXiv:2512.18470.
+
+Cited by: §1 [#S1.p1.1].
+
+[6]
+C. S. Xia, Z. Wang, Y. Yang, Y. Wei, et al. (2025)
+
+Live-SWE-agent: can software engineering agents self-evolve on the fly?.
+
+arXiv preprint arXiv:2511.13646.
+
+Cited by: §1 [#S1.p1.1].
+
+[7]
+A. Novikov, N. Vũ, M. Eisenberger, E. Dupont, P. Huang, A. Z. Wagner, et al. (2025)
+
+AlphaEvolve: a coding agent for scientific and algorithmic discovery.
+
+arXiv preprint arXiv:2506.13131.
+
+Cited by: §1 [#S1.p1.1].
+
+[8]
+J. Zhang, S. Hu, C. Lu, R. Lange, and J. Clune (2026)
+
+Darwin Gödel machine: open-ended evolution of self-improving agents.
+
+In International Conference on Learning Representations,
+
+Cited by: §1 [#S1.p1.1].
+
+[9]
+X. Liu, H. Yu, H. Zhang, Y. Xu, X. Lei, H. Lai, Y. Gu, H. Ding, K. Men, K. Yang, et al. (2024)
+
+AgentBench: evaluating LLMs as agents.
+
+In International Conference on Learning Representations,
+
+Cited by: §1 [#S1.p2.1],
+§6 [#S6.SS0.SSS0.Px1.p1.1].
+
+[10]
+C. E. Jimenez, J. Yang, A. Wettig, S. Yao, K. Pei, O. Press, and K. Narasimhan (2024)
+
+SWE-bench: can language models resolve real-world GitHub issues?.
+
+In International Conference on Learning Representations,
+
+Cited by: §1 [#S1.p2.1],
+§4.5 [#S4.SS5.p1.1],
+§6 [#S6.SS0.SSS0.Px1.p1.1].
+
+[11]
+X. Deng, J. Da, E. Pan, Y. Y. He, C. Ide, K. Garg, N. Lauffer, A. Park, C. Rane, K. Sampath, et al. (2026)
+
+SWE-Bench Pro: can AI agents solve long-horizon software engineering tasks?.
+
+In International Conference on Machine Learning,
+
+Cited by: §A.1 [#A1.SS1.p1.1],
+§1 [#S1.p2.1],
+§3.3 [#S3.SS3.p2.1],
+§6 [#S6.SS0.SSS0.Px1.p1.1].
+
+[12]
+Q. Huang, J. Vora, P. Liang, and J. Leskovec (2024)
+
+MLAgentBench: evaluating language agents on machine learning experimentation.
+
+In International Conference on Machine Learning,
+
+Cited by: §1 [#S1.p2.1],
+§6 [#S6.SS0.SSS0.Px1.p1.1].
+
+[13]
+H. Wijk, T. Lin, J. Becker, S. Jawhar, N. Parikh, T. Broadley, L. Chan, M. Chen, J. Clymer, J. Dhyani, et al. (2025)
+
+RE-Bench: evaluating frontier AI R&D capabilities of language model agents against human experts.
+
+In International Conference on Machine Learning,
+
+Cited by: §1 [#S1.p2.1],
+§3.3 [#S3.SS3.p2.1],
+§6 [#S6.SS0.SSS0.Px1.p1.1].
+
+[14]
+D. Rein, J. Becker, A. Deng, S. Nix, C. Canal, D. O’Connel, P. Arnott, R. Bloom, T. Broadley, K. Garcia, et al. (2025)
+
+HCAST: human-calibrated autonomy software tasks.
+
+arXiv preprint arXiv:2503.17354.
+
+Cited by: §3.3 [#S3.SS3.p2.1].
+
+[15]
+N. Parikh and H. Wijk (2025)
+
+MALT: a dataset of natural and prompted behaviors that threaten eval integrity.
+
+Note: https://metr.org/blog/2025-10-14-malt-dataset-of-natural-and-prompted-behaviors/ [https://metr.org/blog/2025-10-14-malt-dataset-of-natural-and-prompted-behaviors/]
+
+Cited by: §A.1 [#A1.SS1.p2.1],
+§3.3 [#S3.SS3.p2.1].
+
+[16]
+L. Shi, C. Ma, W. Liang, X. Diao, W. Ma, and S. Vosoughi (2025)
+
+Judging the judges: a systematic study of position bias in LLM-as-a-judge.
+
+In Proceedings of the 14th International Joint Conference on Natural Language Processing and the 4th Conference of the Asia-Pacific Chapter of the Association for Computational Linguistics,
+
+pp. 292–314.
+
+Cited by: §3.4 [#S3.SS4.p2.1].
+
+[17]
+Anthropic (2026)
+
+System card: Claude Opus 5.
+
+Note: https://www.anthropic.com/claude-opus-5-system-card [https://www.anthropic.com/claude-opus-5-system-card]
+
+Cited by: §4.1 [#S4.SS1.p1.1].
+
+[18]
+Anthropic (2026)
+
+System card: Claude Sonnet 5.
+
+Note: https://www.anthropic.com/claude-sonnet-5-system-card [https://www.anthropic.com/claude-sonnet-5-system-card]
+
+Cited by: §4.1 [#S4.SS1.p1.1].
+
+[19]
+OpenAI (2026)
+
+Introducing GPT-5.4 mini and nano.
+
+Note: https://openai.com/index/introducing-gpt-5-4-mini-and-nano/ [https://openai.com/index/introducing-gpt-5-4-mini-and-nano/]
+
+Cited by: §4.1 [#S4.SS1.p1.1].
+
+[20]
+OpenAI (2026)
+
+GPT-5.5 system card.
+
+Note: https://openai.com/index/gpt-5-5-system-card/ [https://openai.com/index/gpt-5-5-system-card/]
+
+Cited by: §4.1 [#S4.SS1.p1.1].
+
+[21]
+OpenAI (2026)
+
+GPT-5.6 system card.
+
+Note: https://deploymentsafety.openai.com/gpt-5-6 [https://deploymentsafety.openai.com/gpt-5-6]
+
+Cited by: §4.1 [#S4.SS1.p1.1].
+
+[22]
+xAI (2026)
+
+Grok 4.20 Reasoning.
+
+Note: https://docs.x.ai/developers/models/grok-4.20-reasoning [https://docs.x.ai/developers/models/grok-4.20-reasoning]Model documentation
+
+Cited by: §4.1 [#S4.SS1.p1.1].
+
+[23]
+xAI (2026)
+
+Model card: Grok 4.5.
+
+Note: https://media.x.ai/v1/website/4p5-5184fdf9.pdf [https://media.x.ai/v1/website/4p5-5184fdf9.pdf]
+
+Cited by: §4.1 [#S4.SS1.p1.1].
+
+[24]
+DeepSeek-AI (2026)
+
+DeepSeek-V4: towards highly efficient million-token context intelligence.
+
+arXiv preprint arXiv:2606.19348.
+
+Cited by: §4.1 [#S4.SS1.p1.1].
+
+[25]
+GLM-5 Team (2026)
+
+GLM-5: from vibe coding to agentic engineering.
+
+arXiv preprint arXiv:2602.15763.
+
+Cited by: §4.1 [#S4.SS1.p1.1].
+
+[26]
+Z.ai (2026)
+
+GLM-5.2: built for long-horizon tasks.
+
+Note: https://z.ai/blog/glm-5.2 [https://z.ai/blog/glm-5.2]
+
+Cited by: §4.1 [#S4.SS1.p1.1].
+
+[27]
+MiniMax (2026)
+
+MiniMax M3: frontier coding, 1M context, native multimodality—all in one model.
+
+Note: https://www.minimax.io/blog/minimax-m3 [https://www.minimax.io/blog/minimax-m3]
+
+Cited by: §4.1 [#S4.SS1.p1.1].
+
+[28]
+Mistral AI (2026)
+
+Mistral Medium 3.5.
+
+Note: https://docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04 [https://docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04]Model card
+
+Cited by: §4.1 [#S4.SS1.p1.1].
+
+[29]
+N. Chowdhury J. Aung et al. (2024)
+
+Introducing SWE-bench Verified.
+
+Note: OpenAI blog, https://openai.com/index/introducing-swe-bench-verified/ [https://openai.com/index/introducing-swe-bench-verified/]
+
+Cited by: §4.5 [#S4.SS5.p1.1].
+
+[30]
+Vals AI (2026)
+
+SWE-bench Verified leaderboard.
+
+Note: https://www.vals.ai/benchmarks/swebench [https://www.vals.ai/benchmarks/swebench]
+
+Cited by: §4.5 [#S4.SS5.p1.1].
+
+[31]
+E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, and W. Chen (2022)
+
+LoRA: low-rank adaptation of large language models.
+
+In International Conference on Learning Representations,
+
+Cited by: §5 [#S5.p1.1].
+
+[32]
+J. Hübotter, F. Lübeck, L. Behric, A. Baumann, M. Bagatella, D. Marta, I. Hakimi, I. Shenfeld, T. Kleine Buening, C. Guestrin, and A. Krause (2026)
+
+Reinforcement learning via self-distillation.
+
+In International Conference on Machine Learning,
+
+Cited by: §5.1 [#S5.SS1.p2.1],
+§6 [#S6.SS0.SSS0.Px4.p1.1].
+
+[33]
+J. Wen, C. Si, Y. Chen, H. He, and S. Feng (2025)
+
+Predicting empirical AI research outcomes with language models.
+
+In Advances in Neural Information Processing Systems,
+
+Cited by: §6 [#S6.SS0.SSS0.Px2.p1.1].
+
+[34]
+J. Zheng, J. Zhang, Y. Luo, Y. Mao, Y. Gao, L. Du, H. Chen, and N. Zhang (2026)
+
+Can we predict before executing machine learning agents?.
+
+In Proceedings of the 64th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers),
+
+pp. 3941–3974.
+
+Cited by: §6 [#S6.SS0.SSS0.Px2.p1.1].
+
+[35]
+H. Baig, H. Joren, and J. Benton (2026)
+
+TASTE: can AI models judge AI safety research proposals?.
+
+Note: Anthropic Alignment Science Blog, https://alignment.anthropic.com/2026/taste/ [https://alignment.anthropic.com/2026/taste/]
+
+Cited by: §6 [#S6.SS0.SSS0.Px2.p1.1].
+
+[36]
+C. Si, T. Hashimoto, and D. Yang (2026)
+
+The ideation-execution gap: execution outcomes of LLM-generated versus human research ideas.
+
+In International Conference on Learning Representations,
+
+Cited by: §6 [#S6.SS0.SSS0.Px2.p1.1].
+
+[37]
+H. Lightman, V. Kosaraju, Y. Burda, H. Edwards, B. Baker, T. Lee, J. Leike, J. Schulman, I. Sutskever, and K. Cobbe (2024)
+
+Let’s verify step by step.
+
+In International Conference on Learning Representations,
+
+Cited by: §6 [#S6.SS0.SSS0.Px3.p1.1].
+
+[38]
+P. Wang, L. Li, Z. Shao, R. Xu, D. Dai, Y. Li, D. Chen, Y. Wu, and Z. Sui (2024)
+
+Math-shepherd: verify and reinforce LLMs step-by-step without human annotations.
+
+In Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics,
+
+Cited by: §6 [#S6.SS0.SSS0.Px3.p1.1].
+
+[39]
+Y. Song, D. Yin, X. Yue, J. Huang, S. Li, and B. Y. Lin (2024)
+
+Trial and error: exploration-based trajectory optimization of LLM agents.
+
+In Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics,
+
+Cited by: §6 [#S6.SS0.SSS0.Px3.p1.1].
+
+[40]
+M. Li, Q. Zeng, T. Fang, Z. Liang, L. Song, Q. Liu, H. Mi, and D. Yu (2026)
+
+Verified critical step optimization for LLM agents.
+
+In Findings of the Association for Computational Linguistics: ACL 2026,
+
+Cited by: §6 [#S6.SS0.SSS0.Px3.p1.1].
+
+[41]
+H. Chae, S. Kim, J. Cho, S. Kim, S. Moon, G. Hwangbo, D. Lim, M. Kim, Y. Hwang, M. Gwak, et al. (2025)
+
+Web-shepherd: advancing PRMs for reinforcing web agents.
+
+In Advances in Neural Information Processing Systems,
+
+Cited by: §6 [#S6.SS0.SSS0.Px3.p1.1].
+
+[42]
+M. Zhuge, C. Zhao, D. R. Ashley, W. Wang, D. Khizbullin, Y. Xiong, Z. Liu, E. Chang, R. Krishnamoorthi, Y. Tian, Y. Shi, V. Chandra, and J. Schmidhuber (2025)
+
+Agent-as-a-judge: evaluate agents with agents.
+
+In International Conference on Machine Learning,
+
+Cited by: §6 [#S6.SS0.SSS0.Px3.p1.1].
+
+[43]
+X. H. Lù, A. Kazemnejad, N. Meade, A. Patel, D. Shin, A. Zambrano, K. Stańczak, P. Shaw, C. J. Pal, and S. Reddy (2025)
+
+AgentRewardBench: evaluating automatic evaluations of web agent trajectories.
+
+In Conference on Language Modeling,
+
+Cited by: §6 [#S6.SS0.SSS0.Px3.p1.1].
+
+[44]
+S. Zhang, M. Yin, J. Zhang, J. Liu, Z. Han, J. Zhang, B. Li, C. Wang, H. Wang, Y. Chen, and Q. Wu (2025)
+
+Which agent causes task failures and when? on automated failure attribution of LLM multi-agent systems.
+
+In International Conference on Machine Learning,
+
+Cited by: §6 [#S6.SS0.SSS0.Px3.p1.1].
+
+[45]
+G. Zhang, J. Wang, J. Chen, W. Zhou, K. Wang, and S. Yan (2026)
+
+AgenTracer: who is inducing failure in the LLM agentic systems?.
+
+In International Conference on Learning Representations,
+
+Cited by: §6 [#S6.SS0.SSS0.Px3.p1.1].
+
+[46]
+G. Hinton, O. Vinyals, and J. Dean (2015)
+
+Distilling the knowledge in a neural network.
+
+arXiv preprint arXiv:1503.02531.
+
+Cited by: §6 [#S6.SS0.SSS0.Px4.p1.1].
+
+[47]
+A. Askell, Y. Bai, A. Chen, D. Drain, D. Ganguli, T. Henighan, A. Jones, N. Joseph, B. Mann, N. DasSarma, et al. (2021)
+
+A general language assistant as a laboratory for alignment.
+
+arXiv preprint arXiv:2112.00861.
+
+Cited by: §6 [#S6.SS0.SSS0.Px4.p1.1].
+
+[48]
+C. Snell, D. Klein, and R. Zhong (2022)
+
+Learning by distilling context.
+
+arXiv preprint arXiv:2209.15189.
+
+Cited by: §6 [#S6.SS0.SSS0.Px4.p1.1].
+
+[49]
+E. Zelikman, Y. Wu, J. Mu, and N. D. Goodman (2022)
+
+STaR: bootstrapping reasoning with reasoning.
+
+In Advances in Neural Information Processing Systems,
+
+Cited by: §6 [#S6.SS0.SSS0.Px4.p1.1].
+
+[50]
+S. Choudhury and P. Sodhi (2025)
+
+Better than your teacher: LLM agents that learn from privileged AI feedback.
+
+In International Conference on Learning Representations,
+
+Cited by: §6 [#S6.SS0.SSS0.Px4.p1.1].
+
+[51]
+R. Agarwal, N. Vieillard, Y. Zhou, P. Stanczyk, S. Ramos, M. Geist, and O. Bachem (2024)
+
+On-policy distillation of language models: learning from self-generated mistakes.
+
+In International Conference on Learning Representations,
+
+Cited by: §6 [#S6.SS0.SSS0.Px4.p1.1].
+
+[52]
+P. Asawa, A. Zhu, A. O’Neill, M. Zaharia, A. G. Dimakis, and J. E. Gonzalez (2026)
+
+How to train your advisor: steering black-box LLMs with advisor models.
+
+In International Conference on Machine Learning,
+
+Cited by: §6 [#S6.SS0.SSS0.Px4.p1.1].
+
+Appendix A Benchmark Construction Details
+
+This appendix supplements Section 3 [#S3] with the source data, the statistics of the mined forks, the prompts of the generator and the judges, and the counts at each stage of the construction.
+
+Source trajectories
+
+The engineering trajectories are taken from our own coding-agent runs on SWE-bench Pro [11 [#bib.bib2]].
+Specifically, the pool contains 2,677 graded rollouts on 517 tasks from 11 repositories, produced by GPT-5.4 and GPT-5.5 agents in 31 runs between April and July 2026.
+The test result of each attempt is recorded, and both constructions draw from this pool.
+
+The research trajectories are taken from MALT, the public transcript release of METR [15 [#bib.bib3]].
+We keep only the runs whose native score is recorded.
+The remaining pool contains 1,132 runs on 47 tasks from RE-Bench and the research subset of HCAST, and the trajectories are produced by Claude 3.5 Sonnet, Claude 3.7 Sonnet, Claude Sonnet 4, Claude Opus 4, and DeepSeek V3 agents.
+From this pool, the detour construction takes 896 trajectories in a first pass and 437 further trajectories in a second pass as input, and the parallel construction takes 600 pairs of attempts with opposite outcomes as input, which remain from 905 candidate pairs after we exclude pairs whose scores are not comparable or whose combined transcript exceeds the generator context.
+
+Statistics of the mined forks
+
+Parallel trajectories. The pairs of attempts are formed within a task between one passing attempt and one failing attempt, with at most eight pairs per task, and attempts by the same model under the same reasoning setting are paired first.
+The generator then reads both attempts in full and locates the decision point in each of them, so the two candidates describe the actual actions of the two attempts at comparable points.
+The prefix of the question is the part of the supported attempt before its decision point.
+In the released engineering cell, 111 of 124 pairs contrast two attempts by the same model, and the remaining 13 pairs contrast a GPT-5.5 attempt with a GPT-5.4 attempt.
+In the research cell, all 48 pairs contrast two attempts by the same model.
+
+Detour trajectories. The fork is placed at the step right before the agent takes the abandoned direction.
+To locate it, the generator must cite four excerpts from the trajectory in order: the step where the agent commits to the abandoned direction, the observed failure after which the agent abandons it, the step where the agent commits to the recovery, and the evidence that the recovery succeeds.
+Each excerpt must appear verbatim in the cited step, the four steps must appear in this order, and the cited failure must contain a failure signal such as a non-zero exit code or an error message.
+These three checks run mechanically after generation, and a candidate fork that fails any of them is discarded.
+
+Prefix length. Table 1 [#A1.T1] reports the size of the released questions.
+The prefix of a question is rendered from the trajectory steps before the fork, and Appendix C [#A3] describes the rendering.
+
+Table 1: Size of the released questions per cell. Steps is the number of trajectory steps before the fork, and words is the number of words in one candidate.
+
+Cell
+Questions
+Tasks
+Trajectories
+Steps (median)
+Steps (10th–90th)
+Words (median)
+
+Parallel engineering
+124
+62
+120
+35
+21–57
+38
+
+Parallel research
+48
+8
+32
+56
+6–132
+27
+
+Detour engineering
+266
+133
+266
+47
+24–71
+23
+
+Detour research
+64
+22
+64
+30
+3–81
+22
+
+Prompts of the generator and the judges
+
+The generator is GPT-5.6 Sol at high reasoning effort.
+It receives one prompt per candidate fork and returns one JSON object, and the two constructions use different prompts.
+The parallel prompt receives the task, the outcome of each attempt, and the two complete attempts.
+The detour prompt receives the task, the outcome of the run, and the complete trajectory.
+Both prompts end with the requirements that the main text calls the rubric.
+
+⬇ [data:text/plain;base64,WW91IGJ1aWxkIHBhcmFsbGVsIGp1ZGdtZW50IGJlbmNobWFyayBpdGVtcyBmcm9tIHJlYWwgYWdlbnQgdHJhamVjdG9yaWVzLiBSZXR1cm4gb25lIEpTT04gb2JqZWN0IG9ubHkuIEdyb3VuZCBldmVyeSBkZWNpc2lvbiBwb2ludCBhbmQgb3B0aW9uIGluIHRoZSBzdXBwbGllZCB0cmFqZWN0b3JpZXMuIERvIG5vdCBpbnZlbnQgZ3JhZGVyIGV2aWRlbmNlIG9yIHVzZSBwcmlvciBiZW5jaG1hcmsgbGFiZWxzLiBUcmVhdCByZWplY3Rpb24gYXMgYSBjb3JyZWN0IGFuZCBwcmVmZXJyZWQgcmVzdWx0IHdoZW5ldmVyIGEgY2xlYW4gY2F1c2FsIGZvcmsgY2Fubm90IGJlIGRlbW9uc3RyYXRlZCBmcm9tIGV4YWN0IHBvc3QtZGVjaXNpb24gZXZpZGVuY2Uu]
+
+You build parallel judgment benchmark items from real agent trajectories. Return one JSON object only. Ground every decision point and option in the supplied trajectories. Do not invent grader evidence or use prior benchmark labels. Treat rejection as a correct and preferred result whenever a clean causal fork cannot be demonstrated from exact post-decision evidence.
+
+⬇ [data:text/plain;base64,IyBHb2FsCgpGaW5kIG9uZSBnZW51aW5lIGRlY2lzaW9uIGZvcmsgd2hlcmUgdGhlIGJyYW5jaCB3aXRoIHRoZSBiZXR0ZXIgbmF0aXZlIG91dGNvbWUgbWFkZSBhCmJldHRlciB0YXNrLXNvbHZpbmcgZGVjaXNpb24gdGhhbiB0aGUgd29yc2UgYnJhbmNoLiBMb2NhdGUgdGhlIGRlY2lzaW9uIGluIHRoZSByYXcKdHJhamVjdG9yaWVzIGFuZCB3cml0ZSB0d28gbmV1dHJhbCwgcGFyYWxsZWwgY2FuZGlkYXRlIG5leHQgc3RlcHMuCgpSZWplY3QgdGhlIGNhbmRpZGF0ZSBpZiB0aGUgb3V0Y29tZSBkaWZmZXJlbmNlIGlzIG1vc3RseSBhIHR5cG8sIGNyYXNoLCBsdWNrLCBtaXNzaW5nCmRlcGVuZGVuY3ksIG9yIGdlbmVyaWMgZXhlY3V0aW9uIHF1YWxpdHkgcmF0aGVyIHRoYW4gdGhlIGNob3NlbiBhcHByb2FjaC4KCiMgVGFzawp7cXVlcnl9CgojIE91dGNvbWUgaW50ZXJwcmV0YXRpb24Ke291dGNvbWVfc3RhbmRhcmR9CgojIEJyYW5jaGVzCgp7YnJhbmNoZXN9CgojIFJlcXVpcmVkIEpTT04KClJldHVybiBleGFjdGx5IG9uZSBvYmplY3Qgd2l0aDoKewogICJpc19nb29kX3NhbXBsZSI6IHRydWUgb3IgZmFsc2UsCiAgInJlYXNvbiI6ICJicmllZiBvdXRjb21lLWdyb3VuZGVkIHJlYXNvbiIsCiAgInF1ZXJ5IjogInNlbGYtY29udGFpbmVkIHRhc2sgc3RhdGVtZW50IHByZXNlcnZpbmcgaW1wb3J0YW50IGNvbnN0cmFpbnRzIiwKICAiZ29vZF90cmFqIjogInRyYWplY3RvcnkgaWQgb2YgdGhlIHBhc3NpbmcgYnJhbmNoIiwKICAiYmFkX3RyYWoiOiAidHJhamVjdG9yeSBpZCBvZiB0aGUgc2VsZWN0ZWQgZmFpbGluZyBicmFuY2giLAogICJnb29kX3N0YXJ0X3N0ZXAiOiBpbnRlZ2VyIHBvc2l0aW9uIGltbWVkaWF0ZWx5IGJlZm9yZSB0aGUgZ29vZCBicmFuY2ggY29tbWl0cywKICAiYmFkX3N0YXJ0X3N0ZXAiOiBpbnRlZ2VyIHBvc2l0aW9uIGltbWVkaWF0ZWx5IGJlZm9yZSB0aGUgYmFkIGJyYW5jaCBjb21taXRzLAogICJnb29kX2Nob2ljZSI6ICIxLTMgc2VudGVuY2UgbmV1dHJhbCBuZXh0IHN0ZXAiLAogICJiYWRfY2hvaWNlIjogIjEtMyBzZW50ZW5jZSBuZXV0cmFsIG5leHQgc3RlcCIsCiAgImV2aWRlbmNlIjogewogICAgImdvb2RfYWN0aW9uIjogeyJzdGVwIjogaW50ZWdlciwgInF1b3RlIjogImV4YWN0IGV4Y2VycHQgZnJvbSB0aGF0IHN0ZXAifSwKICAgICJiYWRfYWN0aW9uIjogeyJzdGVwIjogaW50ZWdlciwgInF1b3RlIjogImV4YWN0IGV4Y2VycHQgZnJvbSB0aGF0IHN0ZXAifSwKICAgICJnb29kX3Bvc3RfZGVjaXNpb24iOiBbCiAgICAgIHsic3RlcCI6IGludGVnZXIsICJxdW90ZSI6ICJleGFjdCBleGNlcnB0IHNob3dpbmcgYSBjb25zZXF1ZW5jZSBvciByZXN1bHQifQogICAgXSwKICAgICJiYWRfcG9zdF9kZWNpc2lvbiI6IFsKICAgICAgeyJzdGVwIjogaW50ZWdlciwgInF1b3RlIjogImV4YWN0IGV4Y2VycHQgc2hvd2luZyBhIGNvbnNlcXVlbmNlIG9yIHJlc3VsdCJ9CiAgICBdCiAgfQp9CgpSZXF1aXJlbWVudHM6Ci0gZ29vZF90cmFqIG11c3QgYmUgdGhlIGJyYW5jaCB3aXRoIHRoZSBiZXR0ZXIgc3VwcGxpZWQgb3V0Y29tZTsgYmFkX3RyYWogdGhlIHdvcnNlIG9uZS4KLSBTdGVwIHBvc2l0aW9ucyBtdXN0IGJlIHdpdGhpbiB0aGVpciBjb3JyZXNwb25kaW5nIHRyYWplY3RvcmllcyBhbmQgYmVmb3JlIGNvbW1pdG1lbnQuCi0gQm90aCBjaG9pY2VzIG11c3QgYWRkcmVzcyB0aGUgc2FtZSBpbW1lZGlhdGUgc3VicHJvYmxlbSBmcm9tIGNvbXBhcmFibGUgZGVjaXNpb24gcG9pbnRzLgotIFRoZSBldmlkZW5jZSB0aGF0IGRpc3Rpbmd1aXNoZXMgdGhlIGNob2ljZXMgbXVzdCBvY2N1ciBhZnRlciB0aGUgcHJvcG9zZWQgZGVjaXNpb24gcG9pbnRzLgogIElmIHRoZSBiZXR0ZXIgb3B0aW9uIGlzIGFscmVhZHkgaWRlbnRpZmlhYmxlIGZyb20gcHJlLWRlY2lzaW9uIGRpZmZlcmVuY2VzLCByZWplY3QgdGhlIHNhbXBsZS4KLSBUaGUgcHJlZml4IGZyb20gZ29vZF90cmFqIGJlZm9yZSBnb29kX3N0YXJ0X3N0ZXAgbXVzdCBjb250YWluIGVub3VnaCB0YXNrIGNvbnRleHQuCi0gUHJlc2VydmUgaW1wb3J0YW50IHRhc2sgY29uc3RyYWludHMgaW4gcXVlcnkgZXZlbiBpZiB0aGV5IGFwcGVhciBlYXJseSBpbiBhIHRyYW5zY3JpcHQuCi0gQ2hvaWNlcyBtdXN0IGRlc2NyaWJlIHRoZSBhY3R1YWwgYnJhbmNoIGRlY2lzaW9ucywgYXQgdGhlIHNhbWUgc3BlY2lmaWNpdHkgYW5kIHRvbmUuCi0gRG8gbm90IG1lbnRpb24gc2NvcmVzLCBwYXNzL2ZhaWwsIGdyYWRlciByZXN1bHRzLCBicmFuY2ggbmFtZXMsIG9yIGhpbmRzaWdodCBpbiBjaG9pY2VzLgotIERvIG5vdCBwdXQgYSBicmFuY2gncyBzZWxmLXJlcG9ydGVkIG9yIHByZWRpY3RlZCB0YXJnZXQgbWV0cmljIGluIGEgY2hvaWNlIHdoZW4gaXRzCiAgZGlyZWN0aW9uIG1ha2VzIHRoYXQgY2hvaWNlIG1lY2hhbmljYWxseSBwcmVmZXJhYmxlIChmb3IgZXhhbXBsZSwgbWVyZWx5IGNsYWltaW5nIGEKICBsb3dlciBwcmVkaWN0ZWQgbG9zcykuIERlc2NyaWJlIHRoZSBkZWNpc2lvbiBwcm9jZWR1cmUgb3IgY29udHJvbGxhYmxlIGFjdGlvbiBpbnN0ZWFkLgotIERvIG5vdCB1c2UgcHJhaXNlLCBibGFtZSwgY29uZmlkZW5jZSwgY2F1dGlvbiwgb3Igb3RoZXIgd29yZGluZyB0aGF0IG1ha2VzIG9uZSBvcHRpb24gYW4KICBvYnZpb3VzIHN0cmF3bWFuLiBJZiBuZXV0cmFsIHBhcmFsbGVsIHdvcmRpbmcgaXMgbm90IHBvc3NpYmxlLCByZWplY3QgdGhlIHNhbXBsZS4KLSBJbiByZWFzb24sIGlkZW50aWZ5IHRoZSBwb3N0LWRlY2lzaW9uIHRyYWplY3RvcnkgZXZpZGVuY2UgY29ubmVjdGluZyB0aGUgZGVjaXNpb24gdG8gdGhlCiAgbmF0aXZlIG91dGNvbWUuIElmIHRoZSBvdXRjb21lIGdhcCBpcyBub3QgY2F1c2FsbHkgYXR0cmlidXRhYmxlIHRvIHRoZSBkZWNpc2lvbiwgcmVqZWN0LgotIFJlY29uc3RydWN0IHRoZSB0aW1lbGluZSBiZWZvcmUgYWNjZXB0aW5nLiBBIHNjb3JlIG9yIGFydGlmYWN0IHRoYXQgYWxyZWFkeSBleGlzdGVkCiAgYmVmb3JlIHRoZSBwcm9wb3NlZCBjdXQgY2Fubm90IGJlIGNyZWRpdGVkIHRvIHRoZSBwcm9wb3NlZCBuZXh0IHN0ZXAuCi0gVGhlIHByb3Bvc2VkIGFjdGlvbiBtdXN0IGJlIG5ldyBhdCB0aGUgY3V0LiBSZWplY3QgaWYgdGhlIHNhbWUgYWN0aW9uIHdhcyBhbHJlYWR5CiAgZXhlY3V0ZWQgYmVmb3JlIHRoZSBjdXQsIG9yIGlmIGNpdGVkIHBvc3QtZGVjaXNpb24gZXZpZGVuY2UgcmVwZWF0cyBldmlkZW5jZSBhbHJlYWR5CiAgcHJlc2VudCBiZWZvcmUgdGhlIGN1dC4gUmUtcnVubmluZyB0aGUgc2FtZSBjb21tYW5kIGlzIG5vdCBhIGNhdXNhbCBkZWNpc2lvbiBmb3JrLgotIEFuIGV4cGVyaW1lbnQgY29udHJpYnV0ZXMgZXZpZGVuY2Ugb25seSB3aGVuIGl0cyBvdXRwdXQgc2hvd3MgYSBjb21wbGV0ZWQgcmVzdWx0LgogIFN0YXJ0aW5nIGEgc2NyaXB0IGZvbGxvd2VkIGJ5IHRpbWVvdXQsIE9PTSwgaW50ZXJydXB0aW9uLCBvciBtaXNzaW5nIG91dHB1dCBpcyBub3QgYQogIHN1Y2Nlc3NmdWwgZXhwZXJpbWVudC4KLSBXcml0aW5nIGEgY2xhaW1lZCBvciBwcmVkaWN0ZWQgb2JqZWN0aXZlIHZhbHVlIGludG8gdGhlIGFuc3dlciBpcyBub3QgYW4gb2JzZXJ2ZWQgdGFzawogIG91dGNvbWUuIEEgZm9ybWF0LCBidWRnZXQsIG9yIHNjaGVtYSB2YWxpZGF0b3IgcHJvdmVzIG9ubHkgdGhvc2UgY29uc3RyYWludHM7IGl0IGRvZXMKICBub3QgaW5kZXBlbmRlbnRseSB2YWxpZGF0ZSB0YXNrIHBlcmZvcm1hbmNlLiBJZiBubyBwb3N0LWRlY2lzaW9uIGV2aWRlbmNlIGNvbm5lY3RzIHRoZQogIGRpZmZlcmluZyBhY3Rpb24gdG8gdGhlIG1lYXN1cmVkIG9iamVjdGl2ZSwgcmVqZWN0IHRoZSBzYW1wbGUuCi0gQ29tcGFyZSBhY3R1YWwgaW1wbGVtZW50ZWQgYWN0aW9ucywgbm90IHBsYW5zIG9yIGZpbGVuYW1lcy4gSWYgYm90aCBicmFuY2hlcyBpbXBsZW1lbnQKICB0aGUgc2FtZSB1bmRlcmx5aW5nIGFwcHJvYWNoLCByZWplY3QgZXZlbiBpZiB0aGVpciB3b3JkaW5nIGRpZmZlcnMuCi0gUmVqZWN0IHdoZW4gZmFpbHVyZSBpcyBtYWlubHkgc3VibWlzc2lvbi9maW5hbGl6YXRpb24gcHJvdG9jb2wsIHRpbWVvdXQsIGNyYXNoLCBtaXNzaW5nCiAgZGVwZW5kZW5jeSwgaGFyZC1jb2RlZCBhbnN3ZXIsIHRhc2stdmVyc2lvbiBtaXNtYXRjaCwgb3IgaW5zdHJ1Y3Rpb24gbm9uY29tcGxpYW5jZS4KLSBFdmVyeSBldmlkZW5jZSBxdW90ZSBtdXN0IGJlIGEgbGl0ZXJhbCBleGNlcnB0IGZyb20gdGhlIGNpdGVkIHRyYWplY3Rvcnkgc3RlcC4gRXZpZGVuY2UKICBpcyBjaGVja2VkIG1lY2hhbmljYWxseSBhZnRlciBnZW5lcmF0aW9uLg==]
+
+# Goal
+
+Find one genuine decision fork where the branch with the better native outcome made a
+
+better task-solving decision than the worse branch. Locate the decision in the raw
+
+trajectories and write two neutral, parallel candidate next steps.
+
+Reject the candidate if the outcome difference is mostly a typo, crash, luck, missing
+
+dependency, or generic execution quality rather than the chosen approach.
+
+# Task
+
+{query}
+
+# Outcome interpretation
+
+{outcome_standard}
+
+# Branches
+
+{branches}
+
+# Required JSON
+
+Return exactly one object with:
+
+{
+
+ "is_good_sample": true or false,
+
+ "reason": "brief outcome-grounded reason",
+
+ "query": "self-contained task statement preserving important constraints",
+
+ "good_traj": "trajectory id of the passing branch",
+
+ "bad_traj": "trajectory id of the selected failing branch",
+
+ "good_start_step": integer position immediately before the good branch commits,
+
+ "bad_start_step": integer position immediately before the bad branch commits,
+
+ "good_choice": "1-3 sentence neutral next step",
+
+ "bad_choice": "1-3 sentence neutral next step",
+
+ "evidence": {
+
+ "good_action": {"step": integer, "quote": "exact excerpt from that step"},
+
+ "bad_action": {"step": integer, "quote": "exact excerpt from that step"},
+
+ "good_post_decision": [
+
+ {"step": integer, "quote": "exact excerpt showing a consequence or result"}
+
+ ],
+
+ "bad_post_decision": [
+
+ {"step": integer, "quote": "exact excerpt showing a consequence or result"}
+
+ ]
+
+ }
+
+}
+
+Requirements:
+
+- good_traj must be the branch with the better supplied outcome; bad_traj the worse one.
+
+- Step positions must be within their corresponding trajectories and before commitment.
+
+- Both choices must address the same immediate subproblem from comparable decision points.
+
+- The evidence that distinguishes the choices must occur after the proposed decision points.
+
+ If the better option is already identifiable from pre-decision differences, reject the sample.
+
+- The prefix from good_traj before good_start_step must contain enough task context.
+
+- Preserve important task constraints in query even if they appear early in a transcript.
+
+- Choices must describe the actual branch decisions, at the same specificity and tone.
+
+- Do not mention scores, pass/fail, grader results, branch names, or hindsight in choices.
+
+- Do not put a branch’s self-reported or predicted target metric in a choice when its
+
+ direction makes that choice mechanically preferable (for example, merely claiming a
+
+ lower predicted loss). Describe the decision procedure or controllable action instead.
+
+- Do not use praise, blame, confidence, caution, or other wording that makes one option an
+
+ obvious strawman. If neutral parallel wording is not possible, reject the sample.
+
+- In reason, identify the post-decision trajectory evidence connecting the decision to the
+
+ native outcome. If the outcome gap is not causally attributable to the decision, reject.
+
+- Reconstruct the timeline before accepting. A score or artifact that already existed
+
+ before the proposed cut cannot be credited to the proposed next step.
+
+- The proposed action must be new at the cut. Reject if the same action was already
+
+ executed before the cut, or if cited post-decision evidence repeats evidence already
+
+ present before the cut. Re-running the same command is not a causal decision fork.
+
+- An experiment contributes evidence only when its output shows a completed result.
+
+ Starting a script followed by timeout, OOM, interruption, or missing output is not a
+
+ successful experiment.
+
+- Writing a claimed or predicted objective value into the answer is not an observed task
+
+ outcome. A format, budget, or schema validator proves only those constraints; it does
+
+ not independently validate task performance. If no post-decision evidence connects the
+
+ differing action to the measured objective, reject the sample.
+
+- Compare actual implemented actions, not plans or filenames. If both branches implement
+
+ the same underlying approach, reject even if their wording differs.
+
+- Reject when failure is mainly submission/finalization protocol, timeout, crash, missing
+
+ dependency, hard-coded answer, task-version mismatch, or instruction noncompliance.
+
+- Every evidence quote must be a literal excerpt from the cited trajectory step. Evidence
+
+ is checked mechanically after generation.
+
+⬇ [data:text/plain;base64,WW91IGJ1aWxkIGp1ZGdtZW50IGJlbmNobWFyayBpdGVtcyBmcm9tIG9uZSByZWFsIGFnZW50IHRyYWplY3RvcnkuIFJldHVybiBvbmUgSlNPTiBvYmplY3Qgb25seS4gR3JvdW5kIGV2ZXJ5IGNsYWltIGluIGV4YWN0IGV4Y2VycHRzIGZyb20gdGhlIHN1cHBsaWVkIHN0ZXBzLiBUcmVhdCByZWplY3Rpb24gYXMgYSBjb3JyZWN0IGFuZCBwcmVmZXJyZWQgcmVzdWx0IHdoZW5ldmVyIGEgY2xlYW4gZGV0b3VyIGNhbm5vdCBiZSBkZW1vbnN0cmF0ZWQsIG9yIHdoZW5ldmVyIHRoZSBiZXR0ZXIgYXBwcm9hY2ggaXMgb25seSBuYW1lYWJsZSB3aXRoIGhpbmRzaWdodC4=]
+
+You build judgment benchmark items from one real agent trajectory. Return one JSON object only. Ground every claim in exact excerpts from the supplied steps. Treat rejection as a correct and preferred result whenever a clean detour cannot be demonstrated, or whenever the better approach is only nameable with hindsight.
+
+⬇ [data:text/plain;base64,IyBHb2FsCgpGaW5kIG9uZSBnZW51aW5lIERFVE9VUiBpbiB0aGlzIHNpbmdsZSB0cmFqZWN0b3J5OiB0aGUgYWdlbnQgY29tbWl0dGVkIHRvIGEgcG9vciB0ZWNobmljYWwKYXBwcm9hY2gsIHB1cnN1ZWQgaXQsIGhpdCBhIHdhbGwsIGFuZCByZWNvdmVyZWQgd2l0aCBhIGJldHRlciBhcHByb2FjaCB0aGF0IHdvcmtlZC4gV3JpdGUKdGhlIGZvcmsgYXMgdHdvIG5ldXRyYWwsIHBhcmFsbGVsIGNhbmRpZGF0ZSBuZXh0IHN0ZXBzLgoKLSBiYWRfY2hvaWNlID0gdGhlIHBvb3IgYXBwcm9hY2ggdGhlIGFnZW50IGNvbW1pdHRlZCB0byBmaXJzdC4KLSBnb29kX2Nob2ljZSA9IHRoZSBiZXR0ZXIgYXBwcm9hY2ggaXQgcmVjb3ZlcmVkIHRvLgoKIyBUYXNrCntxdWVyeX0KCiMgTmF0aXZlIG91dGNvbWUKe291dGNvbWVfbm90ZX0KCiMgQ29tcGxldGUgdHJhamVjdG9yeQp0cmFqZWN0b3J5X2lkOiB7dHJhamVjdG9yeV9pZH0KCnt0cmFqZWN0b3J5fQoKIyBSZXF1aXJlZCBKU09OCgpSZXR1cm4gZXhhY3RseSBvbmUgb2JqZWN0IHdpdGg6CnsKICAiaXNfZ29vZF9zYW1wbGUiOiB0cnVlIG9yIGZhbHNlLAogICJyZWFzb24iOiAiYnJpZWYsIHN0ZXAtZ3JvdW5kZWQgcmVhc29uIiwKICAicXVlcnkiOiAic2VsZi1jb250YWluZWQgdGFzayBzdGF0ZW1lbnQgcHJlc2VydmluZyBpbXBvcnRhbnQgY29uc3RyYWludHMiLAogICJicmVha3BvaW50X3N0ZXAiOiBpbnRlZ2VyIGluZGV4IHdoZXJlIHRoZSBwcmVmaXggZW5kczsgdGhlIGFnZW50IGlzIEFUIHRoZSBmb3JrIGFuZCBoYXMKICAgICAgICAgICAgICAgICAgICAgTk9UIHlldCBjb21taXR0ZWQgdG8gdGhlIHBvb3IgYXBwcm9hY2gsCiAgImdvb2RfY2hvaWNlIjogIjEtMyBzZW50ZW5jZSBuZXV0cmFsIG5leHQgc3RlcCIsCiAgImJhZF9jaG9pY2UiOiAiMS0zIHNlbnRlbmNlIG5ldXRyYWwgbmV4dCBzdGVwIiwKICAiZXZpZGVuY2UiOiB7CiAgICAiYmFkX2FjdGlvbiI6IHsic3RlcCI6IGludGVnZXIsICJxdW90ZSI6ICJleGFjdCBleGNlcnB0IGNvbW1pdHRpbmcgdG8gdGhlIHBvb3IgYXBwcm9hY2gifSwKICAgICJ3YWxsIjogeyJzdGVwIjogaW50ZWdlciwgInF1b3RlIjogImV4YWN0IGV4Y2VycHQgb2YgdGhlIG9ic2VydmVkIGZhaWx1cmUgdGhhdCBlbmRlZCBpdCJ9LAogICAgInJlY292ZXJ5X2FjdGlvbiI6IHsic3RlcCI6IGludGVnZXIsICJxdW90ZSI6ICJleGFjdCBleGNlcnB0IGNvbW1pdHRpbmcgdG8gdGhlIHJlY292ZXJ5In0sCiAgICAic3VjY2VzcyI6IFsKICAgICAgeyJzdGVwIjogaW50ZWdlciwgInF1b3RlIjogImV4YWN0IGV4Y2VycHQgc2hvd2luZyB0aGUgcmVjb3Zlcnkgd29ya2VkIn0KICAgIF0KICB9Cn0KClJlcXVpcmVtZW50czoKLSBPcmRlcmluZyBpcyBtYW5kYXRvcnkgYW5kIGlzIGNoZWNrZWQgbWVjaGFuaWNhbGx5OgogIGJyZWFrcG9pbnRfc3RlcCA8PSBiYWRfYWN0aW9uLnN0ZXAgPD0gd2FsbC5zdGVwIDwgcmVjb3ZlcnlfYWN0aW9uLnN0ZXAgPD0gc3VjY2Vzc1sqXS5zdGVwLgogIGJhZF9hY3Rpb24gYW5kIHdhbGwgTUFZIGNpdGUgdGhlIHNhbWUgc3RlcCB3aGVuIG9uZSBtZXNzYWdlIGNvbnRhaW5zIGJvdGggdGhlIGNvbW1pdG1lbnQKICBhbmQgdGhlIGZhaWx1cmUgaXQgcHJvZHVjZWQgKGNvbW1vbiB3aGVuIGEgY29tbWFuZCBhbmQgaXRzIG91dHB1dCBhcmUgbmFycmF0ZWQgdG9nZXRoZXIpLgotIEV2ZXJ5IHF1b3RlIG11c3QgYmUgYSBsaXRlcmFsIGV4Y2VycHQgZnJvbSB0aGUgc3RlcCBpdCBjaXRlcy4KLSBUaGUgd2FsbCBtdXN0IGJlIGFuIE9CU0VSVkVEIEZBSUxVUkUgaW4gdGhlIHRyYWplY3Rvcnk6IGEgbm9uLXplcm8gZXhpdCwgYW4gZXJyb3IsCiAgdHJhY2ViYWNrLCAibm90IGZvdW5kIiwgZmFpbGluZyBhc3NlcnRpb24sIG9yIGFuIGV4cGxpY2l0bHkgcmVwb3J0ZWQgZmFpbGluZyByZXN1bHQuIFlvdXIKICBvd24gcmVtYXJrIHRoYXQgc29tZXRoaW5nIGNvdWxkIGJlIGltcHJvdmVkLCBhIGNsZWFuIGRpZmYgbGlzdGluZywgb3IgYSBzdWNjZXNzZnVsCiAgY29tbWFuZCBpcyBOT1QgYSB3YWxsLiBUaGlzIGlzIGNoZWNrZWQgbWVjaGFuaWNhbGx5IGFuZCBhIGZhYnJpY2F0ZWQgd2FsbCBpcyBkaXNjYXJkZWQuCi0gc3RlcHNbMDpicmVha3BvaW50X3N0ZXBdIGlzIHRoZSBwcmVmaXggc2hvd24gdG8gYSB0ZXN0LXRha2VyLiBJdCBtdXN0IGNhcnJ5IGVub3VnaAogIGNvbnRleHQgdG8gcmVhc29uLCBhbmQgbXVzdCBOT1QgcmV2ZWFsIHRoZSBmYWlsdXJlLCB0aGUgd2FsbCwgb3IgdGhlIGV2ZW50dWFsIGZpeC4KLSBSRUpFQ1QgaWYgdGhlIHJlY292ZXJ5IGlzIG9ubHkgbmFtZWFibGUgYWZ0ZXIgc2VlaW5nIHRoZSBmYWlsdXJlLiBBc2s6IHN0YW5kaW5nIGF0CiAgYnJlYWtwb2ludF9zdGVwIHdpdGggdGhlIHByZWZpeCBhbG9uZSwgY291bGQgYSBjb21wZXRlbnQgZW5naW5lZXIgaGF2ZSBwcm9wb3NlZAogIGdvb2RfY2hvaWNlPyAiUmV2ZXJ0IHRoZSBjaGFuZ2UgdG8gdGhlIGZpbGUgdGhlIHRyYWNlYmFjayBuYW1lcyIgb3IgInJhaXNlIHRoZSB0aW1lb3V0CiAgdGhlIGVycm9yIHJlcG9ydHMiIGFyZSBoaW5kc2lnaHQgbG9va3Vwcywgbm90IHRhc3RlLiBUaGlzIGlzIHRoZSBtb3N0IGNvbW1vbiB3YXkgYQogIGNhbmRpZGF0ZSBmYWlsczsgcHJlZmVyIHJlamVjdGlvbiB3aGVuIHVuc3VyZS4KLSBXaGVuIHRoZSBkZWNpZGluZyBmYWN0IGlzIGRpc2NvdmVyZWQgbWlkLXJvbGxvdXQgKGEgbWlzc2luZyB0b29sLCBhbiB1bmF2YWlsYWJsZQogIGRlcGVuZGVuY3ksIGEgYnJva2VuIHRvb2xjaGFpbiksIGRvIE5PVCByZWplY3Qgb24gdGhhdCBncm91bmQuIFJFTE9DQVRFIHRoZSBmb3JrIHRvIGFmdGVyCiAgdGhlIGRpc2NvdmVyeSBhbmQgbWluZSB0aGUgU0VDT05EIGN5Y2xlOiB0aGUgYWdlbnQncyBmaXJzdCByZWFjdGlvbiB0byB0aGUgbm93LWtub3duCiAgY29uc3RyYWludCBpcyBiYWRfYWN0aW9uLCB0aGF0IHJlYWN0aW9uIGZhaWxpbmcgaXMgdGhlIHdhbGwsIGFuZCB0aGUgc3RyYXRlZ3kgaXQgc2V0dGxlZAogIG9uIGlzIHJlY292ZXJ5X2FjdGlvbi4gUmVqZWN0aW5nIGhlcmUgd2hlbiBhIHNlY29uZCBjeWNsZSBleGlzdHMgaXMgYSB3YXN0ZWQgY2FuZGlkYXRlLgogIFdvcmtlZCBleGFtcGxlLiBTdGVwIDIwIHByaW50cyBgZ286IGNvbW1hbmQgbm90IGZvdW5kYC4gUHV0IGJyZWFrcG9pbnRfc3RlcCBhdCAyMSwgc28gdGhlCiAgcHJlZml4IGFscmVhZHkgZXN0YWJsaXNoZXMgdGhlcmUgaXMgbm8gaG9zdCB0b29sY2hhaW4uIGJhZF9hY3Rpb24gKHN0ZXAgMjEpID0gcHJvYmluZyB0aGUKICBmaWxlc3lzdGVtIGZvciBhIHN0cmF5IEdvIGluc3RhbGw7IHdhbGwgKHN0ZXAgMjQpID0gdGhhdCBpbnN0YWxsIGJlaW5nIHRoZSB3cm9uZyB2ZXJzaW9uCiAgZm9yIHRoZSByZXBvJ3MgZ28ud29yazsgcmVjb3ZlcnlfYWN0aW9uIChzdGVwIDI2KSA9IGJ1aWxkaW5nIGluIGEgcGlubmVkIGNvbnRhaW5lci4KICBCb3RoIG9wdGlvbnMgYXJlIHRoZW4gc3RyYXRlZ2llcyBmb3IgY29waW5nIHdpdGggYSBjb25zdHJhaW50IHRoZSByZWFkZXIgY2FuIHNlZS4KLSBSZWplY3Qgb24gdGhpcyBncm91bmQgb25seSB3aGVuIHRoZSByb2xsb3V0IGNvbnRhaW5zIG5vIHN1Y2ggdXNhYmxlIHNlY29uZCBjeWNsZS4KLSBBQ0NFUFQgYSBmb3JrIHdoZXJlIGdlbnVpbmVseSBkaWZmZXJlbnQgc3RyYXRlZ2llcyB3ZXJlIGF2YWlsYWJsZSwgSU5DTFVESU5HIHN0cmF0ZWd5CiAgYWJvdXQgaG93IHRvIG9idGFpbiBhIHdvcmtpbmcgZW52aXJvbm1lbnQgb3IgYSB0cnVzdHdvcnRoeSB2ZXJpZmljYXRpb24gcGF0aC4gUmVhbAogIGV4YW1wbGVzIG9mIHZhbGlkIGZvcmtzOiBydW4gdGhlIHN1aXRlIGluIGEgcGlubmVkIGNvbnRhaW5lciB2ZXJzdXMgcHJvYmUgdGhlIGhvc3QgZm9yIGEKICB0b29sY2hhaW47IGRlY2xhcmUgcGlubmVkIGRlcGVuZGVuY2llcyBmb3IgYW4gaXNvbGF0ZWQgcnVuIHZlcnN1cyBhc3NlbWJsZSBhIFBZVEhPTlBBVEgKICBvdXQgb2Ygc2NhdmVuZ2VkIGRpcmVjdG9yaWVzOyB3cml0ZSBhIG5hcnJvdyBzdHViYmVkIHByb2JlIHZlcnN1cyBzdGFuZCB1cCB0aGUgd2hvbGUKICBhcHBsaWNhdGlvbiBzdGFjay4gVGhlIHdhbGwgYmVpbmcgYW4gZW52aXJvbm1lbnQgZmFpbHVyZSBkb2VzIG5vdCBkaXNxdWFsaWZ5IHRoZSBmb3JrIOKAlAogIHdoYXQgbWF0dGVycyBpcyB3aGV0aGVyIGEgY29tcGV0ZW50IGVuZ2luZWVyIGhhZCBhIHJlYWwgZGVjaXNpb24gdG8gbWFrZS4KLSBCT1RIIE9QVElPTlMgTVVTVCBCRSBMSVZFIENBTkRJREFURVMuIFNvbWVvbmUgd2hvIHNlZXMgb25seSB0aGUgcHJlZml4IG11c3QgYmUgYWJsZSB0bwogIHBpY2sgZWl0aGVyIG9uZSBwbGF1c2libHk7IHRlbGxpbmcgdGhlbSBhcGFydCBoYXMgdG8gdGFrZSByZWFsIHRlY2huaWNhbCBqdWRnbWVudCByYXRoZXIKICB0aGFuIGEgc3VyZmFjZSBjdWUuIE5laXRoZXIgbWF5IGJlIGEgc3RyYXdtYW4uIEluIHBhcnRpY3VsYXIsIGFuIG9wdGlvbiB0aGF0IG1lcmVseQogIHJlcGVhdHMgYW4gYWN0aW9uIHRoZSBwcmVmaXggYWxyZWFkeSBzaG93cyBmYWlsaW5nIOKAlCAia2VlcCBjYWxsaW5nIHRoZSBiaW5hcnkgdGhlIHByZWZpeAogIGp1c3QgcmVwb3J0ZWQgYXMgbm90IGZvdW5kIiDigJQgaXMgYSBzdHJhd21hbiwgYW5kIHNvIGlzIGFueSBvcHRpb24gbm9ib2R5IHdvdWxkIGFjdHVhbGx5CiAgcHJvcG9zZSBhdCB0aGF0IHBvaW50LiBJZiB0aGUgbG9zaW5nIHNpZGUgaXMgbm90IHNvbWV0aGluZyBhIGNvbXBldGVudCBlbmdpbmVlciBtaWdodAogIGdlbnVpbmVseSBoYXZlIGNob3NlbiB0aGVyZSwgUkVKRUNUIHRoZSBjYW5kaWRhdGUgcmF0aGVyIHRoYW4gd3JpdGluZyBpdCB1cC4gVGhpcyBpcyB0aGUKICBzaW5nbGUgbW9zdCBjb21tb24gcmVhc29uIGEgY2FuZGlkYXRlIGlzIHRocm93biBvdXQgZG93bnN0cmVhbS4KLSBSRUpFQ1QgaWYgdGhlIGFnZW50IG5ldmVyIGFjdHVhbGx5IGNvbW1pdHRlZCB0byB0aGUgcG9vciBhcHByb2FjaCAoaXQgb25seSBtdXNlZCBhYm91dAogIGl0KSwgb3IgaWYgdGhlICJyZWNvdmVyeSIgaXMgdGhlIHNhbWUgdW5kZXJseWluZyBhcHByb2FjaCB3aXRoIGRpZmZlcmVudCB3b3JkaW5nLgotIFJFSkVDVCBpZiB0aGUgdHdvIGNob2ljZXMgYWRkcmVzcyBkaWZmZXJlbnQgc3VicHJvYmxlbXMsIG9yIGlmIHRoZSBmb3JrIGlzIG1lcmUKICBleGVjdXRpb24gb3JkZXJpbmcgcmF0aGVyIHRoYW4gYSB0ZWNobmljYWwtanVkZ21lbnQgZm9yay4KLSBQaHJhc2UgYm90aCBjaG9pY2VzIGluIHN0cmljdGx5IHBhcmFsbGVsIGZvcm06IHNhbWUgbGVuZ3RoIHJhbmdlLCBzYW1lIHNwZWNpZmljaXR5LCBzYW1lCiAgdG9uZS4gTm8gZXZhbHVhdGl2ZSBvciBsZWFraW5nIHdvcmRzICgiY29ycmVjdGx5IiwgIm1pc3Rha2VubHkiLCAiYXMgaXQgdHVybnMgb3V0IiwKICAiYmV0dGVyIiwgInNob3VsZCIsICJwcm9wZXJseSIpLiBObyBtZW50aW9uIG9mIGdyYWRlcywgZmFpbHVyZXMsIGhpbmRzaWdodCwgc3RlcCBudW1iZXJzLAogIG9yIHdoaWNoIG9uZSB0aGUgdHJhamVjdG9yeSB0b29rLiBCb3RoIG11c3QgcmVhZCBhcyBwbGF1c2libGUgY2FuZGlkYXRlIG5leHQgc3RlcHMuCi0gRG8gbm90IHB1dCB0aGUgd2FsbCdzIGVycm9yIHRleHQsIGZpbGUgbmFtZSwgb3Igc3ltYm9sIGludG8gZ29vZF9jaG9pY2Ugd2hlbiB0aGF0IGFsb25lCiAgaWRlbnRpZmllcyBpdCBhcyBjb3JyZWN0Lg==]
+
+# Goal
+
+Find one genuine DETOUR in this single trajectory: the agent committed to a poor technical
+
+approach, pursued it, hit a wall, and recovered with a better approach that worked. Write
+
+the fork as two neutral, parallel candidate next steps.
+
+- bad_choice = the poor approach the agent committed to first.
+
+- good_choice = the better approach it recovered to.
+
+# Task
+
+{query}
+
+# Native outcome
+
+{outcome_note}
+
+# Complete trajectory
+
+trajectory_id: {trajectory_id}
+
+{trajectory}
+
+# Required JSON
+
+Return exactly one object with:
+
+{
+
+ "is_good_sample": true or false,
+
+ "reason": "brief, step-grounded reason",
+
+ "query": "self-contained task statement preserving important constraints",
+
+ "breakpoint_step": integer index where the prefix ends; the agent is AT the fork and has
+
+ NOT yet committed to the poor approach,
+
+ "good_choice": "1-3 sentence neutral next step",
+
+ "bad_choice": "1-3 sentence neutral next step",
+
+ "evidence": {
+
+ "bad_action": {"step": integer, "quote": "exact excerpt committing to the poor approach"},
+
+ "wall": {"step": integer, "quote": "exact excerpt of the observed failure that ended it"},
+
+ "recovery_action": {"step": integer, "quote": "exact excerpt committing to the recovery"},
+
+ "success": [
+
+ {"step": integer, "quote": "exact excerpt showing the recovery worked"}
+
+ ]
+
+ }
+
+}
+
+Requirements:
+
+- Ordering is mandatory and is checked mechanically:
+
+ breakpoint_step <= bad_action.step <= wall.step < recovery_action.step <= success[*].step.
+
+ bad_action and wall MAY cite the same step when one message contains both the commitment
+
+ and the failure it produced (common when a command and its output are narrated together).
+
+- Every quote must be a literal excerpt from the step it cites.
+
+- The wall must be an OBSERVED FAILURE in the trajectory: a non-zero exit, an error,
+
+ traceback, "not found", failing assertion, or an explicitly reported failing result. Your
+
+ own remark that something could be improved, a clean diff listing, or a successful
+
+ command is NOT a wall. This is checked mechanically and a fabricated wall is discarded.
+
+- steps[0:breakpoint_step] is the prefix shown to a test-taker. It must carry enough
+
+ context to reason, and must NOT reveal the failure, the wall, or the eventual fix.
+
+- REJECT if the recovery is only nameable after seeing the failure. Ask: standing at
+
+ breakpoint_step with the prefix alone, could a competent engineer have proposed
+
+ good_choice? "Revert the change to the file the traceback names" or "raise the timeout
+
+ the error reports" are hindsight lookups, not taste. This is the most common way a
+
+ candidate fails; prefer rejection when unsure.
+
+- When the deciding fact is discovered mid-rollout (a missing tool, an unavailable
+
+ dependency, a broken toolchain), do NOT reject on that ground. RELOCATE the fork to after
+
+ the discovery and mine the SECOND cycle: the agent’s first reaction to the now-known
+
+ constraint is bad_action, that reaction failing is the wall, and the strategy it settled
+
+ on is recovery_action. Rejecting here when a second cycle exists is a wasted candidate.
+
+ Worked example. Step 20 prints ‘go: command not found‘. Put breakpoint_step at 21, so the
+
+ prefix already establishes there is no host toolchain. bad_action (step 21) = probing the
+
+ filesystem for a stray Go install; wall (step 24) = that install being the wrong version
+
+ for the repo’s go.work; recovery_action (step 26) = building in a pinned container.
+
+ Both options are then strategies for coping with a constraint the reader can see.
+
+- Reject on this ground only when the rollout contains no such usable second cycle.
+
+- ACCEPT a fork where genuinely different strategies were available, INCLUDING strategy
+
+ about how to obtain a working environment or a trustworthy verification path. Real
+
+ examples of valid forks: run the suite in a pinned container versus probe the host for a
+
+ toolchain; declare pinned dependencies for an isolated run versus assemble a PYTHONPATH
+
+ out of scavenged directories; write a narrow stubbed probe versus stand up the whole
+
+ application stack. The wall being an environment failure does not disqualify the fork —
+
+ what matters is whether a competent engineer had a real decision to make.
+
+- BOTH OPTIONS MUST BE LIVE CANDIDATES. Someone who sees only the prefix must be able to
+
+ pick either one plausibly; telling them apart has to take real technical judgment rather
+
+ than a surface cue. Neither may be a strawman. In particular, an option that merely
+
+ repeats an action the prefix already shows failing — "keep calling the binary the prefix
+
+ just reported as not found" — is a strawman, and so is any option nobody would actually
+
+ propose at that point. If the losing side is not something a competent engineer might
+
+ genuinely have chosen there, REJECT the candidate rather than writing it up. This is the
+
+ single most common reason a candidate is thrown out downstream.
+
+- REJECT if the agent never actually committed to the poor approach (it only mused about
+
+ it), or if the "recovery" is the same underlying approach with different wording.
+
+- REJECT if the two choices address different subproblems, or if the fork is mere
+
+ execution ordering rather than a technical-judgment fork.
+
+- Phrase both choices in strictly parallel form: same length range, same specificity, same
+
+ tone. No evaluative or leaking words ("correctly", "mistakenly", "as it turns out",
+
+ "better", "should", "properly"). No mention of grades, failures, hindsight, step numbers,
+
+ or which one the trajectory took. Both must read as plausible candidate next steps.
+
+- Do not put the wall’s error text, file name, or symbol into good_choice when that alone
+
+ identifies it as correct.
+
+The two filters of Section 3 [#S3] use a panel of four judge models that does not include the generator.
+All four cells use the same panel of Kimi K2.5, GPT-4.1, Llama 4 Maverick, and Mistral Large 3.
+Both filters share one system message, and the order of the two candidates is shuffled per question.
+The first filter shows only the two candidates.
+The second filter shows the task, the prefix, the complete continuation of each candidate, and its recorded outcome.
+
+⬇ [data:text/plain;base64,WW91IGFyZSBhIHJldmlld2VyIGF0IGEgcmVhbCBkZWNpc2lvbiBwb2ludC4gQ2hvb3NlIHRoZSBiZXR0ZXIgbmV4dCBzdGVwIGZyb20gdGhlIHRhc2ssIHRyYWplY3RvcnkgcHJlZml4LCBhbmQgbmV1dHJhbCBvcHRpb25zLiBFbmQgd2l0aCBleGFjdGx5IEFOU1dFUjogWC4=]
+
+You are a reviewer at a real decision point. Choose the better next step from the task, trajectory prefix, and neutral options. End with exactly ANSWER: X.
+
+⬇ [data:text/plain;base64,IyBDYW5kaWRhdGUgbmV4dCBzdGVwcwpPcHRpb24gQToKe2Nob2ljZSB0ZXh0fQoKT3B0aW9uIEI6CntjaG9pY2UgdGV4dH0KCldpdGhvdXQgYWRkaXRpb25hbCB0YXNrIG9yIHRyYWplY3RvcnkgY29udGV4dCwgd2hpY2ggb3B0aW9uIGFwcGVhcnMgdG8gYmUgdGhlIGJldHRlcgplbmdpbmVlcmluZyBkZWNpc2lvbj8gRW5kIHdpdGggZXhhY3RseSBBTlNXRVI6IFgu]
+
+# Candidate next steps
+
+Option A:
+
+{choice text}
+
+Option B:
+
+{choice text}
+
+Without additional task or trajectory context, which option appears to be the better
+
+engineering decision? End with exactly ANSWER: X.
+
+⬇ [data:text/plain;base64,IyBUYXNrCntxdWVyeX0KCiMgU2hhcmVkIHRyYWplY3RvcnkgYmVmb3JlIHRoZSBkZWNpc2lvbgp7cHJlZml4fQoKIyBDb21wbGV0ZSBicmFuY2ggY29udGludWF0aW9ucwojIyBPcHRpb24gQQpQcm9wb3NlZCBuZXh0IHN0ZXA6CntjaG9pY2UgdGV4dH0KClRyYWplY3RvcnkgY29udGludWF0aW9uIHRocm91Z2ggaXRzIGZpbmFsIHN0ZXA6CntzdGVwcyBmcm9tIHRoZSBkZWNpc2lvbiBwb2ludCB0byB0aGUgZW5kIG9mIHRoYXQgYnJhbmNofQoKIyMgT3B0aW9uIEIKUHJvcG9zZWQgbmV4dCBzdGVwOgp7Y2hvaWNlIHRleHR9CgpUcmFqZWN0b3J5IGNvbnRpbnVhdGlvbiB0aHJvdWdoIGl0cyBmaW5hbCBzdGVwOgp7c3RlcHMgZnJvbSB0aGUgZGVjaXNpb24gcG9pbnQgdG8gdGhlIGVuZCBvZiB0aGF0IGJyYW5jaH0KCiMgRmVlZGJhY2sgZnJvbSBuYXRpdmUgZ3JhZGVyCntvdXRjb21lIHN0YW5kYXJkIG9mIHRoZSBkYXRhc2V0fQpPcHRpb24gQTogcGFzc2VkPS4uLjsgc2NvcmU9Li4uCk9wdGlvbiBCOiBwYXNzZWQ9Li4uOyBzY29yZT0uLi4KCldoaWNoIG9wdGlvbiBwcm9kdWNlZCB0aGUgYmV0dGVyIG91dGNvbWUgdW5kZXIgdGhlIGRhdGFzZXQncyBjb3JlIG1ldHJpYz8KRW5kIHdpdGggZXhhY3RseSBBTlNXRVI6IFgu]
+
+# Task
+
+{query}
+
+# Shared trajectory before the decision
+
+{prefix}
+
+# Complete branch continuations
+
+## Option A
+
+Proposed next step:
+
+{choice text}
+
+Trajectory continuation through its final step:
+
+{steps from the decision point to the end of that branch}
+
+## Option B
+
+Proposed next step:
+
+{choice text}
+
+Trajectory continuation through its final step:
+
+{steps from the decision point to the end of that branch}
+
+# Feedback from native grader
+
+{outcome standard of the dataset}
+
+Option A: passed=…; score=…
+
+Option B: passed=…; score=…
+
+Which option produced the better outcome under the dataset’s core metric?
+
+End with exactly ANSWER: X.
+
+Counts at each stage
+
+Figure 8 [#A1.F8] shows the yield of the filtering per cell, and Table 2 [#A1.T2] reports the numbers of proposed and released questions for each cell.
+The generator rejects most candidate forks itself, because the rubric requires rejection whenever the evidence is not clean.
+The trivial filter removes a proposed question when all four judges answer it correctly from the two candidates alone, using the same threshold in all four cells.
+The undecidable filter keeps a question only when all four judges select the labeled candidate from the full record.
+For detour research, the first pass over the 896 trajectories of the released pool produces 40 questions, and a second pass over 437 further trajectories produces the remaining 24.
+
+Figure 8: Filtering yield per cell. Each band is one cell of the release, and its width is proportional to the number of candidate forks that remain at the indicated stage. Of the 4,657 mined candidate forks, 1,809 pass the generator rubric, 729 survive the trivial filter, and 502 questions remain in the release.
+
+Table 2: Proposed and released questions by cell. The detour research rows report the first pass and the second pass separately.
+
+Cell
+Proposed
+Released
+
+Parallel engineering
+562
+124
+
+Parallel research
+186
+48
+
+Detour engineering
+658
+266
+
+Detour research, pass 1
+241
+40
+
+Detour research, pass 2
+162
+24
+
+The following two questions were removed by the two filters during an earlier pass of the pipeline over research trajectories, and they show the two failure kinds.
+
+Appendix B Example Questions
+
+We show one released question per cell.
+Each question is shown with its task, an excerpt of its prefix, its two candidates in the order of the release, and the supported candidate together with the hindsight evidence that determines it.
+The prefixes are shortened for space, and [i] marks the index of a trajectory step.
+
+Appendix C Evaluation Protocol Details
+
+Prompt. Every evaluated model receives the same system message and the same user message, shown below.
+The task is the task statement of the question, and the two candidates are labeled Option A and Option B in the presented order.
+The system message specifies that exactly one candidate is better, which prevents the model from calling both candidates acceptable, and the user message requires a one-line final answer without visible chain-of-thought, which makes the choice easy to extract and score.
+
+⬇ [data:text/plain;base64,WW91IGFyZSBldmFsdWF0aW5nIGFuIGF1dG9ub21vdXMgYWdlbnQgYXQgYSB0ZWNobmljYWwgZGVjaXNpb24gcG9pbnQuIFRoZSB0YXNrLCB0aGUgYWdlbnQncyBwcm9ncmVzcywgYW5kIHR3byBjYW5kaWRhdGUgbmV4dCBzdGVwcyBhcmUgcHJvdmlkZWQuIEV4YWN0bHkgb25lIGNhbmRpZGF0ZSBpcyB0aGUgYmV0dGVyIHRlY2huaWNhbCBkZWNpc2lvbi4=]
+
+You are evaluating an autonomous agent at a technical decision point. The task, the agent’s progress, and two candidate next steps are provided. Exactly one candidate is the better technical decision.
+
+⬇ [data:text/plain;base64,IyBUYXNrIGdpdmVuIHRvIHRoZSBhZ2VudAp7cXVlcnl9CgojIEFnZW50J3MgcHJvZ3Jlc3Mgc28gZmFyICh0cmFuc2NyaXB0IHVwIHRvIHRoZSBkZWNpc2lvbiBwb2ludCkKe3ByZWZpeH0KCiMgRGVjaXNpb24gcG9pbnQKT3B0aW9uIEE6CntjYW5kaWRhdGUgdGV4dH0KCk9wdGlvbiBCOgp7Y2FuZGlkYXRlIHRleHR9CgpXaGljaCBvcHRpb24gaXMgdGhlIGJldHRlciB0ZWNobmljYWwgZGVjaXNpb24/ClJldHVybiBleGFjdGx5IG9uZSBsaW5lOiBBTlNXRVI6IFg=]
+
+# Task given to the agent
+
+{query}
+
+# Agent’s progress so far (transcript up to the decision point)
+
+{prefix}
+
+# Decision point
+
+Option A:
+
+{candidate text}
+
+Option B:
+
+{candidate text}
+
+Which option is the better technical decision?
+
+Return exactly one line: ANSWER: X
+
+Prefix rendering. The prefix is rendered from the recorded trajectory steps before the fork, one line per step.
+An agent message is rendered as [i] AGENT: followed by its text, a command as [i] $ followed by the command, its exit code, and its indented output, and a file edit as [i] EDIT: followed by the edited paths.
+When a command output is longer than 700 characters, the rendering keeps its head and its tail and marks the number of omitted characters in between.
+The complete prompt is limited to 65,536 tokens.
+When a prompt exceeds this limit, the rendering keeps the first 25 lines of the prefix, which contain the task setup, and the longest tail that fits, and it marks the omitted steps between them.
+In the main evaluation this limit is reached by one question for two models, Claude Opus 5 and Claude Sonnet 5, and by no question for the other models.
+
+Answer parsing. The response is parsed from its final ANSWER: X line, and a response that consists of a single letter is also accepted.
+A response without a parseable answer is scored as incorrect, and Table 4 [#A4.T4] reports the number of such responses per model.
+
+Scoring. Each question is presented twice, once in a seeded order of the two candidates and once in the reverse order, where the seeded order is fixed per question and shared by all models.
+The accuracy of a model on a cell is the fraction of questions answered correctly in both presentations, and the mean accuracy is the fraction of correct presentations.
+The engineering accuracy pools the two engineering cells and the research accuracy pools the two research cells, and the Average is the mean of the two.
+The 95% intervals of Figure 3 [#S4.F3] are percentile intervals from 4,000 bootstrap resamples of the questions, drawn within each domain.
+
+Model settings. Table 3 [#A3.T3] lists the reasoning setting of each model.
+Every model receives the same prompt and the same output budget of 65,536 tokens, with default sampling parameters unless stated.
+
+Table 3: Settings of the evaluated models.
+
+Model
+Reasoning setting
+
+GPT-5.6 Sol
+reasoning effort xhigh
+
+GPT-5.5
+reasoning effort xhigh
+
+GPT-5.6 Luna, GPT-5.6 Terra
+default
+
+GPT-5.4 Mini, GPT-5.4 Nano
+reasoning effort high
+
+Claude Opus 5
+default
+
+Claude Sonnet 5
+adaptive thinking
+
+Grok 4.5
+reasoning effort high
+
+Grok 4.20 Reasoning
+default
+
+DeepSeek V4 Flash
+reasoning effort max
+
+GLM-5.2
+reasoning effort max, temperature 1.0
+
+MiniMax M3
+default
+
+Mistral Medium 3.5
+reasoning effort high
+
+Appendix D Full Results
+
+Results per model and per cell
+
+Table 4 [#A4.T4] reports the accuracy of every model on the four cells, together with the mean accuracy over the two presentations and the joint outcomes of the two presentations.
+The columns CC, CW, WC, and WW count the questions answered correctly in both presentations, only in the seeded presentation, only in the reverse presentation, and in neither.
+
+Effect of construction and domain. The mean over the 14 models is 58.1% on parallel engineering, 50.9% on parallel research, 50.8% on detour research, and 35.9% on detour engineering.
+Research forks are therefore not uniformly harder than engineering forks.
+Moreover, the gap between the two constructions is larger than the gap between the two domains.
+The pattern is clearest in the two extreme cells.
+Parallel engineering compares two branches whose recorded outcomes are clearly separated, and it is the easiest cell.
+In contrast, detour engineering requires the evaluated model to recognize a mistake before the acting agent did, and it is the hardest cell.
+For this reason, we report the four cells separately and keep both constructions in the benchmark.
+
+Table 4: Full results of the 14 models on Taste-Bench. P and D denote the parallel and detour constructions, and Eng and Res denote the engineering and research domains. Accuracies are percentages. Unparsed is the number of responses without a parseable answer over the 1,004 presentations.
+
+Model
+Average
+Eng.
+Res.
+P-Eng
+P-Res
+D-Eng
+D-Res
+Mean acc.
+CC
+CW
+WC
+WW
+Unparsed
+
+GPT-5.6 Sol
+59.7
+56.9
+62.5
+75.8
+56.2
+48.1
+67.2
+65.2
+292
+25
+29
+156
+0
+
+GPT-5.5
+59.5
+55.6
+63.4
+73.4
+56.2
+47.4
+68.8
+64.6
+288
+26
+24
+164
+0
+
+Claude Opus 5
+55.5
+46.7
+64.3
+71.0
+64.6
+35.3
+64.1
+60.3
+254
+26
+25
+197
+0
+
+Grok 4.5
+54.6
+52.1
+57.1
+61.3
+56.2
+47.7
+57.8
+62.0
+267
+40
+43
+152
+10
+
+GPT-5.6 Terra
+54.0
+50.0
+58.0
+70.2
+58.3
+40.6
+57.8
+62.2
+260
+40
+46
+156
+0
+
+GLM-5.2
+53.9
+47.9
+59.8
+64.5
+60.4
+40.2
+59.4
+64.0
+254
+52
+49
+147
+17
+
+Claude Sonnet 5
+51.6
+44.4
+58.9
+62.1
+56.2
+36.1
+60.9
+60.7
+239
+37
+52
+174
+0
+
+GPT-5.6 Luna
+49.0
+43.6
+54.5
+67.7
+50.0
+32.3
+57.8
+58.9
+231
+48
+51
+172
+0
+
+MiniMax M3
+45.3
+44.1
+46.4
+64.5
+56.2
+34.6
+39.1
+57.2
+224
+61
+51
+166
+3
+
+DeepSeek V4 Flash
+43.3
+38.5
+48.2
+58.1
+50.0
+29.3
+46.9
+54.9
+204
+59
+55
+184
+2
+
+GPT-5.4 Mini
+40.1
+25.6
+54.5
+26.6
+54.2
+25.2
+54.7
+49.5
+161
+46
+59
+236
+112
+
+Mistral Medium 3.5
+37.7
+41.5
+33.9
+43.5
+41.7
+40.6
+28.1
+51.8
+200
+70
+67
+165
+24
+
+GPT-5.4 Nano
+36.6
+32.1
+41.1
+46.0
+43.8
+25.6
+39.1
+48.8
+171
+65
+61
+205
+93
+
+Grok 4.20 Reasoning
+15.7
+22.6
+8.9
+28.2
+8.3
+19.9
+9.4
+29.0
+98
+78
+72
+254
+459
+
+Comparison with SWE-bench Verified
+
+Section 4.5 [#S4.SS5] compares the Average of each model with its public SWE-bench Verified score from the Vals AI leaderboard, and it excludes three models whose responses are unparsable on more than 9% of the presentations.
+Two models change places between the two benchmarks.
+Specifically, DeepSeek V4 Flash is 5th of the 11 models on SWE-bench Verified and 10th on Taste-Bench, and only 2 of its 1,004 responses are unparsable, while GPT-5.5 is 8th on SWE-bench Verified and 2nd on Taste-Bench, ahead of Claude Opus 5 on the engineering subset.
+It is worth noting that the SWE-bench Verified scores are public numbers from a single harness, that the reasoning-effort setting is not matched between the two evaluations for every model, and that the 95% interval of the correlation is wide at this sample size, [+0.04,+0.89][+0.04,+0.89] for the Average (p=0.04p=0.04) and [−0.30,+0.79][-0.30,+0.79] for the engineering subset.
+
+Time horizon annotation
+
+Judge and prompt. One judge model, GPT-5.5, annotates the time horizon of every question.
+The judge reads the task, the prefix, the two candidates, and the supported candidate, and it returns one sentence of justification followed by a score.
+The prompt is shown below.
+
+⬇ [data:text/plain;base64,IyBUYXNrCntxdWVyeX0KCiMgVHJhamVjdG9yeSBiZWZvcmUgdGhlIGRlY2lzaW9uCntwcmVmaXh9CgojIENhbmRpZGF0ZSBuZXh0IHN0ZXBzCk9wdGlvbiBBOgp7Y2FuZGlkYXRlIHRleHR9CgpPcHRpb24gQjoKe2NhbmRpZGF0ZSB0ZXh0fQoKIyBDb3JyZWN0IGFuc3dlcgp7bGV0dGVyfSAoZXN0YWJsaXNoZWQgaW4gaGluZHNpZ2h0IGZyb20gdGhlIGNvbXBsZXRlZCBydW4pCgpIb3cgZmFyIGludG8gdGhlIGZ1dHVyZSB3b3VsZCBhbiBvYnNlcnZlciBhdCB0aGlzIGRlY2lzaW9uIHBvaW50IG5lZWQgdG8gc2VlIGJlZm9yZSB0aGUgY29ycmVjdCBjaG9pY2UgYmVjb21lcyBjbGVhcmx5IGp1c3RpZmllZD8gVXNlIHRoaXMgc2NhbGU6CgowIC0gRXhwbGljaXQgZXZpZGVuY2UgaW4gdGhlIHByZWZpeDogYSBzcGVjaWZpYyBkZWNpc2l2ZSBmYWN0IGlzIGFscmVhZHkgdmlzaWJsZSBiZWZvcmUgdGhlIGRlY2lzaW9uIChhbiBlcnJvciBtZXNzYWdlLCBhIHN0YXRlZCBjb25zdHJhaW50LCBhIHZpc2libGUgZml4IG9yIGRpZmYpIHRoYXQgZGlyZWN0bHkgcnVsZXMgb3V0IG9uZSBvcHRpb24uCjEgLSBJbmZlcmFibGUgZnJvbSB0aGUgcHJlZml4OiBubyBzaW5nbGUgZGVjaXNpdmUgZmFjdCBpcyB2aXNpYmxlLCBidXQgd2VpZ2hpbmcgdGhlIGhpbnRzIGFscmVhZHkgcHJlc2VudCBpbiB0aGUgcHJlZml4IChkb21haW4ganVkZ21lbnQsIGNvbWJpbmluZyBvYnNlcnZhdGlvbnMpIGlzIGVub3VnaCB0byBqdXN0aWZ5IHRoZSBjb3JyZWN0IG9wdGlvbjsgbm8gZnV0dXJlIG9ic2VydmF0aW9uIGlzIG5lZWRlZC4KMiAtIE5leHQgb2JzZXJ2YXRpb24gc2V0dGxlcyBpdDogdGhlIGZpcnN0IGRpcmVjdCBvYnNlcnZhdGlvbiBhZnRlciB0aGUgZGVjaXNpb24gKHRoZSBvdXRwdXQgb2Ygb25lIGNvbW1hbmQgb3IgcHJvYmUsIHRoZSBjb250ZW50IG9mIG9uZSBvcGVuZWQgZmlsZSkgd291bGQgY2xlYXJseSBqdXN0aWZ5IHRoZSBjb3JyZWN0IG9wdGlvbi4KMyAtIFF1aWNrIGxvY2FsIGNoZWNrIG5lZWRlZDogYSBjb21wbGV0ZWQsIHNlbGYtY29udGFpbmVkIGxvY2FsIHZlcmlmaWNhdGlvbiBpcyBuZWVkZWQgKHJ1bm5pbmcgb25lIHVuaXQgdGVzdCwgYSBzbWFsbCBzY3JpcHQsIGEgcXVpY2sgc21va2UgZXhwZXJpbWVudCkgYmVmb3JlIHRoZSBjb3JyZWN0IG9wdGlvbiBpcyBjbGVhcmx5IGp1c3RpZmllZC4KNCAtIFN1YnN0YW50aWFsIGZ1dHVyZSB3b3JrIG5lZWRlZDogbW9yZSB0aGFuIGEgcXVpY2sgbG9jYWwgY2hlY2sgaXMgcmVxdWlyZWQgLSBtZWFuaW5nZnVsIGZ1cnRoZXIgaW1wbGVtZW50YXRpb24gb3IgaW52ZXN0aWdhdGlvbiwgcmVzdWx0cyBhcHBlYXJpbmcgYWNyb3NzIGxhdGVyIHN0YWdlcyBvZiBkb3duc3RyZWFtIHdvcmssIG9yIG9ubHkgdGhlIHRlcm1pbmFsIG91dGNvbWUgKGZpbmFsIHRlc3Qgc3VpdGUsIGV4dGVybmFsIGdyYWRlciwgY29tcGxldGUgYnJhbmNoIGNvbXBhcmlzb24pLgoKR2l2ZSBhIG9uZS1zZW50ZW5jZSBqdXN0aWZpY2F0aW9uLCB0aGVuIGVuZCB3aXRoIGV4YWN0bHk6IFNDT1JFOiBO]
+
+# Task
+
+{query}
+
+# Trajectory before the decision
+
+{prefix}
+
+# Candidate next steps
+
+Option A:
+
+{candidate text}
+
+Option B:
+
+{candidate text}
+
+# Correct answer
+
+{letter} (established in hindsight from the completed run)
+
+How far into the future would an observer at this decision point need to see before the correct choice becomes clearly justified? Use this scale:
+
+0 - Explicit evidence in the prefix: a specific decisive fact is already visible before the decision (an error message, a stated constraint, a visible fix or diff) that directly rules out one option.
+
+1 - Inferable from the prefix: no single decisive fact is visible, but weighing the hints already present in the prefix (domain judgment, combining observations) is enough to justify the correct option; no future observation is needed.
+
+2 - Next observation settles it: the first direct observation after the decision (the output of one command or probe, the content of one opened file) would clearly justify the correct option.
+
+3 - Quick local check needed: a completed, self-contained local verification is needed (running one unit test, a small script, a quick smoke experiment) before the correct option is clearly justified.
+
+4 - Substantial future work needed: more than a quick local check is required - meaningful further implementation or investigation, results appearing across later stages of downstream work, or only the terminal outcome (final test suite, external grader, complete branch comparison).
+
+Give a one-sentence justification, then end with exactly: SCORE: N
+
+Levels. The prompt defines five scores, and the four levels of Section 4 [#S4] are these scores with the two highest merged.
+This is because only 13 questions receive the highest score, which is too few for a per-model comparison, so we merge them with the 56 questions at the quick-local-check score into the more-work level.
+The four levels contain 158, 219, 56, and 69 questions.
+Table 5 [#A4.T5] reports the distribution per cell, and Table 6 [#A4.T6] reports the accuracy of every model per level.
+
+Table 5: Number of questions per time horizon level and cell.
+
+Cell
+In prefix
+Inferable
+Next step
+More work
+
+Parallel engineering
+72
+45
+4
+3
+
+Parallel research
+11
+13
+3
+21
+
+Detour engineering
+69
+128
+36
+33
+
+Detour research
+6
+33
+13
+12
+
+All
+158
+219
+56
+69
+
+Table 6: Accuracy of every model per time horizon level. Accuracy requires both presentations to be answered correctly, as in Section 3.4 [#S3.SS4].
+
+Model
+In prefix
+Inferable
+Next step
+More work
+
+(n=158n=158)
+(n=219n=219)
+(n=56n=56)
+(n=69n=69)
+
+GPT-5.5
+75.9
+57.1
+48.2
+23.2
+
+GPT-5.6 Sol
+79.7
+57.5
+44.6
+21.7
+
+Grok 4.5
+67.1
+53.9
+32.1
+36.2
+
+Claude Opus 5
+67.1
+47.0
+50.0
+24.6
+
+GPT-5.6 Terra
+73.4
+48.9
+41.1
+20.3
+
+GLM-5.2
+69.0
+49.8
+32.1
+26.1
+
+Claude Sonnet 5
+63.9
+45.7
+35.7
+26.1
+
+GPT-5.6 Luna
+67.7
+43.8
+32.1
+14.5
+
+MiniMax M3
+64.6
+41.1
+25.0
+26.1
+
+DeepSeek V4 Flash
+61.4
+35.6
+30.4
+17.4
+
+Mistral Medium 3.5
+54.4
+42.5
+14.3
+18.8
+
+GPT-5.4 Nano
+49.4
+31.1
+25.0
+15.9
+
+GPT-5.4 Mini
+46.2
+30.1
+16.1
+18.8
+
+Grok 4.20 Reasoning
+32.3
+16.4
+14.3
+4.3
+
+Mean over models
+62.3
+42.9
+31.5
+21.0
+
+Reasoning budget
+
+Table 7 [#A4.T7] reports the six conditions of Section 4.4 [#S4.SS4], with the accuracy over all questions and the accuracy per time horizon level.
+For the differences between the lowest and the highest setting in Section 4.4 [#S4.SS4], the 95% interval is [−3.2,+2.8][-3.2,+2.8] points for GPT-5.6 Sol and [−1.6,+6.0][-1.6,+6.0] points for GPT-5.6 Luna.
+These are percentile intervals from 10,000 bootstrap resamples of the questions, where the two conditions of a difference are resampled jointly.
+A logistic model with an interaction between the budget and the horizon level also shows no interaction for either model (p=0.80p=0.80 for Sol and p=0.82p=0.82 for Luna).
+
+Where the budget is spent. At every setting with reasoning enabled, the two models produce the most reasoning tokens at the more-work level.
+However, the more-work level is also the level with the lowest accuracy, between 13.0% and 23.2% over the six conditions.
+
+Response statistics. Across the 6,024 responses, no response reaches the token limit and one response is unparsable.
+
+Results by domain. On the research subset, the accuracy of Luna increases with the budget from 43.8% to 54.5%, while its engineering subset and both subsets of Sol are unchanged.
+
+Table 7: Accuracy under three reasoning-effort settings per model.
+
+Model
+Setting
+Accuracy
+In prefix
+Inferable
+Next step
+More work
+
+GPT-5.6 Sol
+low
+56.2
+79.1
+53.9
+44.6
+20.3
+
+GPT-5.6 Sol
+xhigh
+55.6
+78.5
+52.1
+46.4
+21.7
+
+GPT-5.6 Sol
+max
+56.0
+79.7
+52.5
+42.9
+23.2
+
+GPT-5.6 Luna
+none
+43.4
+60.8
+44.3
+28.6
+13.0
+
+GPT-5.6 Luna
+high
+45.8
+67.7
+42.9
+28.6
+18.8
+
+GPT-5.6 Luna
+max
+45.6
+65.2
+43.4
+35.7
+15.9
+
+Appendix E Agreement of the Judges
+
+Table 8 [#A5.T8] reports how often each judge selects the labeled candidate in the trivial filter for the parallel engineering cell, both over all proposed questions and over the released questions.
+On the released questions in this cell, the pairwise agreement between two judges is 51.7%.
+In the undecidable filter, every judge selects the labeled candidate on every released question, because the filter keeps a question only under unanimous agreement.
+
+Table 8: Accuracy of the judges from the two candidates alone in the parallel engineering cell. Accuracies are percentages over the proposed questions and over the released questions. Agreement is the fraction of judge pairs that select the same candidate on the released questions.
+
+Cell
+Judge
+Proposed
+Released
+Agreement
+
+Parallel engineering
+Kimi K2.5
+84.7
+55.6
+51.7
+
+GPT-4.1
+85.8
+63.7
+
+Llama 4 Maverick
+75.6
+34.7
+
+Mistral Large 3
+82.0
+59.7
+
+Appendix F Human Review
+
+Sampling and annotation
+
+Sampling. The human review contains 100 questions.
+We sample 70 released questions across the four construction-domain cells and four time-horizon levels, together with 15 questions removed by the trivial filter and 15 removed because the judges do not unanimously support the label.
+The questions are mixed and presented with randomized candidate order, shared by both reviewers.
+
+Annotation procedure. Both reviewers complete the same two-stage interface.
+The first question asks which direction they would choose at the decision point and allows A, B, or “unsure.”
+After summaries of the recorded continuations and outcomes are shown, the second question asks which decision was better.
+It allows A, B, or a response indicating that neither decision is meaningfully better or that the choice does not explain the outcome difference.
+We use the second response to assess label agreement.
+
+Agreement calculation. We exclude second-stage responses without a clear A/B preference.
+Of the remaining 172 judgments, 170 support the mined label, yielding 98.8% agreement.
+For agreement between reviewers, we retain the 74 questions where both select A or B.
+They agree on 73 of these questions, with Cohen’s κ=0.973\kappa=0.973{}.
+Table 9 [#A6.T9] reports the results for each reviewer.
+
+Table 9: Human review after outcome disclosure. Each reviewer assesses the same 100 questions. We exclude responses without a clear A/B preference, and label agreement is computed over the retained judgments.
+
+Reviewer
+Retained judgments
+Label agreement
+
+Reviewer 1
+87
+86/87 (98.9%)
+
+Reviewer 2
+85
+84/85 (98.8%)
+
+Combined
+172
+170/172 (98.8%)
+
+Appendix G Distillation Details
+
+Recipe
+
+Contexts. The teacher and the student are the same frozen Qwen3.6-27B base model with different contexts.
+The student context is the question, rendered with the system message and user message below, where the two candidates are presented in both orders, so every question provides two training views.
+The teacher context is the same messages with the demonstration inserted before the question and separated from it by a heading.
+
+⬇ [data:text/plain;base64,WW91IGFyZSBhIHNlbmlvciBzb2Z0d2FyZS9yZXNlYXJjaCBlbmdpbmVlciByZXZpZXdpbmcgYW4gYXV0b25vbW91cyBhZ2VudCdzIHdvcmsgYXQgYSBkZWNpc2lvbiBwb2ludC4gSnVkZ2UgdGhlIGFsdGVybmF0aXZlcyBvbiB0ZWNobmljYWwgbWVyaXQgYW5kIGxpa2VseSB0YXNrIG91dGNvbWUu]
+
+You are a senior software/research engineer reviewing an autonomous agent’s work at a decision point. Judge the alternatives on technical merit and likely task outcome.
+
+⬇ [data:text/plain;base64,IyBUYXNrIGdpdmVuIHRvIHRoZSBhZ2VudAp7cXVlcnl9CgojIEFnZW50IHByb2dyZXNzIHVwIHRvIHRoZSBkZWNpc2lvbiBwb2ludAp7cHJlZml4fQoKIyBDYW5kaWRhdGUgbmV4dCBzdGVwcwoKT3B0aW9uIEE6CntjYW5kaWRhdGUgdGV4dH0KCk9wdGlvbiBCOgp7Y2FuZGlkYXRlIHRleHR9CgpUaGluayB0aHJvdWdoIHRoZSBlbmdpbmVlcmluZyBkZWNpc2lvbiBjYXJlZnVsbHkuIEFmdGVyIHRoaW5raW5nLCBzaG93IHlvdXIKY2hvaWNlIGluIHRoZSAiYW5zd2VyIiBmaWVsZCBvZiBhIEpTT04gb2JqZWN0IHVzaW5nIG9ubHkgIkEiIG9yICJCIiwgZm9yCmV4YW1wbGUgeyJhbnN3ZXIiOiJBIn0u]
+
+# Task given to the agent
+
+{query}
+
+# Agent progress up to the decision point
+
+{prefix}
+
+# Candidate next steps
+
+Option A:
+
+{candidate text}
+
+Option B:
+
+{candidate text}
+
+Think through the engineering decision carefully. After thinking, show your
+
+choice in the "answer" field of a JSON object using only "A" or "B", for
+
+example {"answer":"A"}.
+
+⬇ [data:text/plain;base64,QmVsb3cgaXMgYSByZWZlcmVuY2UgZGlzdGlsbGVkIGZyb20gcGFzdCBhZ2VudCBydW5zIG9uIFRISVMgRVhBQ1QgdGFzazogYXQgdGhlIGN1cnJlbnQgZGVjaXNpb24gZm9yaywgdGhlIGNob2ljZSB0aGF0IGxlZCB0byBzdWNjZXNzLCBhbmQgdGhlIGNob2ljZXMgdGhhdCBsZWQgdG8gZmFpbHVyZS4gVXNlIGl0IHdoZW4gcmVsZXZhbnQuCgojIFJlZmVyZW5jZToga2V5IGRlY2lzaW9ucyBmcm9tIHBhc3QgcnVucyBvbiB0aGlzIHRhc2sKCiMjIyBEZWNpc2lvbiBmb3JrIChhdCB0aGUgY3VycmVudCBwb2ludCkKClRoZSByaWdodCBjYWxsIGF0IHRoaXMgcG9pbnQgLS0gZG8gdGhpczoKe3RleHQgb2YgdGhlIHN1cHBvcnRlZCBjYW5kaWRhdGV9CgpBdm9pZDoKLSB7dGV4dCBvZiB0aGUgb3RoZXIgY2FuZGlkYXRlfQoKCi0tLQoKIyBZb3VyIHRhc2sKCntzdHVkZW50IHVzZXIgbWVzc2FnZX0=]
+
+Below is a reference distilled from past agent runs on THIS EXACT task: at the current decision fork, the choice that led to success, and the choices that led to failure. Use it when relevant.
+
+# Reference: key decisions from past runs on this task
+
+### Decision fork (at the current point)
+
+The right call at this point – do this:
+
+{text of the supported candidate}
+
+Avoid:
+
+- {text of the other candidate}
+
+—
+
+# Your task
+
+{student user message}
+
+Teacher outputs. The teacher generates one reasoning trace per view at temperature 1.0 with a budget of 3,072 new tokens, and the trace ends at the closing of the reasoning block followed by the answer.
+A trace is kept only when its reasoning block is well formed and contains at least 32 tokens, and a question is kept only when both of its views are kept.
+On the two folds, 328 of 390 and 311 of 390 traces are kept, so 156 and 142 questions and therefore 312 and 284 training views remain.
+The teacher selects the supported candidate in 328 of 328 and 310 of 311 kept traces.
+
+Objective. The loss at each reasoning position is a forward KL from the student distribution to the teacher distribution, computed over the top 100 tokens of the student together with one extra entry that contains the remaining probability mass, so no mass is dropped.
+The loss at the answer position is a forward KL restricted to the two answer tokens.
+Both terms have weight one, and the reasoning positions of a long trace are subsampled evenly to at most 512 positions.
+The KL is computed on continuations sampled from the teacher rather than from the student.
+This is because the two contexts differ exactly on the tokens where the teacher predicts differently because of the demonstration, and the student’s own samples rarely produce those tokens, so a KL computed on student samples would not reflect the teacher’s preference.
+
+Leakage control. The student must not receive the demonstration through surface text.
+To address this, the leakage control in our recipe is structural.
+The answer is a closed choice between the two candidates, and the teacher sequence ends at the final answer, so no span of the output is a copy of the demonstration text.
+
+Calibration. After distillation, the student is calibrated on its own free reasoning traces on the training fold.
+Specifically, the student generates one trace per view, and the answer position of each trace is trained with a cross-entropy loss on the supported label, which uses 306 and 320 views on the two folds.
+This pass adjusts only the final choice under the student’s own reasoning and does not change the reasoning distribution.
+
+Hyperparameters. Table 10 [#A7.T10] lists the settings, which are the same for the two folds.
+Training on each fold takes about two hours on one A100 80GB GPU.
+
+Table 10: Distillation hyperparameters.
+
+Setting
+
+Value
+
+Base model
+
+Qwen3.6-27B, bfloat16
+
+Adapter
+
+LoRA, rank 16, α=32\alpha=32, no dropout, on all attention and MLP projections
+
+Trainable parameters
+
+79.7M
+
+Optimizer
+
+AdamW, gradient clipping at norm 1.0
+
+Distillation
+
+learning rate 10−410^{-4}, 2 epochs, one view per step, 624 and 568 steps
+
+Distillation loss
+
+forward KL at temperature 1.0, top-100 tokens plus one entry for the remaining mass, at most 512 reasoning positions
+
+Calibration
+
+learning rate 10−510^{-5}, 1 epoch, softmax temperature 2.0, 306 and 320 steps
+
+Sequence length
+
+at most 10,240 tokens, no truncation in the training data
+
+Peak GPU memory
+
+71 GB
+
+Wall clock per fold
+
+2.1 h and 1.8 h for distillation
+
+Folds
+
+The 390 engineering questions are split by task into two folds of 195 questions, so that both folds contain the same number of parallel and detour questions and every repository is present in both folds.
+Table 11 [#A7.T11] reports the composition.
+The two folds share no question, no task, no source trajectory, and no prefix, which we verify before training.
+Each student trains on one fold and is evaluated on the other; Section 5.2 [#S5.SS2] pools the two out-of-fold evaluations.
+
+Table 11: Composition of the two task-disjoint folds.
+
+Fold 1
+Fold 2
+
+Questions
+195
+195
+
+Parallel / detour questions
+62 / 133
+62 / 133
+
+Tasks
+86
+72
+
+NodeBB
+11
+2
+
+ansible
+29
+43
+
+element-web
+16
+12
+
+flipt
+15
+13
+
+vuls
+10
+12
+
+teleport
+11
+11
+
+openlibrary
+38
+35
+
+navidrome
+13
+23
+
+webclients
+7
+16
+
+qutebrowser
+24
+21
+
+tutanota
+21
+7
+
+Transfer results
+
+Section 5.2 [#S5.SS2] scores the held-out questions with the protocol of Section 3.4 [#S3.SS4].
+Specifically, each of the 390 questions is presented in both orders, a question counts as correct only when both presentations are answered correctly, and a presentation without a parseable answer counts as wrong.
+The student answers both presentations correctly on 187 questions, and the base model does so on 117 questions.
+Relative to the base model, the student answers 104 questions correctly that the base model answers wrongly, and 34 questions wrongly that the base model answers correctly.
+On the training fold, the gain from 48.6% to 92.9% in Section 5.2 [#S5.SS2] has p≈8×10−9p\approx 8\times 10^{-9}.
+The 95% intervals of Figure 7 [#S5.F7.fig1] are computed by item bootstrap with 4,000 draws, as in Figure 3 [#S4.F3].
+Because the scoring is the same, the student can be placed in the engineering ranking of Figure 3 [#S4.F3], where it is below GPT-5.6 Sol (56.9%) and GPT-5.6 Terra (50.0%), equal to GLM-5.2 (47.9%), and above Claude Opus 5 (46.7%), while the base model is just below GPT-5.4 Nano (32.1%).
+
+The advice of Section 5.3 [#S5.SS3] needs one decision per question.
+For each question, we sum over the two presentations the log-odds that the student assigns to the two answer tokens, and we select the candidate that the sum favors.
+Under this rule, the student selects the supported candidate on 287 of 390 questions and the base model on 207 of 390.
+These rates are higher than the accuracy above because the rule needs only the combined decision and not a correct answer on both presentations.
+
+Appendix H End-to-End Experiment Details
+
+Tasks. The 41 held-out tasks are SWE-bench Pro tasks from which the pipeline of Section 3 [#S3] mined at least one engineering question, and they cover 11 repositories: ansible (8), openlibrary (8), qutebrowser (6), vuls (4), tutanota (4), element-web (3), flipt (2), teleport (2), webclients (2), NodeBB (1), and navidrome (1).
+Together they contain 98 forks.
+For every task, the advice is written by the student trained on the fold that does not contain the task, so the student is never trained on the task.
+Two tasks have forks from both constructions, and for these we use the forks of the parallel construction.
+
+Executor. The executor is SWE-agent 1.1.0 with Qwen3.6-27B as the model, with thinking disabled, temperature 0.7, top-pp 0.8, top-kk 20, and presence penalty 1.5.
+Each run is limited to 75 model calls, 600 seconds per command, and 4,800 seconds in total, and it runs in the official SWE-bench Pro container of the task.
+A run is successful when the official SWE-bench Pro evaluation accepts its patch.
+The gain of correct advice over no advice in Section 5.3 [#S5.SS3] has an exact McNemar p≤0.004p\leq 0.004.
+
+Advice text. The advice is placed before the problem statement in the first user message of the executor, followed by a heading and the original problem statement.
+It contains one note per fork of the task, and each note contains the situation at the fork, the candidate to avoid, and the candidate to take, followed by a reminder that the note is not evidence about the current patch.
+The template is shown below, and an example note follows it.
+
+⬇ [data:text/plain;base64,IyBUYXNrLXNwZWNpZmljIHBpdGZhbGwgbm90ZXMgKGZyb20gcHJpb3IgcnVucyBvbiB0aGlzIGV4YWN0IHRhc2spCgpUaGVzZSBub3RlcyBhcmUgZGlzdGlsbGVkIGZyb20gZWFybGllciBhZ2VudCBydW5zIHRoYXQgYXR0ZW1wdGVkIFRISVMgRVhBQ1QgdGFzayBhbmQgZWl0aGVyIHBhc3NlZCBvciBmYWlsZWQgdGhlIGhpZGRlbiB0ZXN0cy4gVGhleSBkZXNjcmliZSBkZWNpc2lvbiBwb2ludHMgd2hlcmUgcnVucyBkaXZlcmdlZC4KClJFQUQgVEhJUyBGSVJTVCDigJQgd2hhdCB0aGVzZSBub3RlcyBhcmUgTk9UOgotIFRoZXkgYXJlIE5PVCBldmlkZW5jZSBhYm91dCBZT1VSIHBhdGNoLiBUaGV5IGRlc2NyaWJlIG90aGVyIHJ1bnMsIG5vdCB0aGlzIG9uZS4KLSBBIG5vdGUgc2F5aW5nIGEgcm91dGUgInBhc3NlZCIgbWVhbnMgaXQgcGFzc2VkIEZPUiBUSEFUIFJVTi4gWW91ciBpbXBsZW1lbnRhdGlvbiBkaWZmZXJzIGluIGRldGFpbHMgeW91IGNhbm5vdCBzZWU7IHRoZSBvbmx5IHdheSB0byBrbm93IHlvdXIgcGF0Y2ggd29ya3MgaXMgdG8gcnVuIGNoZWNrcyB5b3Vyc2VsZiBpbiB0aGlzIHNlc3Npb24uCi0gRG8gbm90IHN1Ym1pdCBiZWNhdXNlIHlvdXIgYXBwcm9hY2ggbWF0Y2hlcyBhIHBhc3NlZCByb3V0ZS4gU3VibWl0dGluZyB3aXRob3V0IHJ1bm5pbmcgeW91ciBvd24gdmVyaWZpY2F0aW9uIGhhcyBoaXN0b3JpY2FsbHkgcHJvZHVjZWQgZmFpbGluZyBwYXRjaGVzIG9uIHRoaXMgZXhhY3QgdGFzayBldmVuIHdoZW4gdGhlIGFwcHJvYWNoIHdhcyByaWdodC4KClNVQk1JU1NJT04gQ09OVFJBQ1QgKG1hbmRhdG9yeSk6IGJlZm9yZSB5b3Ugc3VibWl0LCB5b3UgbXVzdCAoMSkgcnVuIHRoZSBwcm9qZWN0J3MgcmVsZXZhbnQgdGVzdHMgb3IsIGlmIHRoZXkgY2Fubm90IHJ1biwgYSBmb2N1c2VkIGNoZWNrIHlvdSBjb25zdHJ1Y3QgeW91cnNlbGYsICgyKSBvYnNlcnZlIHRoZSBhY3R1YWwgb3V0cHV0LCBhbmQgKDMpIGZpeCBhbmQgcmUtcnVuIHVudGlsIGl0IHBhc3NlcyBvciB5b3VyIGJ1ZGdldCBydW5zIG91dC4gSWYgeW91IGhhdmUgbm90IGV4ZWN1dGVkIGEgdmVyaWZpY2F0aW9uIGNvbW1hbmQgYW5kIHNlZW4gaXRzIG91dHB1dCBpbiB0aGlzIHNlc3Npb24sIHlvdSBhcmUgbm90IHJlYWR5IHRvIHN1Ym1pdC4KCldvcmsgb24gdGhlIHRhc2sgaW4geW91ciBub3JtYWwgd2F5LiBEbyBub3Qgc3BlbmQgYWN0aW9ucyBzZWFyY2hpbmcgdGhlIGNvZGViYXNlIGZvciB0aGUgc2l0dWF0aW9ucyBiZWxvdywgYW5kIGRvIG5vdCByZXN0cnVjdHVyZSB5b3VyIHBsYW4gYXJvdW5kIHRoZW0uIE9ubHkgaWYgeW91IGZpbmQgeW91cnNlbGYgYWxyZWFkeSBmYWNpbmcgb25lIG9mIHRoZXNlIGRlY2lzaW9ucywgdXNlIHRoZSBub3RlIHRvIGF2b2lkIHRoZSBrbm93biB0cmFwIOKAlCB0aGVuIHZlcmlmeSBhcyB1c3VhbC4KCiMjIERlY2lzaW9uIHRyYXAge259IFt7Y29uc3RydWN0aW9ufV0gKHN0ZXAge2Zvcmsgc3RlcH0pCiMjIyBTaXR1YXRpb24gd2hlcmUgcHJpb3IgcnVucyBkaXZlcmdlZAp7c2l0dWF0aW9ufQojIyMgS25vd24gdHJhcCAodGhpcyByb3V0ZSBwcm9kdWNlZCBhIEZBSUxJTkcgcGF0Y2gpCntjYW5kaWRhdGUgdG8gYXZvaWR9CiMjIyBSb3V0ZSB0aGF0IGF2b2lkZWQgdGhlIHRyYXAgaW4gYSBwcmlvciBydW4Ke2NhbmRpZGF0ZSB0byB0YWtlfQpSZW1pbmRlcjogY2hvb3NpbmcgdGhpcyByb3V0ZSBpcyBub3QgdmVyaWZpY2F0aW9uLiBBZnRlciBhY3RpbmcsIHByb2R1Y2UgeW91ciBvd24gZXZpZGVuY2UgdGhhdCB0aGUgcmVzdWx0aW5nIGJlaGF2aW9yIGlzIGNvcnJlY3Qu]
+
+# Task-specific pitfall notes (from prior runs on this exact task)
+
+These notes are distilled from earlier agent runs that attempted THIS EXACT task and either passed or failed the hidden tests. They describe decision points where runs diverged.
+
+READ THIS FIRST — what these notes are NOT:
+
+- They are NOT evidence about YOUR patch. They describe other runs, not this one.
+
+- A note saying a route "passed" means it passed FOR THAT RUN. Your implementation differs in details you cannot see; the only way to know your patch works is to run checks yourself in this session.
+
+- Do not submit because your approach matches a passed route. Submitting without running your own verification has historically produced failing patches on this exact task even when the approach was right.
+
+SUBMISSION CONTRACT (mandatory): before you submit, you must (1) run the project’s relevant tests or, if they cannot run, a focused check you construct yourself, (2) observe the actual output, and (3) fix and re-run until it passes or your budget runs out. If you have not executed a verification command and seen its output in this session, you are not ready to submit.
+
+Work on the task in your normal way. Do not spend actions searching the codebase for the situations below, and do not restructure your plan around them. Only if you find yourself already facing one of these decisions, use the note to avoid the known trap — then verify as usual.
+
+## Decision trap {n} [{construction}] (step {fork step})
+
+### Situation where prior runs diverged
+
+{situation}
+
+### Known trap (this route produced a FAILING patch)
+
+{candidate to avoid}
+
+### Route that avoided the trap in a prior run
+
+{candidate to take}
+
+Reminder: choosing this route is not verification. After acting, produce your own evidence that the resulting behavior is correct.
+
+⬇ [data:text/plain;base64,IyMgRGVjaXNpb24gdHJhcCAxIFtwYXJhbGxlbF0gKHN0ZXAgNzkpCiMjIyBTaXR1YXRpb24gd2hlcmUgcHJpb3IgcnVucyBkaXZlcmdlZApSZWZhY3RvciBUZWxlcG9ydCdzIEhTTS9LTVMgdGVzdCBjb25maWd1cmF0aW9uIHVuZGVyIGByZXBvL2Agc28gYGxpYi9hdXRoL2tleXN0b3JlL3Rlc3RoZWxwZXJzLmdvYCBleHBvc2VzIGBIU01UZXN0Q29uZmlnKHQgKnRlc3RpbmcuVCkgQ29uZmlnYCwgc2VsZWN0aW5nIFl1YmlIU00sIENsb3VkSFNNLCBBV1MgS01TLCBHQ1AgS01TLCBvciBTb2Z0SFNNIGZyb20gYFRFTEVQT1JUX1RFU1RfKmAgZW52aXJvbm1lbnQgY29uZmlndXJhdGlvbiBhbmQgZmFpbGluZyB0aGUgdGVzdCB3aGVuIG5vbmUgaXMgYXZhaWxhYmxlLiBBZGQgcmV1c2FibGUgcGVyLWJhY2tlbmQgY29uZmlndXJhdGlvbiBmdW5jdGlvbnMgcmV0dXJuaW5nIGNvbmZpZ3VyYXRpb24gcGx1cyBhdmFpbGFiaWxpdHksIHZhbGlkYXRlIG1pc3Npbmcgb3IgaW5jb21wbGV0ZSBlbnZpcm9ubWVudCBzZXR1cCBjb25zaXN0ZW50bHksIGFuZCByZXBsYWNlIGR1cGxpY2F0ZWQgZGV0ZWN0aW9uIGluIHRoZSBrZXlzdG9yZSBhbmQgSFNNIGludGVncmF0aW9uIHRlc3RzIHdpdGhvdXQgYnJlYWtpbmcgYmFja2VuZC1zcGVjaWZpYyBiZWhhdmlvci4gRm9jdXMgb24gdGhlIHJlcXVpcmVkIHRlc3QtaW5mcmFzdHJ1Y3R1cmUgc291cmNlIGNoYW5nZXMgYW5kIHZlcmlmeSB0aGUgYWZmZWN0ZWQgR28gcGFja2FnZXMuCiMjIyBLbm93biB0cmFwICh0aGlzIHJvdXRlIHByb2R1Y2VkIGEgRkFJTElORyBwYXRjaCkKS2VlcCB0aGUgZXhpc3RpbmcgUEtDUyMxMS1zcGVjaWZpYyBhbGVydCBhc3NlcnRpb24gdW5jaGFuZ2VkIGFuZCBsaW1pdCB0aGUgcmVmYWN0b3IgdG8gY2VudHJhbGl6ZWQgY29uZmlndXJhdGlvbiBhbmQgYXZhaWxhYmlsaXR5IHBsdW1iaW5nLiBGaW5pc2ggd2l0aCB0aGUgZm9jdXNlZCBwYWNrYWdlIGNoZWNrcyBhbHJlYWR5IHJ1bi4KIyMjIFJvdXRlIHRoYXQgYXZvaWRlZCB0aGUgdHJhcCBpbiBhIHByaW9yIHJ1bgpSZXZpZXcgaW50ZWdyYXRpb24gYXNzZXJ0aW9ucyBmb3IgYXNzdW1wdGlvbnMgaW52YWxpZGF0ZWQgYnkgdGhlIGV4cGFuZGVkIGJhY2tlbmQgc2VsZWN0b3IuIFJlcGxhY2UgdGhlIGFsZXJ0IGNoZWNrIHRoYXQgc3BlY2lmaWNhbGx5IGV4cGVjdHMg4oCcUEtDUyMxMSBIU00ga2V5c+KAnSB3aXRoIGEgYmFja2VuZC1uZXV0cmFsIGFzc2VydGlvbiBzbyB0aGUgc2FtZSB0ZXN0IHJlbWFpbnMgdmFsaWQgZm9yIEtNUyBjb25maWd1cmF0aW9ucy4KUmVtaW5kZXI6IGNob29zaW5nIHRoaXMgcm91dGUgaXMgbm90IHZlcmlmaWNhdGlvbi4gQWZ0ZXIgYWN0aW5nLCBwcm9kdWNlIHlvdXIgb3duIGV2aWRlbmNlIHRoYXQgdGhlIHJlc3VsdGluZyBiZWhhdmlvciBpcyBjb3JyZWN0Lg==]
+
+## Decision trap 1 [parallel] (step 79)
+
+### Situation where prior runs diverged
+
+Refactor Teleport’s HSM/KMS test configuration under ‘repo/‘ so ‘lib/auth/keystore/testhelpers.go‘ exposes ‘HSMTestConfig(t *testing.T) Config‘, selecting YubiHSM, CloudHSM, AWS KMS, GCP KMS, or SoftHSM from ‘TELEPORT_TEST_*‘ environment configuration and failing the test when none is available. Add reusable per-backend configuration functions returning configuration plus availability, validate missing or incomplete environment setup consistently, and replace duplicated detection in the keystore and HSM integration tests without breaking backend-specific behavior. Focus on the required test-infrastructure source changes and verify the affected Go packages.
+
+### Known trap (this route produced a FAILING patch)
+
+Keep the existing PKCS#11-specific alert assertion unchanged and limit the refactor to centralized configuration and availability plumbing. Finish with the focused package checks already run.
+
+### Route that avoided the trap in a prior run
+
+Review integration assertions for assumptions invalidated by the expanded backend selector. Replace the alert check that specifically expects “PKCS#11 HSM keys” with a backend-neutral assertion so the same test remains valid for KMS configurations.
+
+Reminder: choosing this route is not verification. After acting, produce your own evidence that the resulting behavior is correct.
+
+Student advice. The student answers the taste question of every fork, and each note recommends the candidate that the student selects and marks the other candidate as the one to avoid.
+Across the 41 tasks, the student selects the supported candidate on 77 of the 98 forks.
+We provide these notes to the executor before it starts each task and evaluate the resulting patch with the official SWE-bench Pro evaluation.
+With student advice, the executor achieves the 33.7% success rate reported in Section 5.3 [#S5.SS3].
+
+Per-task student decisions. Table 12 [#A8.T12] lists every task with its number of forks and the number the student answers correctly.
+
+Table 12: Per-task student decisions in the end-to-end experiment.
+
+Task
+Forks
+Student correct
+
+NodeBB (3c85b94)
+1
+1
+
+ansible (0fd8871)
+1
+1
+
+ansible (395e5e2)
+4
+4
+
+ansible (7094849)
+1
+1
+
+ansible (7765870)
+3
+2
+
+ansible (be2c376)
+3
+3
+
+ansible (cd9c4eb)
+4
+3
+
+ansible (ea04e00)
+7
+6
+
+ansible (ed6581e)
+1
+1
+
+element-web (494d9de)
+1
+0
+
+element-web (b7fea97)
+1
+1
+
+element-web (ca8b1b0)
+2
+2
+
+flipt (3ef34d1)
+3
+1
+
+flipt (b22f5f0)
+1
+1
+
+vuls (4c04acb)
+2
+2
+
+vuls (abd8041)
+1
+1
+
+vuls (dc49646)
+2
+2
+
+vuls (e52fa8d)
+1
+1
+
+teleport (6eaaf3a)
+2
+2
+
+teleport (baeb269)
+1
+1
+
+openlibrary (08ac40d)
+3
+3
+
+openlibrary (3c48b4b)
+3
+1
+
+openlibrary (3f580a5)
+2
+2
+
+openlibrary (5899980)
+3
+3
+
+openlibrary (6a117fa)
+1
+0
+
+openlibrary (9cd47f4)
+3
+3
+
+openlibrary (b4f7c18)
+3
+1
+
+openlibrary (e010b2a)
+1
+1
+
+navidrome (8383527)
+2
+0
+
+webclients (01b519c)
+3
+3
+
+webclients (4feccbc)
+4
+4
+
+qutebrowser (1943fa0)
+1
+1
+
+qutebrowser (2dd8966)
+2
+1
+
+qutebrowser (9902914)
+1
+1
+
+qutebrowser (996487c)
+1
+1
+
+qutebrowser (a84ecfb)
+5
+4
+
+qutebrowser (de4a1c1)
+4
+2
+
+tutanota (09c2776)
+3
+1
+
+tutanota (1e516e9)
+4
+4
+
+tutanota (219bc8f)
+3
+2
+
+tutanota (da4edb7)
+4
+3
+
+Total
+98
+77
+
+ Experimental support, please
+ view the build logs [./2609.25804v2/__stdout.txt]
+ for errors. Generated by
+
+ L
+ A
+ T
+ E
+
+ xml
+
+ [https://math.nist.gov/~BMiller/LaTeXML/].
+
+Instructions for reporting errors
+
+We are continuing to improve HTML versions of papers, and your feedback helps enhance accessibility and mobile
+ support. To report errors in the HTML that will help us improve conversion and rendering, choose any of the
+ methods listed below:
+
+Click the "Report Issue" () button, located in the page header.
+
+Tip: You can select the relevant text first, to include it in your report.
+
+Our team has already identified the following issues [https://github.com/arXiv/html_feedback/issues]. We appreciate your time reviewing and reporting rendering errors we
+ may not have found yet. Your efforts will help us improve the HTML versions for all readers, because disability
+ should not be a barrier to accessing research. Thank you for your continued support in championing open access for
+ all.
+
+Have a free development cycle? Help support accessibility at arXiv! Our collaborators at LaTeXML maintain a list of packages that need conversion [https://github.com/brucemiller/LaTeXML/wiki/Porting-LaTeX-packages-for-LaTeXML], and welcome developer contributions [https://github.com/brucemiller/LaTeXML/issues].
+
+ We gratefully acknowledge support from
+ our major funders,
+ member institutions [https://info.arxiv.org/about/ourmembers.html], ,
+ and all contributors.
+
+ About [https://info.arxiv.org/about]
+ ·
+ Help [https://info.arxiv.org/help]
+ ·
+ Contact [https://info.arxiv.org/help/contact.html]
+ ·
+ Subscribe [https://info.arxiv.org/help/subscribe]
+ ·
+ Copyright [https://info.arxiv.org/help/license/index.html]
+ ·
+ Privacy [https://info.arxiv.org/help/policies/privacy_policy.html]
+ ·
+ Accessibility [https://info.arxiv.org/help/web_accessibility.html]
+ ·
+ Operational Status (opens in new tab) [https://status.arxiv.org]
+
+Major funding support from
+
+ [https://www.simonsfoundation.org/]
+
+ [https://www.sfi.org.bm/]
+
+ [https://www.schmidtsciences.org/]
+
+ [javascript:toggleReadingMode();]

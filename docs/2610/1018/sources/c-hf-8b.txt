@@ -1,0 +1,242 @@
+togethercomputer/HybridAgent-8B-Agentic · Hugging Face
+
+ Hugging Face [/] 
+
+ Models [/models]
+
+ Datasets [/datasets]
+
+ Spaces [/spaces]
+
+ Buckets new [/storage]
+
+ Docs [/docs]
+
+ Enterprise [/enterprise]
+
+Pricing [/pricing]
+
+Website
+
+ Tasks [/tasks] 
+
+ HuggingChat [/chat] 
+
+ Collections [/collections] 
+
+ Languages [/languages] 
+
+ Organizations [/organizations] 
+
+Community
+
+ Blog [/blog] 
+
+ Posts [/posts] 
+
+ Daily Papers [/papers] 
+
+ Hardware [/hardware] 
+
+ Learn [/learn] 
+
+ Discord [/join/discord] 
+
+ Forum [https://discuss.huggingface.co/] 
+
+ GitHub [https://github.com/huggingface] 
+
+Solutions
+
+ Team & Enterprise [/enterprise] 
+
+ Hugging Face PRO [/pro] 
+
+ Enterprise Support [/support] 
+
+ Inference Providers [/inference/models] 
+
+ Inference Endpoints [/inference-endpoints] 
+
+ Storage Buckets [/storage] 
+
+Log In [/login]
+
+Sign Up [/join]
+
+ [/togethercomputer] 
+ togethercomputer [/togethercomputer] 
+/
+
+HybridAgent-8B-Agentic [/togethercomputer/HybridAgent-8B-Agentic] 
+
+ Like 5
+
+Follow
+ Together 1.23k
+
+ Text Generation 
+ [/models?pipeline_tag=text-generation]
+ Safetensors 
+ [/models?library=safetensors]
+ English 
+ [/models?language=en]
+ qwen3 
+ [/models?other=qwen3]
+ hybrid-reasoning 
+ [/models?other=hybrid-reasoning]
+ latent-reasoning 
+ [/models?other=latent-reasoning]
+ agent 
+ [/models?other=agent]
+ tool-use 
+ [/models?other=tool-use]
+ conversational 
+ [/models?other=conversational]
+
+ arxiv: 2610.18861 
+
+ License: mit 
+
+ Model card [/togethercomputer/HybridAgent-8B-Agentic] Files Files and versions 
+ xet
+ [/togethercomputer/HybridAgent-8B-Agentic/tree/main] Community [/togethercomputer/HybridAgent-8B-Agentic/discussions]
+
+ Copy to bucket new 
+
+HybridAgent-8B-Agentic [#hybridagent-8b-agentic] 
+
+Overview [#overview] 
+
+Files [#files] 
+
+Usage [#usage] 
+
+Citation [#citation] 
+
+ [#hybridagent-8b-agentic]
+
+ HybridAgent-8B-Agentic
+
+Paper: Hybrid Reasoning Agents [https://arxiv.org/pdf/2610.18861]
+
+Code: https://github.com/togethercomputer/HybridAgent [https://github.com/togethercomputer/HybridAgent]
+
+14B HybridAgent: togethercomputer/HybridAgent-14B-Agentic [https://huggingface.co/togethercomputer/HybridAgent-14B-Agentic]
+
+ [#overview]
+
+ Overview
+
+HybridAgent is an LLM agent that dynamically navigates between latent reasoning and text-based interaction within a single generation process. It thinks in continuous latent space through a lightweight HybridLink and acts through text, calling a Python interpreter and a web search tool across multiple turns over one shared working memory. Its latent thoughts stay directly interpretable: every latent step can be read out as pseudo-text.
+
+This checkpoint is the 8B HybridAgent for agentic reasoning tasks, built on Qwen3-8B-Base with HybridSFT followed by HybridRL.
+
+ [#files]
+
+ Files
+
+Standard Transformers files for the backbone (model.safetensors, config.json, generation_config.json, the tokenizer with the two anchor tokens <latent> and </latent>) plus the HybridLink weights adapter.pt with adapter_config.json. Loading the backbone with transformers alone gives a text-only model; hybrid generation with latent mode and tools needs the HybridAgent code.
+
+ [#usage]
+
+ Usage
+
+git clone https://github.com/togethercomputer/HybridAgent.git && cd HybridAgent
+pip install -r requirements.txt && pip install -e .
+cp .env.example .env # TAVILY_API_KEY for the search tool
+
+# batch inference on a JSONL file of questions
+python -m hybrid_inference.run_batch --model togethercomputer/HybridAgent-8B-Agentic \
+ --input examples/questions.jsonl --output outputs/results.jsonl
+
+# inspect the latent thoughts of a trajectory as pseudo-text (HTML report)
+python -m interpretable_latent_mode --model togethercomputer/HybridAgent-8B-Agentic \
+ --question "How many trailing zeros does 100! have?" --output report.html
+
+import torch
+from hybrid_agent import HybridGenerationEngine, SYSTEM_PROMPT, build_tool_executor, load_hybrid_agent
+
+model, tokenizer = load_hybrid_agent("togethercomputer/HybridAgent-8B-Agentic", device="cuda")
+engine = HybridGenerationEngine(model, tokenizer, torch.device("cuda"), build_tool_executor(), SYSTEM_PROMPT,
+ "How many trailing zeros does 100! have?", batch_size=1, record_latent_readout=True)
+engine.run(torch.Generator(device="cuda").manual_seed(0))
+print(engine.row_result(engine.rows[0])["output_rendered"])
+
+ [#citation]
+
+ Citation
+
+@misc{zou2026hybridagent,
+ title={Hybrid Reasoning Agents},
+ author={Jiaru Zou and Yunzhe Qi and Sirui Chen and Federico Bianchi and Shang Zhu and Pan Lu and Jingrui He and James Zou},
+ year={2026},
+ eprint={2610.18861},
+ archivePrefix={arXiv},
+ primaryClass={cs.CL},
+ url={https://arxiv.org/abs/2610.18861},
+}
+
+Downloads last month
+
+949
+
+Safetensors [https://huggingface.co/docs/safetensors]
+
+Model size
+
+8B params
+
+Tensor type
+
+BF16 
+·
+
+Chat template
+
+Files info
+
+ Inference Providers NEW [https://huggingface.co/docs/inference-providers]
+
+ Text Generation
+ [/tasks/text-generation]
+
+This model isn't deployed by any Inference Provider. 🙋 Ask for provider support [/spaces/huggingface/InferenceSupport/discussions/new?title=togethercomputer/HybridAgent-8B-Agentic&description=React%20to%20this%20comment%20with%20an%20emoji%20to%20vote%20for%20%5Btogethercomputer%2FHybridAgent-8B-Agentic%5D(%2Ftogethercomputer%2FHybridAgent-8B-Agentic)%20to%20be%20supported%20by%20Inference%20Providers.%0A%0A(optional)%20Which%20providers%20are%20you%20interested%20in%3F%20(Novita%2C%20Hyperbolic%2C%20Together%E2%80%A6)%0A]
+
+ Model tree for togethercomputer/HybridAgent-8B-Agentic [/docs/hub/model-cards#specifying-a-base-model]
+
+Base model
+
+ Qwen/Qwen3-8B-Base [/Qwen/Qwen3-8B-Base]
+
+ Finetuned
+ (631 [/models?other=base_model:finetune:Qwen/Qwen3-8B-Base]) 
+
+this model
+
+Quantizations
+
+ 1 model [/models?other=base_model:quantized:togethercomputer/HybridAgent-8B-Agentic]
+
+ Collection including togethercomputer/HybridAgent-8B-Agentic
+
+HybridAgent
+
+ Collection
+
+ 5 items • Updated 8 days ago • 6
+ [/collections/togethercomputer/hybridagent]
+
+ Paper for togethercomputer/HybridAgent-8B-Agentic
+
+Hybrid Reasoning Agents
+
+ Paper • 2610.18861 • Published 6 days ago • 35 
+ [/papers/2610.18861]
+
+ System theme 
+
+Company
+ TOS [/terms-of-service] Privacy [/privacy] About [/huggingface] Careers [https://apply.workable.com/huggingface/] [/] 
+Website
+ Models [/models] Datasets [/datasets] Spaces [/spaces] Pricing [/pricing] Docs [/docs]
