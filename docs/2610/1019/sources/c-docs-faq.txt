@@ -1,0 +1,236 @@
+Frequently Asked Questions - Inception Platform
+
+Documentation Index
+
+Fetch the complete documentation index at: /llms.txt [/llms.txt]
+
+Use this file to discover all available pages before exploring further.
+
+Skip to main content [#content-area]
+
+Mercury 3 is here — 50% off at launch | Start building → [https://platform.inceptionlabs.ai/]
+
+Inception Platform home page [/]
+
+Search...
+
+⌘KAsk Assistant⌘I
+
+Support [/cdn-cgi/l/email-protection#f3808683839c8187b39a9d909683879a9c9d9f929180dd929a]
+
+Dashboard [https://platform.inceptionlabs.ai/]
+
+Dashboard
+ [https://platform.inceptionlabs.ai/]
+
+Search...
+
+Navigation
+
+Resources
+
+Frequently Asked Questions
+
+Getting Started
+
+Home
+
+ [/]
+
+Quick Start
+
+ [/get-started]
+
+Authentication
+
+ [/get-started/authentication]
+
+Models
+
+ [/get-started/models]
+
+SDKs
+
+ [/get-started/sdks]
+
+Rate Limits
+
+ [/get-started/rate-limits]
+
+API reference
+
+Decisions
+
+Chat
+
+FIM
+
+Edit
+
+Models
+
+Capabilities
+
+Reasoning Efforts
+
+ [/capabilities/reasoning-efforts]
+
+Streaming & Diffusion
+
+ [/capabilities/streaming]
+
+Tool Use
+
+ [/capabilities/tool-use]
+
+Structured Outputs
+
+ [/capabilities/structured-outputs]
+
+Decisions
+
+ [/capabilities/decisions]
+
+Autocomplete (FIM)
+
+ [/capabilities/fim]
+
+Next Edit
+
+ [/capabilities/next-edit]
+
+Guides
+
+Prompt Guide
+
+ [/resources/prompt-guide]
+
+Voice Quickstart
+
+ [/usecases/voice]
+
+Cookbooks
+
+Integrations
+
+Resources
+
+Inception Chat
+
+ [https://chat.inceptionlabs.ai/]
+
+Error Codes
+
+ [/resources/error-codes]
+
+FAQ
+
+ [/resources/faq]
+
+Support
+
+Contact Support
+
+ [https://platform.inceptionlabs.ai/support]
+
+Terms of Use
+
+ [https://www.inceptionlabs.ai/docs/terms-of-use]
+
+Privacy Policy
+
+ [https://www.inceptionlabs.ai/docs/privacy-policy]
+
+Resources
+
+Frequently Asked Questions
+
+Copy pageCopy page
+
+Answers to common questions about the Inception API.
+
+Copy pageCopy page
+
+How do I get higher rate limits?
+
+Reach out to our support team [/support/support] with details about your use case, expected volume, and any latency or throughput requirements. We’ll review your needs and can raise your limits accordingly.
+
+How do I handle rate limits?
+
+Implement exponential backoff in your client code. When you receive a rate limit error (429) or a server error (503), wait before retrying.
+
+How are tokens counted?
+
+Tokens are pieces of text that our models process. A token is roughly 4 characters for English text. Both input and output tokens count toward your usage limits.
+
+Does the API return token counts or dollar costs?
+
+Responses include a usage object with token counts, but not a dollar-cost field:
+
+prompt_tokens — all input tokens, including cached input.
+
+prompt_tokens_details.cached_tokens — the subset of prompt_tokens served from the prefix cache.
+
+completion_tokens — all generated tokens, including reasoning tokens.
+
+completion_tokens_details.reasoning_tokens — the subset of completion_tokens used for reasoning.
+
+total_tokens — prompt_tokens + completion_tokens.
+
+The nested detail counts are already included in their parent totals, so do not add them again. Cached prompt tokens use the cached-input rate; completion tokens, including reasoning tokens, use the output rate.For streaming (stream: true), set stream_options.include_usage: true to receive a final usage chunk before data: [DONE]. Use the rates on Models [/get-started/models] to calculate cost.
+
+Can I feed these docs to an LLM or coding agent?
+
+Yes. The full documentation index is published at https://docs.inceptionlabs.ai/llms.txt [https://docs.inceptionlabs.ai/llms.txt]. Point your LLM, IDE assistant, or agent at that URL to discover every page in the docs. The docs site does not block crawlers or agent traffic.
+
+Do Mercury models support image or vision input?
+
+Mercury 3, Mercury 2.5, Mercury 2, and Mercury Edit 2 accept text input only, and image generation is not supported. Mercury Decide [/capabilities/decisions#send-images] accepts images in a decision’s state and instructions. See /get-started/models [/get-started/models] for supported input formats per model.
+
+How do the free tokens work?
+
+Every new account includes a one-time credit of 100 million free tokens. The credit is shared across all models rather than granted per model. When your free tokens run low, add payment information under Billing [https://platform.inceptionlabs.ai/dashboard/billing] to continue using the API. For questions about the free credit that aren’t covered here, contact support [/support/support].
+
+Can I use Mercury with MCP clients or agent frameworks?
+
+The API does not include a dedicated MCP (Model Context Protocol) server or endpoint. Mercury 3 supports OpenAI-compatible tool calling, so any MCP client or agent framework that lets you configure an OpenAI-compatible backend can use it. Set the base URL to https://api.inceptionlabs.ai/v1, provide your API key, and set the model to mercury-2.5. Tool definitions follow the OpenAI function schema shown in the Tool Use [/capabilities/tool-use] guide.
+
+Does the API support embeddings?
+
+No. Inception’s API covers chat completions (/v1/chat/completions), fill-in-the-middle completions (/v1/fim/completions), and code edit completions (/v1/edit/completions). There is no /v1/embeddings endpoint or embedding model. Pair Mercury with a separate embeddings provider if your workflow needs vector representations.
+
+Can I fine-tune Mercury models?
+
+Fine-tuning is not available through the public API. There is no fine-tuning endpoint, and the Platform dashboard does not offer a self-serve fine-tuning workflow. If you need a custom-tuned Mercury model, contact support [/support/support] with details about your use case, dataset, and deployment requirements.
+
+Are Mercury sampling results reproducible? Is there a seed parameter?
+
+No. The chat completions request schema does not accept a seed parameter, and temperature on mercury-3, mercury-2.5, and mercury-2 is restricted to the range 0.5–1.0. Values outside that range are silently reset to the model’s default (0.75 for mercury-2, 1 for mercury-2.5) and the response includes a warning field noting the reset. Bit-exact reproducibility across runs is not supported today. Aggregate over multiple samples if you need stable evaluation numbers, or contact support [/support/support] to discuss your use case.The code edit endpoint (/v1/edit/completions) uses a different temperature range of 0–2 with a default of 0.2 and no clamping.
+
+How long is a cached prompt prefix retained?
+
+Prefix caching is automatic and requires no request parameter. The usage.prompt_tokens_details.cached_tokens field reports how many prompt tokens were served from cache on a given request, and cached tokens are billed at each model’s input_cache_reads rate (see Models [/get-started/models]). The API does not expose a documented TTL or a way to pin, invalidate, or inspect cache entries. If your workload depends on a specific retention guarantee, contact support [/support/support].
+
+What is the data retention policy for API requests?
+
+Data handling for the Inception API is covered by the Privacy Policy [/support/privacy] and Terms of Use [/support/tou]. Custom data-handling arrangements, including zero-retention configurations for regulated workloads, are handled case by case — contact support [/support/support] with your requirements.
+
+Was this page helpful?
+
+YesNo
+
+Error Codes
+ [/resources/error-codes]
+Contact Support
+ [/support/support]
+
+x [https://x.com/_inception_ai]linkedin [https://www.linkedin.com/company/inception-labs-ai]discord [https://discord.com/invite/btzTARamwH]
+
+Powered byThis documentation is built and hosted on Mintlify, a developer documentation platform [https://www.mintlify.com?utm_campaign=poweredBy&utm_medium=referral&utm_source=inception]
+
+Assistant
+
+Responses are generated using AI and may contain mistakes.
+
+Contact support
+ [/cdn-cgi/l/email-protection#43303633332c3137032a2d202633372a2c2d2f2221306d222a]

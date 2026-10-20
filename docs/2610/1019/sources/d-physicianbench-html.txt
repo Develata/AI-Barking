@@ -1,0 +1,1737 @@
+PhysicianBench: Evaluating LLM Agents in Real-World EHR Environments
+
+Report GitHub Issue
+
+ ×
+
+ Title:
+
+Content selection saved. Describe the issue below:
+
+ Description:
+
+ Submit without GitHub
+ Submit in GitHub
+
+ arXiv is now an independent nonprofit!
+ Learn more [https://info.arxiv.org/about]
+ ×
+
+ Back to arXiv
+ [/]
+
+ Why HTML? [https://info.arxiv.org/about/accessible_HTML.html]
+
+ Report Issue [#]
+
+ Back to Abstract
+ [/abs/2605.02240v1]
+
+ Download PDF [/pdf/2605.02240v1]
+
+ [javascript:toggleNavTOC();]
+
+ [javascript:toggleReadingMode();]
+
+Abstract [#abstract1]
+
+1 Introduction [#S1]
+
+2 Related Work [#S2]
+
+General-domain agent benchmarks. [#S2.SS0.SSS0.Px1]
+
+Medical agent benchmarks. [#S2.SS0.SSS0.Px2]
+
+3 Benchmark Environment and Evaluation [#S3]
+
+3.1 Task Formulation [#S3.SS1]
+
+3.2 EHR Environment and Agent Tools [#S3.SS2]
+
+3.3 Checkpoint Evaluation [#S3.SS3]
+
+4 Task Design and Curation [#S4]
+
+4.1 Task Sourcing and Construction [#S4.SS1]
+
+4.2 Clinical Coverage [#S4.SS2]
+
+4.3 Physician Validation [#S4.SS3]
+
+5 Experiments [#S5]
+
+5.1 Experimental Setup [#S5.SS1]
+
+5.2 Main Results [#S5.SS2]
+
+5.3 Error Analysis [#S5.SS3]
+
+5.4 What Drives the GPT-5.5 Lead? [#S5.SS4]
+
+6 Discussion [#S6]
+
+References [#bib]
+
+A Task Taxonomy [#A1]
+
+B Checkpoint Grader Specifications [#A2]
+
+Code graders [#A2.SS0.SSS0.Px1]
+
+Hybrid graders [#A2.SS0.SSS0.Px2]
+
+LLM-judge graders [#A2.SS0.SSS0.Px3]
+
+C Data Annotation Protocol [#A3]
+
+C.1 Data Collection [#A3.SS1]
+
+C.2 Patient Data De-identification [#A3.SS2]
+
+Structured EHR data. [#A3.SS2.SSS0.Px1]
+
+Unstructured clinical notes. [#A3.SS2.SSS0.Px2]
+
+C.3 Annotation Guidelines and Quality Control [#A3.SS3]
+
+D Annotator Details [#A4]
+
+E Agent Framework Implementation [#A5]
+
+Interaction loop. [#A5.SS0.SSS0.Px1]
+
+Tool inventory. [#A5.SS0.SSS0.Px2]
+
+Robustness enhancements. [#A5.SS0.SSS0.Px3]
+
+System prompt. [#A5.SS0.SSS0.Px4]
+
+Configuration. [#A5.SS0.SSS0.Px5]
+
+F Additional Results [#A6]
+
+G Representative Failure Trajectory [#A7]
+
+ License: arXiv.org perpetual non-exclusive license
+ [https://info.arxiv.org/help/license/index.html#licenses-available]
+
+arXiv:2605.02240v1 [cs.AI] 04 May 2026
+
+PhysicianBench: Evaluating LLM Agents in Real-World EHR Environments
+
+Ruoqi Liu
+
+Imran Q. Mohiuddin
+
+Austin J. Schoeffler
+
+Affiliation: Kavita Renduchintala,Ashwin Nayak,Prasantha L. Vemu,
+
+Affiliation: Shivam C. Vedak,Kameron C. Black,John L. Havlik,
+
+Affiliation: Isaac Ogunmola,Stephen P. Ma,Roopa Dhatt,Jonathan H. Chen
+
+Affiliation: Stanford University
+
+Affiliation: {ruoqiliu, jonc101}@stanford.edu
+
+Abstract
+
+We introduce PhysicianBench, a benchmark for evaluating LLM agents on physician tasks grounded in real clinical setting within electronic health record (EHR) environments. Existing medical agent benchmarks primarily focus on static knowledge recall, single-step atomic actions, or action intent without verifiable execution against the environment. As a result, they fail to capture the long-horizon, composite workflows that characterize real clinical systems.
+PhysicianBench comprises 100 long-horizon tasks adapted from real consultation cases between primary care and subspecialty physicians, with each task independently reviewed by a separate panel of physicians. Tasks are instantiated in an EHR environment with real patient records and accessed through the same standard APIs used by commercial EHR vendors. Tasks span 21 specialties (e.g., cardiology, endocrinology, oncology, psychiatry) and diverse workflow types (e.g., diagnosis interpretation, medication prescribing, treatment planning), requiring an average of 27 tool calls per task. Solving each task requires retrieving data across encounters, reasoning over heterogeneous clinical information, executing consequential clinical actions, and producing clinical documentation. Each task is decomposed into structured checkpoints (670 in total across the benchmark) capturing distinct stages of completion graded by task-specific scripts with execution-grounded verification.
+Across 12 proprietary and open-source LLM agents, the best-performing model achieves only 46% success rate (pass@1), while open-source models reach at most 19%, revealing a substantial gap between current agent capabilities and the demands of real-world clinical workflows.
+PhysicianBench provides a realistic and execution-grounded benchmark for measuring progress toward autonomous clinical agents.
+
+: https://healthrex.github.io/PhysicianBench/ [https://healthrex.github.io/PhysicianBench/]
+
+Figure 1: PhysicianBench overall model performance ranked by success rate (pass@1).
+
+1 Introduction
+
+Figure 2: Overview of PhysicianBench. Tasks are curated from real consultation cases, paired with real EHR environments, and further validated by physicians independently. Each task instruction specifies a clinical role, trigger event, required steps, and expected deliverable. During execution, the agent interacts with EHR environment through multi-step tool calls. Agent performance is assessed via a sequence of checkpoints for each step of the task.
+
+Large language models (LLMs) have demonstrated strong clinical knowledge and are increasingly deployed in health contexts to support information access, clinical decision-making, and patient care (Singhal et al., 2023 [#bib.bib30]; Korom et al., 2025 [#bib.bib16]).
+A more consequential shift is now underway: beyond answering questions, LLMs are being instantiated as agents that can autonomously plan, use tools, interact with external systems, and execute multi-step actions (Yao et al., 2022 [#bib.bib33]; Xu et al., 2025 [#bib.bib7]; Yao et al., 2025 [#bib.bib2]).
+In healthcare, this shift is particularly impactful.
+Real clinical work requires retrieving information from electronic health records (EHRs), reasoning over heterogeneous data sources, coordinating with clinical systems, and executing consequential actions such as placing orders, prescribing medications, and documenting clinical plans.
+LLM agents that reliably perform such work could alleviate the well-documented EHR burden that now dominates clinicians’ workdays and contributes to professional burnout (Sinsky et al., 2016 [#bib.bib31]; Holmgren et al., 2024 [#bib.bib32]).
+
+Realizing this potential, and measuring progress toward it, requires benchmarks that test not only what agents know, but whether they can reliably complete clinical workflows.
+Existing medical benchmarks fall short of this goal in three ways.
+First, they rarely evaluate long-horizon, multi-step agent behavior, instead focusing on question answering (Jin et al., 2021 [#bib.bib11]; Jin et al., 2019 [#bib.bib10]), clinical conversation and response quality (Arora et al., 2025 [#bib.bib13]; Schmidgall et al., 2024 [#bib.bib14]), or single-step atomic actions (Jiang et al., 2025 [#bib.bib20]).
+Second, they provide limited evaluation in real EHR environments: benchmarks may assess the intent of an action (Jiang et al., 2025 [#bib.bib20]), rather than requiring agents to execute actions in an EHR system and verifying that those actions correctly update the underlying clinical state.
+Third, their tasks are often derived from exams (Jin et al., 2021 [#bib.bib11]) or synthetic patient simulators (Schmidgall et al., 2024 [#bib.bib14]), rather than real clinical cases that are validated by physicians.
+
+In this work, we introduce PhysicianBench (Fig. 2 [#S1.F2]), a benchmark for evaluating LLM agents on long-horizon tasks in a real EHR environment.
+PhysicianBench comprises 100 tasks curated from real clinical consultation cases between primary care and subspecialty physicians, spanning 21 specialties and diverse workflows.
+Each task requires an agent to retrieve patient data, reason across encounters, execute clinical actions, and produce clinical documentation, averaging 27 tool calls per task.
+Tasks run against EHR instances accessed through standard Fast Healthcare Interoperability Resources (FHIR) APIs, a widely used standard for API-based interoperability in modern EHR systems (Health Level Seven International, [#bib.bib23]).
+Task correctness is graded via task-specific checkpoints that capture intermediate reasoning steps and final action outcomes, combining execution-grounded verification of the resulting FHIR state with complementary LLM-based judgments.
+Each task is independently reviewed by a panel of physicians through a multi-round annotation pipeline to ensure clinical fidelity.
+
+We evaluate 12 proprietary and open-source LLMs. The best-performing agent, GPT-5.5, completes only 46% of tasks (pass@1), with Claude Opus 4.6 and 4.7 reaching 32% and 29% respectively, while the strongest open-source model (DeepSeek V4-Pro) reaches 19%.
+Reliability is also limited: pass^3 across three independent runs reaches only 28% even for the best model, indicating that successful task completion is often stochastic.
+Error analysis further reveals that failures are distributed across retrieval, reasoning, and action execution rather than concentrated in any single bottleneck.
+
+Our contributions are as follows:
+
+• 
+
+A real-world, physician-validated benchmark. PhysicianBench provides 100 long-horizon clinical tasks sourced from real consultation cases, both authored and independently reviewed by physicians, instantiated in a FHIR-compliant EHR environment.
+
+• 
+
+Execution-grounded and verifiable evaluation. Agent actions are verified against the post-execution EHR state to enable verifiable execution, while structured per-task checkpoints support effective diagnostics of agent failure modes.
+
+• 
+
+Measuring progress of agents on real clinical tasks. An evaluation of 12 LLM agents quantifies how far current agents remain from autonomously and reliably handling real-world clinical tasks.
+
+• 
+
+Fully open-source release. To support reproducible evaluation and future development of agents, we release the benchmark with environments, the agent framework, and the evaluation harness.
+
+2 Related Work
+
+General-domain agent benchmarks.
+
+Evaluating LLMs as autonomous agents has progressed rapidly from narrow skill tests to real, long-horizon simulations. Early efforts established multi-environment evaluation (Liu et al., 2023 [#bib.bib3]) and function-calling accuracy (Patil et al., 2025 [#bib.bib4]), followed by domain-specific benchmarks such as software engineering (Jimenez et al., 2024 [#bib.bib5]) and web navigation (Zhou et al., 2024 [#bib.bib6]).
+
+More recent benchmarks emphasize multi-step tasks in real environments: τ\tau-bench (Yao et al., 2025 [#bib.bib2]) evaluates tool-agent-user interaction in retail and airline domains; TheAgentCompany (Xu et al., 2025 [#bib.bib7]) simulates a software company spanning web browsing and code execution; Toolathlon (Li et al., 2025 [#bib.bib8]) scales to 32 applications and 604 tools; and MCP-Bench (Wang et al., 2025 [#bib.bib9]) connects LLMs to 28 live MCP servers spanning 250 tools across finance, travel, and scientific computing. These benchmarks demonstrate that multi-step, consequential task execution remains an open challenge. However, none address healthcare, a domain with unique requirements including specialized clinical terminology, complex multi-system reasoning, and regulatory data standards such as FHIR.
+
+Medical agent benchmarks.
+
+Traditional medical AI benchmarks such as MedQA (Jin et al., 2021 [#bib.bib11]), PubMedQA (Jin et al., 2019 [#bib.bib10]), and MedMCQA (Pal et al., 2022 [#bib.bib12]) evaluate clinical knowledge recall through static multiple-choice questions derived from licensing examinations, without involving tool use, EHR interaction, or action execution. More recently, HealthBench (Arora et al., 2025 [#bib.bib13]) expands clinical evaluation to 5,000 open-ended health conversations graded by physician-designed rubrics, and its extension HealthBench Professional (Hicks et al., 2026 [#bib.bib24]) further stratifies these scenarios across 27 clinical specialties. MedHELM (Bedi et al., 2026 [#bib.bib25]) aggregates a broad set of clinical NLP tasks into a unified holistic evaluation suite. These efforts substantially broaden the scope of medical LLM evaluation, but still grade static model responses without tool use, EHR interaction, or action execution.
+
+AgentClinic (Schmidgall et al., 2024 [#bib.bib14]) moves toward interactive evaluation by simulating multi-turn patient-doctor conversations, demonstrating that diagnostic accuracy can drop to one-tenth of static performance.
+However, it remains diagnosis-centric and does not involve EHR systems, structured data manipulation, or clinical action execution such as ordering medications or placing referrals. EHRAgent (Shi et al., 2024 [#bib.bib15]) equips LLMs with code-generation interfaces to translate clinical questions into SQL queries over EHR data warehouses, but operates on site-specific schemas rather than interoperable standards. FHIR-AgentBench (Lee et al., 2025 [#bib.bib17]) grounds 2,931 clinical questions in FHIR-structured data, evaluating retrieval precision and answer correctness, but focuses exclusively on question answering without workflow execution or action creation. AgentEHR (Liao et al., 2026 [#bib.bib19]) challenges agents to perform diagnosis and treatment planning through long-range interactive reasoning over raw EHR databases, but does not involve a FHIR-compliant environment or structured action execution (e.g., creating orders or referrals).
+
+The most closely related work is MedAgentBench (Jiang et al., 2025 [#bib.bib20]), which also provides a FHIR-compliant interactive environment with 300 clinician-authored tasks across 10 templates. It represents a significant advance in grounding medical agent evaluation in realistic EHR infrastructure. However, its tasks are predominantly single-step atomic operations, such as retrieving a single lab value or placing a single order, evaluating individual clinical skills in isolation rather than the composite, multi-step workflows that characterize real clinical practice.
+
+PhysicianBench addresses these limitations by combining three properties absent from any single prior benchmark:
+(1) long-horizon, multi-step agent tasks reflecting the real clinical workflow from information retrieval through reasoning, action execution, and documentation;
+(2) a real EHR environment accessed through standard FHIR APIs, with execution-grounded verification of actions against the resulting EHR state; and
+(3) tasks grounded in real clinical consultation cases independently validated by a separate panel of physicians.
+Table 1 [#S2.T1] summarizes the key differences between PhysicianBench and existing benchmarks along these dimensions.
+
+Table 1: Comparison of PhysicianBench with related benchmarks. “EHR Env.” indicates whether the benchmark provides an EHR system with production-standard APIs rather than static EHR data dumps; “Verifiable Execution” indicates whether the evaluation verifies the resulting EHR state after execution; “Specialties” reports the number of clinical specialties covered (“–” indicates not reported by the original paper); “Clinician-validated” indicates whether tasks are validated by clinicians.
+
+Benchmark
+EHR Env.
+Long-horizon
+Verifiable Execution
+Specialties
+Clinician-validated
+
+HealthBench Professional (Hicks et al., 2026 [#bib.bib24])
+✗
+✗
+✗
+27
+✓
+
+AgentClinic (Schmidgall et al., 2024 [#bib.bib14])
+✗
+✗
+✗
+9
+✗
+
+EHRAgent (Shi et al., 2024 [#bib.bib15])
+✗
+✗
+✗
+–
+✗
+
+MedAgentBench (Jiang et al., 2025 [#bib.bib20])
+✓
+✗
+✗
+–
+✓
+
+FHIR-AgentBench (Lee et al., 2025 [#bib.bib17])
+✓
+✗
+✗
+–
+✗
+
+AgentEHR (Liao et al., 2026 [#bib.bib19])
+✗
+✓
+✗
+–
+✗
+
+PhysicianBench
+✓
+✓
+✓
+21
+✓
+
+3 Benchmark Environment and Evaluation
+
+PhysicianBench is an integrated benchmark system in which an agent receives a clinical task instruction, interacts with a FHIR-compliant EHR through structured tool calls, and is evaluated against a set of clinically grounded checkpoints.
+Figure 2 [#S1.F2] illustrates the end-to-end pipeline.
+We first formalize the task structure (§3.1 [#S3.SS1]), then describe the EHR environment and available tools (§3.2 [#S3.SS2]), and finally present the checkpoint-based evaluation framework (§3.3 [#S3.SS3]).
+
+3.1 Task Formulation
+
+We formulate each task as a partially observable Markov decision process (POMDP) (𝒮,𝒜,T,𝒪,Ω,I,C)(\mathcal{S},\mathcal{A},T,\mathcal{O},\Omega,I,C).
+The state space 𝒮\mathcal{S} comprises the full EHR contents, including patient records, agent-created resources, and workspace files.
+The action space 𝒜\mathcal{A} is defined by 14 structured tool calls (§3.2 [#S3.SS2]).
+The transition function TT is deterministic: write actions (e.g., creating a MedicationRequest) modify the EHR state, while read actions (e.g., searching for lab results) leave it unchanged.
+The observation space 𝒪\mathcal{O} consists of the FHIR JSON bundles returned by search tools, confirmation responses from write tools, and file contents.
+The observation function Ω\Omega governs what the agent perceives: it cannot observe the full EHR state but must actively query relevant resources to build a working clinical picture, mirroring how clinicians navigate real EHR systems.
+Each task instance additionally specifies a natural-language instruction II, which defines the clinical scenario (the agent’s role, patient identifier, current date, multi-step requirements, and expected deliverables), and a set of evaluation checkpoints C={c1,…,cK}C=\{c_{1},\dots,c_{K}\} used for grading (§3.3 [#S3.SS3]).
+
+At each turn tt, the agent selects a tool call at∈𝒜a_{t}\in\mathcal{A} conditioned on II and its observation history (o1,…,ot−1)(o_{1},\dots,o_{t-1}), receives an observation oto_{t}, and the environment transitions to st+1=T⁡(st,at)s_{t+1}=T(s_{t},a_{t}).
+The interaction terminates when the agent issues a final response or reaches the maximum step limit.
+
+3.2 EHR Environment and Agent Tools
+
+EHR server.
+FHIR (Health Level Seven International, [#bib.bib23]) is the standard for health information exchange, supported by major commercial EHR vendors (e.g., Epic, Cerner, Oracle Health).
+We build our environment on FHIR R4 to ensure that agent tool calls, data representations, and clinical workflows closely mirror those in production healthcare systems.
+Concretely, we use the open-source HAPI FHIR JPA server (Smile CDR, 2024 [#bib.bib41]) backed by a persistent H2 database.
+Each task instance runs in an isolated Docker container hosting a dedicated FHIR server pre-loaded with the corresponding patient record encoded using standardized clinical terminologies (e.g., LOINC codes for laboratory observations and vitals).
+
+Agent tools.
+The agent interacts with the EHR through a set of tools including (1) FHIR GET requests to query patient demographics, the problem list (Condition), laboratory results and vital signs (Observation), social history, medication orders (MedicationRequest), completed procedures (Procedure), clinical notes (DocumentReference), and existing service requests (ServiceRequest); (2) FHIR POST requests to create medication orders, service requests for diagnostic studies and referrals, appointments, and patient communications; and (3) Utility tool allowing the agent to write output files to the workspace.
+All tools accept structured parameters following the function-calling schema; search tools return JSON bundles, while write tools return the created resource or a file-write confirmation.
+The full tool inventory, with FHIR resource types and key arguments, is provided in Table A4 [#A5.T4] (Appendix E [#A5]).
+
+Agent Framework.
+We implement a lightweight tool-calling agent framework to enable fair comparison across models with different native agent integrations.
+At each turn, the model receives the task instruction and complete interaction history, may produce reasoning tokens, and emits one or more tool calls through an OpenAI-compatible function-calling interface.
+The framework dispatches each call, appends the resulting observation to the history, and iterates until the agent returns a final response, reaches the maximum step limit, or triggers an early-termination safeguard.
+Beyond this core loop, the framework includes robustness mechanisms for tool-error handling, overlong-output truncation, loop and stuck-state detection.
+All model responses, tool calls, and tool observations are recorded in a structured trajectory log for failure analysis.
+Full implementation details, configuration settings, and safeguard thresholds are provided in Appendix E [#A5].
+
+3.3 Checkpoint Evaluation
+
+Rather than evaluating only the final task output, we decompose each task into a set of checkpoints C={c1,…,cK}C=\{c_{1},\dots,c_{K}\}, where each checkpoint represents a discrete, clinically meaningful milestone.
+PhysicianBench contains 670 checkpoints in total across the 100 tasks, enabling fine-grained diagnostics that identify which stages of clinical workflows are most challenging for current agents.
+
+Checkpoint taxonomy.
+Checkpoints follow a consistent progression that mirrors the real clinical decision-making.
+Each checkpoint is assigned a type reflecting the capability it evaluates:
+
+• 
+
+Data retrieval: verifies that the agent queried the necessary resources (e.g., demographics, laboratory results, conditions) and surfaced the critical data points required for downstream reasoning.
+
+• 
+
+Clinical reasoning: evaluates the agent’s interpretation of retrieved data across four subtypes: calculating clinical scores from patient data (e.g., CHA2DS2-VASc from demographics and coded diagnoses), interpreting and synthesizing clinical findings (e.g., recognizing eGFR discrepancies between creatinine-based and cystatin C-based estimates), making clinical judgments such as differential diagnosis, treatment selection, or medication management (e.g., anticoagulation strategy for low-risk atrial fibrillation), and applying clinical criteria to patient data (e.g., ruling out proximal tubular dysfunction based on urinalysis findings).
+
+• 
+
+Action execution: validates that the agent created appropriate FHIR resources, including MedicationRequest for prescriptions (e.g., high-intensity statin with correct dose range) and ServiceRequest for diagnostic studies and referrals (e.g., CT angiography, HFE gene testing).
+
+• 
+
+Documentation: assesses the completeness and clinical soundness of the agent’s written output (e.g., assessment notes, management plans), including consistency with retrieved data, adherence to clinical guidelines, and absence of clinically unsafe recommendations.
+
+Grader types.
+Each checkpoint is graded by one of three grader types, selected based on the nature of the criterion: (1) code graders query the FHIR server to verify that the agent created the expected resources (e.g., a MedicationRequest matching the required drug, dose, and frequency); (2) hybrid graders combine deterministic ground-truth computation from FHIR data with LLM-assisted extraction from the agent’s free-text output (e.g., comparing a CHA2DS2-VASc score the agent reports against the score computed from coded diagnoses); and (3) LLM-judge graders score clinical reasoning and documentation against a structured rubric with three-level outcomes (pass/partial/fail). Full grader-type specifications and example rubrics are provided in Appendix B [#A2].
+
+Figure 3: Distribution of tasks in PhysicianBench. (a) Task type distribution as a two-level sunburst: the inner ring shows four high-level clinical workflow types, and the outer ring shows finer-grained subtypes. (b) Distribution across eight major groups with full list in Table A2 [#A1.T2].
+
+4 Task Design and Curation
+
+We now describe how tasks in PhysicianBench were constructed and validated.
+Each task is grounded in a real clinical case and undergoes multi-round physician review before inclusion in the benchmark.
+Figure A1 [#A3.F1] summarizes the curation pipeline.
+
+4.1 Task Sourcing and Construction
+
+Source material.
+Tasks are adapted from real electronic consultation (e-consult) cases drawn from clinical practice. An e-consult is an asynchronous, EHR-based specialty consultation: a primary care physician (PCP) submits a clinical question to a subspecialist, who reviews the patient’s full EHR and returns a written assessment with recommended workup, treatment, or referral for the PCP to act on. During task curation, we intentionally diversify the framing beyond the e-consult itself, recasting cases as general clinical tasks across varied roles and settings so the agent’s workflow is not limited to static consultation. These cases naturally embody the complex, long-horizon, multi-step clinical reasoning that PhysicianBench aims to evaluate.
+
+Patient records.
+The patient data underlying each task is derived from real clinical records in the STAnford Research Repository (STARR) (Datta et al., 2020 [#bib.bib1]), a de-identified clinical data warehouse linked to Stanford Health Care EHR systems.
+To further protect patient privacy while preserving clinical fidelity, we apply additional perturbations to the source records, including date shifts, demographic modifications, and adjustments to clinical values that preserve the original clinical meaning, which are verified as part of the physician validation pipeline (§4.3 [#S4.SS3]).
+This approach grounds tasks in realistic clinical complexity, capturing the co-morbidity patterns, data irregularities, and longitudinal health trajectories of real patient populations that fully synthetic records typically lack.
+
+Task construction.
+From each source case, we construct a task instance comprising four artifacts:
+(a) a natural-language instruction specifying the clinical context (date, physician role, patient background), multi-step task requirements, and expected deliverables;
+(b) the corresponding patient record encoded in FHIR and mapped to standardized terminologies;
+(c) an evaluation test suite implementing checkpoint definitions and grader logic; and
+(d) a reference solution summary and review checklist supporting structured physician validation.
+
+4.2 Clinical Coverage
+
+PhysicianBench comprises 100 physician-validated agent tasks spanning diverse clinical workflows and subspecialties (Figure 3 [#S3.F3]). Tasks are organized into four high-level clinical workflow types (Figure 3 [#S3.F3]a), each further divided into finer-grained subtypes. For example, Workup & Risk Stratification consists of disease workup, abnormal lab evaluation, incidental finding followup, and infection evaluation. Specifically, these tasks are drawn from 21 clinical subspecialties grouped into 8 major groups (Figure 3 [#S3.F3]b). Appendix A [#A1] provides the detailed statistics of the clinical coverage.
+
+4.3 Physician Validation
+
+To ensure clinical fidelity, every task undergoes multi-round review by a panel of 11 human physicians (background detailed in Appendix D [#A4]) through an interactive annotation pipeline. Initial task artifacts and patient EHRs, together with a review checklist tailored to the task’s content, then enter the validation pipeline (Figure A1 [#A3.F1], Appendix C [#A3]), which proceeds through three stages:
+
+(1) Initial review.
+A domain expert reviews the task against the structured checklist (Figure A2 [#A3.F2]), which targets four dimensions:
+instruction clarity (whether the task is unambiguous and actionable for an agent),
+clinical accuracy (whether reasoning chains and clinical recommendations are medically sound),
+checkpoint validity (whether evaluation criteria are appropriate and complete), and
+EHR consistency (whether referenced clinical data matches the patient record).
+The reviewer provides categorical assessments and free-text comments for each checklist item.
+
+(2) Agentic revision.
+An LLM agent parses the reviewer’s structured assessments and free-text comments and produces targeted edits across all task artifacts. Each edit is recorded as a structured diff capturing the source review item, the affected file and location, the before/after text, and a rationale, so that changes can be individually approved or rejected in stage (3). When a change requires consistency edits to other artifacts, the agent emits these as auto-synchronized companion diffs grouped under the primary change.
+
+(3) Approval review.
+Physicians review each proposed change in a diff-based interface (Figure A3 [#A3.F3]), seeing the before-and-after text for every edit, and approve or reject individual changes with rationale.
+Rejected changes trigger another revision cycle: stages (2) and (3) repeat until all changes are approved.
+Tasks reaching full approval are marked as finalized and included in the benchmark. This iterative human-in-the-loop process ensures that the final benchmark tasks meet clinical standards for accuracy, clarity, and safety.
+
+5 Experiments
+
+5.1 Experimental Setup
+
+Models.
+We evaluate multiple LLMs spanning both proprietary and open-source families.
+Proprietary models include GPT-5.4 (OpenAI, 2026a [#bib.bib22]), GPT-5.5 (OpenAI, 2026b [#bib.bib26]), Claude Opus 4.6 (Anthropic, 2026a [#bib.bib28]), Claude Sonnet 4.6 (Anthropic, 2026c [#bib.bib34]) and Claude Opus 4.7 (Anthropic, 2026b [#bib.bib27]), Qwen3.6-Plus (Qwen Team, 2026 [#bib.bib37]), MiniMax M2.7 (MiniMax, 2026 [#bib.bib29]), MiMo-v2.5-Pro (Xiaomi, 2026 [#bib.bib35]), Gemini Pro 3.1 (Google DeepMind, 2026 [#bib.bib40]), and Grok-4.20 (xAI, 2026 [#bib.bib39]).
+Open-source models include DeepSeek V4-Pro (DeepSeek-AI, 2026 [#bib.bib38]), and Kimi-K2.6 (Moonshot AI, 2026 [#bib.bib36]).
+All models use the same minimal tool-calling agent loop described in §3.1 [#S3.SS1], with access to the full set of FHIR tools (§3.2 [#S3.SS2]).
+We allow up to 100 tool-calling turns per task and use the provider’s default temperature. For models that support a reasoning-effort parameter, we set it to high and run 3 independent trials to compute the reliability metrics.
+
+Metrics.
+We report three complementary metrics.
+Pass@1 measures the fraction of tasks an agent fully completes in a single attempt, reflecting practical deployment performance.
+Pass@3 estimates the probability that at least one of k=3k{=}3 independent runs succeeds, following the unbiased estimator of (Chen et al., 2021 [#bib.bib21]): pass@​k=1−(n−ck)/(nk)\text{pass@}k=1-\binom{n-c}{k}/\binom{n}{k}, where nn is the number of runs and cc is the number of successes.
+This captures whether a model can solve a task when given multiple attempts.
+Conversely, Pass^3 (Yao et al., 2025 [#bib.bib2]) =ck/nk=c^{k}/n^{k} estimates the probability that all kk runs succeed, measuring consistency and reliability.
+We also report the average number of tool-calling turns (#Turns) as a measure of agent efficiency.
+
+Environment.
+Each task ships as a self-contained Docker image bundling a HAPI FHIR JPA server (Smile CDR, 2024 [#bib.bib41]) with the patient record pre-loaded into a persistent H2 database, ensuring exact reproducibility without any runtime data ingestion.
+A fresh container is provisioned per task and torn down after evaluation, so no state leaks across evaluations.
+
+5.2 Main Results
+
+Table 2 [#S5.T2] reports comparison results for all models.
+GPT-5.5 leads by a wide margin, achieving 46.3% pass@1, an absolute gap of 14.6 points over the next-best model Claude Opus 4.6 (31.7%). The strongest open-source model, DeepSeek V4-Pro, reaches 18.7%, surpassing several proprietary models.
+GPT-5.5’s lead extends to reliability: its Pass^3 of 28.0% is roughly 10 absolute points above the next-best (Claude Opus 4.6 and Claude Opus 4.7, both 18.0%) and nearly an order of magnitude above weaker models (Grok-4.20, MiniMax M2.7, all at 1.0%). Even so, GPT-5.5 falls well short of the bar required for autonomous clinical use, with fewer than one in three tasks solved consistently across three independent runs, and the remaining models cluster below 32% pass@1, leaving the benchmark far from saturated.
+
+Table 2: Main results on PhysicianBench. Pass@1 is the fraction of tasks fully completed (%). #Turns is the average number of tool calls per task. Bold indicates the best score in each column.
+
+Model
+Pass@1
+Pass@3
+Pass^3
+#Turns
+
+Proprietary Models
+
+GPT-5.5
+46.3 ±\pm 1.2
+57.4
+28.0
+41.9
+
+Claude Opus 4.6
+31.7 ±\pm 2.3
+41.5
+18.0
+25.2
+
+Claude Opus 4.7
+29.3 ±\pm 2.5
+37.9
+18.0
+16.2
+
+GPT-5.4
+27.7 ±\pm 1.5
+37.7
+13.0
+39.8
+
+Claude Sonnet 4.6
+23.0 ±\pm 2.6
+33.2
+9.0
+22.3
+
+MiMo-v2.5-Pro
+16.7 ±\pm 4.0
+23.6
+6.0
+29.5
+
+Qwen3.6-Plus
+13.7 ±\pm 4.0
+22.6
+2.0
+28.0
+
+MiniMax M2.7
+8.7 ±\pm 1.2
+15.9
+1.0
+29.7
+
+Gemini Pro 3.1
+6.0 ±\pm 1.0
+9.3
+3.0
+30.4
+
+Grok-4.20
+5.3 ±\pm 3.2
+9.7
+1.0
+16.7
+
+Open-Source Models
+
+DeepSeek V4-Pro
+18.7 ±\pm 2.9
+27.9
+6.0
+35.3
+
+Kimi-K2.6
+17.0 ±\pm 2.6
+26.3
+5.0
+42.4
+
+Table 3: Pass@1 (%) by clinical specialty group. Bold indicates the best score in each column.
+
+Model
+Cardio
+Endo
+GI/Hep
+Immunol/ID
+Psych/Neuro
+Hem/Onc
+Neph/Urol
+Pulm/Other
+Overall
+
+Proprietary Models
+
+GPT-5.5
+55.6
+59.0
+57.1
+38.9
+33.3
+48.7
+29.2
+48.1
+46.3
+
+Claude Opus 4.6
+27.8
+35.9
+35.7
+38.9
+27.1
+30.8
+33.3
+25.9
+31.7
+
+Claude Opus 4.7
+38.9
+28.2
+28.6
+22.2
+18.8
+30.8
+33.3
+38.9
+29.3
+
+GPT-5.4
+27.8
+30.8
+21.4
+27.8
+22.9
+38.5
+20.8
+29.6
+27.7
+
+Claude Sonnet 4.6
+33.3
+10.3
+26.2
+27.8
+25.0
+25.6
+33.3
+14.8
+23.0
+
+MiMo-v2.5-Pro
+11.1
+10.3
+23.8
+16.7
+27.1
+17.9
+4.2
+13.0
+16.7
+
+Qwen3.6-Plus
+5.6
+12.8
+9.5
+16.7
+20.8
+10.3
+12.5
+14.8
+13.7
+
+MiniMax M2.7
+0.0
+5.1
+11.9
+11.1
+8.3
+7.7
+4.2
+13.0
+8.7
+
+Gemini Pro 3.1
+5.6
+10.3
+7.1
+0.0
+8.3
+5.1
+0.0
+7.4
+6.0
+
+Grok-4.20
+5.6
+5.1
+9.5
+2.8
+10.4
+2.6
+4.2
+1.9
+5.3
+
+Open-Source Models
+
+DeepSeek V4-Pro
+16.7
+7.7
+33.3
+19.4
+14.6
+15.4
+12.5
+24.1
+18.7
+
+Kimi-K2.6
+27.8
+12.8
+21.4
+16.7
+14.6
+17.9
+12.5
+16.7
+17.0
+
+Variation across specialties.
+Table 3 [#S5.T3] reports pass@1 broken down by clinical specialty.
+GPT-5.5 leads in seven of the eight specialty groups; the only exception is Nephrology/Urology, where the Claude family tops the chart at 33.3% and GPT-5.5 reaches 29.2%.
+Within each group, performance spans a wide range (close to zero for the weakest models, approaching 60% for GPT-5.5 in Endocrinology), indicating that specialty-specific clinical priors and reasoning patterns differ substantially across models.
+
+Variation across task types.
+Performance varies systematically by task type (Table A5 [#A6.T5] in Appendix F [#A6]).
+Treatment Planning is consistently the hardest task type, reflecting its open-ended, multi-step nature: the best non-GPT-5.5 model reaches only 23.5% on Treatment Planning compared with 43.6% on Diagnosis. GPT-5.5’s highest score falls in Workup & Risk Stratification (54.9%), opening a 17-point gap over Claude Opus 4.6 on that column and suggesting its largest gains come from longer-horizon, multi-source workup tasks.
+
+Table 4: Distribution of failed checkpoints by failure category (%). Each failed checkpoint is classified by its evaluation type.
+
+Failure Distribution (% of Failed Checkpoints)
+
+Model
+Data Retrieval
+Clinical Reasoning
+Action Execution
+Documentation
+
+Proprietary Models
+
+GPT-5.5
+10.0
+42.5
+19.4
+28.1
+
+Claude Opus 4.6
+10.0
+50.4
+17.4
+22.2
+
+Claude Opus 4.7
+14.2
+48.3
+14.3
+23.2
+
+GPT-5.4
+10.3
+46.1
+20.6
+23.0
+
+Claude Sonnet 4.6
+11.8
+50.2
+18.8
+19.2
+
+MiMo-v2.5-Pro
+12.6
+52.2
+17.5
+17.7
+
+Qwen3.6-Plus
+11.6
+53.8
+19.3
+15.3
+
+MiniMax M2.7
+13.7
+50.4
+20.0
+15.9
+
+Gemini Pro 3.1
+15.2
+50.1
+19.7
+15.0
+
+Grok-4.20
+13.6
+54.4
+18.7
+13.4
+
+Open-Source Models
+
+DeepSeek V4-Pro
+12.4
+58.3
+15.3
+14.0
+
+Kimi-K2.6
+11.9
+50.3
+19.1
+18.7
+
+Average
+12.4
+50.4
+18.8
+18.4
+
+5.3 Error Analysis
+
+To understand where agents fail, we classify each checkpoint into one of four capability categories: Data Retrieval, Clinical Reasoning, Action Execution, and Documentation, based on the evaluation checkpoint types.
+Table 4 [#S5.T4] reports the distribution of failed checkpoints across these categories.
+
+Failure distribution across capability categories.
+Clinical reasoning accounts for the majority of failures across nearly all models, confirming that multi-step clinical interpretation, rather than tool-use mechanics or data access, is the primary bottleneck. Weaker models show even higher concentration of reasoning failures than stronger ones, and GPT-5.5 reaches the lowest CR share, indicating that stronger models resolve more reasoning checkpoints and shift their failure distribution toward other categories.
+Action execution failures remain stable across all models, reflecting a systematic challenge in translating clinical decisions into structured EHR writes that is largely independent of model capability.
+Documentation failures are more pronounced in stronger models, likely because stronger agents attempt more complete clinical notes and are penalized for omissions that weaker models avoid by producing minimal output. Data retrieval failures are slightly elevated in weaker models that struggle to navigate the EHR environment.
+
+Figure 4: Fine-grained root cause comparison between GPT-5.5 and Claude Opus 4.6. Each failed checkpoint is classified into one of four categories and a fine-grained subtype; bars show the absolute count per subtype with the percentage-of-category label, allowing direct subgroup-level comparison between the two models.
+
+Fine-grained root causes.
+Figure 4 [#S5.F4] contrasts fine-grained failure subtypes of GPT-5.5 and Claude Opus 4.6. Clinical Reasoning failures in both models concentrate in incomplete reasoning and near-miss / detail: the agent reaches the right clinical territory but drops a specific rubric element such as a dose, monitoring plan, or safety caveat. Outright wrong conclusions are rare in both models, so when either agent commits it is rarely wrong; it just leaves rubric elements uncovered. Action Execution is dominated by an output gap (the agent writes the correct action in its note but never creates the corresponding FHIR resource), Documentation by cascade from upstream errors, and Data Retrieval by not retrieved queries. The quantitative shift is uniform: GPT-5.5 records lower absolute counts in every subgroup of every category, suggesting its improvement is broad behavioral consistency rather than relief in any one failure mode.
+
+5.4 What Drives the GPT-5.5 Lead?
+
+To understand why GPT-5.5 outperforms the next-strongest model (Claude Opus 4.6) by such a wide margin, we conducted a head-to-head comparison on two models and observe that (1) EHR data fidelity: Opus 4.6 stated chart-contradictory facts (e.g., describing a patient as not on a PPI when pantoprazole is documented) or abstracted away a required numeric value, while GPT-5.5 instead surfaced the literal data; (2) GPT-5.5 reliably enumerated all required rubric items (a workup-lab set, a documentation checklist) where Opus 4.6 typically covered fewer.
+
+The advantage is not a clinical-knowledge gap. The 8 reverse cases involve the same kinds of failures on different tasks, and the two models share a comparable wrong-conclusion rate. Mechanistically, GPT-5.5 issues markedly more tool calls on the advantage tasks, suggesting deeper EHR exploration translates into stronger data grounding. Both models thus exhibit comparable underlying clinical reasoning capability; GPT-5.5 simply applies it more consistently.
+
+6 Discussion
+
+We introduced PhysicianBench, a benchmark for evaluating LLM agents on real-world clinical tasks in real EHR environments.
+PhysicianBench provides 100 long-horizon tasks sourced from real consultation cases, both authored and independently reviewed by physicians, with 670 fine-grained checkpoints supporting verifiable evaluation.
+A comprehensive evaluation of 12 LLM agents reveals a substantial gap, with the best agents completing only 46% of tasks and reliably solving 28% across multiple attempts, indicating that current agents remain far from autonomously and reliably handling real-world clinical tasks.
+
+Limitations and future work.
+PhysicianBench currently targets EHR-mediated, e-consult-style physician work, leaving several directions for future iterations:
+(i) broader health workflow coverage, extending the infrastructure to discharge summaries, medication management and other inpatient settings;
+(ii) from autonomy to collaboration, evaluating agent-user interaction with simulated physicians or patients under clinical constraints and shared decision-making; and
+(iii) multimodal inputs and expanded tool ecosystems, incorporating imaging, waveforms, and external knowledge bases (e.g., PubMed, RxNorm) to bring evaluation closer to the full information context of practicing physicians.
+We hope PhysicianBench serves as a rigorous yardstick for tracking progress toward LLM agents that can reliably support physicians in real healthcare settings.
+
+Acknowledgments
+
+R.L. is supported by the Stanford Center for Asian Health Research and Education (CARE) Postdoctoral Scholarship (https://asianhealth.stanford.edu/ [https://asianhealth.stanford.edu/]).
+
+References
+
+[1]
+Anthropic (2026)
+
+Introducing claude opus 4.6.
+
+Note: https://www.anthropic.com/news/claude-opus-4-6 [https://www.anthropic.com/news/claude-opus-4-6]
+
+Cited by: §5.1 [#S5.SS1.p1.1].
+
+[2]
+Anthropic (2026)
+
+Introducing claude opus 4.7.
+
+Note: https://www.anthropic.com/news/claude-opus-4-7 [https://www.anthropic.com/news/claude-opus-4-7]
+
+Cited by: §5.1 [#S5.SS1.p1.1].
+
+[3]
+Anthropic (2026)
+
+Introducing claude sonnet 4.6.
+
+Note: https://www.anthropic.com/news/claude-sonnet-4-6 [https://www.anthropic.com/news/claude-sonnet-4-6]
+
+Cited by: §5.1 [#S5.SS1.p1.1].
+
+[4]
+R. K. Arora, J. Wei, R. S. Hicks, P. Bowman, J. Quiñonero-Candela, F. Tsimpourlas, M. Sharman, M. Shah, A. Vallone, A. Beutel, et al. (2025)
+
+Healthbench: evaluating large language models towards improved human health.
+
+arXiv preprint arXiv:2505.08775.
+
+Cited by: §1 [#S1.p2.1],
+§2 [#S2.SS0.SSS0.Px2.p1.1].
+
+[5]
+S. Bedi, H. Cui, M. Fuentes, A. Unell, M. Wornow, J. M. Banda, N. Kotecha, T. Keyes, Y. Mai, M. Oez, et al. (2026)
+
+Holistic evaluation of large language models for medical tasks with medhelm.
+
+Nature Medicine, pp. 1–9.
+
+Cited by: §2 [#S2.SS0.SSS0.Px2.p1.1].
+
+[6]
+M. Chen, J. Tworek, H. Jun, Q. Yuan, H. P. D. O. Pinto, J. Kaplan, H. Edwards, Y. Burda, N. Joseph, G. Brockman, et al. (2021)
+
+Evaluating large language models trained on code.
+
+arXiv preprint arXiv:2107.03374.
+
+Cited by: §5.1 [#S5.SS1.p2.1].
+
+[7]
+S. Datta, J. Posada, G. Olson, W. Li, C. O’Reilly, D. Balraj, J. Mesterhazy, J. Pallas, P. Desai, and N. Shah (2020)
+
+A new paradigm for accelerating clinical data science at stanford medicine.
+
+arXiv preprint arXiv:2003.10534.
+
+Cited by: §C.1 [#A3.SS1.p1.1],
+§4.1 [#S4.SS1.p2.1].
+
+[8]
+DeepSeek-AI (2026)
+
+DeepSeek-v4: towards highly efficient million-token context intelligence.
+
+Technical Report.
+
+External Links: Link [https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/main/DeepSeek_V4.pdf]
+
+Cited by: §5.1 [#S5.SS1.p1.1].
+
+[9]
+Google DeepMind (2026)
+
+Gemini 3.1 pro: a smarter model for your most complex tasks.
+
+Note: https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-3-1-pro/ [https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-3-1-pro/]
+
+Cited by: §5.1 [#S5.SS1.p1.1].
+
+[10]
+Health Level Seven International
+
+FHIR: fast healthcare interoperability resources.
+
+Note: https://hl7.org/fhir/ [https://hl7.org/fhir/]
+
+Cited by: §1 [#S1.p3.1],
+§3.2 [#S3.SS2.p1.1].
+
+[11]
+R. S. Hicks, M. Trofimov, D. Lim, R. K. Arora, F. Tsimpourlas, P. Bowman, M. Sharman, C. Tong, K. Karthik, A. Dugar, et al. (2026)
+
+HealthBench professional: evaluating large language models on real clinician chats.
+
+Technical report
+
+ tech. rep., OpenAI.
+
+Cited by: §2 [#S2.SS0.SSS0.Px2.p1.1],
+Table 1 [#S2.T1.4.1.1.1.1.1.1.2.1].
+
+[12]
+A. J. Holmgren, C. A. Sinsky, L. Rotenstein, and N. C. Apathy (2024)
+
+National comparison of ambulatory physician electronic health record use across specialties.
+
+Journal of general internal medicine 39 (14), pp. 2868–2870.
+
+Cited by: §1 [#S1.p1.1].
+
+[13]
+Y. Jiang, K. C. Black, G. Geng, D. Park, J. Zou, A. Y. Ng, and J. H. Chen (2025)
+
+MedAgentBench: a virtual ehr environment to benchmark medical llm agents.
+
+Nejm Ai 2 (9), pp. AIdbp2500144.
+
+Cited by: §1 [#S1.p2.1],
+§2 [#S2.SS0.SSS0.Px2.p3.1],
+Table 1 [#S2.T1.4.1.1.1.1.1.1.5.1].
+
+[14]
+C. E. Jimenez, J. Yang, A. Wettig, S. Yao, K. Pei, O. Press, and K. Narasimhan (2024)
+
+SWE-bench: can language models resolve real-world github issues?.
+
+In The Twelfth International Conference on Learning Representations,
+
+External Links: Link [https://openreview.net/forum?id=VTF8yNQM66]
+
+Cited by: §2 [#S2.SS0.SSS0.Px1.p1.1].
+
+[15]
+D. Jin, E. Pan, N. Oufattole, W. Weng, H. Fang, and P. Szolovits (2021)
+
+What disease does this patient have? a large-scale open domain question answering dataset from medical exams.
+
+Applied Sciences 11 (14), pp. 6421.
+
+Cited by: §1 [#S1.p2.1],
+§2 [#S2.SS0.SSS0.Px2.p1.1].
+
+[16]
+Q. Jin, B. Dhingra, Z. Liu, W. Cohen, and X. Lu (2019)
+
+PubMedQA: a dataset for biomedical research question answering.
+
+In Proceedings of the 2019 conference on empirical methods in natural language processing and the 9th international joint conference on natural language processing (EMNLP-IJCNLP),
+
+pp. 2567–2577.
+
+Cited by: §1 [#S1.p2.1],
+§2 [#S2.SS0.SSS0.Px2.p1.1].
+
+[17]
+R. Korom, S. Kiptinness, N. Adan, K. Said, C. Ithuli, O. Rotich, B. Kimani, I. King’ori, S. Kamau, E. Atemba, et al. (2025)
+
+Ai-based clinical decision support for primary care: a real-world study.
+
+arXiv preprint arXiv:2507.16947.
+
+Cited by: §1 [#S1.p1.1].
+
+[18]
+G. Lee, E. Bach, E. Yang, T. Pollard, A. JOHNSON, E. Choi, J. H. Lee, et al. (2025)
+
+FHIR-AgentBench: benchmarking llm agents for realistic interoperable ehr question answering.
+
+In Machine Learning for Health,
+
+Cited by: §2 [#S2.SS0.SSS0.Px2.p2.1],
+Table 1 [#S2.T1.4.1.1.1.1.1.1.6.1].
+
+[19]
+J. Li, W. Zhao, J. Zhao, W. Zeng, H. Wu, X. Wang, R. Ge, Y. Cao, Y. Huang, W. Liu, et al. (2025)
+
+The tool decathlon: benchmarking language agents for diverse, realistic, and long-horizon task execution.
+
+arXiv preprint arXiv:2510.25726.
+
+Cited by: §2 [#S2.SS0.SSS0.Px1.p2.1].
+
+[20]
+Y. Liao, C. Xuan, Y. Cai, L. Yang, Z. Chen, Y. Wang, and Y. Wang (2026)
+
+AgentEHR: advancing autonomous clinical decision-making via retrospective summarization.
+
+arXiv preprint arXiv:2601.13918.
+
+Cited by: §2 [#S2.SS0.SSS0.Px2.p2.1],
+Table 1 [#S2.T1.4.1.1.1.1.1.1.7.1].
+
+[21]
+X. Liu, H. Yu, H. Zhang, Y. Xu, X. Lei, H. Lai, Y. Gu, H. Ding, K. Men, K. Yang, et al. (2023)
+
+Agentbench: evaluating llms as agents.
+
+arXiv preprint arXiv:2308.03688.
+
+Cited by: §2 [#S2.SS0.SSS0.Px1.p1.1].
+
+[22]
+MiniMax (2026)
+
+MiniMax m2.7: early echoes of self-evolution.
+
+Note: https://www.minimax.io/news/minimax-m27-en [https://www.minimax.io/news/minimax-m27-en]Accessed: 2026-04-22
+
+Cited by: §5.1 [#S5.SS1.p1.1].
+
+[23]
+Moonshot AI (2026)
+
+Kimi k2.6: advancing open-source coding.
+
+Note: https://www.kimi.com/blog/kimi-k2-6 [https://www.kimi.com/blog/kimi-k2-6]Accessed: 2026-04-22
+
+Cited by: §5.1 [#S5.SS1.p1.1].
+
+[24]
+E. H. Ofstad, J. C. Frich, E. Schei, R. M. Frankel, and P. Gulbrandsen (2016)
+
+What is a medical decision? a taxonomy based on physician statements in hospital encounters: a qualitative study.
+
+BMJ open 6 (2), pp. e010098.
+
+Cited by: Appendix A [#A1.p1.1].
+
+[25]
+OpenAI (2026)
+
+Introducing gpt-5.4.
+
+Note: https://openai.com/index/introducing-gpt-5-4/ [https://openai.com/index/introducing-gpt-5-4/]
+
+Cited by: §5.1 [#S5.SS1.p1.1].
+
+[26]
+OpenAI (2026)
+
+Introducing gpt-5.5.
+
+Note: https://openai.com/index/introducing-gpt-5-5/ [https://openai.com/index/introducing-gpt-5-5/]
+
+Cited by: §5.1 [#S5.SS1.p1.1].
+
+[27]
+A. Pal, L. K. Umapathi, and M. Sankarasubbu (2022)
+
+MedMCQA: a large-scale multi-subject multi-choice dataset for medical domain question answering.
+
+In Conference on health, inference, and learning,
+
+pp. 248–260.
+
+Cited by: §2 [#S2.SS0.SSS0.Px2.p1.1].
+
+[28]
+S. G. Patil, H. Mao, F. Yan, C. C. Ji, V. Suresh, I. Stoica, and J. E. Gonzalez (2025)
+
+The berkeley function calling leaderboard (bfcl): from tool use to agentic evaluation of large language models.
+
+In Forty-second International Conference on Machine Learning,
+
+Cited by: §2 [#S2.SS0.SSS0.Px1.p1.1].
+
+[29]
+Qwen Team (2026)
+
+Qwen3.6-plus: towards real world agents.
+
+Note: https://qwen.ai/blog?id=qwen3.6 [https://qwen.ai/blog?id=qwen3.6]
+
+Cited by: §5.1 [#S5.SS1.p1.1].
+
+[30]
+S. Schmidgall, R. Ziaei, C. Harris, E. Reis, J. Jopling, and M. Moor (2024)
+
+AgentClinic: a multimodal agent benchmark to evaluate ai in simulated clinical environments.
+
+arXiv preprint arXiv:2405.07960.
+
+Cited by: §1 [#S1.p2.1],
+§2 [#S2.SS0.SSS0.Px2.p2.1],
+Table 1 [#S2.T1.4.1.1.1.1.1.1.3.1].
+
+[31]
+W. Shi, R. Xu, Y. Zhuang, Y. Yu, J. Zhang, H. Wu, Y. Zhu, J. C. Ho, C. Yang, and M. D. Wang (2024)
+
+EHRAgent: code empowers large language models for few-shot complex tabular reasoning on electronic health records.
+
+In Proceedings of the 2024 Conference on Empirical Methods in Natural Language Processing,
+
+pp. 22315–22339.
+
+Cited by: §2 [#S2.SS0.SSS0.Px2.p2.1],
+Table 1 [#S2.T1.4.1.1.1.1.1.1.4.1].
+
+[32]
+K. Singhal, S. Azizi, T. Tu, S. S. Mahdavi, J. Wei, H. W. Chung, N. Scales, A. Tanwani, H. Cole-Lewis, S. Pfohl, et al. (2023)
+
+Large language models encode clinical knowledge.
+
+Nature 620 (7972), pp. 172–180.
+
+Cited by: §1 [#S1.p1.1].
+
+[33]
+C. Sinsky, L. Colligan, L. Li, M. Prgomet, S. Reynolds, L. Goeders, J. Westbrook, M. Tutty, and G. Blike (2016)
+
+Allocation of physician time in ambulatory practice: a time and motion study in 4 specialties.
+
+Annals of internal medicine 165 (11), pp. 753–760.
+
+Cited by: §1 [#S1.p1.1].
+
+[34]
+Smile CDR (2024)
+
+HAPI FHIR JPA Server Starter.
+
+Note: Accessed: 2026-03-11
+
+External Links: Link [https://github.com/hapifhir/hapi-fhir-jpaserver-starter]
+
+Cited by: §3.2 [#S3.SS2.p1.1],
+§5.1 [#S5.SS1.p3.1].
+
+[35]
+Z. Wang, Q. Chang, H. Patel, S. Biju, C. Wu, Q. Liu, A. Ding, A. Rezazadeh, A. Shah, Y. Bao, et al. (2025)
+
+MCP-Bench: benchmarking tool-using llm agents with complex real-world tasks via mcp servers.
+
+arXiv preprint arXiv:2508.20453.
+
+Cited by: §2 [#S2.SS0.SSS0.Px1.p2.1].
+
+[36]
+xAI (2026)
+
+Grok 4.20 model documentation.
+
+Note: https://openrouter.ai/x-ai/grok-4.20 [https://openrouter.ai/x-ai/grok-4.20]
+
+Cited by: §5.1 [#S5.SS1.p1.1].
+
+[37]
+Xiaomi (2026)
+
+MiMo-v2.5-pro.
+
+Note: https://mimo.xiaomi.com/mimo-v2-5-pro [https://mimo.xiaomi.com/mimo-v2-5-pro]
+
+Cited by: §5.1 [#S5.SS1.p1.1].
+
+[38]
+F. F. Xu, Y. Song, B. Li, Y. Tang, K. Jain, M. Bao, Z. Z. Wang, X. Zhou, Z. Guo, M. Cao, et al. (2025)
+
+TheAgentCompany: benchmarking llm agents on consequential real world tasks.
+
+In The Thirty-ninth Annual Conference on Neural Information Processing Systems Datasets and Benchmarks Track,
+
+External Links: Link [https://openreview.net/forum?id=LZnKNApvhG]
+
+Cited by: §1 [#S1.p1.1],
+§2 [#S2.SS0.SSS0.Px1.p2.1].
+
+[39]
+S. Yao, N. Shinn, P. Razavi, and K. R. Narasimhan (2025)
+
+τ\tau-bench: a benchmark for Tool-Agent-User interaction in real-world domains.
+
+In The Thirteenth International Conference on Learning Representations,
+
+Cited by: §1 [#S1.p1.1],
+§2 [#S2.SS0.SSS0.Px1.p2.1],
+§5.1 [#S5.SS1.p2.1].
+
+[40]
+S. Yao, J. Zhao, D. Yu, N. Du, I. Shafran, K. R. Narasimhan, and Y. Cao (2022)
+
+React: synergizing reasoning and acting in language models.
+
+In The eleventh international conference on learning representations,
+
+Cited by: §1 [#S1.p1.1].
+
+[41]
+S. Zhou, F. F. Xu, H. Zhu, X. Zhou, R. Lo, A. Sridhar, X. Cheng, T. Ou, Y. Bisk, D. Fried, et al. (2024)
+
+WebArena: a realistic web environment for building autonomous agents.
+
+In The Twelfth International Conference on Learning Representations,
+
+External Links: Link [https://openreview.net/forum?id=oKn9c6ytLx]
+
+Cited by: §2 [#S2.SS0.SSS0.Px1.p1.1].
+
+Appendix
+
+Appendix A Task Taxonomy
+
+PhysicianBench comprises 100 clinician-validated tasks spanning 21 subspecialties organized into 8 specialty groups, and 4 task types subdivided into 14 fine-grained subtypes.
+Specialty groups reflect the primary clinical domain of each task, and task types follow a reformulation of the DICTUM clinical decision-making taxonomy [24 [#bib.bib18]]: Diagnosis & Interpretation (result and imaging interpretation), Medication Prescribing (new therapy, regimen adjustment, acute treatment), Treatment Planning (longer-horizon planning including medication optimization, empiric treatment, diagnostic planning, substance-use management, and risk–benefit analysis), and Workup & Risk Stratification (disease workup, abnormal lab evaluation, incidental-finding follow-up, infection evaluation).
+
+We provide two complementary enumerations of the full task inventory:
+Table A1 [#A1.T1] groups tasks by task type and fine-grained subtype;
+Table A2 [#A1.T2] expands to all 21 subspecialties.
+Figure 3 [#S3.F3] (main paper) summarizes the marginal distributions over specialty and task type.
+
+Table A1: Task taxonomy grouped by task type and fine-grained subtype (100 tasks total).
+
+Task Type
+Subtype
+N
+
+Diagnosis & Interpretation (N=13)
+Result Interpretation
+9
+
+Imaging Interpretation
+4
+
+Medication Prescribing (N=26)
+New Therapy Initiation
+9
+
+Regimen Adjustment
+9
+
+Acute Treatment
+8
+
+Treatment Planning (N=27)
+Medication Optimization
+8
+
+Empiric Treatment
+7
+
+Diagnostic Planning
+5
+
+Substance Use Management
+4
+
+Risk-Benefit Analysis
+3
+
+Workup & Risk Stratification (N=34)
+Disease Workup
+14
+
+Abnormal Lab Evaluation
+11
+
+Incidental Finding Followup
+5
+
+Infection Evaluation
+4
+
+Table A2: Clinical-area coverage across 21 subspecialties. Each task is assigned its primary clinical area based on the topic.
+
+Subspecialty
+N
+
+Endocrinology
+10
+
+Hematology
+10
+
+Family Medicine
+9
+
+Gastroenterology
+9
+
+Infectious Disease
+7
+
+Cardiology
+6
+
+Internal Medicine
+6
+
+Psychiatry
+5
+
+Gynecology
+4
+
+Hepatology
+4
+
+Primary Care
+4
+
+Pulmonology
+4
+
+Allergy & Immunology
+3
+
+Geriatric Medicine
+3
+
+Nephrology
+3
+
+Neurology
+3
+
+Otolaryngology
+3
+
+Urology
+3
+
+Dermatology
+2
+
+Oncology
+1
+
+Rheumatology
+1
+
+Appendix B Checkpoint Grader Specifications
+
+Each checkpoint in PhysicianBench is graded by one of three grader types, selected based on the nature of the criterion being assessed. We provide full specifications below.
+
+Code graders
+
+verify agent actions by querying the FHIR server for resources created during execution. The validation logic checks resource type, status, coded values, and dosage parameters. For example, a medication order checkpoint asserts that a MedicationRequest exists matching the expected drug name pattern, dose range, and frequency. Date filtering ensures that only agent-created resources (those authored after the task timestamp) are evaluated, distinguishing agent actions from pre-existing patient data.
+
+Hybrid graders
+
+combine programmatic verification with LLM-assisted extraction for checkpoints where the ground truth is objectively defined but the agent’s output format varies. First, ground-truth values are computed deterministically from FHIR data (e.g., calculating a CHA2DS2-VASc score from patient demographics and coded diagnoses). Then, an LLM extracts the corresponding value from the agent’s free-text output. Finally, the extracted value is compared against the ground truth using deterministic logic. This approach accommodates variability in how agents report numerical results or clinical decisions while maintaining objective scoring criteria.
+
+LLM-judge graders
+
+evaluate aspects of clinical reasoning and documentation that resist purely programmatic assessment. Each LLM-judge checkpoint specifies a detailed rubric containing: (i) required clinical elements with ground-truth values, (ii) evaluation criteria organized as sequential verification steps, and (iii) three-level scoring thresholds (pass / partial / fail). For instance, a documentation checkpoint rubric may require that the agent’s note contains correct lab values, cites appropriate clinical guidelines, provides patient-specific rationale for treatment decisions, and avoids clinically unsafe recommendations.
+
+Appendix C Data Annotation Protocol
+
+Figure A1: Clinician validation pipeline. Each task progresses through four stages: (1) LLM-assisted generation of draft artifacts, (2) initial expert review against a structured checklist, (3) agentic revision that produces targeted edits with rationale, and (4) approval review where the clinician accepts or rejects each change. Stages (3)–(4) iterate until convergence.
+
+C.1 Data Collection
+
+Source clinical scenarios are drawn from de-identified electronic health records (EHR) in the STARR [7 [#bib.bib1]], specifically from the e-consult system in which primary care providers submit structured referral questions to subspecialists. E-consult records were selected to span diverse subspecialties and task types (diagnostic workup, treatment planning, medication management, referral coordination, and clinical documentation), yielding an initial pool of 185 candidate cases. Cases were filtered to ensure sufficient clinical complexity: each selected case must involve at least two distinct reasoning steps and require interaction with multiple EHR data sources (e.g., labs, medications, clinical notes).
+
+C.2 Patient Data De-identification
+
+Structured EHR data.
+
+Structured fields (laboratory values, vital signs, imaging measurements) were perturbed while preserving clinical plausibility: continuous values were shifted by a random noise drawn from a uniform distribution bounded by the assay’s reference range, ensuring the perturbed value remains within normal or clinically expected bounds.
+Categorical fields carrying task-relevant information (diagnoses, active medications, procedure codes) were further anonymized by randomly dropping a subset of entries and inserting clinically plausible but task-irrelevant values drawn from the same ontology, preventing the agent from trivially identifying the target condition from the record structure alone.
+Patient demographics (name, date of birth, address, phone number, MRN) were replaced with synthetically generated values using the Faker library11
+ 1
+
+ https://pypi.org/project/Faker/ [https://pypi.org/project/Faker/], producing internally consistent but entirely fictitious identities.
+
+Unstructured clinical notes.
+
+Free-text clinical notes were processed using Stanford SecureGPT, a series of PHI-safe LLMs operating within a secure institutional enclave that does not transmit data externally.
+SecureGPT was prompted to (i) identify and remove all protected health information (PHI) categories defined under HIPAA Safe Harbor, and (ii) rewrite the note in a stylistically distinct form that preserves the clinical meaning and key findings while producing text that differs substantially from the original.
+
+C.3 Annotation Guidelines and Quality Control
+
+Each task artifact, comprising a natural-language instruction, a solution summary, structured evaluation checkpoints, and an EHR reference, was reviewed by a domain-expert clinician through a dedicated web-based annotation application.
+Reviewers were provided with a structured checklist covering five dimensions:
+
+1. 
+
+Instruction clarity. Whether the task instruction is unambiguous and actionable for an autonomous agent, with a single correct interpretation. Reviewers flagged ambiguities and suggested specific rewording.
+
+2. 
+
+Clinical reasoning validity. Whether the reasoning chain in the solution summary is medically correct and follows accepted clinical guidelines. Reviewers flagged flawed or incomplete reasoning and provided the correct clinical logic.
+
+3. 
+
+Completeness. Whether the solution omits clinically important elements that a competent clinician would address (e.g., safety checks, guideline-mandated follow-up, contraindication screening).
+
+4. 
+
+Patient safety. Whether any recommended action could cause patient harm. Tasks with safety concerns were flagged and revised or excluded.
+
+5. 
+
+EHR consistency. Whether all clinical values, dates, and findings cited in the solution match the de-identified patient record. Reviewers verified specific data points against the EHR reference panel.
+
+Reviewers selected a categorical response for each checklist item (e.g., Clear / Ambiguous / Missing context) and were required to provide free-text justification for any non-positive response, with access to the full de-identified EHR in Excel format and a curated summary panel. Each review session took approximately 20 minutes per task. Quality was enforced through the iterative human-in-the-loop revision pipeline described in §4.3 [#S4.SS3]; on average, tasks required at least two review rounds before finalization.
+
+Figures A2 [#A3.F2] and A3 [#A3.F3] show the two main interactive screens of the annotation web application. Figure A2 [#A3.F2] is the initial-review screen used in stage (2), where the clinician inspects the task instruction, solution summary, and a curated patient summary alongside a structured clinical-review checklist. Figure A3 [#A3.F3] is the diff-approval screen used in stage (4), where each agent-proposed edit is presented as a before/after diff with the originating reviewer comment, and the clinician approves or rejects it.
+
+Figure A2: Initial-review screen (stage 2) of the annotation web application: structured clinical-review checklist (right) alongside the task instruction, solution summary, and patient summary panel (left and top).
+
+Figure A3: Diff-approval screen (stage 4) of the annotation web application: agent-proposed edits are shown as before/after diffs with the originating reviewer comment (right), and individually approved or rejected by the clinician.
+
+Appendix D Annotator Details
+
+The benchmark was validated by 11 clinicians recruited through institutional networks at Stanford. Because every task is derived from an e-consult case whose clinical answer was already authored by a board-certified subspecialist, our annotators function as second-tier reviewers rather than de novo authors of subspecialty judgments. Their task is to verify that the generated instruction, solution summary, and checkpoints faithfully reflect the subspecialist’s original answer, that the reasoning remains clinically coherent, and that no patient-safety issue was introduced during task construction. Table A3 [#A4.T3] summarizes the cohort’s demographics.
+
+Table A3: Demographic summary of the 11 expert annotators.
+
+ID
+Department
+Years of Experience
+
+A1
+Internal Medicine / Hospital Medicine
+12
+
+A2
+Internal Medicine
+10
+
+A3
+Internal Medicine
+8
+
+A4
+Internal Medicine
+7
+
+A5
+Internal Medicine
+6
+
+A6
+Internal Medicine
+5
+
+A7
+Internal Medicine
+5
+
+A8
+Internal Medicine
+6
+
+A9
+Cardiology / Internal Medicine
+6
+
+A10
+Emergency Medicine / Clinical Informatics
+5
+
+A11
+Psychiatry
+5
+
+Appendix E Agent Framework Implementation
+
+The agent framework described in §3.2 [#S3.SS2] is implemented as a ∼\sim300-line Python module wrapping the OpenAI-compatible chat completions API. We intentionally avoid third-party agent SDKs (e.g., OpenAI Agents SDK, LangChain, Claude Code) so that performance differences between models are attributable to model capability rather than model-specific scaffolding. Below we describe the interaction loop, robustness enhancements, and configuration settings used throughout our experiments.
+
+Interaction loop.
+
+At each step tt, the agent state consists of the system prompt, the task instruction, and the running message history (m1,…,mt−1)(m_{1},\dots,m_{t-1}). The framework invokes the model with (i) the message history, (ii) the JSON schemas of all 14 tools defined in §3.2 [#S3.SS2], and (iii) the provider-specific reasoning effort (high for reasoning-capable models; unset otherwise). Temperature is left at the provider’s default. If the response contains no tool calls, the text content is treated as the agent’s final answer and the loop terminates. Otherwise, each tool call is dispatched to the corresponding handler, the resulting FHIR JSON bundle or file-write confirmation is serialized and appended as a tool-role message, and the loop repeats. Parallel tool calls within a single step are supported natively and executed sequentially by the handler.
+
+Tool inventory.
+
+Table A4 [#A5.T4] enumerates the complete tool interface exposed to agents. The action space contains 14 registered tools: 13 FHIR-backed EHR tools and one workspace file-writing tool.
+
+Table A4: Tool inventory exposed to agents, named by the underlying FHIR resource. Search tools issue GET requests against the FHIR server; create tools issue POST requests that persist on the task-local server.
+
+Resource / endpoint
+
+Key arguments
+
+Search (GET)
+
+Patient
+
+identifier, name, birthdate, gender, telecom
+
+Condition
+
+patient, clinical_status, category, code, onset_date
+
+Observation (labs)
+
+patient, category, code, date
+
+Observation (vitals)
+
+patient, code, category, date
+
+Observation (social history)
+
+patient, code, date
+
+MedicationRequest
+
+patient, status, intent, authoredon, date
+
+Procedure
+
+patient, category, date
+
+DocumentReference
+
+patient, encounter, date, category, type
+
+ServiceRequest
+
+patient, status, intent, category, code, authored
+
+Create (POST)
+
+MedicationRequest
+
+patient, medication_display, dose_value, frequency_text
+
+ServiceRequest
+
+patient, code_code, code_display, priority, reason_display
+
+Appointment
+
+patient, practitioner, start, end, based_on
+
+Communication
+
+patient, message_text, recipient, sender
+
+Utility
+
+write_file
+
+file_path, content, mode
+
+Robustness enhancements.
+
+We add four safeguards beyond the basic loop:
+
+• 
+
+Tool error handling. Exceptions raised during tool dispatch (e.g., FHIR server unreachable, malformed resourceType), or JSON decoding errors on tool arguments, are caught and returned to the model as a structured {"error": ...} message rather than propagating. This allows the agent to observe and recover from transient or semantic errors.
+
+• 
+
+Overlong-output handling. Tool responses exceeding MAX_TOOL_OUTPUT_LEN=10,000 characters are truncated with an explicit tail hint: “output truncated, showing first NN of MM characters; use filters such as ‘code’, ‘date=ge…’, or reduced ‘count’ to narrow results.” This prevents single large FHIR bundles (e.g., unfiltered Observation search) from consuming the entire context window while instructing the agent how to recover.
+
+• 
+
+Loop detection. The agent is aborted early under any of three stuck-state conditions, each with a five-step threshold: (a) MAX_REPEATED_ERRORS, the same tool returns the same error for five consecutive calls; (b) MAX_REPEATED_CALLS, the same (tool, args, output) triple is observed five times in a row; (c) MAX_REPEATED_BATCHES, the same multi-call batch (as an unordered set) repeats five times within a sliding window of ten steps. An additional novelty counter aborts when no new (tool, args) pair has been issued for 15 consecutive steps.
+
+• 
+
+Reasoning-effort pass-through. For models supporting the reasoning_effort parameter, we pass high to maximize reasoning budget. For models without native reasoning support, the parameter is omitted.
+
+System prompt.
+
+The system prompt is intentionally minimal to avoid steering model behavior. Task-specific details (the working directory for file outputs and the FHIR server URL substitutions) are appended to the per-task instruction rather than hard-coded in the system prompt, keeping the latter reusable across tasks:
+
+Configuration.
+
+Unless otherwise noted, all experiments use the provider’s default temperature, max_steps=100, parallel_tool_calls=True, tool-output truncation at 10,000 characters, and provider-specific reasoning effort high. Each task runs against a fresh FHIR server container, eliminating state leakage across tasks.
+
+Appendix F Additional Results
+
+Table A5: Pass@1 (%) by task type, averaged over 3 runs. Bold indicates the best score in each column.
+
+Model
+Diagnosis/Interpretation
+Med Prescribe
+Treatment Plan
+Workup/Risk Stratification
+Overall
+
+Proprietary Models
+
+GPT-5.5
+46.2
+41.0
+40.7
+54.9
+46.3
+
+Claude Opus 4.6
+43.6
+28.2
+21.0
+38.2
+31.7
+
+Claude Opus 4.7
+41.0
+26.9
+22.2
+32.4
+29.3
+
+GPT-5.4
+35.9
+26.9
+23.5
+28.4
+27.7
+
+Claude Sonnet 4.6
+35.9
+24.4
+12.3
+25.5
+23.0
+
+MiMo-v2.5-Pro
+20.5
+14.1
+14.8
+18.6
+16.7
+
+Qwen3.6-Plus
+15.4
+12.8
+18.5
+9.8
+13.7
+
+MiniMax M2.7
+7.7
+11.5
+6.2
+8.8
+8.7
+
+Gemini Pro 3.1
+5.1
+5.1
+4.9
+7.8
+6.0
+
+Grok-4.20
+2.6
+7.7
+2.5
+6.9
+5.3
+
+Open-Source Models
+
+DeepSeek V4-Pro
+12.8
+14.1
+14.8
+27.5
+18.7
+
+Kimi-K2.6
+23.1
+10.3
+16.0
+20.6
+17.0
+
+Appendix G Representative Failure Trajectory
+
+To illustrate how the four error categories manifest within a single agent run, we show a reproduces a representative failure trajectory from Claude Opus 4.6 on task “Adrenal Insufficiency Management”. The task asks an endocrinologist agent to evaluate replacement adequacy in a 69-year-old woman with secondary adrenal insufficiency, a pituitary-axis condition diagnosed from chronic ophthalmic corticosteroid exposure and opioid use, in which aldosterone secretion is preserved.
+
+The agent successfully retrieves the relevant Condition, MedicationRequest, and Observation resources, but then confidently reclassifies the clinical picture as primary adrenal insufficiency (Addison’s disease) based on an elevated renin level, and recommends initiating fludrocortisone, a mineralocorticoid that is not indicated in secondary AI and can cause hypertension, hypokalemia, and volume overload. It subsequently names an urgent cardiology referral in the written plan but never creates the corresponding FHIR ServiceRequest, and the final documentation inherits the primary-vs-secondary misdiagnosis. A single trajectory thus exercises all four top-level failure categories: Data Retrieval (E27.40 retrieved from FHIR but not surfaced in the output), Clinical Reasoning (wrong conclusion: primary vs. secondary AI), Action Execution (output gap: referral named but not ordered), and Documentation (cascaded misclassification).
+
+“Patient with known secondary adrenal
+insufficiency diagnosed 2019 (morning cortisol 0.9 mcg/dL)
+attributed to chronic exogenous ophthalmic corticosteroid drops and
+opioid use. On hydrocortisone 15 mg/day. Now reports fatigue, BP
+lability, HR 105…”
+
+ Experimental support, please
+ view the build logs [./2605.02240v1/__stdout.txt]
+ for errors. Generated by
+
+ L
+ A
+ T
+ E
+
+ xml
+
+ [https://math.nist.gov/~BMiller/LaTeXML/].
+
+Instructions for reporting errors
+
+We are continuing to improve HTML versions of papers, and your feedback helps enhance accessibility and mobile
+ support. To report errors in the HTML that will help us improve conversion and rendering, choose any of the
+ methods listed below:
+
+Click the "Report Issue" () button, located in the page header.
+
+Tip: You can select the relevant text first, to include it in your report.
+
+Our team has already identified the following issues [https://github.com/arXiv/html_feedback/issues]. We appreciate your time reviewing and reporting rendering errors we
+ may not have found yet. Your efforts will help us improve the HTML versions for all readers, because disability
+ should not be a barrier to accessing research. Thank you for your continued support in championing open access for
+ all.
+
+Have a free development cycle? Help support accessibility at arXiv! Our collaborators at LaTeXML maintain a list of packages that need conversion [https://github.com/brucemiller/LaTeXML/wiki/Porting-LaTeX-packages-for-LaTeXML], and welcome developer contributions [https://github.com/brucemiller/LaTeXML/issues].
+
+ We gratefully acknowledge support from
+ our major funders,
+ member institutions [https://info.arxiv.org/about/ourmembers.html], ,
+ and all contributors.
+
+ About [https://info.arxiv.org/about]
+ ·
+ Help [https://info.arxiv.org/help]
+ ·
+ Contact [https://info.arxiv.org/help/contact.html]
+ ·
+ Subscribe [https://info.arxiv.org/help/subscribe]
+ ·
+ Copyright [https://info.arxiv.org/help/license/index.html]
+ ·
+ Privacy [https://info.arxiv.org/help/policies/privacy_policy.html]
+ ·
+ Accessibility [https://info.arxiv.org/help/web_accessibility.html]
+ ·
+ Operational Status (opens in new tab) [https://status.arxiv.org]
+
+Major funding support from
+
+ [https://www.simonsfoundation.org/]
+
+ [https://www.sfi.org.bm/]
+
+ [https://www.schmidtsciences.org/]
+
+ [javascript:toggleReadingMode();]

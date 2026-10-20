@@ -1,0 +1,348 @@
+Streaming & Diffusion - Inception Platform
+
+Documentation Index
+
+Fetch the complete documentation index at: /llms.txt [/llms.txt]
+
+Use this file to discover all available pages before exploring further.
+
+Skip to main content [#content-area]
+
+Mercury 3 is here — 50% off at launch | Start building → [https://platform.inceptionlabs.ai/]
+
+Inception Platform home page [/]
+
+Search...
+
+⌘KAsk Assistant⌘I
+
+Support [/cdn-cgi/l/email-protection#c2b1b7b2b2adb0b682abaca1a7b2b6abadacaea3a0b1eca3ab]
+
+Dashboard [https://platform.inceptionlabs.ai/]
+
+Dashboard
+ [https://platform.inceptionlabs.ai/]
+
+Search...
+
+Navigation
+
+Capabilities
+
+Streaming & Diffusion
+
+Getting Started
+
+Home
+
+ [/]
+
+Quick Start
+
+ [/get-started]
+
+Authentication
+
+ [/get-started/authentication]
+
+Models
+
+ [/get-started/models]
+
+SDKs
+
+ [/get-started/sdks]
+
+Rate Limits
+
+ [/get-started/rate-limits]
+
+API reference
+
+Decisions
+
+Chat
+
+FIM
+
+Edit
+
+Models
+
+Capabilities
+
+Reasoning Efforts
+
+ [/capabilities/reasoning-efforts]
+
+Streaming & Diffusion
+
+ [/capabilities/streaming]
+
+Tool Use
+
+ [/capabilities/tool-use]
+
+Structured Outputs
+
+ [/capabilities/structured-outputs]
+
+Decisions
+
+ [/capabilities/decisions]
+
+Autocomplete (FIM)
+
+ [/capabilities/fim]
+
+Next Edit
+
+ [/capabilities/next-edit]
+
+Guides
+
+Prompt Guide
+
+ [/resources/prompt-guide]
+
+Voice Quickstart
+
+ [/usecases/voice]
+
+Cookbooks
+
+Integrations
+
+Resources
+
+Inception Chat
+
+ [https://chat.inceptionlabs.ai/]
+
+Error Codes
+
+ [/resources/error-codes]
+
+FAQ
+
+ [/resources/faq]
+
+Support
+
+Contact Support
+
+ [https://platform.inceptionlabs.ai/support]
+
+Terms of Use
+
+ [https://www.inceptionlabs.ai/docs/terms-of-use]
+
+Privacy Policy
+
+ [https://www.inceptionlabs.ai/docs/privacy-policy]
+
+On this page
+
+Streaming [#streaming]
+
+Diffusion [#diffusion]
+
+Capabilities
+
+Streaming & Diffusion
+
+Copy pageCopy page
+
+Stream Mercury 3 chat completions or enable the diffusion mode to visualize how the model iteratively denoises text into the final answer.
+
+Copy pageCopy page
+
+Inception API supports streaming output and diffusion effect modes:
+
+Streaming: Get responses block-by-block for instant feedback—ideal for chat and live applications. A “block” is a chunk of refined text the model emits as it decodes, rather than one token at a time.
+
+Diffusing: Optionally visualize how noisy outputs are refined into final text, showcasing the model’s iterative denoising process.
+
+Set your API key [https://platform.inceptionlabs.ai/dashboard/api-keys] as an environment variable and install the SDK.
+
+macOS / Linux
+
+Windows (Command Prompt)
+
+Windows (PowerShell)
+
+export INCEPTION_API_KEY="your_api_key_here"
+
+set INCEPTION_API_KEY=your_api_key_here
+
+$env:INCEPTION_API_KEY="your_api_key_here"
+
+Python
+
+TypeScript
+
+pip install inceptionai
+
+npm install inceptionai
+
+​
+
+ [#streaming]
+Streaming
+
+Stream the response block-by-block as it is generated.
+
+cURL
+
+Python
+
+TypeScript
+
+curl https://api.inceptionlabs.ai/v1/chat/completions \
+ -H "Content-Type: application/json" \
+ -H "Authorization: Bearer $INCEPTION_API_KEY" \
+ -d '{
+ "model": "mercury-3",
+ "messages": [
+ {"role": "user", "content": "What is a diffusion model?"}
+ ],
+ "max_completion_tokens": 1000,
+ "stream": true
+ }'
+
+from inceptionai import Inception
+
+client = Inception() # reads INCEPTION_API_KEY from the environment
+
+stream = client.chat.completions.create(
+ model="mercury-3",
+ messages=[{"role": "user", "content": "What is a diffusion model?"}],
+ max_completion_tokens=1000,
+ stream=True,
+)
+for chunk in stream:
+ print(chunk.choices[0].delta.content or "", end="", flush=True)
+
+import Inception from 'inceptionai';
+
+const client = new Inception(); // reads INCEPTION_API_KEY from the environment
+
+const stream = await client.chat.completions.create({
+ model: 'mercury-3',
+ messages: [{ role: 'user', content: 'What is a diffusion model?' }],
+ max_completion_tokens: 1000,
+ stream: true,
+});
+for await (const chunk of stream) {
+ process.stdout.write(chunk.choices[0]?.delta.content ?? '');
+}
+
+​
+
+ [#diffusion]
+Diffusion
+
+Set diffusing to true to stream the model’s intermediate denoising steps. Each chunk contains the full text as it is refined into the final answer.
+
+cURL
+
+Python
+
+TypeScript
+
+curl https://api.inceptionlabs.ai/v1/chat/completions \
+ -H "Content-Type: application/json" \
+ -H "Authorization: Bearer $INCEPTION_API_KEY" \
+ -d '{
+ "model": "mercury-3",
+ "messages": [
+ {"role": "user", "content": "What is a diffusion model?"}
+ ],
+ "max_completion_tokens": 1000,
+ "stream": true,
+ "diffusing": true
+ }'
+
+from inceptionai import Inception
+
+client = Inception() # reads INCEPTION_API_KEY from the environment
+
+stream = client.chat.completions.create(
+ model="mercury-3",
+ messages=[{"role": "user", "content": "What is a diffusion model?"}],
+ max_completion_tokens=1000,
+ stream=True,
+ diffusing=True,
+)
+for chunk in stream:
+ # In diffusing mode each chunk is the full text as it is denoised
+ print(chunk.choices[0].delta.content or "", flush=True)
+
+import Inception from 'inceptionai';
+
+const client = new Inception(); // reads INCEPTION_API_KEY from the environment
+
+const stream = await client.chat.completions.create({
+ model: 'mercury-3',
+ messages: [{ role: 'user', content: 'What is a diffusion model?' }],
+ max_completion_tokens: 1000,
+ stream: true,
+ diffusing: true,
+});
+for await (const chunk of stream) {
+ // In diffusing mode each chunk is the full text as it is denoised
+ console.log(chunk.choices[0]?.delta.content ?? '');
+}
+
+The diffusing effect is best shown by overwriting the displayed text on each step. Here is an example in a web app using JavaScript:
+
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+let fullContent = '';
+while (true) {
+ const { done, value } = await reader.read();
+ if (done) break;
+
+ const chunk = decoder.decode(value);
+ const lines = chunk.split('\n');
+
+ for (const line of lines) {
+ const trimmed = line.trim();
+ if (!trimmed || !trimmed.startsWith('data: ')) continue;
+ if (trimmed === 'data: [DONE]') continue;
+ const jsonStr = trimmed.substring(6);
+ if (!jsonStr.startsWith('{')) continue;
+ try {
+ const data = JSON.parse(jsonStr);
+
+ for (const choice of data.choices || []) {
+ if (choice.delta && choice.delta.content !== null && choice.delta.content !== undefined) {
+ fullContent = choice.delta.content || '';
+ contentElement.textContent = fullContent;
+ }
+ }
+ } catch (error) {
+ console.error('Parsing error:', error);
+ }
+ }
+}
+
+Was this page helpful?
+
+YesNo
+
+Reasoning Efforts
+ [/capabilities/reasoning-efforts]
+Tool Use
+ [/capabilities/tool-use]
+
+x [https://x.com/_inception_ai]linkedin [https://www.linkedin.com/company/inception-labs-ai]discord [https://discord.com/invite/btzTARamwH]
+
+Powered byThis documentation is built and hosted on Mintlify, a developer documentation platform [https://www.mintlify.com?utm_campaign=poweredBy&utm_medium=referral&utm_source=inception]
+
+Assistant
+
+Responses are generated using AI and may contain mistakes.
+
+Contact support
+ [/cdn-cgi/l/email-protection#2754525757485553674e49444257534e48494b46455409464e]
