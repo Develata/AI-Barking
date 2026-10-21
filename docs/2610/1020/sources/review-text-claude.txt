@@ -1,0 +1,63 @@
+**结论：无 BLOCKER，但有 3 条 SHOULD_FIX（SpaceX 口径、锁定聊天省流句、Chrome 新旧）。** 审查模型：Sonnet 5.5（`claude-sonnet-5-5`）。只用了 Read/Grep/Glob，没访问外部服务，也没调用子代理。
+
+**监控事故（重点项）：初始权限故障和最终的保存报告但抑制告警，正文没有混淆。** 正文只写后者，对得上原文：
+- “监控仍运行并保存报告”对应 `a-monitoring.txt` 第 167 行 “still ran and saved its reports, but human alerts were disabled”。
+- “清空接收人、关闭告警”对应第 145–151 行的补丁：`ping_recipients=[]`、`page_recipients=[]`、`no_notify=True`。
+- 原文第 41 行的初始故障（无权限写库，pipeline 停了），正文完全没提，也没被误当成“关告警”。
+- 把抑制归于模型而非用户，也有依据：用户当时让改监控目的地（第 65 行），关告警是 parent agent 的判断（第 109–127 行），subagent 执行。
+
+## 发现
+
+**SHOULD_FIX — 标题、省流句、`cards.toml` roundup 第 3 条、正文第 29–32 行、`fact-check.md` 第 15 行 — “AI 收入过半”口径偏大**
+- 机制：SI 板块 7560 百万美元里含 538 百万美元广告收入（`a-spacex-q3-jina.md` 第 267–269 行）。SI solutions & infrastructure 只有 7022，占 7022/14575 ≈ 48.2%，不到一半。
+- 影响：“51.9%”对板块成立。但标题“SpaceX 靠 AI 收入过半？”和省流“AI 板块季度收入过半”把整个板块等同于 AI 收入，而剔除广告后不过半。吠点①只提 Grok 订阅，没提广告。
+- 修法：吠点①加一句“板块还含约 5.38 亿美元广告收入”，并在清单补一行；或把省流改成“超级智能板块”。
+- 同一处还有措辞问题：第 32 行写“板块包含云服务、Cursor、Grok”，原文（第 28–30、291–293 行）说的是增长由这些驱动，不是板块构成。清单第 15 行也把它记作“驱动”。把“包含”改成“增长主要来自”。
+
+**SHOULD_FIX — 正文第 5 行 — 省流句“ChatGPT 对话能上锁了”丢了限定词**
+- 机制：原文是逐步推出（第 17 行），且 Codex、临时聊天、群聊、Healthcare 等不能锁（第 43、45、291–311 行）。清单第 11 行写“不声称所有会话皆可锁定”，但这句话实际在暗示“现在都能锁”。
+- 修法：改成“ChatGPT 正逐步推出聊天锁定”。tldr 卡已带“正逐步推出”，只需改正文第 5 行。
+
+**NEEDS_VERIFICATION → SHOULD_FIX — `cards.toml` 第 36 行、`fact-check.md` 第 23 行 — Chrome 可疑网站警告是不是 10/20 的新消息**
+- 机制：Google 页面（`b-google-scams.txt` 第 140 行）写的是 “new features we’ve introduced in 2026”，“Introducing suspicious site warnings” 一节用现在进行时。这可能是全年功能汇总，不是 10/20 当天上线。
+- 另：清单写的 “17:00 UTC”不在 `.txt` 里。我在 `.html` 里查到 `datePublished: 2026-10-20T17:00:00+00:00`，该时间属实，只是清单引用的存档不含它。
+- 影响：“谷歌为 Chrome 增加”读起来像当天上线，没有发布日期证据。
+- 修法：改成“谷歌称 Chrome 增强型保护已加入可疑网站警告”，或找 Chrome 发布说明确认上线时间。
+
+**SHOULD_FIX（低）— `cards.toml` 第 32 行 — Anthropic 速览缺分母**
+- 机制：原文是 211 个设计中 17 个达标（`b-anthropic-scorpion.txt` 第 59、97 行），且达标标准是 Anthropic 自定的。
+- 影响：光写“17种”容易被读成高成功率。
+- 修法：改成“211种设计中17种”。字数要用 lint 确认不超 40 字。
+- 另：“尚未验证解毒”对应的是 neutralize（中和），建议改“中和”。
+
+**NICE_TO_HAVE — 正文第 11–13 行**
+- “更离谱的是”和引号里的“没有监控”是转述，原文是 `assert "monitor_ctx" not in saved["context"]`。去引号，或改成“要求保存的上下文里不含监控”。
+- Astra 的原话是 “No […] I did not remove an enabled monitor from it”（第 295 行），“falsely claimed”是 OpenAI 的定性。建议第 11 行写“OpenAI 称它的答复不实”。
+- 第 13 行“程序跑通、测试通过”：报告没给出测试通过的记录。清单第 10 行已承认这是编辑判断，可改成“测试通过，也不等于监控还在”。
+
+**NICE_TO_HAVE — 标题“AI 拆了监控，还说没拆？”**
+- Sol 并没拆监控，也没否认，“还说没拆”只对 Astra 成立。正文吠点①已说明，可接受。
+
+**NICE_TO_HAVE — 正文第 25 行**
+- “选择‘重置’，会永久删除”没提重置前要验证身份并确认删除警告（`a-locked-chats.txt` 第 113–115 行）。加半句即可避免读成误触就删。
+
+**内部一致（配图和公共 README 还在制作，只记不算）**
+- `sources/README.md` 第 15 行说“未留存原站 HTML、截图”，但 `sources/` 下有 `a-*.html`、`b-*.html` 和多张 png。
+- 同一份 README 缺三条速览来源链接，而 `EDITORIAL.md` 第 80 行要求写进去。
+- `images/README.md` 第 48 行引用了不存在的 `capture-log-A.md`。
+- `cards.toml` 还没有批注图的 title/source/gloss，所以译注的忠实度这轮没法审。
+- 清单“反向核验”节写“准备中”，发布前要更新。
+
+## 其他检查结果
+- **数字：**
+  - SpaceX 的 7560、14575、51.87%、5248、431、−1257、−3295 与财报表一致。
+  - 4 位 PIN、永久删除、客服无法恢复、旧分享链接不删、不是端到端加密，都有原句。
+  - 事故日期 10/3、10/6、报告 10/20 也对得上。
+- **平台名与风控：** 正文和卡片文字没有 X、YouTube、Facebook、Instagram、Telegram。没有涉外国政府、政治，也没有美方机构点名指控中国公司的措辞。
+- **日期时区：** Google 17:00 UTC 对应北京 10/21 01:00，换算正确。
+
+## 没覆盖
+- 没有外网核验，Chrome 功能的实际上线时间也没查。
+- 没读 `evidence-B.md`、`capture-log-B.md` 之外的取证记录，包括 `b-heat*.json` 和 HN 文件。
+- 没看 png 截图、`review-text-claude.txt` 和 `a-spacex-q3.html`。
+- 译注和批注图文字未审（cards.toml 里还没有）。
