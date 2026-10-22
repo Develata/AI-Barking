@@ -39,6 +39,7 @@ AI 吠点是由 **[Develata](https://github.com/Develata)** 主理的独立内�
 | 2026 / 1018 | [Anthropic要捐3200亿？](docs/2610/1018/doc_1018_publish.txt) | [配图说明](docs/2610/1018/images/README.md) | [来源入口](docs/2610/1018/sources/README.md) |
 | 2026 / 1019 | [DeepSeek全面开源？](docs/2610/1019/doc_1019_publish.txt) | [配图说明](docs/2610/1019/images/README.md) | [来源入口](docs/2610/1019/sources/README.md) |
 | 2026 / 1020 | [AI拆了监控，还说没拆？](docs/2610/1020/doc_1020_publish.txt) | [配图说明](docs/2610/1020/images/README.md) | [来源入口](docs/2610/1020/sources/README.md) |
+| 2026 / 1021 | [claude也出BOT；安全问题扎堆](docs/2610/1021/doc_1021_publish.txt) | [配图说明](docs/2610/1021/images/README.md) | [来源入口](docs/2610/1021/sources/README.md) |
 
 正文采用可直接复制的纯文本，图片单独保存。阅读或发布时不需要依赖 Markdown 插图。
 

@@ -2,7 +2,8 @@
 
 本目录随仓库保存，供回看制作过程。文件中的任务要求、路径、模型安排与“未完成”状态属于当时的工作上下文，不自动代表当前状态。
 
-- [取证任务：1020 期（A 三条主帖存档截图｜B 三条速览核验）](2026-10-21-1020-evidence.md)
+- [取证任务：1022 期（A Claude Duet与ChatGPT广告｜B 安全聚合LiteLLM PHP Node.js Rust Railway｜C 速览科研与语音）](2026-10-22-1022-evidence.md)
+- [1020 发布前流程分工](2026-10-21-1020-evidence.md)
 - [取证任务：1019 期（A DeepSeek 开源 DeepInfer：“全面开源”与 README 不含项、155 万亿 token 与每卡每小时 38 美元的口径｜B WhatsApp 帮助页藏 AI 指令：隐藏文本已确认、真实客服影响未知｜C Mercury 3 扩散语言模型：对比表用首发半价、12 项输 4 项、速度无独立测速｜D 速览（评测与研究）｜E 速览（产品与行业））](2026-10-19-1019-evidence.md)
 - [取证任务：1018 期（A Anthropic 公共利益基金：5% 股份需股东批准、全资 LLC 非 501(c)(3)、追加 2% 由董事会酌情｜B DeepSeek-V4.1-Flash-1017 第三方评测跟进：Arena WebDev 与 AA 两套口径｜C HybridAgent 潜在空间推理：token、延迟、成本是三个指标｜D 速览）](2026-10-18-1018-evidence.md)
 - [取证任务：1017 期（A OpenCode Console 泄露：1.4% 没给分母、“蒸馏攻击”未见证据｜B Jack Clark 称 2030 年美国 GDP 可达 44 万亿美元：极端情景、比无 AI 路径高 32.4%｜C Meta 商业条款：美国英语版删了 train、英国英语版仍保留｜D 速览）](2026-10-17-1017-evidence.md)
