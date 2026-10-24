@@ -2,6 +2,7 @@
 
 本目录随仓库保存，供回看制作过程。文件中的任务要求、路径、模型安排与“未完成”状态属于当时的工作上下文，不自动代表当前状态。
 
+- [取证任务：1023 期（A Kimi K3.1 Pro 网络能力取舍｜B Block Dessa 纯语音模型｜C Anthropic 与 AISI 事故重放｜D 速览）](2026-10-23-1023-evidence.md)
 - [取证任务：1022 期（A Claude Duet与ChatGPT广告｜B 安全聚合LiteLLM PHP Node.js Rust Railway｜C 速览科研与语音）](2026-10-22-1022-evidence.md)
 - [1020 发布前流程分工](2026-10-21-1020-evidence.md)
 - [取证任务：1019 期（A DeepSeek 开源 DeepInfer：“全面开源”与 README 不含项、155 万亿 token 与每卡每小时 38 美元的口径｜B WhatsApp 帮助页藏 AI 指令：隐藏文本已确认、真实客服影响未知｜C Mercury 3 扩散语言模型：对比表用首发半价、12 项输 4 项、速度无独立测速｜D 速览（评测与研究）｜E 速览（产品与行业））](2026-10-19-1019-evidence.md)
