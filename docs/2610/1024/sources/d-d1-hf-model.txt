@@ -1,0 +1,690 @@
+MiniMaxAI/MiniMax-M3.1-Flash · Hugging Face
+
+ Hugging Face [/] 
+
+ Models [/models]
+
+ Datasets [/datasets]
+
+ Spaces [/spaces]
+
+ Buckets new [/storage]
+
+ Docs [/docs]
+
+ Enterprise [/enterprise]
+
+Pricing [/pricing]
+
+Website
+
+ Tasks [/tasks] 
+
+ HuggingChat [/chat] 
+
+ Collections [/collections] 
+
+ Languages [/languages] 
+
+ Organizations [/organizations] 
+
+Community
+
+ Blog [/blog] 
+
+ Posts [/posts] 
+
+ Daily Papers [/papers] 
+
+ Hardware [/hardware] 
+
+ Learn [/learn] 
+
+ Discord [/join/discord] 
+
+ Forum [https://discuss.huggingface.co/] 
+
+ GitHub [https://github.com/huggingface] 
+
+Solutions
+
+ Team & Enterprise [/enterprise] 
+
+ Hugging Face PRO [/pro] 
+
+ Enterprise Support [/support] 
+
+ Inference Providers [/inference/models] 
+
+ Inference Endpoints [/inference-endpoints] 
+
+ Storage Buckets [/storage] 
+
+Log In [/login]
+
+Sign Up [/join]
+
+ [/MiniMaxAI] 
+ MiniMaxAI [/MiniMaxAI] 
+/
+
+MiniMax-M3.1-Flash [/MiniMaxAI/MiniMax-M3.1-Flash] 
+
+ Like 336
+
+Follow
+ MiniMax 11.5k
+
+ Image-Text-to-Text 
+ [/models?pipeline_tag=image-text-to-text]
+ Transformers 
+ [/models?library=transformers]
+ Safetensors 
+ [/models?library=safetensors]
+ minimax_m3_vl 
+ [/models?other=minimax_m3_vl]
+ multimodal 
+ [/models?other=multimodal]
+ Mixture of Experts 
+ [/models?other=moe]
+ agent 
+ [/models?other=agent]
+ coding 
+ [/models?other=coding]
+ video 
+ [/models?other=video]
+ conversational 
+ [/models?other=conversational]
+ custom_code 
+ [/models?other=custom_code]
+ Eval Results 
+ [/models?other=eval-results]
+ 8-bit precision 
+ [/models?other=8-bit]
+ mxfp8 
+ [/models?other=mxfp8]
+
+ arxiv: 2606.13392 
+
+ License: minimax-community 
+
+ Model card [/MiniMaxAI/MiniMax-M3.1-Flash] Files Files and versions 
+ xet
+ [/MiniMaxAI/MiniMax-M3.1-Flash/tree/main] Community 
+7
+ [/MiniMaxAI/MiniMax-M3.1-Flash/discussions]
+
+ Deploy 
+
+ Copy to bucket new 
+
+ Use this model 
+
+Instructions to use MiniMaxAI/MiniMax-M3.1-Flash with libraries, inference providers, notebooks, and local apps. Follow these links to get started.
+
+Libraries
+
+ Transformers [/MiniMaxAI/MiniMax-M3.1-Flash?library=transformers] 
+How to use MiniMaxAI/MiniMax-M3.1-Flash with Transformers:
+
+# Use a pipeline as a high-level helper
+from transformers import pipeline
+
+pipe = pipeline("image-text-to-text", model="MiniMaxAI/MiniMax-M3.1-Flash", trust_remote_code=True)
+messages = [
+ {
+ "role": "user",
+ "content": [
+ {"type": "image", "url": "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/p-blog/candy.JPG"},
+ {"type": "text", "text": "What animal is on the candy?"}
+ ]
+ },
+]
+pipe(text=messages)
+
+# pip install -U transformers accelerate
+# Load model directly
+from transformers import AutoProcessor, AutoModelForMultimodalLM
+
+processor = AutoProcessor.from_pretrained("MiniMaxAI/MiniMax-M3.1-Flash", trust_remote_code=True)
+model = AutoModelForMultimodalLM.from_pretrained("MiniMaxAI/MiniMax-M3.1-Flash", trust_remote_code=True, device_map="auto")
+messages = [
+ {
+ "role": "user",
+ "content": [
+ {"type": "image", "url": "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/p-blog/candy.JPG"},
+ {"type": "text", "text": "What animal is on the candy?"}
+ ]
+ },
+]
+inputs = processor.apply_chat_template(
+ messages,
+ add_generation_prompt=True,
+ tokenize=True,
+ return_dict=True,
+ return_tensors="pt",
+).to(model.device)
+
+outputs = model.generate(**inputs, max_new_tokens=256)
+print(processor.decode(outputs[0][inputs["input_ids"].shape[-1]:]))
+
+Notebooks
+
+ Google Colab [/MiniMaxAI/MiniMax-M3.1-Flash/colab] 
+
+ Kaggle [/MiniMaxAI/MiniMax-M3.1-Flash/kaggle] 
+
+Local Apps Settings [/settings/local-apps]
+
+ vLLM [/MiniMaxAI/MiniMax-M3.1-Flash?local-app=vllm] 
+How to use MiniMaxAI/MiniMax-M3.1-Flash with vLLM:
+
+Install from pip and serve model
+
+# Install vLLM from pip:
+pip install vllm
+# Start the vLLM server:
+vllm serve "MiniMaxAI/MiniMax-M3.1-Flash"
+# Call the server using curl (OpenAI-compatible API):
+curl -X POST "http://localhost:8000/v1/chat/completions" \
+ -H "Content-Type: application/json" \
+ --data '{
+ "model": "MiniMaxAI/MiniMax-M3.1-Flash",
+ "messages": [
+ {
+ "role": "user",
+ "content": [
+ {
+ "type": "text",
+ "text": "Describe this image in one sentence."
+ },
+ {
+ "type": "image_url",
+ "image_url": {
+ "url": "https://cdn.britannica.com/61/93061-050-99147DCE/Statue-of-Liberty-Island-New-York-Bay.jpg"
+ }
+ }
+ ]
+ }
+ ]
+ }'
+
+Use Docker
+
+docker model run hf.co/MiniMaxAI/MiniMax-M3.1-Flash
+
+ SGLang [/MiniMaxAI/MiniMax-M3.1-Flash?local-app=sglang] 
+How to use MiniMaxAI/MiniMax-M3.1-Flash with SGLang:
+
+Install from pip and serve model
+
+# Install SGLang from pip:
+pip install sglang
+# Start the SGLang server:
+python3 -m sglang.launch_server \
+ --model-path "MiniMaxAI/MiniMax-M3.1-Flash" \
+ --host 0.0.0.0 \
+ --port 30000
+# Call the server using curl (OpenAI-compatible API):
+curl -X POST "http://localhost:30000/v1/chat/completions" \
+ -H "Content-Type: application/json" \
+ --data '{
+ "model": "MiniMaxAI/MiniMax-M3.1-Flash",
+ "messages": [
+ {
+ "role": "user",
+ "content": [
+ {
+ "type": "text",
+ "text": "Describe this image in one sentence."
+ },
+ {
+ "type": "image_url",
+ "image_url": {
+ "url": "https://cdn.britannica.com/61/93061-050-99147DCE/Statue-of-Liberty-Island-New-York-Bay.jpg"
+ }
+ }
+ ]
+ }
+ ]
+ }'
+
+Use Docker images
+
+docker run --gpus all \
+ --shm-size 32g \
+ -p 30000:30000 \
+ -v ~/.cache/huggingface:/root/.cache/huggingface \
+ --env "HF_TOKEN=<secret>" \
+ --ipc=host \
+ lmsysorg/sglang:latest \
+ python3 -m sglang.launch_server \
+ --model-path "MiniMaxAI/MiniMax-M3.1-Flash" \
+ --host 0.0.0.0 \
+ --port 30000
+# Call the server using curl (OpenAI-compatible API):
+curl -X POST "http://localhost:30000/v1/chat/completions" \
+ -H "Content-Type: application/json" \
+ --data '{
+ "model": "MiniMaxAI/MiniMax-M3.1-Flash",
+ "messages": [
+ {
+ "role": "user",
+ "content": [
+ {
+ "type": "text",
+ "text": "Describe this image in one sentence."
+ },
+ {
+ "type": "image_url",
+ "image_url": {
+ "url": "https://cdn.britannica.com/61/93061-050-99147DCE/Statue-of-Liberty-Island-New-York-Bay.jpg"
+ }
+ }
+ ]
+ }
+ ]
+ }'
+
+ Docker Model Runner [/MiniMaxAI/MiniMax-M3.1-Flash?local-app=docker-model-runner] 
+How to use MiniMaxAI/MiniMax-M3.1-Flash with Docker Model Runner:
+
+docker model run hf.co/MiniMaxAI/MiniMax-M3.1-Flash
+
+Browse
+ Quantizations [/models?other=base_model:quantized:MiniMaxAI/MiniMax-M3.1-Flash] to use this model in llama.cpp, Ollama, LM Studio, or any compatible app.
+
+Model at a Glance [#model-at-a-glance] 
+
+Benchmarks [#benchmarks] 
+
+What’s New in M3.1-Flash [#whats-new-in-m31-flash] 
+
+How to Use [#how-to-use] 
+
+Local Deployment [#local-deployment] 
+
+Multi-Chip Deployment [#multi-chip-deployment] 
+
+Inference Settings [#inference-settings] 
+
+Contact Us [#contact-us] 
+
+ [https://agent.minimax.io/]
+ [https://platform.minimax.io/docs/guides/text-generation]
+ [https://www.minimax.io]
+
+ [https://modelscope.cn/organization/minimax]
+ [https://platform.minimaxi.com/docs/faq/contact-us]
+ [https://discord.com/invite/DPC4AHFCBw]
+ [https://huggingface.co/MiniMaxAI]
+ [https://github.com/MiniMax-AI]
+ [https://arxiv.org/abs/2606.13392]
+
+MiniMax-M3.1-Flash is a native multimodal mixture-of-experts model for coding, agentic workflows, computer use, and cybersecurity. It supports text, image, and video inputs with a context window of up to 1M tokens.
+
+Building on MiniMax-M3, M3.1-Flash improves task performance and inference efficiency with sparse attention throughout the model, quantization-aware training, and DSpark speculative decoding.
+
+Highlights:
+
+Agentic performance: A generational leap in agentic tasks, coding, and cybersecurity — 76.2 on BankerToolBench, 73.7% on DeepSWE v1.1, 61.7 on OSWorld V2, 29.6 on Agents' Last Exam, and 82.2 on CyberGym.
+
+Efficient by design: Sparse attention throughout, quantization-aware training, and DSpark speculative decoding improve inference efficiency.
+
+ [#model-at-a-glance]
+
+ Model at a Glance
+
+Architecture: Native multimodal mixture-of-experts (MoE)
+
+Parameters: Approximately 428B total; 23B activated per token
+
+Inputs / output: Text, image, and video inputs; text output
+
+Context window: Up to 1,000,000 tokens
+
+Attention: MiniMax Sparse Attention [https://arxiv.org/abs/2606.13392] (MSA) throughout the model
+
+Speculative decoding: DSpark draft head included
+
+ [#benchmarks]
+
+ Benchmarks
+
+Benchmark
+MiniMax M3.1 Flash
+DeepSeek V4.1 Flash-1017
+DeepSeek V4.1 Flash
+Kimi K3
+GLM-5.3
+GPT-5.6 Sol
+Opus 5
+
+Automation-Bench v1.0.6
+
+62.8
+60.5
+54.8
+46.7
+48.8
+45.8
+50.3
+
+BankerToolBench
+76.2
+—
+73.7
+69.1
+74.5
+74.6
+76.2
+
+GDP.pdf AA
+20.8
+—
+12.8
+22.0
+11.2
+27.2
+21.6
+
+Terminal Bench 4.0
+38.1
+42.3
+31.2
+12.6
+37.9
+39.9
+51.8
+
+LOCA-Bench 256K
+60.3
+—
+—
+49.7
+50.3
+60.0
+53.7
+
+Agents’ Last Exam
+
+29.6
+—
+—
+28.3
+—
+30.6
+32.2
+
+OSWorld 2.0
+61.7
+—
+54.3
+58.3
+—
+65.7
+70.6
+
+PostTrain Bench v1.1
+
+39.3
+—
+30.5
+36.6
+37.5
+36.2
+40.4
+
+DeepSWE v1.1
+73.7
+77.0
+74.2
+67.5
+66.9
+73.0
+74.0
+
+NL2Repo-Bench
+61.2
+68.2
+65.4
+58.0
+58.0
+56.8
+75.3
+
+SWE Refactor Bench
+23.0
+—
+11.8
+19.5
+10.4
+28.5
+31.0
+
+CyberGym
+
+82.2
+—
+—
+80.0
+84.5
+83.6
+—
+
+BabyVision (with tools)
+
+91.0
+92.5
+89.6
+85.7
+—
+88.9
+94.1
+
+HLE (without tools)
+43.4
+42.6
+39.2
+43.5
+42.3
+49.5
+55.6
+
+CharXiv RQ
+82.5
+—
+69.0
+84.8
+—
+85.2
+83.7
+
+Evaluation Notes
+
+Automation-Bench v1.0.6: 600 publicly released tasks.
+
+BankerToolBench: OpenCode 1.17.18; MiniMax-M2.7 judge.
+
+GDP.pdf AA: Taken directly from Artificial Analysis.
+
+Terminal Bench 4.0: Codex 0.149.1.
+
+LOCA-Bench 256K: Official implementation.
+
+Agents’ Last Exam: Official Overall setting; full-set results from the official ALE leaderboard only. Blank = no official result (CLI-only excluded), not zero.
+
+OSWorld 2.0: 0808 Full release; highest reported per model at release, except DeepSeek V4.1 (in-house reproduction).
+
+PostTrain Bench v1.1: Claude Code 2.1.251, 512K context; otherwise official setup.
+
+DeepSWE v1.1: mini-SWE-agent 2.4.5, 512K context.
+
+NL2Repo-Bench: Claude Code 2.1.233, 512K context; reward hacking = 0; two inconsistent tasks corrected (scores use the corrected set).
+
+SWE Refactor Bench: Claude Code 2.1.220, 200K context; otherwise official setup.
+
+CyberGym: Claude Code 2.1.263, 1M context.
+
+BabyVision (with tools): Claude Code 2.1.285; min image side 1,500 px.
+
+HLE (without tools): Text-only subset (2,158 questions).
+
+CharXiv RQ: GPT-5.5 judge.
+
+Results are for the official weights; third-party quantizations may differ.
+
+ [#whats-new-in-m31-flash]
+
+ What’s New in M3.1-Flash
+
+M3.1-Flash retains M3’s core mixture-of-experts architecture, with three main changes:
+
+Sparse attention throughout: the first three full-attention layers are replaced with sparse attention.
+
+Quantization-aware training: the routed MoE experts and the attention paths are quantized during training, reducing memory footprint and improving serving efficiency.
+
+DSpark speculative decoding: DSpark replaces the earlier EAGLE-like MTP approach. The release includes the draft head for use with compatible serving implementations.
+
+ [#how-to-use]
+
+ How to Use
+
+MiniMax Agent [https://agent.minimax.io/]
+
+MiniMax API [https://platform.minimax.io/]
+
+ [#local-deployment]
+
+ Local Deployment
+
+Download the model:
+
+hf download MiniMaxAI/MiniMax-M3.1-Flash --local-dir MiniMax-M3.1-Flash
+
+We recommend the following inference frameworks to serve the model:
+
+SGLang [https://docs.sglang.io/] — see SGLang cookbook [https://docs.sglang.io/cookbook/autoregressive/MiniMax/MiniMax-M3.1].
+
+vLLM [https://github.com/vllm-project/vllm] — see vLLM recipe [https://recipes.vllm.ai/MiniMaxAI/MiniMax-M3.1-Flash].
+
+TokenSpeed [https://github.com/lightseekorg/tokenspeed] — see TokenSpeed recipe [https://lightseek.org/tokenspeed/recipes/models#minimax-m3-1].
+
+Additional integrations in progress: Transformers, KTransformers, unsloth, and ATOM.
+
+ [#multi-chip-deployment]
+
+ Multi-Chip Deployment
+
+FlagOS [https://github.com/flagos-ai] — see Multi-Chip Support and Downloads [https://huggingface.co/MiniMaxAI/MiniMax-M3.1-Flash/blob/main/docs/FlagOS-Multi-Chip-Support-and-Downloads.md].
+
+ [#inference-settings]
+
+ Inference Settings
+
+Recommended sampling settings: temperature=1.0 and top_p=0.95.
+
+For reasoning, set reasoning_effort in the chat template: low, medium, high, xhigh, or max.
+
+The model supports a context window of up to 1M tokens. Usable context length and throughput depend on GPU memory and the serving configuration.
+
+ [#contact-us]
+
+ Contact Us
+
+Contact us at model@minimax.io [mailto:model@minimax.io].
+
+Downloads last month
+
+7,355
+
+Safetensors [https://huggingface.co/docs/safetensors]
+
+Model size
+
+220B params
+
+Tensor type
+
+F32 
+·
+BF16 
+·
+F8_E4M3 
+·
+U8 
+·
+
+Chat template
+
+Files info
+
+ Inference Providers NEW [https://huggingface.co/docs/inference-providers]
+
+ Image-Text-to-Text
+ [/tasks/image-text-to-text]
+
+This model isn't deployed by any Inference Provider. 🙋 4 Ask for provider support [/spaces/huggingface/InferenceSupport/discussions/13143]
+
+ Model tree for MiniMaxAI/MiniMax-M3.1-Flash [/docs/hub/model-cards#specifying-a-base-model]
+
+Finetunes
+
+ 8 models [/models?other=base_model:finetune:MiniMaxAI/MiniMax-M3.1-Flash]
+
+Quantizations
+
+ [/models?apps=llama.cpp&other=base_model:quantized:MiniMaxAI/MiniMax-M3.1-Flash] [/models?apps=lmstudio&other=base_model:quantized:MiniMaxAI/MiniMax-M3.1-Flash] [/models?apps=jan&other=base_model:quantized:MiniMaxAI/MiniMax-M3.1-Flash] [/models?apps=ollama&other=base_model:quantized:MiniMaxAI/MiniMax-M3.1-Flash]
+ 27 models [/models?other=base_model:quantized:MiniMaxAI/MiniMax-M3.1-Flash]
+
+ Spaces using MiniMaxAI/MiniMax-M3.1-Flash 2
+
+🤖
+
+Jindrich3/openajaj
+ [/spaces/Jindrich3/openajaj]
+🕹️
+
+hmb/m31-vs-deepseek
+ [/spaces/hmb/m31-vs-deepseek] 
+
+ Collection including MiniMaxAI/MiniMax-M3.1-Flash
+
+MiniMax-M3
+
+ Collection
+
+ 8 items • Updated about 6 hours ago • 25
+ [/collections/MiniMaxAI/minimax-m3]
+
+ Paper for MiniMaxAI/MiniMax-M3.1-Flash
+
+MiniMax Sparse Attention
+
+ Paper • 2606.13392 • Published Jun 11 • 173 
+ [/papers/2606.13392]
+
+ Evaluation results [https://huggingface.co/docs/hub/eval-results] 
+
+harborframework/terminal-bench [/datasets/harborframework/terminal-bench] · Terminalbench 4 View evaluation results [/MiniMaxAI/MiniMax-M3.1-Flash/discussions/7] leaderboard [/datasets/harborframework/terminal-bench?eval_result=MiniMaxAI/MiniMax-M3.1-Flash&leaderboard_task_id=terminalbench_4] 
+
+ [/datasets/harborframework/terminal-bench?eval_result=MiniMaxAI%2FMiniMax-M3.1-Flash&leaderboard_task_id=terminalbench_4] 38.1 *
+
+agents-last-exam/agents-last-exam [/datasets/agents-last-exam/agents-last-exam] · Overall Pass Rate View evaluation results [/MiniMaxAI/MiniMax-M3.1-Flash/discussions/7] leaderboard [/datasets/agents-last-exam/agents-last-exam?eval_result=MiniMaxAI/MiniMax-M3.1-Flash&leaderboard_task_id=overall-pass-rate] 
+
+ [/datasets/agents-last-exam/agents-last-exam?eval_result=MiniMaxAI%2FMiniMax-M3.1-Flash&leaderboard_task_id=overall-pass-rate] 29.6 *
+
+datacurve/deep-swe [/datasets/datacurve/deep-swe] · Deep Swe View evaluation results [/MiniMaxAI/MiniMax-M3.1-Flash/discussions/7] leaderboard [/datasets/datacurve/deep-swe?eval_result=MiniMaxAI/MiniMax-M3.1-Flash&leaderboard_task_id=deep_swe] 
+
+ [/datasets/datacurve/deep-swe?eval_result=MiniMaxAI%2FMiniMax-M3.1-Flash&leaderboard_task_id=deep_swe] 73.7 *
+
+cais/hle [/datasets/cais/hle] · Hle View evaluation results [/MiniMaxAI/MiniMax-M3.1-Flash/discussions/7] 
+
+ 43.4 *
+
+ System theme 
+
+Company
+ TOS [/terms-of-service] Privacy [/privacy] About [/huggingface] Careers [https://apply.workable.com/huggingface/] [/] 
+Website
+ Models [/models] Datasets [/datasets] Spaces [/spaces] Pricing [/pricing] Docs [/docs]
