@@ -10,6 +10,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::card::{self, Kind};
+use crate::cover;
 
 const TITLE_MAX: usize = 20;
 const TOTAL_MAX: usize = 1000;
@@ -31,6 +32,48 @@ const NEW_FORMAT_FROM: u32 = 2610_1002;
 /// Issues from this date carry a 速览聚合图 `images/00-roundup.png`
 /// (EDITORIAL.md 速览).
 const ROUNDUP_FROM: u32 = 2610_1004;
+/// Issues from this date follow EDITORIAL.md 标题 / 文风 (2026-10-26) and
+/// record a `封面抽签：` line (`barking cover-draw`).
+const STYLE_FROM: u32 = 2610_1025;
+/// Names with one canonical spelling. Another casing in a title is only a
+/// warning: Develata may choose one on purpose (1021 used `claude`).
+const BRANDS: [&str; 13] = [
+    "Anthropic",
+    "ChatGPT",
+    "Claude",
+    "Codex",
+    "Copilot",
+    "DeepSeek",
+    "Gemini",
+    "Google",
+    "Grok",
+    "Kimi",
+    "Meta",
+    "OpenAI",
+    "Qwen",
+];
+/// Wire-copy words that make a title read like a press summary; the question
+/// mark already carries the doubt.
+const TITLE_WIRE: [&str; 3] = ["被曝", "被指", "疑似"];
+/// Admonishing pivots and maxim closers (“A 不等于 B”“仍需外部检验”). Summed
+/// over 0924–1024: 1022 has 10, 1007 and 1021 have 5, 1014 has 3, every other
+/// issue at most 2.
+const HEDGES: [&str; 13] = [
+    "不等于",
+    "不能当成",
+    "不能直接",
+    "照搬",
+    "要分清",
+    "得分清",
+    "有边界",
+    "有范围",
+    "仍需",
+    "就变了",
+    "还得看",
+    "有待观察",
+    "仍待",
+];
+const HEDGE_WARN_AT: usize = 3;
 /// Platforms unreachable from mainland China, never named in the publish text
 /// or the card texts (风控; EDITORIAL.md 事实分级). Screenshots may show them.
 /// Matched case-insensitively as whole words, so `xAI` and `SpaceX` pass;
@@ -140,6 +183,7 @@ pub fn lint_issue(dir: &Path) -> Vec<Finding> {
     let era = Era {
         new_format,
         roundup: roundup_era,
+        style: key.is_none_or(|k| k >= STYLE_FROM),
     };
 
     let fc_path = dir.join("sources").join("fact-check.md");
@@ -196,6 +240,9 @@ pub fn lint_issue(dir: &Path) -> Vec<Finding> {
     // the ones a fresh clone lacks.
     let offsite = offsite_paths(dir);
     lint_images(&images, era, spec.as_ref(), &offsite, &mut out);
+    if era.style && kind == Kind::Main {
+        lint_cover_ledger(dir, key.unwrap_or(u32::MAX), &images, &mut out);
+    }
     lint_cards(&images, &body_lines, era, spec.as_ref(), &offsite, &mut out);
     if let Some(spec) = &spec {
         let mut sink = Sink {
@@ -259,6 +306,9 @@ fn lint_publish(sink: &mut Sink, raw: &str, fact_check: Option<&str>, era: Era, 
     }
     if total > TOTAL_MAX {
         sink.error(None, format!("全文 {total} 字，超过上限 {TOTAL_MAX}"));
+    }
+    if era.style {
+        lint_style(sink, title, &text);
     }
 
     lint_structure(sink, &lines, new_format, kind);
@@ -562,6 +612,72 @@ struct Era {
     new_format: bool,
     /// 2026-10-04: 速览聚合图.
     roundup: bool,
+    /// 1025 on: 标题 / 文风 checks and the 封面抽签 line.
+    style: bool,
+}
+
+/// The mechanical parts of EDITORIAL.md 标题 and 文风. All warnings: each
+/// single use can be legitimate, so they ask for a look, not a rewrite.
+fn lint_style(sink: &mut Sink, title: &str, text: &str) {
+    for (w, b) in brand_case_issues(title) {
+        sink.warn(Some(1), format!("标题里的「{w}」通常写作「{b}」"));
+    }
+    for w in TITLE_WIRE.iter().filter(|w| title.contains(*w)) {
+        sink.warn(
+            Some(1),
+            format!("标题含「{w}」，像新闻摘要：钩子写具体事实，存疑交给问号（EDITORIAL.md 标题）"),
+        );
+    }
+    let hits = hedge_hits(text);
+    let n: usize = hits.iter().map(|(_, k)| k).sum();
+    if n >= HEDGE_WARN_AT {
+        let list: Vec<String> = hits.iter().map(|(w, k)| format!("{w}×{k}")).collect();
+        sink.warn(
+            None,
+            format!(
+                "告诫式套话 {n} 处（{}）：逐句改成具体事实或删掉（EDITORIAL.md 文风）",
+                list.join("、")
+            ),
+        );
+    }
+}
+
+/// ASCII words that match a brand case-insensitively but not exactly.
+fn brand_case_issues(s: &str) -> Vec<(&str, &'static str)> {
+    s.split(|c: char| !c.is_ascii_alphanumeric())
+        .filter_map(|w| {
+            BRANDS
+                .iter()
+                .find(|b| b.eq_ignore_ascii_case(w) && **b != w)
+                .map(|b| (w, *b))
+        })
+        .collect()
+}
+
+fn hedge_hits(text: &str) -> Vec<(&'static str, usize)> {
+    HEDGES
+        .iter()
+        .map(|w| (*w, text.matches(w).count()))
+        .filter(|(_, k)| *k > 0)
+        .collect()
+}
+
+/// EDITORIAL.md 封面“每期抽签”: one `封面抽签：` line, values from the deck,
+/// none used too recently.
+fn lint_cover_ledger(dir: &Path, key: u32, images: &Path, out: &mut Vec<Finding>) {
+    let readme = images.join("README.md");
+    // A missing README is already an error from `lint_images`.
+    let Ok(md) = fs::read_to_string(&readme) else {
+        return;
+    };
+    let mut sink = Sink { path: &readme, out };
+    let root = match card::repo_root(dir) {
+        Ok(r) => r,
+        Err(e) => return sink.error(None, e),
+    };
+    for (line, msg) in cover::ledger_errors(&root, key, &md) {
+        sink.error(line, msg);
+    }
 }
 
 fn lint_images(
@@ -874,6 +990,27 @@ mod tests {
         let set = parse_offsite(tsv);
         assert!(set.contains("images/00-tldr.png") && set.contains("sources/a.pdf"));
         assert_eq!(set.len(), 2);
+    }
+
+    #[test]
+    fn brand_spelling_is_checked_on_whole_words() {
+        assert_eq!(
+            brand_case_issues("claude也出BOT；安全问题扎堆"),
+            [("claude", "Claude")]
+        );
+        assert!(brand_case_issues("OpenAI撤稿？骂Claude封号？").is_empty());
+        assert!(brand_case_issues("metadata 与 Kimis").is_empty());
+        assert_eq!(
+            brand_case_issues("OPENAI 与 deepseek"),
+            [("OPENAI", "OpenAI"), ("deepseek", "DeepSeek")]
+        );
+    }
+
+    #[test]
+    fn hedges_are_counted_per_occurrence() {
+        let hits = hedge_hits("撤回不等于证伪，通过也不等于验证；结论不能直接照搬。");
+        assert_eq!(hits, [("不等于", 2), ("不能直接", 1), ("照搬", 1)]);
+        assert!(hedge_hits("他用 Grok Bot 建了个智能体。").is_empty());
     }
 
     #[test]

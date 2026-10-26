@@ -757,7 +757,7 @@ struct Plan {
 }
 
 /// The files of batch ③, relative to the issue directory.
-fn product_files(mmdd: &str) -> [String; 7] {
+fn product_files(mmdd: &str) -> [String; 9] {
     [
         format!("doc_{mmdd}_publish.txt"),
         "images/README.md".to_string(),
@@ -766,6 +766,8 @@ fn product_files(mmdd: &str) -> [String; 7] {
         "sources/fact-check.md".to_string(),
         "sources/evidence.md".to_string(),
         "sources/capture-log.md".to_string(),
+        "sources/titles.md".to_string(),
+        "sources/style-review.md".to_string(),
     ]
 }
 
