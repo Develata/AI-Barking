@@ -2,6 +2,7 @@
 
 本目录随仓库保存，供回看制作过程。文件中的任务要求、路径、模型安排与“未完成”状态属于当时的工作上下文，不自动代表当前状态。
 
+- [取证任务：1025 期（A 十年前 CNN 胜过前沿 LLM 的皮肤癌测试｜B Kimi K3.1 Pro 额度事故与补偿【跟进1023/1024】｜C 速览）](2026-10-25-1025-evidence.md)
 - [取证任务：1024 期（A Kimi K3.1 Pro 宣传风波【跟进1023】｜B Apollo“科技业外零回报”与创意行业 20 万岗位｜C METR 审计 OpenAI 内部监控【跟进1020】与 OpenAI 训练环境安全｜D 速览）](2026-10-25-1024-evidence.md)
 - [取证任务：1023 期（A Kimi K3.1 Pro 网络能力取舍｜B Block Dessa 纯语音模型｜C Anthropic 与 AISI 事故重放｜D 速览）](2026-10-23-1023-evidence.md)
 - [取证任务：1022 期（A Claude Duet与ChatGPT广告｜B 安全聚合LiteLLM PHP Node.js Rust Railway｜C 速览科研与语音）](2026-10-22-1022-evidence.md)
