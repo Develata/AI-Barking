@@ -64,7 +64,7 @@ AI 吠点是由 **[Develata](https://github.com/Develata)** 主理的独立内�
 
 如发现错误，可在 [Issues](https://github.com/Develata/AI-Barking/issues) 中附上原文位置与来源。更正记录放在对应期次的 `CORRECTION.md`，不以删除原帖代替说明。
 
-制作与发布工具位于 `tools/barking/`（Rust，`cargo run --release --manifest-path tools/barking/Cargo.toml -- <子命令>`）：`lint` 机械格式检查；`card` 渲染省流卡、速览图与批注截图；`offsite` 登记并上传不入库的原件；`shot`、`html2txt`、`heat` 取证截图、HTML 转文本与热度采样；`handoff` 生成取证派工单；`review` 拼出跨模型复核命令；`scan-rows`、`publish-check`、`stage` 做发布后的索引行、检查与分批暂存（流程见 `docs/workflow/publish.md`）。例如：
+制作与发布工具位于 `tools/barking/`（Rust，`cargo run --release --manifest-path tools/barking/Cargo.toml -- <子命令>`）：`lint` 机械格式检查；`card` 渲染省流卡、速览图与批注截图；`cover-draw` 抽封面画风（排除前几期用过的取值）；`offsite` 登记并上传不入库的原件；`shot`、`html2txt`、`heat` 取证截图、HTML 转文本与热度采样；`handoff` 生成取证派工单；`review` 拼出跨模型复核命令；`scan-rows`、`publish-check`、`stage` 做发布后的索引行、检查与分批暂存（流程见 `docs/workflow/publish.md`）。例如：
 
 ```sh
 cargo run --release --manifest-path tools/barking/Cargo.toml -- lint docs/2609/0925
