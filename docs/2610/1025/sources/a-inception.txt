@@ -1,0 +1,54 @@
+Inception v3 Skin Lesion Classifier | Lynch Lab
+
+ Lynch Lab
+ [/]
+
+Inception v3 skin lesion classifier
+
+This uses a fine-tuned Inception v3, a neural network about ten years old (published by Google in 2015), retrained here on skin lesion images from the ISIC Archive. It is not a state-of-the-art model: we use it only as a baseline against which to compare newer models.
+
+Runs in your web browser
+
+The neural network is downloaded to this device and runs here, on your graphics card or processor. Your image is analysed on this device and is never uploaded - no server sees it.
+
+Downloading the model to your browser...
+
+ Not a medical device and not for diagnosis.
+ This is an experimental research model shown for academic interest. It will miss skin cancers, including melanoma. It must not be used to decide whether to see a doctor. If you are worried about a mole or skin lesion, see your GP or a dermatologist.
+
+Use a dermoscopic image (taken through a dermatoscope) or a clinical close-up photograph of a single lesion. The model works out which kind it is.
+
+ Choose an image
+ Try a random sample image
+
+The research thresholds were set on held-back validation images so that 90% of malignant lesions scored above them; on harder, biopsied lesions they catch fewer. Scores are not probabilities that apply to you.
+
+About the model
+
+Inception v3 convolutional neural network (Google, 2015), pretrained on ImageNet and fine-tuned on 68,011 dermoscopic and clinical close-up images from the ISIC Archive, predicting nine diagnostic groups.
+
+The structure of the network was modified: its original output layer (the 1,000 ImageNet categories) was replaced by a new one for the nine diagnostic groups, and a second output was added alongside it that recognises whether the image is dermoscopic or a clinical close-up. Both outputs read the same image features and were trained together. The image type is 99.5% correct on held-back test images and decides which thresholds are used.
+
+Training: all layers of the network were fine-tuned, not only the final layer, on an NVIDIA H100 GPU. It made 20 passes over the training images (about 50 seconds each), with the class weights balanced so that rare diagnoses count, and the version kept is the one that scored best on the validation images.
+
+Training, validation and test split: 87,206 labelled ISIC Archive images were divided so that images of the same patient, the same lesion, or near-identical photographs always stay together, and no lesion appears in more than one set. 68,011 were used for training; 8,523 for validation (to choose the version kept and to set the thresholds); 8,517 as the internal test, used only for the final results; 1,286 from a clinic not used in training (Hospital Italiano de Buenos Aires) as an external test; and 869 were held out for comparison with large language models, including the 600 sample images on this page.
+
+Thresholds: each score is compared with a research threshold set on the validation images so that 90% of the lesions in question scored above it, separately for each image type. For dermoscopic images they are 17.0% (malignant) and 21.7% (malignant or actinic keratosis); for clinical close-ups 35.5% and 53.2%. On the internal test, the malignant threshold caught 92% of malignant dermoscopic images while passing 81% of benign ones, and 91% of malignant clinical photographs while passing 69% of benign ones.
+
+Before analysis the image is resized, any dark dermatoscope border is cropped, colours are normalised (Shades of Gray), and the result is averaged over four flipped copies.
+
+On 8,517 held-back test images, the area under the ROC curve for malignant against benign was 0.944 (0.875 on the 4,364 histology-confirmed images) and 0.934 on 1,286 images from a clinic not used in training. Clinical close-up photographs performed less well (0.90).
+
+On a harder separate set of 200 biopsied lesions, all photographed both ways and never used in training, it was weaker (0.86 on the dermoscopic images, 0.82 on the clinical photographs, for lesions that should not be discharged). At the thresholds used here, 6 of the 30 melanomas scored below the threshold on their dermoscopic image and 14 of 30 on their clinical photograph. The thresholds are research settings, not a safe cut-off.
+
+Known limitations: few images of darker skin types; images come from specialist clinics where lesions were often biopsied; skin markings, stickers or rulers in the image may affect the result; rare diagnoses are not covered.
+
+Data and licence
+
+Trained on images from the ISIC Archive [https://www.isic-archive.com], used under CC-0, CC-BY and CC-BY-NC licences, contributed by Memorial Sloan Kettering Cancer Center; Hospital Clínic de Barcelona; the ViDIR Group, Medical University of Vienna; the MILK study team; the University of Queensland Diamantina Institute; Imperial College London; Sydney Melanoma Diagnostic Centre, Royal Prince Alfred Hospital; Federal University of Espírito Santo (PAD-UFES-20); University of Athens, Andreas Syggros Hospital; Hospital Italiano de Buenos Aires; the International Dermoscopy Society; University Hospital Basel; and other anonymous contributors. Because some training images are licensed for non-commercial use only, this model is provided for non-commercial research and education only.
+
+The sample images (a random one is picked each time) are 300 lesions from the MILK10k dataset in the ISIC Archive, each as a clinical close-up and a dermoscopic image, 600 in all. Every one was confirmed by biopsy, and none was used to train, tune or test the model. Images: MILK study team, CC-BY-NC.
+
+Model inference: ONNX Runtime Web [https://onnxruntime.ai] using WebGPU where available, otherwise WebAssembly.
+
+Lynch Lab, St John's Institute of Dermatology, King's College London. Back to home [/]

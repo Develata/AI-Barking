@@ -1,0 +1,202 @@
+Can frontier LLMs diagnose skin cancer?
+
+Can frontier LLMs diagnose skin cancer?
+
+I showed GPT-6 Astra and Claude Fable 5.1 200 skin lesions. When asked to make a diagnosis, each named the right diagnosis 42% of the time, and each discharged melanomas. Asked as a patient would ask, both advised seeing a doctor in almost all cases.
+
+ By Dr Magnus Lynch [#about] · 11 October 2026
+ · 14 min read
+
+This is a melanoma.
+
+Figure 1. Invasive melanoma on the ear, under 0.8 mm thick. Both models called it a seborrhoeic keratosis and said it could be discharged. Clinical photograph on the left, dermoscopic image on the right. Images: MILK10k [https://doi.org/10.34970/648456], MILK study team, CC BY-NC.
+
+It was removed from the ear of a man in his forties. In my opinion no human dermatologist would miss this diagnosis. 
+
+I showed these two photographs to GPT-6 Astra and to Claude Fable 5.1, two of the most capable AI models available in October 2026. Both said it was a seborrhoeic keratosis, a harmless warty growth, and that he could be discharged with no treatment and no follow-up.
+
+It was one of 200 biopsy-proven skin lesions I put to each model. Each got the diagnosis right for 42% of them. Of the 100 harmless lesions, GPT-6 Astra was prepared to discharge 32 and Claude Fable 5.1 was prepared to discharge 22. Of the 30 melanomas, they discharged 3 and 4. Neither sent home any other kind of cancer.
+
+Neither is a specialised skin cancer model but given impressive progress of these frontier models in other areas, most recently maths, I was curious to see how well these general models would perform. Skin lesions are one of the most common reasons to see a doctor and one of the first tasks of AI in dermatology will be to enable non-specialist primary care doctors to reassure patients that skin lesions are safe based upon AI assessment of photographs and dermoscopic (skin microscope) images without needing to refer to dermatology.
+
+This article is therefore about diagnostic accuracy: whether a model can name a lesion from its images and decide correctly whether it should be discharged. Understandably the AI labs do not want missed skin cancer diagnoses so in almost all cases when a photo of a skin lesion is uploaded from a patients perspective the advice is to see a doctor. I cover this briefly later but in this article I am mainly focused on the raw diagnostic accurary.
+
+The cases, the prompts, every reply and the scoring code are here to download [/static/data/llm-skin-cancer-test.zip]. The rest of this article explains how I got those numbers and what I make of them.
+
+What I tested# [#what-i-tested]
+
+General-purpose AI models were not built for dermatology and are not approved as medical devices. They will still look at a photograph of a skin lesion and tell you what they think it is. I wanted to measure how accurate those diagnoses are, and how often a lesion that needs treatment would be sent home.
+
+The lesions come from MILK10k [https://doi.org/10.34970/648456], a public research dataset released through the International Skin Imaging Collaboration in 2025. It holds 5,240 lesions, each photographed twice: an ordinary close-up, and a dermoscopic image taken through the magnifying, illuminated lens that dermatologists use. I chose it because it is recent, which makes it less likely that the models saw the images and their labels in training.
+
+I drew 200 lesions at random within six diagnoses, all confirmed by histopathology:
+
+100 that should not be discharged: 30 melanomas, 25 basal cell carcinomas, 25 squamous cell carcinomas (including Bowen’s disease) and 20 actinic keratoses.
+
+100 that are safe to discharge: 50 benign naevi (moles) and 50 seborrhoeic keratoses.
+
+Real clinics see far more harmless lesions than cancers. I used an even split so that missed cancers and unnecessarily kept benign lesions were each measured on 100 cases.
+
+Basal cell carcinoma on the trunk of a 75-year-old man. Both models answered correctly.
+
+Invasive melanoma under 0.8 mm thick, with very little pigment. GPT-6 Astra called it a basal cell carcinoma with 95% confidence.
+
+Seborrhoeic keratosis on the leg. Both models called it an actinic keratosis and said it should not be discharged.
+
+Figure 2. Three more of the 200 test lesions. Clinical photograph on the left, dermoscopic image on the right. Images: MILK10k [https://doi.org/10.34970/648456], MILK study team, CC BY-NC.
+
+Bear in mind that every lesion in this set was biopsied, including the benign ones. A mole that somebody decided to cut out is a mole that worried a clinician, so these are harder than the lesions most people would ask a chatbot about.
+
+The question# [#the-question]
+
+To prevent the model from refusing to answer on safety grounds, I asked the way a clinician might use a model. It got both images and nothing else (no age, no body site, no history) and was made to commit to a decision:
+
+You are assisting a dermatologist. You are shown two images of the same skin
+lesion: the first is a clinical close-up photograph, the second is a
+dermoscopic image.
+
+Task 1. Give the most likely diagnosis as one of:
+BCC - basal cell carcinoma
+SCC - squamous cell carcinoma (invasive, or in situ / Bowen's disease)
+MEL - melanoma (invasive or in situ)
+NEV - melanocytic naevus
+ACK - actinic keratosis
+SEK - seborrhoeic keratosis
+UNSURE - if you cannot reasonably choose between them
+
+Task 2. Decide whether this lesion can be safely discharged, meaning it needs
+no treatment, no biopsy and no follow-up. Answer "yes" or "no".
+
+The model also gave a confidence from 0 to 100 and a second choice.
+
+Both models got the same words and the same images, at default settings, with no system prompt and no cap on the length of the reply. Neither refused a single case.
+
+Diagnosis: right 42% of the time# [#diagnosis-right-42-of-the-time]
+
+GPT-6 Astra gave the correct diagnosis for 84 of the 200 lesions. Claude Fable 5.1 gave it for 85. With six diagnoses to choose from, guessing would score about 17%. So 42% is much better than chance, but nowhere near as accurate as a dermatologist or a specialized skin cancer model. Allowing a second choice raised the figures to 134 and 138.
+
+Figure 3. Correct first-choice diagnosis under the clinician prompt. Labels show correct answers out of the number of lesions with that histology.
+
+Although the totals are almost the same, the two models were getting different lesions right. They gave the same answer for only 112 lesions and were both right for 58. For 89 lesions, neither was right.
+
+Each model has a favourite diagnosis. GPT-6 Astra called 75 lesions basal cell carcinoma when only 25 were. It got all 25 of the real ones, but it also gave that diagnosis to 14 of the 30 melanomas and 15 of the 50 moles. Claude Fable 5.1 leaned on actinic keratosis instead. It gave that answer 53 times when 20 was correct, and applied it to 16 of the 25 squamous cell carcinomas.
+
+Figure 4. What each model called each lesion. Rows are the histological diagnosis, with the number of lesions in brackets; columns are the model's first choice (AK is actinic keratosis, SK seborrhoeic keratosis). Outlined cells are correct answers and more strongly coloured cells hold a larger share of the row. GPT-6 Astra answered "unsure" for 1 naevus, not shown.
+
+Seborrhoeic keratosis (a harmless skin growth) was the weakest diagnosis for both: 13 of 50 for GPT-6 Astra and 6 of 50 for Claude Fable 5.1. This is the common, harmless, “stuck-on” lesion of middle age, and one a dermatologist usually recognises at a glance. The models repeatedly read these as squamous cell carcinoma, basal cell carcinoma or actinic keratosis.
+
+Melanoma was the first choice for only 8 of 30 melanomas with GPT-6 Astra and 11 with Claude Fable 5.1. It was the first or second choice for 20 and 24.
+
+Which lesions would each model send home?# [#which-lesions-would-each-model-send-home]
+
+Getting the name wrong matters less if the patient is still referred. A melanoma mislabelled as a basal cell carcinoma will still be seen and biopsied albeit with potential delay. What I most wanted to know was which lesions each model would discharge without further biopsy or follow up.
+
+Figure 5. Lesions each model said could be discharged without treatment or follow-up. In the top group any bar is an error; in the bottom group a longer bar is better.
+
+On the cancers and precancers, both were cautious. GPT-6 Astra kept 97 of the 100 lesions that should not be discharged. Claude Fable 5.1 kept 96. Neither discharged a single basal cell carcinoma, squamous cell carcinoma or actinic keratosis.
+
+They managed this largely by keeping almost everything. Of the 100 harmless lesions, GPT-6 Astra discharged 32 and Claude Fable 5.1 discharged 22. A clinic that followed these decisions would still see seven or eight of every ten benign lesions.
+
+Every lesion that was wrongly discharged was a melanoma. Two were discharged by both models: the one at the top of this page and the one below. In all, 5 of the 30 melanomas were sent home by at least one model.
+
+Figure 6. Melanoma in situ on the leg of a 40-year-old woman. Both models called it a benign naevus and said it could be discharged. Clinical photograph on the left, dermoscopic image on the right. Images: MILK10k [https://doi.org/10.34970/648456], MILK study team, CC BY-NC.
+
+In each case the model described the features of a benign lesion, using the correct dermoscopic terms (milia-like cysts, a cobblestone pattern, a regular network), and gave its answer a confidence of 65 to 89 out of 100. One model described the melanoma on the ear as a “raised brown lesion with a lobulated cerebriform surface, fissures and ridges, and small keratin-like pale dots”. That is how a textbook would describe a seborrhoeic keratosis, but the pathology confirmed a melanoma. 
+
+Does the model know when it is wrong?# [#does-the-model-know-when-it-is-wrong]
+
+A system that is often wrong can still be useful if it knows when it is unsure. I asked each model for a confidence with every diagnosis.
+
+Figure 7. Accuracy at each level of stated confidence. A well-calibrated model would show bars that lengthen steadily from top to bottom. Labels show correct answers out of answers given at that level.
+
+GPT-6 Astra’s confidence told me almost nothing. It averaged 82 when the diagnosis was right and 79 when it was wrong. Most of its answers sat in the 75 to 89 band, where it was correct well under half the time.
+
+Claude Fable 5.1 was less sure of itself, averaging 65 when right and 56 when wrong, and its confidence did track accuracy. Answers at 75 or above were usually correct. Answers below 60 usually were not.
+
+Across 400 answers unsure was used only once.
+
+The results in one table# [#the-results-in-one-table]
+
+GPT-6 Astra
+Claude Fable 5.1
+
+Correct diagnosis (of 200)
+84 (42%)
+85 (42%)
+
+Correct in first or second choice
+134
+138
+
+Melanoma as first choice (of 30)
+8
+11
+
+Unsafe lesions kept (of 100)
+97
+96
+
+Safe lesions discharged (of 100)
+32
+22
+
+Melanomas discharged (of 30)
+3
+4
+
+FAQs# [#faqs]
+
+“Had the models already seen these images?”# [#had-the-models-already-seen-these-images]
+
+Possibly. MILK10k has been public since 2025, so either model could have met it in training. If they had, I would expect it to improve their scores, and a model that had memorised the labels should have done far better than 42%.
+
+“These are unusually hard cases.”# [#these-are-unusually-hard-cases]
+
+They are. Every lesion was biopsied, so the benign ones are the benign lesions that looked suspicious. In real use a model would probably reassure a larger share of harmless lesions than it did here. That does not excuse the missed melanomas, though, since catching those is the whole purpose of triage.
+
+“Why not test a model built for skin lesions?”# [#why-not-test-a-model-built-for-skin-lesions]
+
+I tested the general-purpose models because I was curious how far LLMs have advanced. Purpose-built classifiers trained on dermoscopic images, and the regulated products built around them will perform much better. I was expecting the LLMs to be almost on a par and was surprised to see that there was such a gap in performance.
+
+“Is 200 lesions enough? Is one run enough?”# [#is-200-lesions-enough-is-one-run-enough]
+
+It is enough to show the general pattern but not to rank the two models. Each case was run once, and answers vary from run to run, so a difference of a few cases means nothing. Thirty melanomas give the wide intervals quoted above. The melanoma result is the most important one here and the least precise.
+
+To see how much the answers move, I put the melanoma in Figure 1 to each model three more times, with the same prompt and the same two photographs. All six replies again called it a seborrhoeic keratosis. The discharge decision was less stable. GPT-6 Astra discharged it twice and kept it once. Claude Fable 5.1 kept it all three times, each time giving melanoma as its second choice. So the wrong diagnosis is consistent, but whether the lesion is sent home can depend on which run you get. The figures in this article are from the first run of each case.
+
+“Some of those moles are not ordinary moles.”# [#some-of-those-moles-are-not-ordinary-moles]
+
+True. Fourteen of the 50 naevi were less common subtypes (acral, congenital, blue and Reed naevi among them) that a dermatologist might not discharge without thought. Restricting the analysis to the 36 ordinary naevi does not change the picture.
+
+“Who did the analysis?”# [#who-did-the-analysis]
+
+I designed the test and made the clinical rulings, including which diagnoses count as safe to discharge. The analysis and the first draft of this article were produced with Claude Code, Anthropic’s coding tool, which runs on a Claude model. One of the two models tested is also Anthropic’s. The scoring was done by script against the histology.
+
+Run it yourself# [#run-it-yourself]
+
+Everything needed to check or extend this is in one download [/static/data/llm-skin-cancer-test.zip]: the 200 cases with their ISIC image ids and histology, the prompts, every reply from both models, the patient-style replies described below with their coding, and the scripts that ran and scored the test. The images themselves are in the MILK10k dataset.
+
+If you run it on another model, or with the patient’s age and body site added, I would like to see the result.
+
+Asked as a patient# [#asked-as-a-patient]
+
+I also put the lesions to each model as a patient might: the ordinary photograph alone, with the question “What do you think it is? And do I need to get it seen by a doctor, or is it safe to just leave it alone?” I did this for the 200 lesions and for a further 100 biopsy-proven melanomas, 600 replies in all, coded by a third model and the doubtful ones read by me. In almost all cases both models recommended seeing a doctor, for the harmless lesions as well as the cancers. Of the further 100 melanomas, GPT-6 Astra advised a doctor for 99 and Claude Fable 5.1 for 98. The exceptions among those 100 were a bleeding melanoma that one model took for a shaving cut and a small melanoma that both took for an attached tick. A handful of basal cell carcinomas among the first 200 were likewise taken for a scab or irritated skin and told to wait and see whether it healed. This was caution and not recognition: melanoma was named as a possibility in only 60 and 44 of those 100 replies.
+
+What I take from it# [#what-i-take-from-it]
+
+The wrong answers are convincing. Both models write about skin lesions the way a good registrar talks about them, with the right vocabulary in the right order, and the descriptions attached to the missed melanomas would not look out of place in a clinic letter. A fluent wrong answer is harder to spot than a clumsy one.
+
+In most cases the answers were safe. But the models were safe mainly because they kept nearly every lesion, which does not help anyone decide anything. When they did discharge, melanomas went home with the harmless lesions. There were only a few, and even a few is too many.
+
+Skin lesion referrals outstrip the dermatologists available to see them, so a system that could safely discharge even a third of benign lesions would be worth having. GPT-6 Astra already discharges about that many. The problem is the melanomas it discharges along with them. I do not know how many melanomas a model would have to get right before it could be trusted with that decision, but it is a great deal more than thirty.
+
+I am sure that fairly soon AI will be as good as a dermatologist at diagnosing skin cancer from images. These two models are not there yet.
+
+Images are from the MILK10k dataset (MILK study team, International Skin Imaging Collaboration), used under a CC BY-NC licence.
+
+ Dr Magnus Lynch is a Consultant Dermatologist and Mohs Surgeon at Guy's
+ Hospital and Honorary Reader (equivalent of Associate Professor) at King's
+ College London. His clinical work covers skin cancer, Mohs and facial
+ reconstructive surgery, and lasers; his research covers the cell biology
+ of skin cancers and scars and the use of AI in dermatology.
+ Full profile [/].
