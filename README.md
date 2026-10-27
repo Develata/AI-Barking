@@ -44,6 +44,7 @@ AI 吠点是由 **[Develata](https://github.com/Develata)** 主理的独立内�
 | 2026 / 1023 | [Kimi“压低”攻击力，比上代还强？](docs/2610/1023/doc_1023_publish.txt) | [配图说明](docs/2610/1023/images/README.md) | [来源入口](docs/2610/1023/sources/README.md) |
 | 2026 / 1024 | [Kimi 推广被曝：别标付费合作？](docs/2610/1024/doc_1024_publish.txt) | [配图说明](docs/2610/1024/images/README.md) | [来源入口](docs/2610/1024/sources/README.md) |
 | 2026 / 1025 | [10年前的AI比GPT准，却漏18个癌](docs/2610/1025/doc_1025_publish.txt) | [配图说明](docs/2610/1025/images/README.md) | [来源入口](docs/2610/1025/sources/README.md) |
+| 2026 / 1026 | [两家AI撞车？同天称推翻同一猜想](docs/2610/1026/doc_1026_publish.txt) | [配图说明](docs/2610/1026/images/README.md) | [来源入口](docs/2610/1026/sources/README.md) |
 
 正文采用可直接复制的纯文本，图片单独保存。阅读或发布时不需要依赖 Markdown 插图。
 
