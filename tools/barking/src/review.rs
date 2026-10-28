@@ -241,6 +241,9 @@ fn execute(opts: &Opts) -> Result<ExitCode, String> {
     println!("命令（可直接粘到 Git Bash 运行）：");
     println!("{}", invocation.display());
     println!(
+        "-- 执行方是 GPT 时不要跑这条命令，也不要加 --run（同家族）：把上面的提示词交 Claude Opus，见 EDITORIAL.md“核验流程”的“执行方”"
+    );
+    println!(
         "-- 逐条核实报告意见后，结论记入 {}/sources/fact-check.md 的“{}”节",
         issue.rel(),
         opts.mode.heading()

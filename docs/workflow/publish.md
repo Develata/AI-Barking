@@ -22,7 +22,7 @@ Develata 在对话中说“已发布”，即授权 Claude 对当期完成下面
    - 身份：按 `templates/codex-evidence.md` 第 7 条，用 `.env` 里 `BARKING_IDENTITY_HANDLES` 列出的抓取账号 X handle，经 fxtwitter 公开接口解析出显示名、头像 ID 与数字用户 ID（缓存在 `~/.config/barking/identity.json`，一天后自动刷新，改名后旧名仍保留在缓存里），加上 `BARKING_IDENTITY_PATTERNS` 手填的片段，搜索待提交文件与文件名，确认未入库（两者都未配置时只警告）；
    - 凭据与会话状态（`.env`、cookies、storage-state）仍被 `.gitignore` 排除，且没有进入待提交集合。
 3. **提交**：`barking stage <期次目录>` 列出三批文件与建议提交信息；按 `AGENTS.md` 的提交约定依序 `barking stage <期次目录> --batch 1 --add` 后 `git commit`，再 `--batch 2`、`--batch 3`。第②批的提交信息要按组描述存档内容后再提交；工具只暂存精确路径，不提交。
-4. **推送**：`git push origin main`，再 `git fetch` 核对 `origin/main` 上的 `daily-scan.md` 与本地一致。
+4. **推送**：先 `git log --oneline origin/main..HEAD`，除当期三批外还列出别的提交，就先问 Develata：“已发布”只授权推送当期三批（1025 期曾把三个此前未推送的规范改动一并推了出去）。确认后 `git push origin main`，再 `git fetch` 核对 `origin/main` 上的 `daily-scan.md` 与本地一致。
 5. **上传**：`cargo run --release --manifest-path tools/barking/Cargo.toml -- offsite <期次目录> --upload`，逐个核对远端大小一致。
 6. **回报**：各批提交哈希、推送结果、上传数量与失败项。
 

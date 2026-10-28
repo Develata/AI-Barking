@@ -1,8 +1,8 @@
 # AI 吠点仓库约定
 
-选题、正文结构、事实分级、核验流程与纠错见 `EDITORIAL.md`；本文件只管交付格式。
+选题、正文结构、事实分级、核验流程与纠错见 `EDITORIAL.md`；本文件只管交付格式。执行方默认是 Claude；GPT（Codex）接手时同样遵守本文件与 `EDITORIAL.md`，复核角色怎么对调、Claude 不可用时怎么降级，见 `EDITORIAL.md`“核验流程”的“执行方”。
 
-- 仓库结构：每期一个目录 `docs/<YYMM>/<MMDD>/`（正文、`images/`、`sources/`），按月份归档，如 `docs/2609/0928/`；流程文档放 `docs/workflow/`。根目录只放 `README.md`、规范、`daily-scan.md`、`.env.example`、`brand/`、`common_images/`（跨期通用图片，如头像 PNG 原图）、`templates/`、`tools/` 与 `.handoff/`（历史派工及交接），保持整洁。`daily-scan.md` 是定时检索任务读取的 prompt，不要移动或改名。
+- 仓库结构：每期一个目录 `docs/<YYMM>/<MMDD>/`（正文、`images/`、`sources/`），按月份归档，如 `docs/2609/0928/`；流程文档放 `docs/workflow/`。根目录只放 `README.md`、规范、`daily-scan.md`、`.env.example`、`brand/`、`common_images/`（跨期通用图片，如头像 PNG 原图）、`templates/`、`tools/` 与 `.handoff/`（历史派工及交接），保持整洁。`daily-scan.md` 是定时检索任务读取的 prompt，不要移动或改名。新一期期号 = 仓库里最新一期 + 1（1012→1013；跨月 1031→1101，目录随之进 `docs/2611/`；2026-10-13 起 Develata 决定），开工时直接定，不问 Develata，也不按系统时钟或北京时间推算。改过期号时，历史日志与派工单里的旧路径不动，在 `sources/README.md` 注明；OpenList 按期号存路径且上传账号不能移动或删除，先传到新路径，旧路径请 Develata 清理。
 - 内容面向小红书、抖音、微信公众号（2026-09-28 起不再运营微博），默认维护一份统一正文。
 - 正文与图片分开交付：发布正文应能直接复制，图片作为独立素材保存在对应期次的 images/ 中（自 1002 期起图片只存本地与网盘，不入库）。
 - 可复制正文默认保存为 `<稿件名>_publish.txt`，不包含 Markdown 标题、加粗、链接语法等排版标记；标题与正文用纯文本表达。不要再生成 `with_images` 插图副本作为发布稿。
@@ -14,5 +14,5 @@
 - 不生成 ZIP 等打包副本，除非用户明确要求。
 - 默认交付正文文件、图片目录和配图说明的本地链接；不为方便下载另做压缩包或重复目录。
 - 保留用户原稿；内部稿和核验记录可以使用 Markdown。调整交付格式不等于授权重写正文事实或结论。
-- 公开归档范围见 `README.md`。本仓库同时保存完整工作材料与 Git 历史；草稿、核验笔记、派工与原始采集可以公开，但须与发布正文及已核验事实区分。自 1002 期起，`images/` 下的全部图片（封面、省流卡、批注截图、备用图）与 `sources/` 中的 PDF、WPS/DOC 文档、HTML、图片和音视频原件都不入库，只入库文字，存 OpenList（0924–1001 期原先已入库的这类文件，已于 2026-10-02 补传网盘并改写历史移出），`sources/offsite.tsv` 记其大小与 SHA-256，分工见 `docs/workflow/publish.md`。凭据、浏览器会话状态、缓存和构建产物不上传；`.gitignore` 不能排除已有提交中的文件。
+- 公开归档范围见 `README.md`。本仓库同时保存完整工作材料与 Git 历史；草稿、核验笔记、派工与原始采集可以公开，但须与发布正文及已核验事实区分。自 1002 期起，`images/` 下的全部图片（封面、省流卡、批注截图、备用图）与 `sources/` 中的 PDF、WPS/DOC 文档、HTML、图片和音视频原件都不入库，只入库文字，存 OpenList（0924–1001 期原先已入库的这类文件，已于 2026-10-02 补传网盘并改写历史移出），`sources/offsite.tsv` 记其大小与 SHA-256，分工见 `docs/workflow/publish.md`。凭据、浏览器会话状态、缓存和构建产物不上传；`.gitignore` 不能排除已有提交中的文件。各平台运营数据（播放、完播、点赞、收藏、转发、涨粉等）也不入本仓库，另存私有账本（2026-10-02 起，位置问 Develata）；Develata 贴来数据时，按本号自己的趋势判断，不按平台给的同类中位数。
 - 提交约定：Develata 说“已发布”后，按 `docs/workflow/publish.md` 检查、提交、推送并上传原件。每期新增内容按三批、依序提交，提交信息以期次 `<MMDD>：` 开头；分批清单与建议提交信息由 `barking stage <期次目录>` 生成，`--batch N --add` 只暂存该批的精确路径，提交仍由 Claude 执行。①仓库层：根目录 `README.md` 期次索引、`daily-scan.md` 的“已发过”与“近 3 天速览已收”、`.handoff/` 派工单；②取证存档：`sources/` 下除下面第③批所列之外的全部入库文件（文本存档、社交采样、抓取脚本、辅助记录、`offsite.tsv`）；③本期成品：`doc_<MMDD>_publish.txt`、`images/README.md` 与 `images/cards.toml`（图片本身不入库）以及 `sources/` 下的 `README.md`、`fact-check.md`、`evidence.md`、`capture-log.md`、`titles.md`（标题候选）、`style-review.md`（读者稿检查）。取证存档先于成品提交，因为成品引用它。提交前先看有无单个超过 1 MB 的文件，有就先问是否必须入库；入库的历史无法靠 `.gitignore` 撤回。当期没有新增取证存档时，第②批省略。发布后的标题、文字或配图修订，各自单独小提交。推送、打标签、改写已推送的历史需要当次明确授权（“已发布”即当期三批的推送授权）；尚未推送的提交可经同意后重新拆分。

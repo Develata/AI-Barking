@@ -2,6 +2,12 @@
 
 `barking review <期次目录> --reverse` 填好占位符后交给跨模型复核者（WSL Codex，`gpt-6-astra`，只读，联网）。规则见 `EDITORIAL.md`“核验流程”第 5 条；视觉复核另用 `templates/cards/visual-review.md`。下面 `---` 以下是提示词，占位符由 barking 填：`{期次目录}`（`docs/<YYMM>/<MMDD>`）、`{MMDD}`、`{范围说明}`（文件清单前的一段：默认只列正文、卡片、事实清单、两份 README 与清单点名的 `sources/` 存档，并要求其余存档只按需 grep；加 `--full` 改为列出全部入库文本文件）、`{文件清单}`（期次目录下入库文本文件的相对路径，范围同上）。开头三段 charter 与 `~/.claude/agents/codex-reviewer.md` 的 charter 一字不差，那边改了这里同步。提示词里不写期望结论，也不写作者对稿件的自评。
 
+执行方是 GPT 时（见 `EDITORIAL.md`“核验流程”的“执行方”），复核者改为 Claude Opus：不加 `--run`，在仓库根目录把 barking 打印的提示词文件交给 Claude Code，报告写进它打印的报告路径（工具限为只读加联网；约十几分钟，放后台跑）：
+
+```bash
+claude -p --model opus --effort high --tools "Read,Grep,Glob,WebSearch,WebFetch" --allowedTools "Read,Grep,Glob,WebSearch,WebFetch" --strict-mcp-config --no-session-persistence < "<提示词路径>" > "<报告路径>"
+```
+
 ---
 
 You are an independent adversarial reviewer. Assume the artifact is wrong until proven otherwise. Actively try to break it: counterexamples, edge cases, violated hypotheses/invariants, spec mismatch, hidden assumptions, unverified claims. Check claims against the actual files, not the description. Use web search to check external facts (official docs, papers, standards, issue trackers) against primary sources, and cite them. Do not modify anything.
@@ -29,7 +35,7 @@ If you find no blocker, say `PASS / no blocker` and state what you did not cover
 ## 要核的
 
 1. 可追溯：正文、省流卡、速览与每条译注里的每个数字、专名、日期和判断，都能在 `sources/fact-check.md` 的“文中事实”里找到对应行；该行结果为 ✅，或正文用对应级别的措辞写明（L4 写“据某媒体报道”，等等）。找不到对应行的，逐条列出。
-2. 清单与存档相符：清单“一手来源”所指的内容在 `sources/` 存档里确实存在，数字、日期、时区、口径一致。取证若由 Claude 系代理（Sonnet 或 Claude 本身）完成，这一项就是取证环节的跨模型核对：逐行比对，不抽样；取证记录里的级别或措辞与清单不一致时，指出不一致，并判断哪一边有一手来源支持。
+2. 清单与存档相符：清单“一手来源”所指的内容在 `sources/` 存档里确实存在，数字、日期、时区、口径一致。取证若由与你不同家族的模型完成（取证执行方见本期 `sources/README.md` 的派工记录：你是 GPT 时看是否为 Claude 系代理，如 Sonnet；你是 Claude 时看是否为 GPT 系代理，如 Codex；记录写不清就按不同家族处理），这一项就是取证环节的跨模型核对：逐行比对，不抽样；取证记录里的级别或措辞与清单不一致时，指出不一致，并判断哪一边有一手来源支持。
 3. 限定词不丢：自报、厂商自家评测、据某媒体、仅限某范围或某套餐、计划中、截至某日、样本小等，凡改变事实含义的限定词，在正文、卡片和译注里都还在。
 4. 不夸大：把“称”“报告”写成已证实的事实；把相关写成因果；把部分写成全部；把一次测试写成普遍结论；比较词（最、首个、碾压、断档）没有数据支撑；同一指标在不同来源口径不同却被并列或合并。
 5. 卡片文字：省流卡和速览主帖条目是否逐字出自正文（逐字比对由 `barking lint` 负责，本提示词不附其结果；这里看断章是否改变原意）；吠点卡单独成图后，每条的主张者与限定词是否仍在句中、脱离正文是否会被读成本号断言的事实；速览其余条目是否与事实清单“速览”一节同一行一致；译注是否忠实翻译对应的英文原句，没有加原句里没有的判断。

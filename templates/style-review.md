@@ -1,6 +1,6 @@
 # 读者稿检查模板
 
-规则见 EDITORIAL.md“文风”与“核验流程”第 4 步。正文定稿后、与第一轮反向核验并行跑一次。检查者要与起草者不同家族、不带本期上下文：Claude 起草时用下面的 Codex 命令，GPT 起草时把同一段提示词交给 Sonnet 子代理（不给它仓库路径和事实清单）。它只读，不改稿，不核事实；采纳与否由 Claude 逐条判断，按“文风”一节修改。
+规则见 EDITORIAL.md“文风”与“核验流程”第 4 步。正文定稿后、与第一轮反向核验并行跑一次。检查者要与起草者不同家族、不带本期上下文：Claude 起草时用下面的 Codex 命令，GPT 起草时用下面的 Claude Sonnet 命令（不开任何工具，不给它仓库路径和事实清单）。它只读，不改稿，不核事实；采纳与否由 Claude 逐条判断，按“文风”一节修改。
 
 ## 命令
 
@@ -8,6 +8,12 @@
 
 ```bash
 codex exec -m gpt-6-astra -c 'model_reasoning_effort="medium"' -s danger-full-access --skip-git-repo-check --ephemeral -C "{OUT}" -o "{OUT}/report.md" - < "{OUT}/prompt.md"
+```
+
+GPT 起草时改用（在 `{OUT}` 里运行）：
+
+```bash
+claude -p --model sonnet --effort high --tools "" --strict-mcp-config --no-session-persistence < "{OUT}/prompt.md" > "{OUT}/report.md"
 ```
 
 约 2 分钟。把 `{OUT}/report.md` 存为本期 `sources/style-review.md`，在末尾补一节“采纳”：逐条写采纳或不采纳及理由。

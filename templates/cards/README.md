@@ -40,5 +40,11 @@
    ```
 
    Codex 不可用或超时时，改派 Sonnet 子代理按同一提示词看图复核，并在记录中注明复核方。Claude 逐条核实意见再改，结论记入 `sources/fact-check.md`。
+
+   执行方是 GPT 时（见 `EDITORIAL.md`“核验流程”的“执行方”），复核者改为 Claude Opus：不加 `--run`，在期次目录里把打印的提示词文件交给 Claude Code，由它用 Read 逐张看提示词列出的图（工具限为只读）；Claude 也不可用时按同一节的“降级”办，并在记录中注明复核方：
+
+   ```bash
+   claude -p --model opus --effort high --tools "Read,Grep,Glob" --allowedTools "Read,Grep,Glob" --strict-mcp-config --no-session-persistence < "<提示词路径>" > "<报告路径>"
+   ```
 6. `barking lint`：省流卡与速览主帖条目的文字须在正文同一行中逐字出现，速览其余条目须逐字列在事实清单“速览”一节且级别与措辞相符，第 N 张吠点卡须与正文第 N 段“吠点：”逐条逐字一致、一条不缺（1027 期起缺吠点卡也报错；均为 error）；吠点卡没列进正式配图、没按主帖顺序、所在行没注明公众号不插，cards.toml 改过而图未重渲、省流卡不在正式配图第一行、`fact-check.md` 没有“视觉复核”记录，均给 warn。
 7. `images/README.md` 的正式配图里，省流卡列第 1 行、速览聚合图第 2 行（速览专帖只有速览图，列第 1 行），其后按主帖顺序，每个主帖先列吠点卡（该行注明“公众号不插”），再列它的批注图；批注图替代原截图；`-raw` 底图列入备用图（用途写“批注底图”）。1002 期起，包括卡片在内的全部图片都不入 Git，发布后由 `barking offsite --upload` 存 OpenList（路径与 SHA-256 见 `sources/offsite.tsv`）；日后重渲，先从 OpenList 同一路径取回底图。
