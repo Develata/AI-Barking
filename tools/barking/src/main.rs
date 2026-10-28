@@ -22,7 +22,7 @@ const USAGE: &str = "\
 用法：
   barking lint [期次目录...]                定稿前机械检查；不给目录则检查 docs/<YYMM>/<MMDD> 下全部期次（如 docs/2609/0925）
   barking offsite <期次目录>... [--upload]  把不入库的原件记入 sources/offsite.tsv；--upload 同时上传 OpenList
-  barking card <期次目录> [文件名...|--all] 按 images/cards.toml 渲染省流卡、速览聚合图与批注截图（见 templates/cards/）；输入未变的跳过，--all 全部重渲
+  barking card <期次目录> [文件名...|--all] 按 images/cards.toml 渲染省流卡、速览聚合图、吠点卡与批注截图（见 templates/cards/）；输入未变的跳过，--all 全部重渲
   barking cover-draw <期次目录> [--seed N]  按 templates/cover-styles.toml 抽两组封面画风轴（A、B），排除前几期用过的取值
   barking publish-check <期次目录>          发布后检查七步：lint、标记行、oxipng、offsite 清单、大文件、身份、凭据（docs/workflow/publish.md）
   barking stage <期次目录> [--batch 1|2|3] [--add]  按提交约定分三批列出待提交文件与建议提交信息；--add 暂存该批（不 commit）

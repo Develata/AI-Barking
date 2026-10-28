@@ -1,4 +1,4 @@
-//! `barking card`: render one issue's 省流卡, 速览聚合图 and annotated
+//! `barking card`: render one issue's 省流卡, 速览聚合图, 吠点卡 and annotated
 //! screenshots (plus the template covers of a 速览专帖) from
 //! `images/cards.toml`, filling the HTML templates in `templates/cards/` and
 //! screenshotting them with headless Chrome.
@@ -59,9 +59,21 @@ const TLDR_TEMPLATE: &str = include_str!("../../../templates/cards/tldr.html");
 const ANNOT_TEMPLATE: &str = include_str!("../../../templates/cards/annot.html");
 const ROUNDUP_TEMPLATE: &str = include_str!("../../../templates/cards/roundup.html");
 const COVER_TEMPLATE: &str = include_str!("../../../templates/cards/cover.html");
+const BARK_TEMPLATE: &str = include_str!("../../../templates/cards/bark.html");
 pub const SPEC_FILE: &str = "cards.toml";
 pub const TLDR_OUT: &str = "00-tldr.png";
 pub const ROUNDUP_OUT: &str = "00-roundup.png";
+/// One 吠点卡 per main post, in the main posts' order. Fixed names keep the
+/// outputs `&'static` and the 配图说明 predictable; no issue has had more
+/// than four main posts.
+const BARK_OUTS: [&str; 6] = [
+    "00-bark-1.png",
+    "00-bark-2.png",
+    "00-bark-3.png",
+    "00-bark-4.png",
+    "00-bark-5.png",
+    "00-bark-6.png",
+];
 pub const COVER_OUT: &str = "00-cover.png";
 pub const COVER_WIDE_OUT: &str = "00-cover-wide.png";
 /// Mascot on the template covers, relative to the repo root.
@@ -103,7 +115,21 @@ pub struct Spec {
     #[serde(default)]
     pub roundup: Vec<RoundupItem>,
     #[serde(default)]
+    pub bark: Vec<BarkCard>,
+    #[serde(default)]
     pub annot: Vec<Annot>,
+}
+
+/// A 吠点卡 (from 2026-10-28): one main post's whole 吠点 section, so a reader
+/// who only flips through the images still gets it. Its heading is the main
+/// post's 速览 entry with the same tag, not a third copy of the title.
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct BarkCard {
+    pub tag: String,
+    /// The section's 吠点 lines, verbatim and in order, without the ①②
+    /// numbers, which the card adds.
+    pub points: Vec<String>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -122,9 +148,10 @@ pub struct RoundupItem {
 pub struct TldrItem {
     pub tag: String,
     pub fact: String,
-    /// Retired 2026-10-03: images carry no 吠点. Still parsed so a published
-    /// issue's cards.toml (which records what its images said) loads; rendering
-    /// such an entry is an error.
+    /// Retired 2026-10-03: the 省流卡 and annotated screenshots carry no 吠点
+    /// (since 2026-10-28 it has its own card, [`BarkCard`]). Still parsed so a
+    /// published issue's cards.toml (which records what its images said)
+    /// loads; rendering such an entry is an error.
     #[serde(default)]
     pub barks: Vec<String>,
 }
@@ -176,12 +203,27 @@ impl Spec {
     pub fn own_texts(&self) -> Vec<&str> {
         let tldr = self.tldr.iter().flat_map(|t| [t.tag.as_str(), &t.fact]);
         let roundup = self.roundup.iter().flat_map(|r| [r.tag.as_str(), &r.text]);
+        let bark = (self.bark.iter()).flat_map(|b| {
+            std::iter::once(b.tag.as_str()).chain(b.points.iter().map(String::as_str))
+        });
         let annot = self.annot.iter().flat_map(|a| {
             [a.title.as_str(), &a.source]
                 .into_iter()
                 .chain(a.note.iter().map(|n| n.gloss.as_str()))
         });
-        tldr.chain(roundup).chain(annot).collect()
+        tldr.chain(roundup).chain(bark).chain(annot).collect()
+    }
+
+    /// The 吠点卡 file names, one per [[bark]] (no more than `BARK_OUTS`).
+    pub fn bark_outputs(&self) -> impl Iterator<Item = &'static str> {
+        BARK_OUTS.iter().copied().take(self.bark.len())
+    }
+
+    /// A 吠点卡's heading: the main 速览 entry with its tag.
+    fn bark_heading(&self, b: &BarkCard) -> Option<&str> {
+        self.main_entries()
+            .find(|r| r.tag == b.tag)
+            .map(|r| r.text.as_str())
     }
 
     pub fn main_entries(&self) -> impl Iterator<Item = &RoundupItem> {
@@ -207,6 +249,7 @@ impl Spec {
                 errs.push("速览专帖没有主帖，[[roundup]] 不应写 main = true".into());
             }
         }
+        errs.extend(self.bark_errors());
         if self.roundup.is_empty() {
             return errs;
         }
@@ -249,6 +292,55 @@ impl Spec {
         errs
     }
 
+    /// The [[bark]] rules decidable from cards.toml alone; lint checks the
+    /// points against the publish text.
+    fn bark_errors(&self) -> Vec<String> {
+        let mut errs = Vec::new();
+        if self.bark.is_empty() {
+            return errs;
+        }
+        if self.kind == Kind::Roundup {
+            errs.push("速览专帖没有主帖，不应有 [[bark]]".into());
+            return errs;
+        }
+        let bark_tags: Vec<&str> = self.bark.iter().map(|b| b.tag.as_str()).collect();
+        let tldr_tags: Vec<&str> = self.tldr.iter().map(|t| t.tag.as_str()).collect();
+        if bark_tags != tldr_tags {
+            errs.push(format!(
+                "吠点卡 [[bark]] 的 tag {bark_tags:?} 须与省流卡 [[tldr]] 的 tag {tldr_tags:?} 一一对应、顺序相同"
+            ));
+        }
+        if self.bark.len() > BARK_OUTS.len() {
+            errs.push(format!(
+                "[[bark]] 有 {} 张，最多 {}（每个主帖一张）",
+                self.bark.len(),
+                BARK_OUTS.len()
+            ));
+        }
+        for b in &self.bark {
+            if self.bark_heading(b).is_none() {
+                errs.push(format!(
+                    "吠点卡「{}」的小标题取自速览里同 tag 的主帖条目（main = true），没找到",
+                    b.tag
+                ));
+            }
+            if b.points.is_empty() {
+                errs.push(format!("吠点卡「{}」没有 points", b.tag));
+            }
+            for p in &b.points {
+                if p.trim().is_empty() {
+                    errs.push(format!("吠点卡「{}」有一条空的 point", b.tag));
+                } else if strip_circled(p.trim_start()).is_some() {
+                    errs.push(format!(
+                        "吠点卡「{}」的 point 不写 ①② 编号（渲染时自动加）：「{p}」",
+                        b.tag
+                    ));
+                }
+            }
+        }
+        errs
+    }
+
     /// Where the retired 吠点 fields are still filled in, if anywhere.
     fn retired_barks(&self) -> Vec<String> {
         let tldr = (self.tldr.iter().filter(|t| !t.barks.is_empty()))
@@ -276,6 +368,11 @@ impl Spec {
         if !self.roundup.is_empty() {
             jobs.push((ROUNDUP_OUT, Job::Roundup));
         }
+        jobs.extend(
+            self.bark_outputs()
+                .enumerate()
+                .map(|(i, o)| (o, Job::Bark(i))),
+        );
         jobs.extend(self.annot.iter().map(|a| (a.out.as_str(), Job::Annot(a))));
         jobs
     }
@@ -316,6 +413,12 @@ impl Spec {
                 part(ROUNDUP_TEMPLATE.as_bytes());
                 part(&json(&self.roundup));
             }
+            Job::Bark(i) => {
+                // The index sets the colour; the heading comes from 速览.
+                let b = &self.bark[*i];
+                part(BARK_TEMPLATE.as_bytes());
+                part(&json(&(i, b, self.bark_heading(b))));
+            }
             Job::Annot(a) => {
                 part(ANNOT_TEMPLATE.as_bytes());
                 part(&json(a));
@@ -343,6 +446,8 @@ enum Job<'a> {
     Cover((u32, u32)),
     Tldr,
     Roundup,
+    /// The 吠点卡 of `spec.bark[i]`.
+    Bark(usize),
     Annot(&'a Annot),
 }
 
@@ -542,6 +647,7 @@ fn job_html(
         }
         Job::Tldr => Ok((tldr_html(spec)?, CARD_SIZE)),
         Job::Roundup => Ok((roundup_html(spec)?, CARD_SIZE)),
+        Job::Bark(i) => Ok((bark_html(spec, i)?, CARD_SIZE)),
         Job::Annot(a) => Ok((annot_html(a, images, work)?, CARD_SIZE)),
     }
 }
@@ -552,7 +658,7 @@ fn precheck(spec: &Spec, images: &Path, only: &[&str]) -> Vec<String> {
     let mut errs = Vec::new();
     for at in spec.retired_barks() {
         errs.push(format!(
-            "{at} 已停用：2026-10-03 起图上不放吠点（只留事实、原文批注与译注），从 cards.toml 删去"
+            "{at} 已停用：2026-10-03 起省流卡与批注图不放吠点，2026-10-28 起吠点改写在吠点卡 [[bark]]；从 cards.toml 删去"
         ));
     }
     errs.extend(spec.structure_errors());
@@ -574,9 +680,14 @@ fn precheck(spec: &Spec, images: &Path, only: &[&str]) -> Vec<String> {
     if !unknown.is_empty() {
         errs.push(format!("cards.toml 中没有这些输出：{unknown:?}"));
     }
-    let dated = spec.kind == Kind::Roundup || !spec.tldr.is_empty() || !spec.roundup.is_empty();
+    let dated = spec.kind == Kind::Roundup
+        || !spec.tldr.is_empty()
+        || !spec.roundup.is_empty()
+        || !spec.bark.is_empty();
     if dated && spec.date.is_none() {
-        errs.push("cards.toml 缺少 date（省流卡、速览聚合图与速览专帖封面都要写日期）".into());
+        errs.push(
+            "cards.toml 缺少 date（省流卡、速览聚合图、吠点卡与速览专帖封面都要写日期）".into(),
+        );
     }
     for a in &spec.annot {
         // Base images are git-ignored and may be absent from a fresh checkout;
@@ -963,6 +1074,51 @@ fn roundup_html(spec: &Spec) -> Result<String, String> {
     Ok(ROUNDUP_TEMPLATE
         .replace("{{DATE}}", &esc(date))
         .replace("{{ITEMS}}", &items))
+}
+
+/// The 吠点卡 of `spec.bark[i]`: its colour is the 省流卡 colour of the same
+/// main post, so the two read as one topic.
+fn bark_html(spec: &Spec, i: usize) -> Result<String, String> {
+    let date = spec
+        .date
+        .as_deref()
+        .ok_or("cards.toml 有 [[bark]] 但缺少 date")?;
+    let b = spec.bark.get(i).ok_or("没有这张吠点卡")?;
+    let heading = spec
+        .bark_heading(b)
+        .ok_or_else(|| format!("吠点卡「{}」在速览里没有同 tag 的主帖条目", b.tag))?;
+    let mut items = String::new();
+    for (k, p) in b.points.iter().enumerate() {
+        let n = circled(k).ok_or("一张吠点卡最多 20 条")?;
+        let _ = writeln!(
+            items,
+            r#"    <div class="pt"><span class="n">{n}</span><div class="{}">{}</div></div>"#,
+            hang("tx", p.trim()),
+            esc(p.trim())
+        );
+    }
+    Ok(BARK_TEMPLATE
+        .replace("{{CLASS}}", &format!("c{}", i % MAX_NOTES + 1))
+        .replace("{{DATE}}", &esc(date))
+        .replace("{{TAG}}", &esc(&b.tag))
+        .replace("{{TITLE}}", &esc(heading))
+        .replace("{{ITEMS}}", &items))
+}
+
+/// ① for 0, ② for 1, … up to ⑳.
+fn circled(k: usize) -> Option<char> {
+    u32::try_from(k)
+        .ok()
+        .filter(|&k| k < 20)
+        .and_then(|k| char::from_u32(0x2460 + k))
+}
+
+/// `s` without its leading circled number (① … ⑳), if it has one.
+pub(crate) fn strip_circled(s: &str) -> Option<&str> {
+    let c = s.chars().next()?;
+    ('\u{2460}'..='\u{2473}')
+        .contains(&c)
+        .then(|| &s[c.len_utf8()..])
 }
 
 /// One of the two template covers of a 速览专帖. It shows only the date, the
@@ -1885,8 +2041,92 @@ mod tests {
         assert!(spec.structure_errors().is_empty());
         assert_eq!(
             spec.outputs(),
-            [TLDR_OUT, ROUNDUP_OUT, "01-openai-dns-pause.png"]
+            [
+                TLDR_OUT,
+                ROUNDUP_OUT,
+                "00-bark-1.png",
+                "00-bark-2.png",
+                "01-openai-dns-pause.png"
+            ]
         );
+    }
+
+    /// Two main posts A and B, with three other 速览 entries and `bark`
+    /// appended verbatim.
+    fn bark_spec(bark: &str) -> Spec {
+        toml::from_str(&format!(
+            "date = \"d\"\n\
+             [[tldr]]\ntag = \"A\"\nfact = \"f\"\n[[tldr]]\ntag = \"B\"\nfact = \"g\"\n\
+             [[roundup]]\ntag = \"A\"\nmain = true\ntext = \"甲标题\"\n\
+             [[roundup]]\ntag = \"B\"\nmain = true\ntext = \"乙标题\"\n\
+             [[roundup]]\ntag = \"x\"\ntext = \"t\"\n[[roundup]]\ntag = \"x\"\ntext = \"t\"\n\
+             [[roundup]]\ntag = \"x\"\ntext = \"t\"\n{bark}"
+        ))
+        .unwrap()
+    }
+
+    #[test]
+    fn bark_cards_follow_the_main_posts() {
+        let ab = "[[bark]]\ntag = \"A\"\npoints = [\"一\", \"二\"]\n\
+                  [[bark]]\ntag = \"B\"\npoints = [\"三\"]\n";
+        let ok = bark_spec(ab);
+        assert!(
+            ok.structure_errors().is_empty(),
+            "{:?}",
+            ok.structure_errors()
+        );
+        assert_eq!(
+            ok.outputs(),
+            [TLDR_OUT, ROUNDUP_OUT, "00-bark-1.png", "00-bark-2.png"]
+        );
+        // Points are not 速览 or 省流 texts; lint checks them section by section.
+        assert_eq!(ok.quoted_texts().len(), 4);
+
+        // Out of the 省流卡 order; numbered or empty points; no points.
+        let ba = "[[bark]]\ntag = \"B\"\npoints = [\"三\"]\n\
+                  [[bark]]\ntag = \"A\"\npoints = [\"①一\", \" \"]\n\
+                  [[bark]]\ntag = \"C\"\npoints = []\n";
+        let errs = bark_spec(ba).structure_errors().join("\n");
+        for needle in ["一一对应", "①②", "空的", "没有 points", "「C」的小标题"] {
+            assert!(errs.contains(needle), "missing {needle}: {errs}");
+        }
+        // A 速览专帖 has no main post, hence no 吠点卡.
+        let solo = roundup(
+            "kind = \"roundup\"\n[[bark]]\ntag = \"x\"\npoints = [\"p\"]\n",
+            &[("x", "t", false); 5],
+        );
+        assert!(
+            solo.structure_errors()
+                .iter()
+                .any(|e| e.contains("[[bark]]"))
+        );
+    }
+
+    #[test]
+    fn bark_card_page_and_fingerprint() {
+        let ab = |second: &str, title: &str| {
+            let mut s = bark_spec(&format!(
+                "[[bark]]\ntag = \"A\"\npoints = [\"一\", \"“二”\"]\n\
+                 [[bark]]\ntag = \"B\"\npoints = [\"{second}\"]\n"
+            ));
+            s.roundup[1].text = title.into();
+            s
+        };
+        let spec = ab("三", "乙标题");
+        let html = bark_html(&spec, 1).unwrap();
+        assert!(html.contains(r#"<body class="c2">"#));
+        assert!(html.contains("乙标题") && html.contains(">B<"));
+        assert!(html.contains(r#"<span class="n">①</span><div class="tx">三</div>"#));
+        // A leading full-width quote hangs.
+        let first = bark_html(&spec, 0).unwrap();
+        assert!(first.contains(r#"<span class="n">②</span><div class="tx q">“二”</div>"#));
+
+        let images = Path::new("unused");
+        let fp = |s: &Spec, i| s.fingerprint(&Job::Bark(i), images, None, "t", "");
+        // A card follows its own points and its heading in 速览, not the other card's.
+        assert_eq!(fp(&spec, 0), fp(&ab("四", "乙标题"), 0));
+        assert_ne!(fp(&spec, 1), fp(&ab("四", "乙标题"), 1));
+        assert_ne!(fp(&spec, 1), fp(&ab("三", "丙标题"), 1));
     }
 
     fn roundup(toml_head: &str, items: &[(&str, &str, bool)]) -> Spec {

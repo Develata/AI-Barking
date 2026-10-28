@@ -35,6 +35,9 @@ const ROUNDUP_FROM: u32 = 2610_1004;
 /// Issues from this date follow EDITORIAL.md 标题 / 文风 (2026-10-26) and
 /// record a `封面抽签：` line (`barking cover-draw`).
 const STYLE_FROM: u32 = 2610_1025;
+/// Issues from this date carry one 吠点卡 `images/00-bark-N.png` per main
+/// post (EDITORIAL.md 省流卡与批注截图, 2026-10-28).
+const BARK_FROM: u32 = 2610_1027;
 /// Names with one canonical spelling. Another casing in a title is only a
 /// warning: Develata may choose one on purpose (1021 used `claude`).
 const BRANDS: [&str; 13] = [
@@ -184,6 +187,7 @@ pub fn lint_issue(dir: &Path) -> Vec<Finding> {
         new_format,
         roundup: roundup_era,
         style: key.is_none_or(|k| k >= STYLE_FROM),
+        bark: key.is_none_or(|k| k >= BARK_FROM),
     };
 
     let fc_path = dir.join("sources").join("fact-check.md");
@@ -614,6 +618,8 @@ struct Era {
     roundup: bool,
     /// 1025 on: 标题 / 文风 checks and the 封面抽签 line.
     style: bool,
+    /// 1027 on: a 吠点卡 per main post.
+    bark: bool,
 }
 
 /// The mechanical parts of EDITORIAL.md 标题 and 文风. All warnings: each
@@ -716,17 +722,36 @@ fn lint_images(
     if era.roundup {
         lead.push(("00-roundup.", "速览聚合图 00-roundup.png"));
     }
-    let formal: Vec<&str> = md
+    // Each row of 正式配图 with the first image it names.
+    let rows: Vec<(&str, &str)> = md
         .lines()
         .skip_while(|l| !l.starts_with("## 正式配图"))
         .skip(1)
         .take_while(|l| !l.starts_with("## "))
-        .filter_map(|l| image_refs_in_line(l).first().copied())
+        .filter_map(|l| image_refs_in_line(l).first().map(|f| (*f, l)))
         .collect();
     for (k, (stem, what)) in lead.iter().enumerate() {
-        if formal.get(k).is_some_and(|f| !f.starts_with(stem)) {
+        if rows.get(k).is_some_and(|(f, _)| !f.starts_with(stem)) {
             sink.warn(None, format!("“正式配图”第 {} 张应为{what}", k + 1));
         }
+    }
+    // 吠点卡: in 正式配图, in main-post order, each row saying 公众号 skips it.
+    let mut last = None;
+    for out in spec.into_iter().flat_map(card::Spec::bark_outputs) {
+        let Some(k) = rows.iter().position(|(f, _)| *f == out) else {
+            sink.warn(None, format!("吠点卡 {out} 应列在“正式配图”里"));
+            continue;
+        };
+        if last.is_some_and(|l| k < l) {
+            sink.warn(None, format!("吠点卡 {out} 应按主帖顺序排列"));
+        }
+        if !rows[k].1.contains("公众号") {
+            sink.warn(
+                None,
+                format!("吠点卡 {out} 一行须注明公众号不插（读者在读正文）"),
+            );
+        }
+        last = Some(k);
     }
 
     let files: Vec<String> = fs::read_dir(images)
@@ -790,7 +815,13 @@ fn lint_cards(
     if era.roundup && spec.roundup.is_empty() {
         sink.error(None, "缺少 [[roundup]]：2026-10-04 起每期都有速览聚合图");
     }
+    if era.bark && spec.kind == Kind::Main && spec.bark.is_empty() {
+        sink.error(None, "缺少 [[bark]]：1027 期起每个主帖一张吠点卡");
+    }
     for msg in card_text_errors(&spec.quoted_texts(), body_lines) {
+        sink.error(None, msg);
+    }
+    for msg in bark_card_errors(&spec.bark, body_lines) {
         sink.error(None, msg);
     }
     if era.roundup {
@@ -870,6 +901,70 @@ fn blocked_msg(name: &str) -> String {
     format!(
         "「{name}」是中国大陆无法访问的平台，正文与卡片文字不写（截图可以）：官方账号发言写“某公司称”，媒体报道写“据外媒报道”"
     )
+}
+
+/// The publish text's 吠点 sections in order: the lines after each `吠点：`
+/// line that start with a circled number, numbers removed. Text after the
+/// colon on the `吠点：` line itself counts as the first point.
+fn bark_sections(body_lines: &[String]) -> Vec<Vec<&str>> {
+    let mut sections = Vec::new();
+    let mut lines = body_lines.iter().peekable();
+    while let Some(l) = lines.next() {
+        let Some(rest) = l.strip_prefix("吠点：") else {
+            continue;
+        };
+        let mut points: Vec<&str> = Vec::new();
+        if !rest.is_empty() {
+            points.push(card::strip_circled(rest).unwrap_or(rest));
+        }
+        while let Some(p) = lines.peek().and_then(|n| card::strip_circled(n)) {
+            points.push(p);
+            lines.next();
+        }
+        sections.push(points);
+    }
+    sections
+}
+
+/// A 吠点卡 carries its main post's whole 吠点 section, verbatim and in
+/// order (whitespace and trailing full stops ignored), so a reader who only
+/// flips through the images misses none of it. The n-th [[bark]] is the
+/// n-th section.
+fn bark_card_errors(barks: &[card::BarkCard], body_lines: &[String]) -> Vec<String> {
+    let mut errs = Vec::new();
+    if barks.is_empty() {
+        return errs;
+    }
+    let sections = bark_sections(body_lines);
+    if sections.len() != barks.len() {
+        errs.push(format!(
+            "正文有 {} 段吠点，[[bark]] 有 {} 张吠点卡，须按主帖顺序一一对应",
+            sections.len(),
+            barks.len()
+        ));
+        return errs;
+    }
+    for (b, section) in barks.iter().zip(&sections) {
+        if b.points.len() != section.len() {
+            errs.push(format!(
+                "吠点卡「{}」有 {} 条，正文对应吠点段有 {} 条：须逐字、完整、同序列出",
+                b.tag,
+                b.points.len(),
+                section.len()
+            ));
+            continue;
+        }
+        for (k, (p, line)) in b.points.iter().zip(section).enumerate() {
+            if compact(p) != compact(line) {
+                errs.push(format!(
+                    "吠点卡「{}」第 {} 条与正文不一致：卡片「{p}」／正文「{line}」",
+                    b.tag,
+                    k + 1
+                ));
+            }
+        }
+    }
+    errs
 }
 
 /// Whitespace removed and trailing sentence punctuation dropped, for verbatim
@@ -1137,6 +1232,45 @@ mod tests {
         // Spans two lines, or alters a word: rejected.
         let bad = ["乙。吠点", "丙等于丁"];
         assert_eq!(card_text_errors(&bad, &lines).len(), 2);
+    }
+
+    #[test]
+    fn bark_cards_carry_whole_sections() {
+        // As lint reads the body: whitespace removed, blank lines dropped.
+        let lines: Vec<String> = [
+            "一、甲",
+            "吠点：",
+            "①丙不等于丁。",
+            "②戊未确认。",
+            "二、乙",
+            "吠点：①己。",
+            "AI吠点：聊AI沸点，轻松识破吠点。",
+        ]
+        .iter()
+        .map(|l| l.to_string())
+        .collect();
+        assert_eq!(
+            bark_sections(&lines),
+            [vec!["丙不等于丁。", "戊未确认。"], vec!["己。"]]
+        );
+        let card = |tag: &str, points: &[&str]| card::BarkCard {
+            tag: tag.into(),
+            points: points.iter().map(|p| p.to_string()).collect(),
+        };
+        // Whitespace and a dropped full stop are fine.
+        let ok = [
+            card("A", &["丙 不等于 丁", "戊未确认。"]),
+            card("B", &["己"]),
+        ];
+        assert!(bark_card_errors(&ok, &lines).is_empty());
+        // A missing card, a missing point, an altered point.
+        assert!(bark_card_errors(&ok[..1], &lines)[0].contains("2 段吠点"));
+        let short = [card("A", &["丙不等于丁"]), card("B", &["己"])];
+        assert!(bark_card_errors(&short, &lines)[0].contains("1 条"));
+        let edited = [card("A", &["丙等于丁", "戊未确认"]), card("B", &["己"])];
+        let errs = bark_card_errors(&edited, &lines);
+        assert_eq!(errs.len(), 1, "{errs:?}");
+        assert!(errs[0].contains("第 1 条"));
     }
 
     #[test]

@@ -575,7 +575,7 @@ fn read_lf(path: &Path) -> Result<String, String> {
 }
 
 /// Images the visual reviewer should see, in review order: 省流卡, 速览图,
-/// covers, then each annotated screenshot followed by its `-raw` base (the
+/// 吠点卡, covers, then each annotated screenshot followed by its `-raw` base (the
 /// reviewer compares the two to confirm no source pixel was altered).
 /// `exists` answers for issue-relative paths. Missing images are reported,
 /// not silently dropped: a review that skipped one is not a full review.
@@ -597,6 +597,11 @@ fn attachments(spec: &Spec, exists: impl Fn(&str) -> bool) -> (Vec<Attachment>, 
     }
     if outputs.contains(&card::ROUNDUP_OUT) && !add(card::ROUNDUP_OUT, "速览聚合图") {
         warns.push(missing(card::ROUNDUP_OUT));
+    }
+    for out in spec.bark_outputs() {
+        if !add(out, "吠点卡") {
+            warns.push(missing(out));
+        }
     }
     // A 速览专帖 renders its covers (so they are required); a main post's
     // covers are generated images that exist only once picked.
@@ -841,6 +846,9 @@ fact = "a"
 tag = "A"
 main = true
 text = "a"
+[[bark]]
+tag = "A"
+points = ["b"]
 [[annot]]
 out = "41-x.png"
 title = "t"
@@ -989,6 +997,7 @@ gloss = "g"
         let all = [
             "images/00-tldr.png",
             "images/00-roundup.png",
+            "images/00-bark-1.png",
             "images/00-cover.png",
             "images/00-cover-wide.png",
             "images/41-x.png",
@@ -1001,15 +1010,16 @@ gloss = "g"
         assert!(warns.is_empty(), "{warns:?}");
         assert_eq!(att[0].label, "省流卡");
         assert_eq!(att[1].label, "速览聚合图");
-        assert_eq!(att[2].label, "封面");
-        assert_eq!(att[4].label, "批注图");
-        assert_eq!(att[5].label, "该批注图的原始底图");
+        assert_eq!(att[2].label, "吠点卡");
+        assert_eq!(att[3].label, "封面");
+        assert_eq!(att[5].label, "批注图");
+        assert_eq!(att[6].label, "该批注图的原始底图");
     }
 
     #[test]
     fn attachments_report_missing_images_but_skip_absent_covers() {
-        // No covers (not required for a main post), 42's image and 41's base
-        // are missing.
+        // No covers (not required for a main post); the 吠点卡, 42's image
+        // and 41's base are missing.
         let have = [
             "images/00-tldr.png",
             "images/00-roundup.png",
@@ -1017,13 +1027,14 @@ gloss = "g"
         ];
         let (att, warns) = attachments(&main_spec(), present(&have));
         assert_eq!(files(&att), have);
-        assert_eq!(warns.len(), 2, "{warns:?}");
-        assert!(warns[0].contains("41-x-raw.png"));
-        assert!(warns[1].contains("42-y.png"));
+        assert_eq!(warns.len(), 3, "{warns:?}");
+        assert!(warns[0].contains("00-bark-1.png"));
+        assert!(warns[1].contains("41-x-raw.png"));
+        assert!(warns[2].contains("42-y.png"));
         // Nothing is invented for an empty directory.
         let (att, warns) = attachments(&main_spec(), present(&[]));
         assert!(att.is_empty());
-        assert_eq!(warns.len(), 4); // tldr, roundup, two annotated images
+        assert_eq!(warns.len(), 5); // tldr, roundup, 吠点卡, two annotated images
     }
 
     #[test]
