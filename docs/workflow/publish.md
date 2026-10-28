@@ -23,7 +23,7 @@ Develata 在对话中说“已发布”，即授权 Claude 对当期完成下面
    - 凭据与会话状态（`.env`、cookies、storage-state）仍被 `.gitignore` 排除，且没有进入待提交集合。
 3. **提交**：`barking stage <期次目录>` 列出三批文件与建议提交信息；按 `AGENTS.md` 的提交约定依序 `barking stage <期次目录> --batch 1 --add` 后 `git commit`，再 `--batch 2`、`--batch 3`。第②批的提交信息要按组描述存档内容后再提交；工具只暂存精确路径，不提交。
 4. **推送**：先 `git log --oneline origin/main..HEAD`，除当期三批外还列出别的提交，就先问 Develata：“已发布”只授权推送当期三批（1025 期曾把三个此前未推送的规范改动一并推了出去）。确认后 `git push origin main`，再 `git fetch` 核对 `origin/main` 上的 `daily-scan.md` 与本地一致。
-5. **上传**：`cargo run --release --manifest-path tools/barking/Cargo.toml -- offsite <期次目录> --upload`，逐个核对远端大小一致。
+5. **上传**：`cargo run --release --manifest-path tools/barking/Cargo.toml -- offsite <期次目录> --upload`：每个远端目录先列一次，已有且大小一致的文件跳过；其余默认 4 路并发上传（单个文件失败自动重试，共 3 次；远端缺目录时，该目录的第一个文件单独先传），传完再列一次远端，逐个核对大小一致。网盘报请求过频时加 `--jobs 1` 串行。
 6. **回报**：各批提交哈希、推送结果、上传数量与失败项。
 
 ## 存储分工
