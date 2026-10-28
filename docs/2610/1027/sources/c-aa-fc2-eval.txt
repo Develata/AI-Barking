@@ -1,0 +1,383 @@
+FrontierCode 2.0 Benchmark | Artificial Analysis
+
+Artificial Analysis [/]
+ [/login]K
+
+Artificial Analysis [/]
+
+Models
+
+Coding Agents
+
+Image, Speech, Video
+
+Inference
+
+Leaderboards
+
+About
+
+AI Trends [/trends]
+
+ [/login]K
+
+All evaluations [/evaluations]
+
+FrontierCode 2.0 Benchmark
+
+Private Dataset [/evaluations?attribute=private-dataset]Intelligence Index [/evaluations?attribute=intelligence-index]Agentic [/evaluations?skill=agentic]Tool Use [/evaluations?skill=tool-use]Coding [/evaluations?skill=coding]Reasoning [/evaluations?skill=reasoning]Instruction Following [/evaluations?skill=instruction-following]
+
+Artificial Analysis' implementation of Cognition's FrontierCode 2.0, a private agentic coding benchmark of 132 tasks in real open-source repositories, graded on whether a maintainer would merge the agent's change.
+See example tasks [#example-tasks]
+
+Background
+
+FrontierCode is a coding benchmark from Cognition [https://cognition.com/blog/frontier-code-2.0], built with maintainers of open-source repositories. Each task asks an agent to make a change to a real open-source repository, and the benchmark measures whether the change is good enough for a maintainer to merge.
+
+We run all 132 tasks of FrontierCode 2.0. The tasks are private to avoid contamination.
+
+The FrontierCode verifier grades each attempt with the task's tests and a rubric of blocking and non-blocking checks. An attempt that fails any blocking check, or that the trajectory scanner flags for looking up the solution, scores 0. Other attempts get a weighted score across the rubric's criteria.
+
+We run every task three times with our Stirrup [https://github.com/ArtificialAnalysis/Stirrup] agent harness, capped at 500 turns, and weight every task equally in the average. Shell commands keep running in the background, so the agent can start a long build or test run, continue working, and check the result in a later turn. We use GPT-6 Luna (medium) as the LLM judge.
+
+Methodology
+
+All evaluations are conducted independently by Artificial Analysis. More information can be found in our FrontierCode 2.0 methodology [/methodology/intelligence-benchmarking#frontiercode-2-0].
+
+Related Links
+
+FrontierCode 2.0
+ [https://cognition.com/blog/frontier-code-2.0]
+FrontierCode 2.0 Methodology
+ [/methodology/intelligence-benchmarking#frontiercode-2-0]
+
+FrontierCode 2.0
+
+Claude Opus 5.5 (Max, Default Fallback) scores the highest on FrontierCode 2.0 with a score of 46.4%, followed by Claude Opus 5.5 (Xhigh, Default Fallback) with a score of 43.8% and GPT-6 Astra (Max) with a score of 42.4%
+
+Score [#results]Token Usage [#token-usage]Cost [#cost]Speed [#speed]Score vs. Release Date [#score-vs-release-date]Example Tasks [#example-tasks]
+
+Score
+
+FrontierCode 2.0: Score
+
+Mean score over three attempts per task (attempts that fail a blocking check or are flagged for looking up the solution score zero) · Independently benchmarked by Artificial Analysis
+
+28 of 77 models
+
+No publicly available API
+
+FrontierCode 2.0: Score vs. Cost per Task
+
+FrontierCode 2.0 score vs. average cost per task (USD)
+
+28 of 77 models
+
+Most attractive quadrant
+
+Pareto line
+
+AnthropicOpenAIGoogleKimiMetaSpaceXAIAlibabaDeepSeekZ AIXiaomiInclusionAIMiniMaxStepFunMistralReflectionNVIDIAThinking Machines
+
+Evaluation Cost per Task
+
+Average cost per task in the evaluation. Costs are split by input, cache hit, cache write, reasoning, and answer token pricing where canonical token counts are available.
+
+Token Usage
+
+Output Tokens per TaskScore vs. Output Tokens per TaskToken BreakdownScore vs. Output Tokens
+
+FrontierCode 2.0: Output Tokens per Task
+
+Output tokens used to run one task, broken down by reasoning and answer tokens
+
+28 of 77 models
+
+No publicly available API
+
+AnswerReasoning
+
+Evaluation Output Tokens per Task
+
+The average number of answer and reasoning tokens produced per benchmark task in this evaluation.
+
+Cost
+
+Cost per TaskTotal Cost to RunScore vs. Compute
+
+FrontierCode 2.0: Cost per Task
+
+Average cost per task (USD), broken down by input, cache hit, cache write, reasoning, and answer tokens
+
+28 of 77 models
+
+AnswerReasoningCache WriteCache HitInput
+
+Evaluation Cost per Task
+
+Average cost per task in the evaluation. Costs are split by input, cache hit, cache write, reasoning, and answer token pricing where canonical token counts are available.
+
+Speed
+
+Time per TaskScore vs. Time per Task
+
+FrontierCode 2.0: Time per Task
+
+Weighted average decode time (minutes) per task; excludes TTFT and overhead time · Lower is better
+
+28 of 77 models
+
+Evaluation Time per Task
+
+The weighted average time (minutes) per evaluation task. This is calculated by dividing output tokens per task by output speed, weighted by the relative weights of each benchmark in the evaluation.
+
+Score vs. Release Date
+
+FrontierCode 2.0: Score vs. Release Date
+
+28 of 77 models
+
+Most attractive region
+
+AnthropicOpenAIGoogleMetaKimiSpaceXAIAlibabaDeepSeekZ AIXiaomiInclusionAIMiniMaxStepFunMistralInstitute of Foundation ModelsReflectionNVIDIAThinking Machines
+
+Example Tasks
+
+Restart Generator Resolvers on Reset
+
+Repository: Mock Service Worker · Language: JavaScript
+
+Mock Service Worker is a library for mocking network requests in JavaScript. A user reports that resetHandlers() doesn't restart generator resolvers, and the task asks the agent to fix the bug.
+
+The task doesn't mention cleanup, but a library that discards a generator should close it so that the user's finally block runs. A fix that only drops the reference to the old generator restarts it as reported, but never closes it, so the cleanup below never runs. That fix fails the task.
+
+function* () {
+ try {
+ yield 'first'
+ return 'rest'
+ } finally {
+ cleanup() // never runs after a reset
+ }
+}
+
+Source: Cognition, FrontierCode 2.0 [https://cognition.com/blog/frontier-code-2.0]
+
+Click to expand
+
+Send Cached Analytics Events in Order
+
+Repository: PostHog Android SDK · Language: Kotlin
+
+When the device is offline, the PostHog Android SDK writes analytics events to disk and sends them the next time the app starts. At startup, the live queue sends new events while a legacy integration, PostHogSendCachedEventsIntegration.kt, sends the cached ones. The two race, and events reach the server out of order. The task asks the agent to fix the race.
+
+Scope blockers check that the agent leaves certain files unchanged. PostHogSendCachedEventsIntegration.kt is part of the SDK's public posthog.api surface, so a fix that deletes it breaks every app that references the class, and fails the task even though the race is gone. A passing fix moves cache loading into PostHogQueue.kt, removes the sending logic from the legacy integration, and leaves the public API unchanged.
+
+Source: Cognition, FrontierCode 2.0 [https://cognition.com/blog/frontier-code-2.0]
+
+Click to expand
+
+Explore Evaluations
+
+Artificial Analysis Intelligence Index v5.0
+
+A composite benchmark aggregating nine challenging evaluations to provide a holistic measure of AI capabilities across mathematics, science, coding, and reasoning.
+ [/evaluations/artificial-analysis-intelligence-index]
+AA-Briefcase v1.1: Agentic Knowledge Work Benchmark
+
+A private evaluation developed by Artificial Analysis for frontier agentic capability in long-horizon knowledge work, testing agents on realistic business workflows that require deliverables such as spreadsheets, presentations, and memos.
+ [/evaluations/aa-briefcase]
+AA-3D: Interactive 3D Experience Benchmark
+
+A benchmark developed by Artificial Analysis for how well AI models build interactive 3D experiences. Models work as agents in an offline sandbox via Stirrup to turn a written brief into a three.js scene, with Elo ratings derived from blind pairwise votes.
+ [/evaluations/aa-3d]
+APEX-Agents-AA Benchmark
+
+Artificial Analysis' implementation of the APEX-Agents benchmark, testing AI agents on long-horizon, cross-application tasks in professional-services environments with realistic application tooling.
+ [/evaluations/apex-agents-aa]
+AA-AnalystAgent Benchmark
+
+Artificial Analysis' data analysis benchmark, testing AI agents on their ability to work with spreadsheets and documents to answer quantitative questions a Business Analyst or Data Analyst would face day-to-day.
+ [/evaluations/aa-analyst-agent]
+AutomationBench-AA: Agentic SaaS Workflow Benchmark
+
+A benchmark measuring agentic task completion across simulated SaaS application environments, scoring the share of each task's objectives completed without guardrail violations.
+ [/evaluations/automationbench-aa]
+Harvey LAB-AA v1.1 Benchmark
+
+Artificial Analysis' implementation of Harvey's Legal Agent Benchmark (LAB), testing AI agents on real-world legal work from Harvey's dataset of 120 private tasks spanning 24 legal practice areas. v1.1, built in collaboration with Harvey, checks every deliverable against the task's source documents for hallucinations, so work that passes every rubric criterion but contains a material hallucination receives no credit. A panel of three judges grades each deliverable criterion-by-criterion.
+ [/evaluations/harvey-lab-aa]
+GDP.pdf Benchmark
+
+Artificial Analysis' implementation of Surge AI's GDP.pdf benchmark, testing whether language models can reason over long, real-world professional documents and satisfy detailed task-specific criteria.
+ [/evaluations/gdp-pdf]
+EnterpriseOps-Gym-AA Benchmark
+
+Artificial Analysis' independent implementation of ServiceNow's EnterpriseOps-Gym, an agentic benchmark testing whether LLM agents can complete stateful, multi-step enterprise workflows across eight business domains via live tool use, graded on the final state of the underlying databases.
+ [/evaluations/enterprise-ops-gym-aa]
+Terminal-Bench 4.0 Benchmark
+
+A harder 66-task benchmark of complex terminal work across software, machine learning, science, operations, security, hardware, and media, with recalibrated compute and time allowances and improved instructions, environments, and verifiers.
+ [/evaluations/terminalbench-4-0]
+Terminal-Bench-Science 0.1 Benchmark
+
+A 70-task benchmark of research workflows authored and reviewed by domain experts across the life, physical, earth, mathematical, and engineering sciences, each completed in a terminal and checked by its own set of tests.
+ [/evaluations/terminal-bench-science]
+FrontierCode 2.0 Benchmark
+
+Artificial Analysis' implementation of Cognition's FrontierCode 2.0, a private agentic coding benchmark of 132 tasks in real open-source repositories, graded on whether a maintainer would merge the agent's change.
+ [/evaluations/frontiercode-2-0]
+HLE-Diamond Benchmark
+
+A refined and updated 1,000-question set of Humanity's Last Exam, split evenly between reasoning and knowledge questions, with 272 questions that include an image.
+ [/evaluations/hle-diamond]
+AA-PersonalityBench: AI Personality & Communication Style Benchmark
+
+Measures how models communicate rather than whether they are correct: 30 judged personality traits rolled up into 8 indexes, plus 21 measured communication characteristics.
+ [/evaluations/aa-personalitybench]
+AA-Omniscience v1.1: Knowledge and Hallucination Benchmark
+
+A benchmark measuring factual recall and hallucination across various economically relevant domains.
+ [/evaluations/omniscience]
+GPQA Diamond Benchmark
+
+The most challenging 198 questions from GPQA, where PhD experts achieve 65% accuracy but skilled non-experts only reach 34% despite web access.
+ [/evaluations/gpqa-diamond]
+ITBench-AA Benchmark
+
+Artificial Analysis' implementation of IBM's ITBench benchmark, testing AI agents on Kubernetes incident root-cause analysis from offline incident snapshots. The agent inspects alerts, events, traces, and topology and identifies the contributing-factor entities (deployments, pods, namespaces, network policies, etc.) responsible for the failure.
+ [/evaluations/itbench-aa]
+MMMU-Pro Benchmark
+
+An enhanced MMMU benchmark that eliminates shortcuts and guessing strategies to more rigorously test multimodal models across 30 academic disciplines.
+ [/evaluations/mmmu-pro]
+IFBench Benchmark
+
+A benchmark evaluating precise instruction-following generalization on 58 diverse, verifiable out-of-domain constraints that test models' ability to follow specific output requirements.
+ [/evaluations/ifbench]
+MLCR-AA: Medical Long Context Reasoning Benchmark
+
+An open benchmark from Wisedocs measuring how well models reason over long, fragmented medical records, performing the multi-document synthesis claims professionals rely on when reviewing insurance and healthcare cases.
+ [/evaluations/mlcr-aa]
+Code2Video-AA Benchmark
+
+Artificial Analysis' implementation of HeyGen's Code2Video Bench, evaluating how well models create short product and brand videos from 114 design briefs using HyperFrames HTML.
+ [/evaluations/code2video-aa]
+HealthBench Benchmark
+
+OpenAI's HealthBench: 5,000 health conversations graded against physician-written rubrics, from emergency referrals to global health.
+ [/evaluations/healthbench]
+CritPt v2 Benchmark
+
+CritPt v2 is the revised version of CritPt, a benchmark designed to test LLMs on research-level physics reasoning tasks, featuring 70 composite research challenges. Models solve problems with a code-execution tool in an offline Linux sandbox.
+ [/evaluations/critpt-v2]
+GDPval-AA v2.1 Benchmark
+
+GDPval-AA v2.1 is Artificial Analysis' evaluation framework for OpenAI's GDPval dataset. It tests AI models on real-world tasks across 44 occupations and 9 major industries. Models are given shell access and web browsing capabilities in an agentic loop via Stirrup to solve tasks, with Elo ratings derived from blind pairwise comparisons.
+ [/evaluations/gdpval-aa]
+𝜏³-Banking Benchmark
+
+A fintech customer-support benchmark from the 𝜏-Knowledge framework that tests whether agents can navigate a large unstructured knowledge base and execute multi-step tool calls to resolve realistic banking workflows.
+ [/evaluations/tau3-banking]
+Terminal-Bench 2.1 Benchmark
+
+A verified refresh of Terminal-Bench 2.0: 89 curated tasks across software engineering, system administration, data processing, model training, and security, with environment and instruction fixes so scores reflect agent capability rather than environment gaps.
+ [/evaluations/terminalbench-2-1]
+FrontierCode 1.1 Benchmark
+
+Artificial Analysis' implementation of Cognition's FrontierCode 1.1, a private agentic coding benchmark that tests models on completing coding tasks in a way that would actually get merged by maintainers of real-world repositories.
+ [/evaluations/frontiercode]
+AA-LCR v1.1: Long Context Reasoning Benchmark
+
+A challenging benchmark measuring language models' ability to extract, reason about, and synthesize information from long-form documents ranging from 10k to 100k tokens (measured using the cl100k_base tokenizer).
+ [/evaluations/artificial-analysis-long-context-reasoning]
+SciCode Benchmark
+
+A scientist-curated coding benchmark featuring 288 test set subproblems from 80 laboratory problems across 16 scientific disciplines.
+ [/evaluations/scicode]
+Humanity's Last Exam Benchmark
+
+A frontier-level benchmark with 2,500 expert-vetted questions across mathematics, sciences, and humanities, designed to be the final closed-ended academic evaluation.
+ [/evaluations/humanitys-last-exam]
+CritPt Benchmark
+
+A benchmark designed to test LLMs on research-level physics reasoning tasks, featuring 71 composite research challenges.
+ [/evaluations/critpt]
+Terminal-Bench Hard Benchmark
+
+An agentic benchmark evaluating AI capabilities in terminal environments through software engineering, system administration, and data processing tasks.
+ [/evaluations/terminalbench-hard]
+𝜏²-Bench Telecom Benchmark
+
+A dual-control conversational AI benchmark simulating technical support scenarios where both agent and user must coordinate actions to resolve telecom service issues.
+ [/evaluations/tau2-bench]
+MMLU-Pro Benchmark
+
+An enhanced version of MMLU with 12,000 graduate-level questions across 14 subject areas, featuring ten answer options and deeper reasoning requirements.
+ [/evaluations/mmlu-pro]
+LiveCodeBench Benchmark
+
+A contamination-free coding benchmark that continuously harvests fresh competitive programming problems from LeetCode, AtCoder, and CodeForces, evaluating code generation, self-repair, and execution.
+ [/evaluations/livecodebench]
+MATH-500 Benchmark
+
+A 500-problem subset from the MATH dataset, featuring competition-level mathematics across six domains including algebra, geometry, and number theory.
+ [/evaluations/math-500]
+AIME 2025 Benchmark
+
+All 30 problems from the 2025 American Invitational Mathematics Examination, testing olympiad-level mathematical reasoning with integer answers from 000-999.
+ [/evaluations/aime-2025]
+Global-MMLU-Lite Benchmark
+
+A lightweight, multilingual version of MMLU, designed to evaluate knowledge and reasoning skills across a diverse range of languages and cultural contexts.
+ [/evaluations/global-mmlu-lite]
+
+ [/]
+Artificial Analysis
+
+Get notified about new articles
+
+Email addressSubscribe
+
+Artificial Analysis
+
+Explore
+
+LLM Leaderboard [/leaderboards/models]
+
+Image Arena [/image/arena]
+
+Video Arena [/video/arena]
+
+AI Agents [/agents/coding-agents]
+
+Evaluations [/evaluations]
+
+Products
+
+Optima [/optima]
+
+MicroEvals [/microevals]
+
+Model Recommender [/models/recommend]
+
+Data Playground [/data-playground]
+
+Image Lab [/image/image-lab]
+
+Company
+
+About [/about]
+
+Methodology [/methodology]
+
+Contact [/contact]
+
+Articles [/articles]
+
+Careers [/careers]
+
+X [https://x.com/ArtificialAnlys]LinkedIn [https://www.linkedin.com/company/artificial-analysis/]YouTube [https://www.youtube.com/@ArtificialAnalysisAI]Rednote [https://www.xiaohongshu.com/user/profile/69ea6345000000000d034c02]Discord [https://discord.gg/Mk298GPZ7V]
+
+© 2026 Artificial Analysis
+Terms of Use [/terms-of-use]Data Platform Terms [https://artificialanalysiscdn.com/legal/ProDataPlatformTerms.pdf]Privacy Policy [/privacy-policy]
+English
