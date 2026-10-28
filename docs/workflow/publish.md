@@ -31,7 +31,7 @@ Develata 在对话中说“已发布”，即授权 Claude 对当期完成下面
 | 存放处 | 内容 |
 |---|---|
 | GitHub（本仓库） | 只入库文字：发布正文、配图说明 `images/README.md`、`images/cards.toml`、`sources/` 中的文本（md、txt、json、jsonl、py、ps1 等）、`sources/offsite.tsv` |
-| OpenList（`openlist.develata.me`） | `images/` 下的全部图片（封面、省流卡、批注截图、备用图），以及 `sources/` 中的 PDF、WPS/DOC 文档、HTML、图片与音视频原件；逐个文件直传，不打压缩包 |
+| OpenList（`openlist.develata.me`） | `images/` 下的全部图片（封面、省流卡、速览聚合图、吠点卡、批注截图、备用图），以及 `sources/` 中的 PDF、WPS/DOC 文档、HTML、图片与音视频原件；逐个文件直传，不打压缩包 |
 
 - 分界写在根目录 `.gitignore`：`images/` 下所有 png、jpg、jpeg、webp、gif，和 `sources/` 下的 PDF、WPS/DOC 文档（2026-10-16 起）、HTML、图片与音视频。0924–1001 期原先已入库的图片与原件，已于 2026-10-02 全部补传 OpenList（417 个文件逐个核对远端大小一致）、记入各期 `offsite.tsv`，并用 `git filter-repo` 从 Git 历史中移出。
 - 没有图片的克隆里，`barking lint` 把 `offsite.tsv` 列出的图片视为存在；重渲卡片前，先从 OpenList 的同一路径取回 `-raw` 底图。
