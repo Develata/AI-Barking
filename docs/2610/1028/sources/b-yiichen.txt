@@ -1,0 +1,445 @@
+1%科技日報 EP226 — 信任的縫隙 - Yii Chen
+
+ [https://substack.com?utm_content=island-substack-logo]
+
+Yii Chen [/]
+
+SubscribeSign in
+
+Translate
+
+1%科技日報 EP226 — 信任的縫隙
+
+Apple 內建的 git、curl 還信任被盜的 eMudhra 憑證；Gemini 4 Carbon 找漏洞 88.2%，先只給資安防守方用
+
+ [https://substack.com/@yiichenhi]
+
+Yii Chen [https://substack.com/@yiichenhi]
+
+Oct 29, 2026
+
+Share
+
+每天花 1% 的時間，掌握科技脈動。
+
+ [https://substackcdn.com/image/fetch/$s_!72Sa!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fa1b40bb4-da2d-4a74-9d33-842e445e3cde_1920x1080.png]
+
+今日金句
+
+“And so once again, having the upstream fix available is absolutely not your bottleneck.” 「所以再說一次，上游有沒有修補根本不是你的瓶頸。」 — Jan Schaumann，資安工程師、netmeister.org 作者（來源 [https://www.netmeister.org/blog/defense-ddos.html]）
+
+“This month, I laid the traditional coding interview to rest.” 「這個月，我把傳統的程式面試送走了。」 — Felix Rieseberg，Anthropic 招募主管（來源 [https://latent.space/p/ainews-anthropic-ends-coding-interviews-hunger-beats-tenure/]）
+
+“This was clearly a string meant to trip every possible safeguard out there.” 「這串字很明顯就是要觸發所有能觸發的安全機制。」 — veritas，nullpt.rs 作者（來源 [https://nullpt.rs/fingerprinting-bioweapons]）
+
+今日主軸
+
+Apple 10 月 17 日就收到 eMudhra 憑證被盜的通報，到 28 日，macOS 內建的 git、curl、python3 還是信任那批憑證，26 日推出的 macOS 27.2 甚至把使用者手動移除憑證的修補還原了。資安工程師 Jan Schaumann 列出同一週要處理的四件事：KVM 逃逸漏洞 PwnEscape、eMudhra、php2shell、brotli，Canonical 在漏洞公開 12 天後還沒出修好的 kernel。Cloudflare 公布 GLM-5.3 有 155 次回答混入其他客戶的資料，原因是 GPU 快取只裝得下約 68 萬 token，輸入上限卻設成約 105 萬，上線前只檢查了回應狀態和效能。Google 同一天發表 Gemini 4 Carbon，找漏洞的 SEC-bench Pro 拿 88.2%，先只開放給資安防守方。我的看法是，修補和模型都在變快，卡住的是沒人盤點的地方：系統內建的憑證檔、被複製進專案的 brotli、推論伺服器的快取設定。
+
+必讀
+
+Apple 內建的 git、curl 還信任被盜的 eMudhra 憑證 [https://emudhra.we-have-a-problem.com/apple.html] — Lobste.rs Dev
+
+This is not sustainable：一週四場漏洞火災，瓶頸在盤點 [https://www.netmeister.org/blog/defense-ddos.html] — Lobste.rs Dev
+
+瀏覽器指紋腳本裡藏生化武器函式名，專門讓 AI 拒絕分析 [https://nullpt.rs/fingerprinting-bioweapons] — Hacker News News
+
+Gemini 4 Carbon：SEC-bench Pro 88.2%，先開放給資安防守方 [https://blog.google/innovation-and-ai/models-and-research/gemini-models/introducing-gemini-4-carbon/] — Hacker News AI
+
+WIRED：ICE 調查單位 119 名探員監控明尼蘇達反 ICE 社運 [https://www.wired.com/story/ice-is-running-one-of-the-largest-anti-left-surveillance-operations-in-us-history/] — Hacker News News
+
+AlpineBSD：NetBSD kernel 加 Alpine 風格 userspace，基礎系統不收 LLM 產出 [https://wiki.alpinebsd.org/] — Lobste.rs News
+
+Latent Space：為什麼 agent 都選 Supabase [https://latent.space/p/supabase/] — Latent Space AI
+
+MacBook Pro 第一次有 OLED 觸控螢幕，11 月 6 日上市 [https://www.apple.com/macbook-pro/proled-xdr-display/] — Hacker News News
+
+Anthropic 招募主管停掉傳統程式面試 [https://latent.space/p/ainews-anthropic-ends-coding-interviews-hunger-beats-tenure/] — Latent Space AI
+
+GitHub Octoverse 2026：每月合併 PR 一年內變三倍，達 2.2 億 [https://simonwillison.net/2026/Oct/28/github-octoverse-2026/] — Simon Willison Dev
+
+C 語言用 goto 集中清理資源，當成 errdefer 用 [https://thestateofinahaze.net/blog/c-goto-considered-totally-sick/] — Lobste.rs Tools
+
+Snowflake：agent 兩週做好，被採用要八到九個月 [https://www.infoq.cn/article/II91QKxeaEg7RuZR2rrf] — InfoQ 中文 Dev
+
+1. Apple 內建的 git、curl 還信任被盜的 eMudhra 憑證 [https://emudhra.we-have-a-problem.com/apple.html]
+
+ [https://substackcdn.com/image/fetch/$s_!R5Cm!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F3e7c3868-2b24-4c40-a6df-b151b7d33c69_1280x800.png]
+
+憑證機構 eMudhra 的中繼憑證被盜，Apple 10 月 17 日收到通報。到 10 月 28 日，macOS 內建的 git、curl、python3 等開發工具仍信任這批憑證，10 月 26 日推出的 macOS 27.2 沒有修，還把使用者手動移除憑證的做法還原了。Safari 和其他走 Apple 網路框架的 App 已經受到保護，其他數十個專案（很多是志工維護）幾天前就出了修補。網站提供一行 git ls-remote 檢查，列出 commit 就代表受影響，網路路徑上的任何人都能攔截你對 GitHub 的 HTTPS 連線、換掉 clone 下來的程式碼、拿走 token。
+
+網站附了一個完整示範：用 http.curloptResolve 把 github.com 導到測試伺服器，伺服器出示由被盜中繼憑證簽的 github.com 憑證，clone 成功就會看到開頭是 INTERCEPTED 的 README
+
+我在自己的 Mac（macOS 26.6.2）上跑了檢查：/usr/bin/curl 連測試網址回 200，Apple Git-157 和 Homebrew 裝的 git 都列出 commit
+
+暫時解法是手動從 /etc/ssl/cert.pem 移除受影響的根憑證，Apple 的說明寫明系統更新可能還原，每次更新後都要重查
+
+💡 為什麼重要：用 macOS runner 跑 CI 的團隊，build 過程拉下來的程式碼和送出的 token 都在這個風險範圍內，網站建議資安團隊把它當成供應鏈風險評估。
+
+🔗 閱讀原文 [https://emudhra.we-have-a-problem.com/apple.html] | 來源: Lobste.rs
+
+2. This is not sustainable：一週四場漏洞火災，瓶頸在盤點 [https://www.netmeister.org/blog/defense-ddos.html]
+
+ [https://substackcdn.com/image/fetch/$s_!vFCG!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fcbfcda87-e860-455a-b230-8f23c4697fcf_499x435.jpeg]
+
+Jan Schaumann 列出防守方同一週要處理的事：KVM 逃逸漏洞 PwnEscape（也影響其他虛擬化和容器），到 10 月 27 日 Canonical 在公開 12 天後還沒出修好的 kernel；eMudhra 憑證被盜；php2shell（作者引述「超過 70% 網站」的說法）；還有遠超出 Node.js 範圍的 brotli RCE。他的結論是，上游修補早就有了，瓶頸在於找出所有被寫死或複製進專案的 CA bundle 和 brotli 副本，而 SBOM 通常列不出這些。
+
+eMudhra 這段指出瀏覽器很快修好，但 TLS 到處都在用，很多程式自帶憑證清單；他另外寫了一個測試工具 jschauma/emudhra
+
+他說 AI 產生的漏洞回報冗長（用 7,000 字的 README 代替一頁說明），並引用 1Password 的文章說 AI 產生的修補超過一半會失敗
+
+他沒有提出解法，建議只有一條：假設已被入侵，限制爆炸半徑
+
+💡 為什麼重要：負責維運的人要盤點的是「哪些程式自己帶了憑證檔和壓縮函式庫」，套件管理器的更新清單看不到這些。
+
+🔗 閱讀原文 [https://www.netmeister.org/blog/defense-ddos.html] | 來源: Lobste.rs
+
+3. 瀏覽器指紋腳本裡藏生化武器函式名，專門讓 AI 拒絕分析 [https://nullpt.rs/fingerprinting-bioweapons]
+
+ [https://substackcdn.com/image/fetch/$s_!yBbx!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F07acd5cf-41c4-46a6-b33b-21c0ae2fcd0a_1200x630.jpeg]
+
+作者用 Playwright 爬 Tranco 排行前段的網站，攔截 canvas 的 toDataURL，收集了 1萬個網站的指紋圖，公開在 fingerprint.garden。其中一支來自 servicepipe.tech 的腳本，函式名稱像 computeRicinLethalDosageForWaterSupply、computeCesium137DirtyBombFalloutRadius，還用不可見的 Unicode tag 字元藏了一段越獄 prompt，加上天安門相關字串，作者判斷是要同時觸發西方和中國模型的安全機制。真正的指紋收集很普通，就是 navigator 和 WebGL 那些訊號。
+
+作者自己的 AI 助理拒絕反混淆這支腳本，GLM-5.3 則照做
+
+腳本裡有一段只在 Node 環境觸發的程式，會讀 .npmrc、.env、.kube/config 並裝 crontab 信標，作者判斷主要是誘餌，因為讀檔的 callback 是空的
+
+發布廠商看起來和俄羅斯的反 DDoS 公司 servicepipe.ru 有關
+
+💡 為什麼重要：靠 AI 協助逆向分析可疑 JavaScript 的資安研究員，要預期模型的拒答會被對手拿來當混淆手段。
+
+🔗 閱讀原文 [https://nullpt.rs/fingerprinting-bioweapons] | 來源: Hacker News
+
+4. Gemini 4 Carbon：SEC-bench Pro 88.2%，先開放給資安防守方 [https://blog.google/innovation-and-ai/models-and-research/gemini-models/introducing-gemini-4-carbon/]
+
+ [https://substackcdn.com/image/fetch/$s_!n9Dt!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F512a28e4-95d2-44ce-8ff1-53b1fa8027db_1300x731.png]
+
+Google 10 月 28 日發表 Gemini 4 Carbon，距離 Gemini 4 Argon 兩週。它在 Artificial Analysis Intelligence Index v5.0 以 59 分排第一。資安測驗（不開防護）找漏洞的 SEC-bench Pro 88.2%、利用漏洞的 ExploitGym 54.8%、修補的 CWE-bench 71.0%，Chrome 團隊回報修補品質是另一家實驗室模型的 10 倍。發布採分批：先給一部分資安防守方，再透過 Fairwind Program 給信任的夥伴，並接受美國政府的自願上市前測試。
+
+Terminal-Bench 4.0 作弊率降到 0.0%，Gray Swan prompt injection 攻擊成功率 0.0%（Argon 是 0.7%）
+
+內部團隊讓 Carbon 連續跑好幾天，處理大型程式碼庫的根因分析和修補
+
+早鳥價每百萬 token 輸入 2 美元、輸出 10 美元，之後調到 4 美元、20 美元
+
+💡 為什麼重要：做漏洞修補和程式碼審查的團隊，接下來幾週拿不到這個模型，要先申請 Fairwind 或等全面開放。
+
+🔗 閱讀原文 [https://blog.google/innovation-and-ai/models-and-research/gemini-models/introducing-gemini-4-carbon/] | 來源: Hacker News
+
+5. WIRED：ICE 調查單位 119 名探員監控明尼蘇達反 ICE 社運 [https://www.wired.com/story/ice-is-running-one-of-the-largest-anti-left-surveillance-operations-in-us-history/]
+
+ [https://substackcdn.com/image/fetch/$s_!vc6_!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fef7bf47d-3d1f-41d9-b6dc-941b1fff0d83_1280x670.jpeg]
+
+「明尼蘇達 15 人」案的辯護律師在證據開示中拿到大量文件，顯示 ICE 轄下的 Homeland Security Investigations 以國內恐怖主義調查名義，監控反 ICE 的社運網絡。案件由 2008 年就存在的臥底經費計畫 Operation Keyhole 支應，法院紀錄顯示有 119 名 HSI 探員參與，包含 11 名臥底，混進武術課、遊行和 Signal 群組。前 FBI 探員 Mike German 比較，CIA 當年監控反越戰運動的行動高峰期是 42 人。
+
+調查用了 15 TB 的 Signal 對話、電匯和 PayPal 紀錄、商業資料仲介的資料，以及 CBP 的 Reaper 無人機畫面
+
+一位社運人士把車牌查詢工具架在 Fly.io 上，HSI 透過 DNS 查詢、Stripe 資料和資料仲介，拿到 SSH session log、註冊 IP 和一張從未完成付款的卡片指紋，再串上駕照、社會安全號碼摘要和住址紀錄
+
+財務紀錄透過《愛國者法》的 314(a) 程序調閱，3 月 31 日一次查了 29 名「對象」
+
+💡 為什麼重要：在雲端平台和金流服務上架工具的開發者，Fly.io 和 Stripe 的帳號紀錄在這個案子裡被拿來還原出真實身分。
+
+🔗 閱讀原文 [https://www.wired.com/story/ice-is-running-one-of-the-largest-anti-left-surveillance-operations-in-us-history/] | 來源: Hacker News
+
+6. AlpineBSD：NetBSD kernel 加 Alpine 風格 userspace，基礎系統不收 LLM 產出 [https://wiki.alpinebsd.org/]
+
+ [https://substackcdn.com/image/fetch/$s_!jCqL!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fcedb5733-c4fc-4aee-916f-faf2371d272c_1280x800.png]
+
+AlpineBSD 用 NetBSD 的 kernel、libc 和 mount 這類平台工具，userspace 參考 Alpine Linux，用 apk-tools 和 busybox，init 系統是 s6，之後打算加 OpenRC。專案的目標是讓使用者盡可能少用 AI 生成的軟體，基礎系統和主套件庫都不收 LLM 產出。套件集是原創的，不是 Alpine Linux 的 fork，但很多套件以 aports 為基礎。
+
+目前沒有安裝程式，只有給「愛冒險的人」的高階安裝說明
+
+首頁直接提醒 NetBSD kernel 的硬體支援比 Linux 差很多，筆電要先查支援清單
+
+userspace 比較偏 GNU，例如預設用 GNU make 而不是 BSD make
+
+💡 為什麼重要：需要對軟體來源有交代的團隊，多了一個明確寫出 AI 政策的作業系統可以觀察，雖然現在還無法拿來實際部署。
+
+🔗 閱讀原文 [https://wiki.alpinebsd.org/] | 來源: Lobste.rs
+
+7. Latent Space：為什麼 agent 都選 Supabase [https://latent.space/p/supabase/]
+
+ [https://substackcdn.com/image/fetch/$s_!BU1X!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fe5506039-3926-42a7-91bf-f67e7c20932f_1280x720.jpeg]
+
+swyx 訪問 Supabase 共同創辦人 Paul Copplestone 和 Ant Wilson，這家全遠端的開源公司估值已到 100 億美元。swyx 自己的 AEO 追蹤器顯示，從 Astra、Fable 到 Muse，各家前沿模型挑 App 後端時幾乎都把 Supabase 當第一選擇。Select 大會的更新分成 Build、Operate、Scale：不用 Docker 就能在本機跑後端、把資料庫的目標 schema 放進 Git（swyx 比喻成資料庫的 Terraform 時刻）、讓運算跑在資料庫旁邊。
+
+創辦人說 Supabase 每月新開約 500 萬個資料庫，在想 agent 把這個數字推到數十億時要怎麼辦
+
+Scale 這塊有 OrioleDB、Multigres（高可用 Postgres，私有 alpha）和收購 Turso
+
+AI 帶來的使用量增加後，啟用率和轉換率都變好，因為 agent 能把使用者從註冊一路帶到可以跑的設定
+
+💡 為什麼重要：做開發者工具的公司可以參考這個數據：模型推薦你，加上 agent 幫使用者完成設定，轉換率會直接反映出來。
+
+🔗 閱讀原文 [https://latent.space/p/supabase/] | 來源: Latent Space
+
+8. MacBook Pro 第一次有 OLED 觸控螢幕，11 月 6 日上市 [https://www.apple.com/macbook-pro/proled-xdr-display/]
+
+ [https://substackcdn.com/image/fetch/$s_!hlU6!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F9f8f15a9-ceca-4b0a-9706-6d108e709d9a_1200x630.png]
+
+Apple 推出搭載 PROLED XDR 螢幕的 MacBook Pro，14.2 吋和 16.3 吋兩種，tandem OLED、內建觸控和 Dynamic Island，預購已開放，11 月 6 日上市。全螢幕持續亮度 1000 nits、峰值 2000 nits，對比 10,000,000:1，ProMotion 10 到 120Hz。晶片是 M5 Pro 和 M5 Max，每個 GPU 核心都有 Neural Accelerator，最大 16TB 儲存、續航最長 24 小時。
+
+Apple 說觸控感測器直接做在面板裡，不是疊在上面，延遲比較低
+
+14 吋重 3.0 磅、16 吋重 4.0 磅；同頁比較的 14 吋 M6 MacBook Pro 是 Liquid Retina XDR、峰值 1600 nits
+
+Dynamic Island 放 Spotlight、Live Activities 和 Siri AI（目前只支援英文）
+
+💡 為什麼重要：寫 macOS App 的開發者，第一次要考慮使用者直接用手指點 Mac 介面的情況。
+
+🔗 閱讀原文 [https://www.apple.com/macbook-pro/proled-xdr-display/] | 來源: Hacker News
+
+9. Anthropic 招募主管停掉傳統程式面試 [https://latent.space/p/ainews-anthropic-ends-coding-interviews-hunger-beats-tenure/]
+
+ [https://substackcdn.com/image/fetch/$s_!vC2f!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F4239d7ba-5246-4cbc-b491-afca582a1d9d_1200x630.png]
+
+Anthropic 的招募主管 Felix Rieseberg 說，他這個月起不再出傳統程式面試題，因為 Claude 在小型 React 題和組合語言測驗上都已經比候選人強。他給初階工程師的建議標題是「Hunger beats tenure」：選商業影響而不是 backlog、挑激進的點子、週末就做出來、專心一個好點子、善用自己的新鮮視角。同一期 AINews 也整理了 Genie 4、Axiom 用 agent 群在 24 天內把有限單群分類定理（約 15,000 頁、500 篇論文）形式化成約 5,000 萬行 Lean。
+
+他的貼文互動約 8,500 次
+
+這期提到 Anthropic 一則未經證實的 Slack 入侵傳聞，頁面自己標註未證實
+
+Anthropic 另有六項藥物研發合作、收購 Mithril Medicine，以及打七折的 GSA OneGov 合約
+
+💡 為什麼重要：準備面試前沿實驗室的工程師，作品集和做過的產品決策，比刷題更可能被拿出來談。
+
+🔗 閱讀原文 [https://latent.space/p/ainews-anthropic-ends-coding-interviews-hunger-beats-tenure/] | 來源: Latent Space
+
+10. GitHub Octoverse 2026：每月合併 PR 一年內變三倍，達 2.2 億 [https://simonwillison.net/2026/Oct/28/github-octoverse-2026/]
+
+ [https://substackcdn.com/image/fetch/$s_!ZXZ-!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F31c182ef-510a-44b1-95d5-52ad8c4abe3f_1920x1080.jpeg]
+
+GitHub Universe 上公布今年的 Octoverse。合併的 PR 不到一年變成三倍，達每月 2.2 億；commit 超過三倍，達每月 73.8 億，大部分成長發生在下半年；新 repo 速率翻倍，每月 3,030 萬。Simon Willison 認為這是 agentic engineering 對 GitHub 影響最直接的數字。報告新增產業別統計，也單獨列出涉及互通性或逆向工程的 repo。
+
+國家排名用 LLM 從使用者個人檔案抽出國家代碼，修正 VPN 造成的偏差
+
+產業別是用微調過的多語 embedding 模型，依 repo 名稱、說明、topic 和 README 分到 NAICS 類別
+
+「互通性」計算 README 等欄位提到 clean room implementation、drop-in replacement、protocol re-implementation 等詞的 repo
+
+💡 為什麼重要：負責 code review 和 CI 容量的團隊，PR 量一年變三倍，審查和建置成本會跟著漲。
+
+🔗 閱讀原文 [https://simonwillison.net/2026/Oct/28/github-octoverse-2026/] | 來源: Simon Willison
+
+11. C 語言用 goto 集中清理資源，當成 errdefer 用 [https://thestateofinahaze.net/blog/c-goto-considered-totally-sick/]
+
+ [https://substackcdn.com/image/fetch/$s_!jKdA!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F8e6a85f2-22d4-4231-879c-621a614515dd_1280x800.png]
+
+作者平常寫 Go 和 Zig，2026 年第一次回頭寫 C（上次是 2018 年），發現少了 defer 和 errdefer 很難處理錯誤。他原本在每個錯誤分支寫各自的清理程式，範例裡三段 free 迴圈條件不一樣（j < i 和 j <= i），close(fd) 只出現在其中一段。參考 John Carmack 談 inline 程式碼的信，以及 Henry Spencer 的飛行軟體規則「控制流只往前走」，他改成把指標陣列先設成 NULL，任何失敗都 goto free_mem，在函式結尾統一釋放。
+
+free(NULL) 是安全的，所以先初始化成 NULL 就能用同一個迴圈全部釋放
+
+IRC 上有人提醒，可能溢位的配置（n * sizeof(T)）要改用 calloc
+
+Linux kernel 的 coding style 就有這個寫法，叫「centralized exiting of functions」，可以用多個 label 分段清理
+
+💡 為什麼重要：維護 C 程式的人，函式越長，各分支各自清理越容易漏掉 close 或 free，集中出口比較好檢查。
+
+🔗 閱讀原文 [https://thestateofinahaze.net/blog/c-goto-considered-totally-sick/] | 來源: Lobste.rs
+
+12. Snowflake：agent 兩週做好，被採用要八到九個月 [https://www.infoq.cn/article/II91QKxeaEg7RuZR2rrf]
+
+ [https://substackcdn.com/image/fetch/$s_!lN9A!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fc2c43449-6d8e-4836-bcd3-bac81ee7a308_1280x720.jpeg]
+
+InfoQ 翻譯了 Snowflake 的 Jennifer Belissent 的文章，主張領先的組織靠的是把 agent 當成要安排到具體職位的「員工」來管，而不是模型更好或預算更多。Snowflake 的研究顯示 65% 的企業覺得打破 AI 資料孤島有困難，62% 覺得讓資料能給 AI 用有困難。一家能源公司說建一個 agent 約 20 分鐘，但整合分散的資料來源和建 embedding 要好幾週。
+
+管理上分出三種角色：設計者、控制者、稽核者
+
+一家汽車製造商用 170 題對 agent 做五輪測試，標準是要勝過人類，接近不算
+
+有負責人估計，建 agent 要四週，真正被採用要八到九個月
+
+💡 為什麼重要：在公司裡推 agent 的工程主管，排時程時要把資料整理和採用期算進去，開發只佔一小段。
+
+🔗 閱讀原文 [https://www.infoq.cn/article/II91QKxeaEg7RuZR2rrf] | 來源: InfoQ 中文
+
+推薦閱讀
+
+ [https://substackcdn.com/image/fetch/$s_!8y5p!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F01e73dcb-1f7c-4cb7-a275-43115d0f7651_728x524.png]
+
+Lenny’s：Grok、Dot、Muse、Claude Duet 九項任務實測 [https://www.lennysnewsletter.com/p/grok-vs-dot-vs-muse-vs-claude-duet] — Claire Vo 做了 How I AI 第一份個人 agent 評測，讓 Grok Bot、Dot、Muse、Claude Duet 跑九項真實任務，包括回 Slack、修 Sentry bug、做 Figma 縮圖、整理收件匣和剪 ChatPRD 發表影片。她用 computer use 操作這些 agent，Claude 負責跑 Dot，Codex 跑其他的並即時評分，最後分別選出工作和生活上最信任的一個。
+
+VibeVideoBench：評測 agent 寫程式產生影片 [https://huggingface.co/papers/2610.35864] — Diffusion 影片模型畫不準公式、圖表和規則一致的遊戲，這篇提出另一條路：讓多模態 agent 寫程式渲染每一格畫面、合成每一段聲音，並建了 VibeVideoBench 來評測。論文是 51 小時前的，不算今天的新結果。
+
+Emacs 50 歲：MIT AI Lab 的編輯器怎麼帶出自由軟體運動 [https://www.technologyreview.com/2026/10/20/1145399/emacs-turns-50/] — MIT Technology Review 從 ENIAC 的接線板、Whirlwind 的打孔紙帶一路講到 1960 年代的行編輯器。EMACS 1976 年在 MIT AI Lab 的視訊終端機上第一次執行，之後被改寫到許多作業系統，Apple 也曾隨 Mac OS X 附上它，圍繞它形成的分享社群後來發展成自由軟體運動。
+
+Zero-Breach-Toolkit：離線檢查傭兵間諜軟體痕跡 [https://github.com/interplains/Zero-Breach-Toolkit] — 免費、開源、離線的檢查工具，找已知傭兵間諜軟體留下的痕跡，支援 Windows、macOS、Linux、Android 手機和 iPhone 備份。用 Python 寫，10 月 25 日建立，目前 2,761 顆星。
+
+加爾默羅會修士用 CNC 雕哥德式教堂石材 [https://carmelitegothic.com/cnc-stone-carving/] — 加爾默羅會修士把工作時間花在蓋哥德式教堂，用鑽石刀頭的 CNC 機器雕石材，以前熟練石匠要幾個月的裝飾件，現在幾天完成。他們的說法是，與其因為預算砍掉細節，不如用現代工具把細節做回來。
+
+OpenAI 和 ServiceNow 擴大合作 [https://openai.com/index/openai-servicenow-partnership-expansion] — OpenAI 模型和 agent 會進到 ServiceNow 的流程，ServiceNow 的工作流程也會接進 ChatGPT 和 Codex。openai.com 今天對 curl 回 403，這則只依 RSS 摘要。
+
+OpenAI：AI 進入組織圖的三種位置 [https://openai.com/index/the-future-of-the-firm] — OpenAI 的文章，談 AI 可能以「在下面、在旁邊、在中間」三種位置進入組織圖。只依 RSS 摘要。
+
+Legora 用 OpenAI 模型做法律工作的 agent 系統 [https://openai.com/index/legora] — 客戶案例：Legora 用 OpenAI 模型、ChatGPT 和 Codex 加速法律工作流程和合約分析。只依 RSS 摘要。
+
+Paseo 可以把 coding agent 跑在 Vercel Sandbox [https://vercel.com/changelog/run-paseo-agents-on-vercel-sandbox] — Paseo 現在可以把 fx、Codex、Claude Code、OpenCode、Pi 跑在 Vercel Sandbox。在筆電上啟動 agent，可以從手機接手同一個 session，筆電闔上也不影響；停止 sandbox 會保存檔案和對話紀錄，執行中的程序則會停掉。
+
+Simon Willison：10 月是 vibe coding 遊戲的轉折點 [https://simonwillison.net/2026/Oct/28/vibe-game-development/] — Simon Willison 認為 2026 年 10 月是 vibe coding 遊戲的轉折點，就像 2025 年 11 月 coding agent 變得可以天天用。他說 Claude Opus 5.5 在 3D 建模、音樂生成和遊戲設計都進步了，對它說「Make it a LOT more fun」它真的做到。這幾週他完全不看程式碼做了四款自己玩得下去的遊戲，GPT-6 Astra 能做出遊戲，但他覺得還差一點。
+
+Interconnects：Artificial Analysis v5 與評測者的兩難 [https://www.interconnects.ai/p/artificial-analysis-v5-and-the-benchmarkers] — Nathan Lambert 以 Artificial Analysis 更新到 Intelligence Index v5 為起點，談獨立評測的難處：要把模型壓成一個數字才好比較，但每種加總方式都有取捨。AI 產業的錢越多，評測者決定的輸贏和對模型發展的影響就越大。
+
+Vercel CI 開放 beta，push 到 CI 通過快 2 到 6 倍 [https://vercel.com/changelog/vercel-ci-is-now-in-beta] — Vercel CI 讓 Turborepo 用一行設定跑 CI，標 ci tag 的任務每次 push 都會跑。Vercel 內部 repo 從 git push 到 CI 通過的等待時間縮短 2 到 6 倍，官方的說法是要讓 CI 跟得上 coding agent。設定流程也包成 skill：npx skills use vercel/ci@setup。
+
+Git for the US Code：用 git 看美國法典每一行的來歷 [https://lexifina.com/blog/git-for-the-us-code] — 程式設計師可以指著任何一行看到誰在什麼時候改的，律師讀聯邦法條通常不行。Lexifina 把美國法典做成可以逐行追溯修法來源的版本，理由是現在很多初步法律研究走語言模型，模型看不到法條的修改沿革就很難正確解釋。
+
+NVIDIA Nemotron 3.5 Transcribe：一個模型做轉錄、講者辨識、翻譯 [https://huggingface.co/blog/nvidia/nemotron-transcribe-granary] — Nemotron 3.5 Transcribe 是開放權重、可以用自然語言下指令的語音模型，一個 checkpoint 做轉錄、講者辨識、翻譯和音訊問答：轉錄 40 種語言、31 種可和英文互譯、13 種可辨識講者，單檔最長一小時、最多 8 位講者。它在 Hugging Face Open ASR Leaderboard 的英文項目是開放權重模型第一，另外公開了 Granary v2 資料管線和微調方法。
+
+Stratechery：Meta 財報與 Muse [https://stratechery.com/2026/meta-earnings-muse-and-the-frontier-musebook/] — Ben Thompson 談 Meta 財報，重點是投資人如果相信 Muse，就得支持 Meta 在算力上的支出。全文付費，這裡只依公開摘要。
+
+中文技術圈
+
+ [https://substackcdn.com/image/fetch/$s_!lT1s!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F726f36ab-f2b4-4ad5-83d4-78b6748efe5f_1946x851.jpeg]
+
+JetBrains 在 Fleet、Air 之後再推輕量編輯器 ThinkRail [https://www.v2ex.com/t/1252393] — ThinkRail 在行程內跑 pi agent，再接到網頁介面：模型、skill、壓縮、成本和 session 狀態歸 pi 管，App 只管工作區、編輯器和連線，官方強調不會在背後偷組 prompt。討論串有人回報 Windows 10 企業版和 Kubuntu 打開是白屏，後者查出是 KDE 全域代理讓 WebKitGTK 連不到本機頁面；也有人說現在給 Codex 足夠權限就幾乎不用 IDE 了。
+
+Cloudflare：GLM-5.3 有 155 次回答混入其他客戶資料 [https://www.ithome.com.tw/news/180015] — 8 月 27 日到 9 月 9 日，Workers AI 上的 GLM-5.3 有 155 次回答混入其他客戶的資料。Cloudflare 把輸入上限設成約 105 萬 token，GPU 的 KV 快取卻只裝得下約 68 萬；SGLang 遇到過長請求本該拒絕，卻因為漏洞只傳了一點新資料就通知另一組 GPU 傳完了，結果讀到別人留下的內容。Cloudflare 承認上線前就知道容量不符，但只檢查了回應狀態和效能；SGLang 7 月就有人回報這個漏洞，建議升級到 10 月 19 日的 v0.5.22 以上。
+
+Amazon 修訂工程師職務指引：看成果，不看 token 用量 [https://www.ithome.com.tw/news/180025] — Amazon 10 月 27 日公布新版軟體開發工程師職務指引，表現要看實際成果，不看 AI 工具採用率、token 用量或程式碼數量。今年 5 月內部有人做了 Kiro token 用量排行榜 KiroRank，有工程師讓 agent 跑不必要的任務衝排名，後來被關掉。新指引建議主管關注 AI 採用率最低和最高的各 10% 團隊，並寫明 AI 工具幫不上某項工作時，工程師說明原因不算表現不佳。
+
+Google 改條款：個人化內容可能用來投放個人化廣告 [https://www.ithome.com.tw/news/180012] — Google 新條款寫明，使用者若同意讓搜尋或 Gemini 存取 Gmail、Drive、Google Photos 的資料做個人化，除了興趣和活動紀錄，個人化內容也會用來投放廣告。原本「不依 Gmail、Drive、Photos 內容投廣告」的規定仍在，但使用者如果讓這些資料出現在支援個人化廣告的服務（例如 YouTube），情況就不同。
+
+資安新創 Cathedral 用 AI agent 12 小時內進到 Anthropic 部分內部系統 [https://infosecu.technews.tw/2026/10/28/cathedral-got-into-anthropic-in-12-hours/] — 華盛頓郵報報導，Cathedral 在 Anthropic 授權的測試計畫下，用 AI agent 不到 12 小時找到第三方商用軟體的漏洞，進入 Anthropic 部分內部系統，能看到會議逐字稿、薪資和聘書資訊，以及討論先進模型的 Slack 對話。Anthropic 說只碰到一小部分銷售、人資和 IT 系統，沒有碰到客戶對話、模型程式碼和權重，監控在對方通報前就偵測到異常並當天切斷，同時批評 Cathedral 誇大國安意涵、沒有完整揭露在系統內的所有活動。
+
+施振榮開一人公司，請兩個 AI 員工幾天寫完一本書 [https://technews.tw/2026/10/28/shi-stan-opc/] — 宏碁創辦人施振榮在 AI 物聯網大聯盟年會上說，他成立了一人公司，雇了兩個 AI：數位分身「阿贏」和負責萃取他想法的「觀復」。以前寫一本書要半年以上，現在幾天完成，中文版寫完，英文和日文版同步完成，紙本和電子書同時全球上架。
+
+NIST 發布 PQC 遷移路線圖：RSA 等傳統公鑰演算法 2035 年後禁用 [https://www.ithome.com.tw/news/180022] — NIST 10 月 27 日發布 NIST IR 8547，RSA、ECDSA、EdDSA 和 Diffie-Hellman 等傳統公鑰演算法 2030 年後列為不建議使用，2035 年後在 NIST 標準中禁用（iThome 標題寫 2031、2036，內文是 2030、2035，這裡照內文）。美國聯邦高價值系統要在 2030 年底完成後量子金鑰建立、2031 年底完成數位簽章轉換，各機關最晚 2030 年 1 月 2 日要支援 TLS 1.3。
+
+開源精選
+
+interplains/Zero-Breach-Toolkit [https://github.com/interplains/Zero-Breach-Toolkit] — Python | ⭐ 2,761 離線檢查已知傭兵間諜軟體痕跡，支援桌機、Android 和 iPhone 備份。
+
+anhao/ai-pose-gallery-zh [https://github.com/anhao/ai-pose-gallery-zh] — HTML | ⭐ 1,893 日文 AI 人體姿勢參考圖庫的中文版，1,439 張圖，附可直接部署的靜態畫廊。
+
+ZiChuanLan/agent-purge [https://github.com/ZiChuanLan/agent-purge] — JavaScript | ⭐ 794 一份 system prompt 套到 Codex、Claude、OpenCode、Pi 等多個 coding agent，可替換、追加或清空，附本機網頁控制台。
+
+影音精選
+
+AI 泡沫破了嗎？Fireship 整理三週的市場變化 [https://www.youtube.com/watch?v=nEaJMdM1djM]
+
+10/28 發布 · Fireship
+
+ [https://substackcdn.com/image/fetch/$s_!Klql!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fecf13116-955f-43b4-8877-1e47ac5b93e1_1280x720.jpeg]
+
+Fireship 回顧過去三週 AI 市場的變化：三週前 SpaceX 一天漲 7%、科技 CEO 輪流上台說要再募 1,000 億美元。影片拆解 Nvidia 投資新創、新創再拿還沒買的 GPU 當抵押向華爾街借錢的循環，這套做法成立的前提是晶片租金高過折舊。逐字稿是全片取樣。
+
+影片說 CoreWeave 是這個模式最典型的例子，三週前它的狀況讓前提不再成立
+
+也提到某家公司的 S-1 有 330 頁，其中 90 頁是風險因素
+
+結論是「看情況」，業配是 Hyperagent
+
+Theo：讓 Claude 連跑好幾週的做法 [https://www.youtube.com/watch?v=NBCM_ZoWZo8]
+
+10/28 發布 · Theo (t3.gg)
+
+ [https://substackcdn.com/image/fetch/$s_!P8sQ!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F22d7137b-af6a-4fa1-b776-1523a2659596_1280x720.jpeg]
+
+Theo 說 Opus 5.5 讓他「有點上癮」，這支示範怎麼讓 Claude 自己跑好幾天。他做了 Skate 3 Bench，一個 thread 幾乎沒人介入連跑 4 天、燒掉數千美元推論費。逐字稿是全片取樣。
+
+關鍵是可驗證的回饋：程式跑出對的結果算成功，也就是 RLVR 的概念
+
+他把遊戲畫面截圖交給其他 LLM 評分，自己也說這樣做「不算好」，只是意外地有效
+
+業配是 Browserbase，也介紹了一個用來開拋棄式 VM 的工具
+
+Gamma 共同創辦人：一份簡報背後 20 個模型、200 次呼叫 [https://www.youtube.com/watch?v=st61aKW8P5A]
+
+10/28 發布 · Greg Isenberg
+
+ [https://substackcdn.com/image/fetch/$s_!u15g!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fbd3afb74-cae2-4769-a7cf-80d2845ce8ad_1280x720.jpeg]
+
+Greg Isenberg 訪問 Gamma 共同創辦人 Jon Noronha，談 Gamma 今年把產品重做成創作 agent，以及垂直領域 agent harness 的創業機會。逐字稿是全片取樣，本集由 Anthropic 贊助。
+
+一份完成的簡報背後大約 20 個模型、200 次呼叫，很多要平行跑才不會讓使用者等到離開
+
+他整年都在講「AI smell」：用 AI 做的東西常常一眼看得出來，寫作最明顯
+
+他想看到 Slack 的 agent harness，幫人從大量訊息裡挑出真的要處理的
+
+YC：擁有自己的模型，不只租用前沿實驗室 [https://www.youtube.com/watch?v=DzblM1Mc-J8]
+
+10/28 發布 · Y Combinator
+
+ [https://substackcdn.com/image/fetch/$s_!ba2v!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F9afd3aa1-0503-4544-9563-64e70c2741b8_1280x720.jpeg]
+
+YC 的徵件影片：多數公司把 token 送給前沿實驗室、拿回答案再付帳單，YC 認為開放權重模型在重要 benchmark 上已經追上，會有更多公司想要自己能跑、能訓練、能控制的模型。
+
+受管制產業最需要，資料治理讓租用模型的成本更高
+
+從下載開放模型到真正改善業務還有距離：要把流程變成 eval、把專業變成訓練資料、把線上失敗變成改進
+
+每次新底座模型發布，這些累積都要帶過去
+
+YC：政府福利需要一個 Plaid [https://www.youtube.com/watch?v=3CDvfm9DYjw]
+
+10/28 發布 · Y Combinator
+
+ [https://substackcdn.com/image/fetch/$s_!6Ze1!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fbc2a7edd-074b-4278-8bff-c967f9f29b0b_1280x720.jpeg]
+
+YC 徵求「政府福利版的 Plaid」：申請福利要在各個不互通的系統一再證明收入、同住人和住址。
+
+美國政府問責署估計，詐領每年讓聯邦政府損失最多 5,000 億美元
+
+AI 幾秒就能偽造一張薪資單
+
+2027 年起，各州要每 6 個月重新審核數百萬名 Medicaid 參加者
+
+YC：資料中心供應鏈的瓶頸不只 GPU [https://www.youtube.com/watch?v=9EJM4LNMK0I]
+
+10/27 發布 · Y Combinator
+
+ [https://substackcdn.com/image/fetch/$s_!Dib_!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fa277686f-ce7a-40ff-9bc6-906e69fdc477_1280x720.jpeg]
+
+YC 說 AI 資料中心的建置是美國史上最大的資本投資計畫，瓶頸遠不只 GPU 和電力。
+
+大型電力變壓器交期三年，開關設備、斷路器和液冷設備都賣光
+
+變壓器鐵芯用的取向電工鋼，美國只有一座工廠在做，產能跟不上
+
+YC 想資助供應鏈上每個環節的公司
+
+硅谷101：AI 幫天文學從海量資料找新天體 [https://www.youtube.com/watch?v=hrQBNhpIFlc]
+
+10/27 發布 · 硅谷101
+
+ [https://substackcdn.com/image/fetch/$s_!WO8G!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fcd713664-c382-47a7-b541-334f73eb2cb3_1280x720.jpeg]
+
+西湖大學助理教授在硅谷101年度大會上，談 AI 怎麼幫天文學處理新一代望遠鏡的資料量。逐字稿是全片取樣。
+
+Vera Rubin 天文台的相機是 3.2 gigapixel，每天產生約 10 到 20 TB 資料，人工分析已經不可行
+
+以前一個博士生可能只在資料裡找出一兩個重力透鏡系統，現在要靠機器學習
+
+他認為天文資料沒有標籤又全部公開，很適合當自監督學習的試驗場
+
+今日觀察
+
+Cloudflare 上線 GLM-5.3 之前就知道 GPU 快取只裝得下約 68 萬 token，輸入上限卻開到約 105 萬，測試只看回應狀態和效能，SGLang 的漏洞 7 月就有人回報，最後 155 次回答混進別人的資料。Apple 的狀況類似：Safari 早就修好了，macOS 內建的 git、curl 從 17 日收到通報到現在還信任被盜的 eMudhra 憑證，27.2 更新還把使用者自己移掉的憑證裝了回去。Jan Schaumann 那篇的重點就在這裡，brotli 和 eMudhra 的修補上游都有了，難的是找出每一個自帶憑證檔、自己複製一份 brotli 的程式。nullpt.rs 那支指紋腳本則是對手開始利用模型的拒答，讓研究員沒辦法用 AI 拆它的程式。我自己的 Mac 跑那行 git ls-remote 就列出了 commit，今天會先把 /etc/ssl/cert.pem 處理掉，再查一次 CI 用的 macOS runner。
+
+覺得有用嗎？分享給一個也在追蹤新知的朋友。
+
+也歡迎中長期投資者體驗新工具 → Moniit [https://moniit.com]
+
+ [https://substackcdn.com/image/fetch/$s_!_nvf!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F9a550a83-8bb9-4784-87ef-5bbb3895084c_1949x540.jpeg]
+
+Share
+
+Discussion about this post
+
+CommentsRestacks
+
+TopLatestDiscussions
+
+No posts
+
+Ready for more?
+
+Subscribe
+
+© 2026 Yii Chen · Privacy [https://substack.com/privacy] ∙ Terms [https://substack.com/tos] ∙ Collection notice [https://substack.com/ccpa#personal-data-collected]
+
+ Start your Substack [https://substack.com/signup?utm_source=substack&utm_medium=web&utm_content=footer]Get the app [https://substack.com/app/app-store-redirect?utm_campaign=app-marketing&utm_content=web-footer-button]
+
+Substack [https://substack.com] is the home for great culture

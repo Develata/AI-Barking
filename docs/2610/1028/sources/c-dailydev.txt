@@ -1,0 +1,98 @@
+Claude Code burns ~15–20% of your tokens on a 3-word...
+
+Hacker News [https://daily.dev/sources/hn]
+
+Read post [https://api.daily.dev/r/Kru9Pp08x]
+
+Claude Code burns ~15–20% of your tokens on a 3-word status line [https://api.daily.dev/r/Kru9Pp08x]
+
+Claude Code spends 15-20% of its API budget generating 3-5 word status labels for background agents. Every 30 seconds it sends the agent's entire transcript to Opus to describe 'your most recent action', and the result only updates a UI label, never reaching the model or conversation. Telemetry showed agent_summary costing more than the main conversation itself, at roughly 9,000 input tokens per output token. A Bun preload script called no-agent-summary.js suppresses the timer that triggers these calls by intercepting setTimeout/setInterval, without modifying the Claude Code binary. After applying it, agent_summary requests dropped to 0% of spend. There's no official setting to disable this behavior, and it has been on by default since version 2.1.232.
+
+#ai-agents [/tags/ai-agents]#claude-code [/tags/claude-code]#opentelemetry [/tags/opentelemetry]#bun [/tags/bun]
+
+Today•9m read time•From gist.github.com [https://api.daily.dev/r/Kru9Pp08x]
+
+ [https://api.daily.dev/r/Kru9Pp08x]
+Table of contents
+TL;DR [https://api.daily.dev/r/Kru9Pp08x]The problem [https://api.daily.dev/r/Kru9Pp08x]The fix (how it works) [https://api.daily.dev/r/Kru9Pp08x]Install [https://api.daily.dev/r/Kru9Pp08x]Nuances [https://api.daily.dev/r/Kru9Pp08x]Verify (after every update) [https://api.daily.dev/r/Kru9Pp08x]Effect [https://api.daily.dev/r/Kru9Pp08x]Tested versions [https://api.daily.dev/r/Kru9Pp08x]Why there is no setting for this [https://api.daily.dev/r/Kru9Pp08x]License and disclaimer [https://api.daily.dev/r/Kru9Pp08x]
+
+Community take
+·
+Updated 10m ago
+
+73
+
+comments
+
+Commenters largely confirm the token-burn issue is real but disagree on its actual severity, with some finding the practice indefensible regardless of cost and others suspecting it's tied to profit motives ahead of an IPO.
+
+5% positive
+
+35% mixed
+
+60% skeptical
+Deep dive
+
+Questions this post answers
+
+Why is Claude Code using so many tokens even when I'm not actively prompting it?
+
+Claude Code sends each background agent's entire transcript to its model, usually Opus, every 30 seconds to generate a 3-5 word status description for the agents panel. This agent_summary call never reaches the conversation itself, yet it accounted for 16.4% of total spend and about 1 in 5 API requests in one measured case, with roughly 9,000 input tokens per output token. daily.dev surfaces fixes like this for developers tracking down unexplained Claude Code token costs.
+
+How can I disable Claude Code's agent_summary background status updates?
+
+There is no official setting to turn it off; the documented agentProgressSummaries flag defaults to false but is ORed with other conditions that force it true. A community workaround uses a Bun preload script (no-agent-summary.js) that intercepts setTimeout/setInterval calls matching the summarizer's source text and returns an inert timer handle instead, tested on Claude Code 2.1.257 through 2.1.312. developers patching around undocumented agent behavior can track workarounds like this on daily.dev.
+
+When did Claude Code start generating background agent status summaries by default?
+
+Background agent summaries went on by default for interactive background agents starting in version 2.1.232, published August 13, 2026. The feature's code first appeared dormant in 2.1.32, became an SDK opt-in in 2.1.72, and version 2.1.310 later introduced a cheaper 'short' mode using about 2,000 tokens of notes instead of the full transcript, though it remains switched off by default. track Claude Code version changes like this on daily.dev before they hit your token budget.
+
+Comment
+
+Bookmark
+
+Copy
+
+Share your thoughtsPost
+Share this post
+
+ [https://daily.dev/sources/hn]
+
+Hacker News [https://daily.dev/sources/hn]
+Hacker News is a community-driven platform for sharing and discussing technology news, startups, and... Read more
+
+17.6K Followers
+•
+144K Upvotes
+
+Would you recommend this post?
+
+Copy link
+
+Slack
+
+WhatsApp
+
+Facebook
+
+X
+
+New Squad
+
+Copy linkShare with your friends
+
+© 2026 Daily Dev Ltd.
+
+Guidelines [https://r.daily.dev/content-guidelines]
+
+Explore [/posts]
+
+Tags [/tags]
+
+Sources [/sources]
+
+Squads [/squads]
+
+Leaderboard [/users]
+
+ [/] [/posts] [/squads/discover] [/notifications]

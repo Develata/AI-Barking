@@ -1,0 +1,125 @@
+{
+  "url": "https://api.github.com/repos/anthropics/claude-code/issues/86879",
+  "repository_url": "https://api.github.com/repos/anthropics/claude-code",
+  "labels_url": "https://api.github.com/repos/anthropics/claude-code/issues/86879/labels{/name}",
+  "comments_url": "https://api.github.com/repos/anthropics/claude-code/issues/86879/comments",
+  "events_url": "https://api.github.com/repos/anthropics/claude-code/issues/86879/events",
+  "html_url": "https://github.com/anthropics/claude-code/issues/86879",
+  "id": 5158961787,
+  "node_id": "I_kwDON91aY88AAAABM3-Cew",
+  "number": 86879,
+  "title": "Feature request: a supported way to disable the agent_summary spinner (22.7% of requests, ~18% of weighted tokens in a subagent-heavy session)",
+  "user": {
+    "login": "rflcrz",
+    "id": 6145989,
+    "node_id": "MDQ6VXNlcjYxNDU5ODk=",
+    "avatar_url": "https://avatars.githubusercontent.com/u/6145989?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/rflcrz",
+    "html_url": "https://github.com/rflcrz",
+    "followers_url": "https://api.github.com/users/rflcrz/followers",
+    "following_url": "https://api.github.com/users/rflcrz/following{/other_user}",
+    "gists_url": "https://api.github.com/users/rflcrz/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/rflcrz/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/rflcrz/subscriptions",
+    "organizations_url": "https://api.github.com/users/rflcrz/orgs",
+    "repos_url": "https://api.github.com/users/rflcrz/repos",
+    "events_url": "https://api.github.com/users/rflcrz/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/rflcrz/received_events",
+    "type": "User",
+    "user_view_type": "public",
+    "site_admin": false
+  },
+  "labels": [
+    {
+      "id": 8190926415,
+      "node_id": "LA_kwDON91aY88AAAAB6DeeTw",
+      "url": "https://api.github.com/repos/anthropics/claude-code/labels/enhancement",
+      "name": "enhancement",
+      "color": "A2D9CE",
+      "default": true,
+      "description": "New feature or request",
+      "archived_at": null,
+      "archived_by": null
+    },
+    {
+      "id": 8223769435,
+      "node_id": "LA_kwDON91aY88AAAAB6izDWw",
+      "url": "https://api.github.com/repos/anthropics/claude-code/labels/platform:macos",
+      "name": "platform:macos",
+      "color": "93A5FF",
+      "default": false,
+      "description": "Issue specifically occurs on macOS",
+      "archived_at": null,
+      "archived_by": null
+    },
+    {
+      "id": 8566350905,
+      "node_id": "LA_kwDON91aY88AAAAB_pgkOQ",
+      "url": "https://api.github.com/repos/anthropics/claude-code/labels/area:cost",
+      "name": "area:cost",
+      "color": "ededed",
+      "default": false,
+      "description": "",
+      "archived_at": null,
+      "archived_by": null
+    },
+    {
+      "id": 9119047308,
+      "node_id": "LA_kwDON91aY88AAAACH4mejA",
+      "url": "https://api.github.com/repos/anthropics/claude-code/labels/area:agents",
+      "name": "area:agents",
+      "color": "ededed",
+      "default": false,
+      "description": null,
+      "archived_at": null,
+      "archived_by": null
+    }
+  ],
+  "state": "open",
+  "locked": false,
+  "assignees": [
+
+  ],
+  "milestone": null,
+  "comments": 7,
+  "created_at": "2026-08-15T10:29:21Z",
+  "updated_at": "2026-10-29T09:49:07Z",
+  "closed_at": null,
+  "assignee": null,
+  "author_association": "NONE",
+  "issue_field_values": [
+
+  ],
+  "type": null,
+  "active_lock_reason": null,
+  "sub_issues_summary": {
+    "total": 0,
+    "completed": 0,
+    "percent_completed": 0
+  },
+  "issue_dependencies_summary": {
+    "blocked_by": 0,
+    "total_blocked_by": 0,
+    "blocking": 0,
+    "total_blocking": 0
+  },
+  "body": "## Request\n\nProvide a supported way to disable the `agent_summary` timer (the 3-5 word subagent spinner text) — an env var, a `settings.json` key, or coverage under an existing flag.\n\n**Version:** 2.1.233 · **Platform:** darwin 25.6.0 · **Entrypoint:** cli\n\n## Why\n\nIn a subagent-heavy session it is a large, invisible share of consumption. Measured over one 4-hour session (27 subagents, 1,496 requests mapped from raw payloads captured with `OTEL_LOG_RAW_API_BODIES`):\n\n| kind | calls | cache read | cache write | output | raw tokens | raw % | weighted % |\n|---|---:|---:|---:|---:|---:|---:|---:|\n| real agent turns | 1,076 | 193,219,620 | 5,209,321 | 825,201 | 199,321,158 | 70.4% | 72.7% |\n| **`agent_summary`** | **339** | **61,560,341** | **254,270** | **21,966** | **62,757,361** | **22.2%** | **18.0%** |\n| suggestion | 37 | 10,117,116 | 9,370 | 229 | 10,145,363 | 3.6% | 2.5% |\n| task-notification | 36 | 9,583,910 | 205,636 | 45,758 | 9,835,376 | 3.5% | 3.8% |\n\nWeighted at Opus 5 list rates (reads 0.1×, 5m writes 1.25×, 1h writes 2×, output 5×).\n\n**22.7% of all API requests in the session**, producing 21,966 output tokens total (~65 per call) of cosmetic status text.\n\nEach call re-sends the subagent's entire conversation history plus the full tool schema, on `claude-opus-5`, every 30 seconds per *active* subagent. Cost therefore scales with fan-out and wall-clock duration, not with useful work: a session with three concurrent long-running subagents pays six of these per minute.\n\n## Why gating it should be safe\n\nThe call is already architecturally decoupled from the agent it describes — from the 2.1.233 bundle:\n\n```js\nawait eW({\n  promptMessages:[Sn({content:mXS(p)})],\n  querySource:\"agent_summary\", forkLabel:\"agent_summary\",\n  maxTurns:1, skipTranscript:true, skipCacheWrite:true,\n  canUseTool: async () => ({behavior:\"deny\", message:\"No tools needed for summary\"}),\n})\n```\n\nIt forks context (`forkContextMessages`) rather than mutating it, denies all tools, caps at one turn, writes no cache, and is excluded from the transcript. The summary never re-enters the agent's context. Suppressing it cannot change any real turn — with it disabled, every other request in the session is byte-identical.\n\nThere is already a conditional at the call site (`let Z = l ? (…) => { KEf(…) } : void 0`), so a gate exists structurally; it just isn't reachable by configuration.\n\n## Suggested options, in preference order\n\n1. **A dedicated flag** — `CLAUDE_CODE_DISABLE_AGENT_SUMMARY=1`, or a `settings.json` key. I checked the binary's `CLAUDE_CODE_*` string table for `summ|spin|agent`: no matches, so nothing exists today.\n2. **Cover it under `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`.** This call fits that category well — purely cosmetic, no effect on agent behavior. If it is already covered, documenting that would be enough and I'll close this.\n3. **Make the 30s interval configurable.** `var fXS = 30000` is read via `i.intervalMs ?? fXS`, and no caller passes `intervalMs` — plumbing that through to config would let users trade update latency against tokens.\n\n## Secondary observation\n\nThese calls carry `skipTranscript: true`, so they appear in **no** transcript. Any transcript-based cost tooling — including users' own — silently understates real token consumption by this amount. Even were the calls kept, emitting them to the transcript (or to OTel usage metrics) would make the spend visible.\n\nRelated: #86876 (subagent resume drops injected `role:\"system\"` messages), from the same investigation.\n",
+  "closed_by": null,
+  "reactions": {
+    "url": "https://api.github.com/repos/anthropics/claude-code/issues/86879/reactions",
+    "total_count": 11,
+    "+1": 11,
+    "-1": 0,
+    "laugh": 0,
+    "hooray": 0,
+    "confused": 0,
+    "heart": 0,
+    "rocket": 0,
+    "eyes": 0
+  },
+  "timeline_url": "https://api.github.com/repos/anthropics/claude-code/issues/86879/timeline",
+  "performed_via_github_app": null,
+  "state_reason": null,
+  "pinned_comment": null
+}

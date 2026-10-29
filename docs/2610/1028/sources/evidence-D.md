@@ -1,0 +1,51 @@
+# 1028 期 取证 D 组：速览（evidence-D）
+
+执行方：Claude Haiku 5.5（model ID claude-haiku-5-5）。状态用词按派工单：已找到 / 部分支持 / 与说法不符 / 未找到一手来源。时刻一律北京时间（UTC+8），原文只给日期的写“官方未给时刻”。下面摘句均为原文逐字。
+
+## 事实清单
+
+| # | 说法（派工单线索） | 级 | 一手来源 URL | 原文摘句（逐字） | 存档 | 条件／口径／时区 | 状态 |
+|---|---|---|---|---|---|---|---|
+| D1 | GitHub Copilot Memory GA；Dreaming 为主动开启的 public preview；改仓库指令走 PR | L1 | https://github.blog/changelog/2026-10-28-github-intelligence-puts-your-code-context-and-history-to-work/ | “GitHub Copilot Memory … is now generally available on paid Copilot plans.” / “Copilot dreaming, now in public preview, …” / “Dreaming is opt-in.” / “Changes to checked-in skills and instructions are proposed in pull requests for your team to review.” | d-d1-copilot-changelog.html / .txt | 发布：October 28, 2026（官方未给时刻）。Memory 限付费计划；Dreaming 个人与仓库都需用户或管理员主动开启；会消耗 AI credits（“Dream runs consume AI credits.”） | 已找到 |
+| D1a | 93%／42% 为会话占比 | L1 | 同上 | “Among the Copilot CLI sessions reviewed during the public preview where the agent used memory, 93% showed better adherence to developer preferences and 42% showed more efficient workflows attributed to the memories included in the session context.” | 同上 | 限定词：仅限公开预览期间、已审阅的 Copilot CLI 会话中“agent 使用了 memory”的那部分；“attributed to the memories” 为厂商归因。不是全部会话占比，也未给样本量 | 部分支持（“会话占比”少了范围限定，见勘误） |
+| D2 | OpenRouter 默认路由改版；TTFT p50 1007→837 ms；每千请求成本 $1.25→$1.32 | L1 | https://openrouter.ai/blog/announcements/how-we-rebuilt-provider-routing/ | 表格：“TTFT p50 … 1,007 ms 837 ms 16.9% lower”；“Cost per K requests $1.25 $1.32 6.0% higher”；“Cost per M tokens $0.301 $0.324 … 7.3% higher”（表格串接文本，7.3% 为据此推读）。正文：“we split over 24 million requests with 103 billion input tokens evenly between the old and new routing algorithms” / “over one full week”。 | d-d2-openrouter-routing.html / .txt | 署名 Scott Morse，·10/28/2026（官方未给时刻）。实验为 OpenRouter 自家平台在自家流量上的 switchback 实验，即厂商自测；“measured the per-model impact across a representative sample of open source models”。原文亦写：“It can [cost more] …”，成本上升 6.0%（派工单未提） | 已找到（数字与口径核对一致；“厂商自测”口径成立） |
+| D3 | Particle-1 基于 DeepSeek V4.1 Flash 后训练；厂商称输出 token 少 28.4%–52.2%；API 可用、非开放权重 | L1（厂商；Vercel 为合作方官方 changelog） | https://particle.ai/blog/introducing-particle-1 ；https://vercel.com/changelog/particle-1-is-now-available-on-ai-gateway | “Particle-1, post-trained on DeepSeek V4.1 Flash, sees large improvements in token efficiency using around ~45% fewer tokens on average across a wide variety of tasks.”；“Across these benchmarks, Particle-1 uses 28.4%–52.2% fewer output tokens and achieves 34.4%–51.6% lower average cost per task … than DeepSeek V4.1 Flash. Pass@1 rates are within the confidence intervals of the base model.”；“Particle-1 is available today through the Particle API.”；Vercel：“Particle-1 from Particle AI is now available on AI Gateway … It is post-trained on DeepSeek V4.1 Flash” | d-d3-particle-1.html / .txt；d-d3-vercel-particle.html / .txt | Particle 博文：Oct 28, 2026（官方未给时刻）；Vercel：28 Oct 2026（未给时刻）。“28.4%–52.2%”限于四个基准（DeepSWE 1.1、Terminal-Bench 2.1、ReactBench、ADE Bench）、对比对象仅为 DeepSeek V4.1 Flash、指标为 output tokens；“~45%”是博文概述中的平均说法。准确率“within the confidence intervals of the base model”（自测）。原文未出现“open weights”“open-weight”或“Hugging Face”等字样，**未找到“非开放权重”的原文支持** | 部分支持（底座、区间、API 可用已找到；“非开放权重”未找到原文依据） |
+| D4 | GitHub Octoverse：Agent 起草 PR，9 月超 40%，3 月约 17% | L1 | https://github.blog/news-insights/octoverse/octoverse-commits-pushes-reach-new-highs-in-2026-as-developers-build-with-agents/ | “As of September, developers start more than 40% of pull requests with an agent. In March, it was 17%.”；正文：“By September 2026, more than 40% of pull requests on GitHub started with an agent’s first draft, up from 17% in March. That is 110 million in September alone, about 6x March’s volume.”；定义：“Agent-started pull request: A pull request whose first draft came from a coding agent that we can detect.”；“Agent signal: … It is a floor, since not all agent use may be detected.” | d-d4-octoverse.html / .txt | 页面日期 October 28, 2026（官方未给时刻）。口径：Octoverse 年度为 2025-10-01 至 2026-09-30；指标“include public and private repositories”（除非另注）；“起草”限于可检测到的 agent（“detectable agents only”，见行业一节）；数字是下限。原文写的是 “17%” 不是 “约 17%” | 已找到（口径需带“可检测”限定） |
+| D5 | Google Connected Apps 平台预览；Search 与 Gemini 统一入口；分阶段开发者预览；50+ 为累计 | L1 | https://blog.google/innovation-and-ai/technology/developers-tools/connected-apps-one-place/ | “today we’re launching the preview of our Connected Apps Platform, a unified way for more app developers to bring their capabilities directly into Gemini and Search.”；“We're opening access in phases, and will add more developers, markets, and Google products over the coming months. Sign up for the preview …”；“We’ve launched more than 50 Connected Apps between Search and Gemini …” | d-d5-google-connected-apps.html / .txt（html 约 0.99 MB，未超 1 MB） | 页面日期 Oct 28, 2026（官方未给时刻）。“50+”原文只写 “We’ve launched more than 50 Connected Apps”，**未注明统计截止时间**；“累计”是派工单的推读，原文无此词 | 部分支持（预览与分阶段已找到；“累计”未原文证实） |
+| D6 | MicroZig 禁用 LLM：10/28 生效，禁 LLM 生成代码与文字，禁讨论是否用了 AI；HN 50282865 | L1（项目官方仓库，行为准则文件） | https://github.com/ZigEmbeddedGroup/microzig/blob/main/CODE_OF_CONDUCT.md （版本：commit ec880d3005645d96e7fcb323b140e5f46437e383 与 ebe5c77e4e8e08e5d288ca04eff9c3f6ab0478d9） | “## Strict No LLM / No AI Policy / This policy takes effect October 28th, 2026.”（#1103 版末句多一句 “New PRs, issues, or comments are subject to this policy going forward.”，#1104 版删去）；“No LLM-generated content, whether it be code or prose.”；“No LLMs for editing, including fixing spelling or grammatical errors.”；“No LLMs for translation.”；“No LLMs for brainstorming and then sharing the results of that brainstorming”；“No LLMs for finding bugs.”；“No talking about use of chatbot/LLM services.” | d-d6-microzig-coc-1103.txt/.headers（约 3.7 KB）；d-d6-microzig-coc-1104.txt/.headers；d-d6-microzig-coc-main.html/.txt；d-microzig-coc-commits.json | 生效日期写为 October 28th, 2026（无时区）。引入该条的提交 #1103 为 2026-10-29T00:13:46Z = **北京 10-29 08:13:46**；#1104 修订为 2026-10-29T00:37:14Z = **北京 10-29 08:37:14**。即写入时刻晚于所称生效日。原文未给“禁讨论是否用了 AI”的完整表述，最接近的是 “No talking about use of chatbot/LLM services.” | 已找到（生效日与禁令范围均已找到；派工单“禁讨论”口径可保留，但应按原文写作“禁谈论 chatbot/LLM 服务的使用”） |
+| D7 | NVIDIA Nemotron 3.5 Transcribe：40 语言，约 34B 总参数、4.3B 激活，批处理优先 | L1 | https://huggingface.co/blog/nvidia/nemotron-transcribe-granary | “NVIDIA Nemotron 3.5 Transcribe is an open-weight, promptable model …”；“it transcribes 40 languages, translates 31 of them to or from English, and attributes speakers in 13.”；“It handles recordings up to an hour long and labels up to eight speakers.”；“about 4B active parameters versus 24B for the model it ties”（AA 对比）；“Transcribe processed 100 hours of audio in under three minutes on one NVIDIA RTX PRO 6000 Blackwell Server Edition GPU, using the forthcoming NVFP4 quantized version. Results were measured on 30-second clips at high concurrency.” | d-d7-nemotron-transcribe.html / .txt | 页面日期 October 28, 2026（官方未给时刻）。参数：HF 仓库名为 “NVIDIA-Nemotron-3.5-Transcribe-30B-A4B”，HF 列表徽标显示 “34B”，两者不一致；原文找不到 “4.3B”，只有 “about 4B active parameters” / “approximately 4B”。“批处理优先”在原文中找不到（只有 “high-throughput” 测速描述） | 部分支持（40 语言已找到；参数见勘误；“批处理优先”未找到） |
+| D8 | Stack Overflow 月提问不足 1000（备选主帖，先按速览核） | L1 为 API 计数；HN 线索 | https://api.stackexchange.com/2.3/questions?site=stackoverflow&fromdate=<起>&todate=<止>&pagesize=1&filter=total （起止见下） | 计数（JSON `{"total":N}`）：2025-09 = 5072；2026-06 = 1701；2026-07 = 1175；2026-08 = 1019；2026-09 = 969；2026-10（至 10-29 11:41 UTC，约 28.5 天）= 963 | d-se-count-2025-09.json、d-se-count-2026-06.json、d-se-count-2026-07.json、d-se-count-2026-08.json、d-se-count-2026-09.json、d-se-count-2026-10.json | 时间窗按 UTC 整月：2025-09 为 1756684800–1759276800；2026-06 为 1780272000–1782864000；2026-07 为 1782864000–1785542400；2026-08 为 1785542400–1788220800；2026-09 为 1788220800–1790812800；2026-10 为 1790812800–1793274061。北京整月边界相差 8 小时。原站 HN 链接 data.stackexchange.com/stackoverflow/query/1926661 被 Cloudflare 质询拦截（403），未绕过，未取得原站数字 | 部分支持（只有 2026-09 低于 1000；2026-07 与 2026-08 高于 1000；2026-10 为未满月的部分值，见勘误） |
+
+## HN 热度（barking heat，北京时间，分数／评论）
+
+| 条目 | HN 条目 | 分数／评论 | 时刻（北京） |
+|---|---|---|---|
+| D1 | 无直接命中（“Copilot Memory” 0 条，“Copilot Dreaming” 0 条） | — | — |
+| D2 | 无直接命中（“rebuilt provider routing” 0 条；“OpenRouter” 10 条均与本文无关） | — | — |
+| D3 | 50277764 Particle-1 | 16 分 / 6 评 | 10-29 01:45:39 |
+| D4 | 50280770（同标题）；50284748（同 URL，另次提交） | 1 分 / 0 评；2 分 / 0 评 | 10-29 04:55:08；10-29 13:00:27 |
+| D5 | 无直接命中（“Connected Apps Platform” 2 条，均无关） | — | — |
+| D6 | 50282865 MicroZig to Adopt Strict No LLM / No AI Policy | 51 分 / 评论 66 条（heat 工具计数，含嵌套） | 10-29 08:30:37 |
+| D7 | 50275128 Nvidia Nemotron 3.5 Transcribe: open ASR for 40 languages | 124 分 / 21 评 | 10-28 23:17:53 |
+| D8 | 50282454 StackOverflow now gets fewer than 1000 questions a month | 519 分 / 评论 427 条（heat 工具计数，含嵌套） | 10-29 07:35:02（原 created_at 2026-10-28T23:35:02Z） |
+
+Reddit：8 条查询全部失败（old.reddit.com 重定向登录页，非 JSON）。未绕过，记为失败。
+
+## 扫描说法勘误
+
+1. **D1 “93%／42% 是会话占比”**：原文范围是“公开预览期间、已审阅的 Copilot CLI 会话中，使用了 memory 的会话”，42% 是归因于记忆的效率改善。不是全体会话占比，应写清范围。
+2. **D3 “API 可用、非开放权重”**：原文只有 “available today through the Particle API”，没有“非开放权重”的表述，也没有“开放权重”的表述。“非开放权重”未找到原文依据。“28.4%–52.2%”也只限于四个基准、对 DeepSeek V4.1 Flash、指标为 output tokens。
+3. **D4 “3 月约 17%”**：原文为 “17%”，“约”是改写。另“40%”的口径是“可检测到的 agent 起草”，原文称是下限。
+4. **D5 “50+ 是累计”**：原文 “We’ve launched more than 50 Connected Apps”，无统计截止时间，“累计”未在原文出现。
+5. **D6 “10/28 生效”**：原文 “takes effect October 28th, 2026”，但引入该条的提交为北京 10-29 08:13:46（#1103），修订于 08:37:14（#1104）。#1104 删去了 “New PRs, issues, or comments are subject to this policy going forward.” 另派工单未列的禁令还包括：禁编辑（含拼写修正）、禁翻译、禁头脑风暴后分享结果、禁用于找 bug。
+6. **D7 参数**：“约 34B 总参数”有 HF 徽标 34B 为据，但仓库名为 30B-A4B，两者不一致，未取舍；“4.3B 激活”原文不存在，原文为 “about 4B active” / “approximately 4B”；“批处理优先”原文未找到。
+7. **D8 “月提问不足 1000”**：API 计数显示只有 2026-09（969）低于 1000；2026-07（1175）与 2026-08（1019）高于 1000；2026-10 为未满月值 963（28.5 天）。WorkBuddy 所称 2026-09 = 961、10/1–29 = 947、2025-09 = 5044 与本次 API 计数（969、963、5072）不同，未取舍，两者均记录。
+8. **D2、D3、D4、D5、D7 的时间**：均为官方只给日期（官方未给时刻）。
+
+## 未完成项
+
+- D5：未核对 Connected Apps 开发者文档（developers.google.com/connected-apps）的预览条件与“50+”的统计截止，原因是时间限制。
+- D8：原站 data.stackexchange 查询被拦截；只用了 API，API 与原站口径是否一致未核。
+- D3：未核 Particle 模型页的开放权重与许可（若有）。
+- Reddit 热度：全部失败，未补。
+- 速览未收条目以外的媒体转述：未取（派工单 D 组不要求）。

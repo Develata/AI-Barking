@@ -1,0 +1,114 @@
+{
+  "url": "https://api.github.com/repos/anthropics/claude-code/issues/104358",
+  "repository_url": "https://api.github.com/repos/anthropics/claude-code",
+  "labels_url": "https://api.github.com/repos/anthropics/claude-code/issues/104358/labels{/name}",
+  "comments_url": "https://api.github.com/repos/anthropics/claude-code/issues/104358/comments",
+  "events_url": "https://api.github.com/repos/anthropics/claude-code/issues/104358/events",
+  "html_url": "https://github.com/anthropics/claude-code/issues/104358",
+  "id": 5985153252,
+  "node_id": "I_kwDON91aY88AAAABZL4w5A",
+  "number": 104358,
+  "title": "[FEATURE] Persist per-request usage for every billed request (incl. skipTranscript forks), and write cost-state incrementally",
+  "user": {
+    "login": "rabitlord1324",
+    "id": 72464822,
+    "node_id": "MDQ6VXNlcjcyNDY0ODIy",
+    "avatar_url": "https://avatars.githubusercontent.com/u/72464822?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/rabitlord1324",
+    "html_url": "https://github.com/rabitlord1324",
+    "followers_url": "https://api.github.com/users/rabitlord1324/followers",
+    "following_url": "https://api.github.com/users/rabitlord1324/following{/other_user}",
+    "gists_url": "https://api.github.com/users/rabitlord1324/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/rabitlord1324/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/rabitlord1324/subscriptions",
+    "organizations_url": "https://api.github.com/users/rabitlord1324/orgs",
+    "repos_url": "https://api.github.com/users/rabitlord1324/repos",
+    "events_url": "https://api.github.com/users/rabitlord1324/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/rabitlord1324/received_events",
+    "type": "User",
+    "user_view_type": "public",
+    "site_admin": false
+  },
+  "labels": [
+    {
+      "id": 8190926415,
+      "node_id": "LA_kwDON91aY88AAAAB6DeeTw",
+      "url": "https://api.github.com/repos/anthropics/claude-code/labels/enhancement",
+      "name": "enhancement",
+      "color": "A2D9CE",
+      "default": true,
+      "description": "New feature or request",
+      "archived_at": null,
+      "archived_by": null
+    },
+    {
+      "id": 8566350905,
+      "node_id": "LA_kwDON91aY88AAAAB_pgkOQ",
+      "url": "https://api.github.com/repos/anthropics/claude-code/labels/area:cost",
+      "name": "area:cost",
+      "color": "ededed",
+      "default": false,
+      "description": "",
+      "archived_at": null,
+      "archived_by": null
+    },
+    {
+      "id": 9119047308,
+      "node_id": "LA_kwDON91aY88AAAACH4mejA",
+      "url": "https://api.github.com/repos/anthropics/claude-code/labels/area:agents",
+      "name": "area:agents",
+      "color": "ededed",
+      "default": false,
+      "description": null,
+      "archived_at": null,
+      "archived_by": null
+    }
+  ],
+  "state": "open",
+  "locked": false,
+  "assignees": [
+
+  ],
+  "milestone": null,
+  "comments": 0,
+  "created_at": "2026-10-22T18:26:53Z",
+  "updated_at": "2026-10-22T18:29:26Z",
+  "closed_at": null,
+  "assignee": null,
+  "author_association": "NONE",
+  "issue_field_values": [
+
+  ],
+  "type": null,
+  "active_lock_reason": null,
+  "sub_issues_summary": {
+    "total": 0,
+    "completed": 0,
+    "percent_completed": 0
+  },
+  "issue_dependencies_summary": {
+    "blocked_by": 0,
+    "total_blocked_by": 0,
+    "blocking": 0,
+    "total_blocking": 0
+  },
+  "body": "\n## Problem\n\nNothing Claude Code writes to disk lets a tool reconstruct what a session cost. In sub-agent-heavy sessions a transcript-based sum lands **×1.35–2.13 below** Claude Code's own `cost-state` (14 sessions, 2.1.273–2.1.300, Linux/WSL2, auto mode). Claude Code's internal accounting is correct: list prices applied to `cost-state`'s own token counts reproduce its `costUSD` exactly. The problem is that the records on disk are incomplete.\n\n1. **Background requests leave no row.** Requests with `querySource` `agent_summary`, `auto_mode` (both classifier stages), `compact`, `away_summary`, `generate_session_title`, `extract_memories`, `prompt_suggestion` and others are billed, but appear neither as `assistant` rows nor as `api-request` rows. In our logs `api-request` only ever carries `repl_main_thread:*` and `agent:custom:*`.\n2. **Sub-agent output is missing from transcripts** in auto mode since 2.1.278 (#100830).\n3. **`cost-state` is the only authoritative on-disk total, and it is written only at process exit.** It is cumulative per accumulation (a clean `/exit` + `--resume` continues it under the same `startTime`), per model only, with no query source and no 5-minute / 1-hour split of cache writes. **A killed process writes none**, so its spend cannot be recovered at all.\n4. **The live total** (`cost.total_cost_usd`) reaches only the statusline command. Hooks and headless sessions never see it.\n\n## Size\n\nOne 36-hour 2.1.300 session (main thread on Opus 5.5, 28 sub-agents on Opus 5.5 / Fable 5.1). Each figure is what `cost-state` reports beyond the sum of all transcripts:\n\n| | Opus 5.5 | Fable 5.1 |\n|---|---:|---:|\n| output | +2.93 M | +1.32 M |\n| uncached input | +1.16 M | +3.43 M |\n| cache read | +338 M | +133 M |\n| cache write | +1.61 M | +1.05 M |\n\nPriced, about 42 % of the gap is output missing from the transcripts and about 58 % is requests with no row (#86879 covers the largest of these, `agent_summary`).\n\n## Asks\n\n1. A usage row for **every billed request**, including `skipTranscript` forks: `query_source`, served model, request id, timestamp, and the full `usage` with the `cache_creation` 5m/1h split. A dedicated record type would keep the conversation chain untouched.\n2. Write `cost-state` **incrementally** (at each turn end or on an interval), not only at exit, and include a per-`query_source` breakdown and the cache-write split.\n3. Expose the live session cost (including sub-agents and background requests) in hook payloads (`Stop`, `SubagentStop`) and in headless `-p` output while the session is running.\n\nRelated: #100830, #86879, #97819, #98193.\n",
+  "closed_by": null,
+  "reactions": {
+    "url": "https://api.github.com/repos/anthropics/claude-code/issues/104358/reactions",
+    "total_count": 0,
+    "+1": 0,
+    "-1": 0,
+    "laugh": 0,
+    "hooray": 0,
+    "confused": 0,
+    "heart": 0,
+    "rocket": 0,
+    "eyes": 0
+  },
+  "timeline_url": "https://api.github.com/repos/anthropics/claude-code/issues/104358/timeline",
+  "performed_via_github_app": null,
+  "state_reason": null,
+  "pinned_comment": null
+}

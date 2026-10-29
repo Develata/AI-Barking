@@ -1,0 +1,129 @@
+{
+  "url": "https://api.github.com/gists/c3905705cc4205e5de3011fa2e74efce",
+  "forks_url": "https://api.github.com/gists/c3905705cc4205e5de3011fa2e74efce/forks",
+  "commits_url": "https://api.github.com/gists/c3905705cc4205e5de3011fa2e74efce/commits",
+  "id": "c3905705cc4205e5de3011fa2e74efce",
+  "node_id": "G_kwDOE_snktoAIGMzOTA1NzA1Y2M0MjA1ZTVkZTMwMTFmYTJlNzRlZmNl",
+  "git_pull_url": "https://gist.github.com/c3905705cc4205e5de3011fa2e74efce.git",
+  "git_push_url": "https://gist.github.com/c3905705cc4205e5de3011fa2e74efce.git",
+  "html_url": "https://gist.github.com/flamerix-ai/c3905705cc4205e5de3011fa2e74efce",
+  "files": {
+    "README.md": {
+      "filename": "README.md",
+      "type": "text/markdown",
+      "language": "Markdown",
+      "raw_url": "https://gist.githubusercontent.com/flamerix-ai/c3905705cc4205e5de3011fa2e74efce/raw/ad44c8a0cf916f2dc6d2992e3af9d3bba52c85c0/README.md",
+      "size": 12027,
+      "truncated": false,
+      "content": "# Claude Code burns ~15–20% of your tokens on a 3-word status line. Here's how to turn it off\n\nby [Flamerix AI](https://flamerix.ai) · MIT License\n\n> Tested on Linux, Claude Code 2.1.257–2.1.312 (see Tested versions). The binary is not modified (`BUN_OPTIONS=--preload`). An update can silently undo it, so see Verify.\n\n## TL;DR\n\n```sh\ncurl -fsSL https://gist.githubusercontent.com/flamerix-ai/c3905705cc4205e5de3011fa2e74efce/raw/no-agent-summary.js -o ~/.local/share/no-agent-summary.js\nclaude daemon stop --any\nBUN_OPTIONS=\"${BUN_OPTIONS:+$BUN_OPTIONS }--preload $HOME/.local/share/no-agent-summary.js\" claude\n```\n\nTo make it permanent for every Claude Code process, see [Install](#install).\n\n## The problem\n\nEvery ~30 seconds, for every background agent, Claude Code sends that agent's **entire\ntranscript** to the agent's own model (usually Opus) and asks it to \"describe your most recent\naction in 3-5 words\". The answer only updates the agent's status line in the agents panel; it\nnever reaches the model or your conversation. There is no setting that turns it off, and since\n2.1.232 (August 2026) it has been on by default.\n\nThe anomaly was detected by [DRIM](https://flamerix.ai) in Claude Code's OpenTelemetry export:\ngrouping `claude_code.api_request` events by `query_source` showed `agent_summary` costing **more than the main conversation itself**.\n\n| `query_source = agent_summary` | week before the hook | 2 days after |\n|---|---|---|\n| share of all Claude Code spend | **16.4 %** (main conversation: 15.7 %) | **0 %** |\n| share of all API requests | **19.7 %**, about 1 in 5 | **0 %** |\n| part of that spend on Opus | 96 % | — |\n| input tokens per output token | ≈ 9,000 : 1 | — |\n\nSpend here means Claude Code's own per-request estimate (`cost_usd`), not an invoice: on a\nsubscription, what you lose is rate-limit headroom. We are not the only ones who measured it:\n[#86879](https://github.com/anthropics/claude-code/issues/86879) collects four independent\nmeasurements of 18–26 %.\n\n## The fix (how it works)\n\n`no-agent-summary.js` is a Bun preload (~80 lines of code). It wraps `setTimeout`/`setInterval`;\nwhen a callback's source text contains a summarizer anchor (e.g. the `[AgentSummary] Timer fired`\nlog line), it returns an inert handle instead of arming the timer. Every other timer passes\nthrough untouched. In the OpenTelemetry export the suppressed requests are\n`claude_code.api_request` events with `query_source = agent_summary`.\n\nWhy a timer hook rather than something simpler: the module ships as precompiled Bun bytecode, so\nediting its JS text inside the binary changes nothing, and the API client does not go through a\nwrapped `globalThis.fetch`. But `Function.prototype.toString` still returns a callback's source\neven when it runs from bytecode, so the timer can be recognised by a string inside it. The inert\ntimer uses exactly 2³¹−1 ms: Node and Bun treat a larger delay as 1 ms, so an \"infinite\" delay\nwould fire at once.\n\n## Install\n\n1. Put `no-agent-summary.js` somewhere stable; note its **absolute** path.\n2. Set `BUN_OPTIONS` **globally** so every Claude Code process gets it. One of:\n\n   ```sh\n   # ~/.profile, ~/.bashrc, ~/.zshrc\n   export BUN_OPTIONS=\"${BUN_OPTIONS:+$BUN_OPTIONS }--preload /abs/path/no-agent-summary.js\"\n   ```\n\n   ```fish\n   # ~/.config/fish/config.fish\n   set -gx BUN_OPTIONS \"--preload /abs/path/no-agent-summary.js\"\n   ```\n\n   ```ini\n   # ~/.config/environment.d/50-no-agent-summary.conf (systemd user env; also reaches\n   # user services and timers; applies when the user manager next starts, usually next login)\n   BUN_OPTIONS=--preload /abs/path/no-agent-summary.js\n   ```\n\n   Or a wrapper named `claude` earlier on `PATH` (the `case` keeps it idempotent when one Claude\n   Code process starts another):\n\n   ```sh\n   #!/bin/sh\n   HOOK=/abs/path/no-agent-summary.js\n   case \" ${BUN_OPTIONS-} \" in\n     *\" --preload $HOOK \"*) ;;\n     *) export BUN_OPTIONS=\"${BUN_OPTIONS:+$BUN_OPTIONS }--preload $HOOK\" ;;\n   esac\n   : \"${CC_AGENT_SUMMARY_LOG:=${XDG_RUNTIME_DIR:-/tmp}/no-agent-summary.log}\"\n   export CC_AGENT_SUMMARY_LOG\n   exec /path/to/the/real/claude \"$@\"\n   ```\n\n3. Restart the daemon and every already-running session, then start Claude Code from an\n   environment that has `BUN_OPTIONS`:\n\n   ```sh\n   claude daemon stop --any\n   ```\n\n### Env\n\n| variable | values | effect |\n|---|---|---|\n| `CC_AGENT_SUMMARY_MODE` | `off` (default), `pass` | `off` suppresses the summary timer. `pass` is the A/B control: loads and logs, arms every timer untouched. Any other value warns on stderr and acts as `off`. |\n| `CC_AGENT_SUMMARY_LOG` | file path, optional | Appends `preload active mode=… bun=… hooked=…` on load, one line per matched timer (first 20), and an exit count. |\n| `CC_AGENT_SUMMARY_MARKER` | file path, optional | Overwritten on load with the `preload active …` line. |\n\n## Nuances\n\n- **Restart the daemon after install.** The daemon, pty host and pre-warmed `bg-spare` sessions\n  inherit the environment of the client that started the daemon, so a daemon started before\n  `BUN_OPTIONS` was set keeps spawning unhooked sessions. Hence `claude daemon stop --any`.\n- **Headless runs need it too:** `claude -p`, cron, CI, editor integrations.\n- **Platform:** Linux tested, macOS and Windows untested. On Windows the `/$bunfs/` gate most\n  likely never installs the hook.\n- **A/B:** `CC_AGENT_SUMMARY_MODE=pass` loads the hook but arms every timer; the summaries come back, which shows the `off` result is the hook's doing.\n- **Background processes:** daemon, pty host and `bg-spare` must carry `--preload` in their environment (`/proc/<pid>/environ` on Linux); if not, restart the daemon.\n\n## Verify (after every update)\n\n1. **Preload loads:**\n\n   ```sh\n   BUN_OPTIONS=\"--preload $HOME/.local/share/no-agent-summary.js\" CC_AGENT_SUMMARY_LOG=/tmp/nas.log claude --version && cat /tmp/nas.log\n   ```\n\n   Expect `preload active mode=off …`. No line: `BUN_OPTIONS` did not reach the process, or the\n   path is not absolute.\n2. **Timer suppressed:** with the same `BUN_OPTIONS` and `CC_AGENT_SUMMARY_LOG=/tmp/nas.log`, run\n   a background subagent for a minute or two. The log shows\n   `summary timer #1 suppressed (setTimeout, delay=30000)` and the agent's panel status stops\n   updating. If you export OpenTelemetry, `query_source = agent_summary` should stay at zero; this\n   is the only check that catches every failure mode.\n\n### Fail-open\n\nMatching is by **source text**: an anchor must sit inside the callback passed to the timer. If an\nupdate breaks that, the hook matches nothing and summaries silently come back. Ways it can happen:\n\n- the log line or query-source id is renamed;\n- the callback is passed via `fn.bind(...)` (no source in `toString`) or another wrapper;\n- the strings move to a shared constant outside the callback;\n- the timer moves to an unwrapped API (`timers/promises`, a scheduler loop).\n\nSo re-run Verify after every update.\n\n## Effect\n\n- We run it under every Claude Code process on our machine (2.1.301). Since then there have been\n  zero `agent_summary` requests, and no other side query grew to take its place.\n- Subagents, background agents, forked skills and background sessions run normally; only the\n  summary fork is skipped.\n- Visible change: the per-agent panel status stops updating; SDK `task_progress` has no `summary`.\n- Overhead: one `Function.prototype.toString` per distinct timer callback, cached in a `WeakMap`.\n  `claude --version`: ~10 ms → ~17 ms (one measurement).\n\n## Tested versions\n\nLinux x64 binary from npm `@anthropic-ai/claude-code-linux-x64` (its sha256 equals the native\ninstaller's `manifest.json` checksum). **Static:** the extracted bundle's summary timer callback\ncarries a hook anchor. **Live:** `claude -p --model haiku` with\n`CLAUDE_CODE_AGENT_PROGRESS_SUMMARIES=1`, one subagent doing 8 steps of ~20 s, counting\n`[AgentSummary] Forking` in `--debug-file`.\n\n| version | published | sha256 | static | summary forks in a ~2.5-min agent run: no hook / hook `pass` / hook `off` | notes |\n|---|---|---|---|---|---|\n| 2.1.312 | 2026-10-27 | `4f4178ce41d8` | OK | **5 / 5 / 0** | `latest` on 2026-10-28; interactive: 6 no hook, 0 `off` |\n| 2.1.310 | 2026-10-23 | `b73676430af1` | OK | **5 / 5 / 0** | |\n| 2.1.308 | 2026-10-22 | `356733f185fa` | OK | **5 / 6 / 0** | `stable` on 2026-10-28; the `pass` run's agent took 9 steps instead of 8 |\n| 2.1.301 | 2026-10-15 | `bc1aad9982c7` | OK | **5 / 5 / 0** | same with earlier hook builds; interactive `off` also 0; in daily use since 2026-10-26, 0 `agent_summary` requests in telemetry |\n| 2.1.280 | 2026-09-22 | `1e08503dbdf3` | OK | **1 / 1 / 0** (timer fired 11 / 11 / 0) | interactive: `-p` cannot enable summaries on this version. The agent sat at a permission prompt, so later timers skipped the unchanged transcript |\n| 2.1.257 | 2026-09-01 | `9a64bda9d872` | OK | **1 / 1 / 0** (timer fired 11 / 11 / 0) | same as 2.1.280 |\n\n5 / 5 / 0 = the fork happens on this version, merely loading the hook changes nothing, and `off`\nremoves it.\n\n## Why there is no setting for this\n\n- **The documented switch only turns it on.** The SDK option `agentProgressSummaries` defaults to\n  `false`, but in the bundle it is one term of an OR, and every code path that writes it sets\n  `true`. So `false` changes nothing, and the undocumented `CLAUDE_CODE_AGENT_PROGRESS_SUMMARIES`\n  can only enable summaries too.\n- **The interval belongs to the server.** It comes from a per-model-family server flag and is\n  clamped to 30–240 s. The default is already the minimum, and no value disables the timer.\n- **The obvious env vars miss.** `DISABLE_NON_ESSENTIAL_MODEL_CALLS`, which some packagers set,\n  does not occur in the binary at all. `CLAUDE_CODE_FORK_SUBAGENT=0` and\n  `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` do stop it, but only by taking fork subagents or\n  background agents with it.\n- **The prompt cache makes it cheaper, not cheap.** About 98 % of these calls re-read the\n  transcript from cache; the ~2 % that hit a cold cache carry over a third of its cost.\n- **Cost tools that read transcripts don't see it.** These requests are not written to the\n  session logs on disk ([#104358](https://github.com/anthropics/claude-code/issues/104358)); only\n  the OpenTelemetry export shows them. The docs section on background token usage doesn't list it\n  either, while Agent View's row summaries are documented as a Haiku-class model refreshing every\n  few minutes.\n- **A cheaper variant already exists, switched off.** 2.1.310 ships a `short` mode: about 2k\n  tokens of notes instead of the full transcript, optionally written by a smaller model. The\n  default is still the full transcript, and only server flags can change it.\n\n### Timeline (2026)\n\n| version (published) | what changed |\n|---|---|\n| 2.1.32 (Feb 5) | the code first appears; dead in public builds |\n| 2.1.72 (Mar 9) | reachable as an SDK opt-in |\n| 2.1.117 (Apr 21) | reachable in the interactive CLI behind the fork gate or a server rollout |\n| ≤ 2.1.220 (Jul 24) | forked skills are always summarized |\n| **2.1.232 (Aug 13)** | **on by default** for interactive background agents |\n| 2.1.300 (Oct 14) | interval becomes server-tunable, 30–240 s |\n| 2.1.310 (Oct 23) | the cheaper `short` mode lands, switched off |\n\nIn our telemetry its weekly share of spend went from 3.5–7 % in July (the fork gate was already\nopen for us) to 7.3 % and then 11.8 % in the week we picked up 2.1.233, and to about 16 % by\nmid-October.\n\n## License and disclaimer\n\nMIT © 2026 [Flamerix AI](https://flamerix.ai). Provided **as is**, without warranty of any kind;\nyou use it at your own risk. Flamerix AI is not liable for any damage, data loss or account\naction arising from its use. Changing a client's runtime behaviour may conflict with the terms of\nthe service you use it with; checking that is on you.\n\n\"Claude\" and \"Claude Code\" are trademarks of Anthropic, PBC. This project is independent and is\nnot affiliated with, sponsored or endorsed by Anthropic.\n",
+      "encoding": "utf-8"
+    },
+    "no-agent-summary.js": {
+      "filename": "no-agent-summary.js",
+      "type": "text/javascript",
+      "language": "JavaScript",
+      "raw_url": "https://gist.githubusercontent.com/flamerix-ai/c3905705cc4205e5de3011fa2e74efce/raw/9f94ac5ef9a780cb5e39067469b2fded10585fa5/no-agent-summary.js",
+      "size": 4130,
+      "truncated": false,
+      "content": "// no-agent-summary.js v2: Bun --preload hook that switches off Claude Code's `agent_summary`\n// side-query. Unofficial, not affiliated with Anthropic. Tested on Linux, Claude Code 2.1.301.\n// Install, env vars, verification and fail-open caveats: README.md.\n//\n// SPDX-License-Identifier: MIT\n// Copyright (c) 2026 Flamerix AI (https://flamerix.ai). Provided \"as is\", without warranty;\n// full license text: README.md.\n//\n// Anchors: the summarizer's debug-log line and its query-source id, both inside the timer\n// callback on 2.1.301.\nconst IN_COMPILED_BUN =\n  typeof Bun !== \"undefined\" && typeof Bun.main === \"string\" && Bun.main.startsWith(\"/$bunfs/\");\n\nfunction install() {\n  const fs = require(\"fs\");\n  const ANCHORS = [\"[AgentSummary] Timer fired\", \"agent_summary\"];\n  const RAW_MODE = process.env.CC_AGENT_SUMMARY_MODE || \"off\";\n  const MODE = RAW_MODE === \"pass\" ? \"pass\" : \"off\";\n  if (RAW_MODE !== MODE) process.stderr.write(`[no-agent-summary] unknown mode ${RAW_MODE}, forcing off\\n`);\n  const LOG = process.env.CC_AGENT_SUMMARY_LOG;\n  const log = (s) => { if (LOG) { try { fs.appendFileSync(LOG, `${new Date().toISOString()} pid=${process.pid} ${s}\\n`); } catch {} } };\n\n  const verdict = new WeakMap(); // fn -> bool (is the summary timer callback)\n  function isSummaryTimer(fn) {\n    if (typeof fn !== \"function\") return false;\n    let v = verdict.get(fn);\n    if (v === undefined) {\n      try {\n        const src = Function.prototype.toString.call(fn);\n        v = ANCHORS.some((a) => src.includes(a));\n      } catch { v = false; }\n      verdict.set(fn, v);\n    }\n    return v;\n  }\n\n  let matched = 0;\n  let suppressed = 0;\n  const PROMISIFY = Symbol.for(\"nodejs.util.promisify.custom\");\n  const wrappers = new Map(); // original timer fn -> its wrapper: one wrapper per original\n  const hookedFns = new WeakSet();\n  function wrap(orig, name) {\n    if (typeof orig !== \"function\") return orig;\n    if (wrappers.has(orig)) return wrappers.get(orig);\n    const hooked = function (fn, delay, ...args) {\n      if (isSummaryTimer(fn)) {\n        matched++;\n        if (MODE === \"off\") {\n          suppressed++;\n          if (matched <= 20) log(`summary timer #${matched} suppressed (${name}, delay=${delay})`);\n          const t = orig(() => {}, 2 ** 31 - 1); // clear*-compatible handle of the same kind, never fires\n          if (t && typeof t.unref === \"function\") t.unref();\n          return t;\n        }\n        if (matched <= 20) log(`summary timer #${matched} passed (control, ${name}, delay=${delay})`);\n      }\n      return orig(fn, delay, ...args);\n    };\n    Object.defineProperty(hooked, \"name\", { value: name });\n    // util.promisify(setTimeout) reads these; without the custom one it calls the wrapper\n    // callback-last and node throws ERR_INVALID_ARG_TYPE.\n    if (orig.__promisify__) hooked.__promisify__ = orig.__promisify__;\n    if (orig[PROMISIFY]) hooked[PROMISIFY] = orig[PROMISIFY];\n    wrappers.set(orig, hooked);\n    hookedFns.add(hooked);\n    return hooked;\n  }\n\n  // require(\"timers/promises\").setTimeout(delay, value) takes no callback, so there is no source\n  // to match an anchor in; it stays unwrapped.\n  const timers = (() => { try { return require(\"timers\"); } catch { return null; } })();\n  const hookedApis = [];\n  for (const name of [\"setTimeout\", \"setInterval\"]) {\n    globalThis[name] = wrap(globalThis[name], name);\n    if (hookedFns.has(globalThis[name])) hookedApis.push(`global.${name}`);\n    if (timers) {\n      try { timers[name] = wrap(timers[name], name); } catch {}\n      if (hookedFns.has(timers[name])) hookedApis.push(`timers.${name}`);\n    }\n  }\n\n  const active = `preload active mode=${MODE} bun=${Bun.version} hooked=${hookedApis.join(\",\")}`;\n  log(active);\n  if (LOG) process.on(\"exit\", () => log(`exit: ${suppressed} summary timer(s) suppressed, ${matched} matched`));\n  const MARKER = process.env.CC_AGENT_SUMMARY_MARKER;\n  if (MARKER) {\n    try { fs.writeFileSync(MARKER, `${active} pid=${process.pid}\\n`); }\n    catch (e) { process.stderr.write(`[no-agent-summary] cannot write marker ${MARKER}: ${e.message}\\n`); }\n  }\n}\n\nif (IN_COMPILED_BUN) install();\n",
+      "encoding": "utf-8"
+    }
+  },
+  "public": true,
+  "created_at": "2026-10-26T22:27:47Z",
+  "updated_at": "2026-10-29T11:39:20Z",
+  "description": "Claude Code burns ~15-20% of your tokens on a 3-word status line: a Bun preload that turns agent_summary off · by Flamerix AI, flamerix.ai · MIT",
+  "comments": 1,
+  "user": null,
+  "comments_enabled": true,
+  "comments_url": "https://api.github.com/gists/c3905705cc4205e5de3011fa2e74efce/comments",
+  "owner": {
+    "login": "flamerix-ai",
+    "id": 335226770,
+    "node_id": "U_kgDOE_snkg",
+    "avatar_url": "https://avatars.githubusercontent.com/u/335226770?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/flamerix-ai",
+    "html_url": "https://github.com/flamerix-ai",
+    "followers_url": "https://api.github.com/users/flamerix-ai/followers",
+    "following_url": "https://api.github.com/users/flamerix-ai/following{/other_user}",
+    "gists_url": "https://api.github.com/users/flamerix-ai/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/flamerix-ai/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/flamerix-ai/subscriptions",
+    "organizations_url": "https://api.github.com/users/flamerix-ai/orgs",
+    "repos_url": "https://api.github.com/users/flamerix-ai/repos",
+    "events_url": "https://api.github.com/users/flamerix-ai/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/flamerix-ai/received_events",
+    "type": "User",
+    "user_view_type": "public",
+    "site_admin": false
+  },
+  "forks": [
+
+  ],
+  "history": [
+    {
+      "user": {
+        "login": "flamerix-ai",
+        "id": 335226770,
+        "node_id": "U_kgDOE_snkg",
+        "avatar_url": "https://avatars.githubusercontent.com/u/335226770?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/flamerix-ai",
+        "html_url": "https://github.com/flamerix-ai",
+        "followers_url": "https://api.github.com/users/flamerix-ai/followers",
+        "following_url": "https://api.github.com/users/flamerix-ai/following{/other_user}",
+        "gists_url": "https://api.github.com/users/flamerix-ai/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/flamerix-ai/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/flamerix-ai/subscriptions",
+        "organizations_url": "https://api.github.com/users/flamerix-ai/orgs",
+        "repos_url": "https://api.github.com/users/flamerix-ai/repos",
+        "events_url": "https://api.github.com/users/flamerix-ai/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/flamerix-ai/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "version": "2fe224167473e3185c104a5dbff7a788ab025b3b",
+      "committed_at": "2026-10-28T19:30:23Z",
+      "change_status": {
+        "total": 24,
+        "additions": 0,
+        "deletions": 24
+      },
+      "url": "https://api.github.com/gists/c3905705cc4205e5de3011fa2e74efce/2fe224167473e3185c104a5dbff7a788ab025b3b"
+    },
+    {
+      "user": {
+        "login": "flamerix-ai",
+        "id": 335226770,
+        "node_id": "U_kgDOE_snkg",
+        "avatar_url": "https://avatars.githubusercontent.com/u/335226770?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/flamerix-ai",
+        "html_url": "https://github.com/flamerix-ai",
+        "followers_url": "https://api.github.com/users/flamerix-ai/followers",
+        "following_url": "https://api.github.com/users/flamerix-ai/following{/other_user}",
+        "gists_url": "https://api.github.com/users/flamerix-ai/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/flamerix-ai/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/flamerix-ai/subscriptions",
+        "organizations_url": "https://api.github.com/users/flamerix-ai/orgs",
+        "repos_url": "https://api.github.com/users/flamerix-ai/repos",
+        "events_url": "https://api.github.com/users/flamerix-ai/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/flamerix-ai/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "version": "b44834d948789935ec85e9e9a578349d4ea47272",
+      "committed_at": "2026-10-28T18:43:39Z",
+      "change_status": {
+        "total": 338,
+        "additions": 338,
+        "deletions": 0
+      },
+      "url": "https://api.github.com/gists/c3905705cc4205e5de3011fa2e74efce/b44834d948789935ec85e9e9a578349d4ea47272"
+    }
+  ],
+  "truncated": false
+}
