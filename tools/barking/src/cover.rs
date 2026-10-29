@@ -368,6 +368,10 @@ fn draw_report(dir: &Path, seed: Option<u64>) -> Result<String, String> {
         ledger_line(&deck, &a),
         ledger_line(&deck, &b)
     );
+    if crate::card::publish_era(Some(issue.key())) {
+        s += "选中的两张封面复制为 images/publish/00-cover.png（3:4）与 images/publish/00-cover-wide.png（2.35:1）；落选的候选留在草稿目录。
+";
+    }
     Ok(s)
 }
 

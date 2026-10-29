@@ -9,7 +9,7 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::card::{self, Kind};
+use crate::card::{self, Kind, issue_key};
 use crate::cover;
 
 const TITLE_MAX: usize = 20;
@@ -152,18 +152,6 @@ impl Sink<'_> {
     }
 }
 
-/// `docs/<YYMM>/<MMDD>` → `YYMMMMDD` as a number; `None` if the path is not
-/// shaped like an issue directory.
-fn issue_key(dir: &Path) -> Option<u32> {
-    let four = |p: Option<&Path>| {
-        p.and_then(Path::file_name)
-            .and_then(|n| n.to_str())
-            .filter(|n| n.len() == 4 && n.bytes().all(|b| b.is_ascii_digit()))
-            .and_then(|n| n.parse::<u32>().ok())
-    };
-    Some(four(dir.parent())? * 10_000 + four(Some(dir))?)
-}
-
 pub fn lint_issue(dir: &Path) -> Vec<Finding> {
     let mut out = Vec::new();
     // Resolve `.` and relative paths so the YYMM/MMDD components are visible;
@@ -192,6 +180,7 @@ pub fn lint_issue(dir: &Path) -> Vec<Finding> {
         style: key.is_none_or(|k| k >= STYLE_FROM),
         bark: key.is_none_or(|k| k >= BARK_FROM),
         event: key.is_none_or(|k| k >= EVENT_FROM),
+        publish: card::publish_era(key),
     };
 
     let fc_path = dir.join("sources").join("fact-check.md");
@@ -626,6 +615,8 @@ struct Era {
     bark: bool,
     /// 1028 on: an 事件卡 per main post.
     event: bool,
+    /// 1029 on: the upload set lives in `images/publish/`, numbered in order.
+    publish: bool,
 }
 
 /// The mechanical parts of EDITORIAL.md 标题 and 文风. All warnings: each
@@ -710,7 +701,11 @@ fn lint_images(
     let mut referenced = BTreeSet::new();
     for (i, line) in md.lines().enumerate() {
         for tok in image_refs_in_line(line) {
-            if let Some(name) = Path::new(tok).file_name().and_then(|n| n.to_str()) {
+            // Only `images/` itself is checked for unlisted files below.
+            let in_publish = era.publish && tok.starts_with("publish/");
+            if let Some(name) = Path::new(tok).file_name().and_then(|n| n.to_str())
+                && !in_publish
+            {
                 referenced.insert(name.to_string());
             }
             if !images.join(tok).is_file() && !offsite.contains(&issue_rel("images", tok)) {
@@ -719,6 +714,53 @@ fn lint_images(
         }
     }
 
+    // Each row of 正式配图 with the first image it names.
+    let rows: Vec<(&str, &str)> = md
+        .lines()
+        .skip_while(|l| !l.starts_with("## 正式配图"))
+        .skip(1)
+        .take_while(|l| !l.starts_with("## "))
+        .filter_map(|l| image_refs_in_line(l).first().map(|f| (*f, l)))
+        .collect();
+    if era.publish {
+        lint_publish_dir(images, spec, &rows, offsite, &mut sink);
+    } else {
+        lint_flat_rows(&rows, era, spec, kind, &mut sink);
+    }
+
+    let files: Vec<String> = fs::read_dir(images)
+        .map(|rd| {
+            rd.filter_map(Result::ok)
+                .filter_map(|e| e.file_name().into_string().ok())
+                .collect()
+        })
+        .unwrap_or_default();
+    if !era.publish {
+        lint_flat_covers(&files, era, kind, offsite, &mut sink);
+    }
+    let mut unlisted: Vec<&String> = files
+        .iter()
+        .filter(|f| {
+            f.rsplit_once('.')
+                .is_some_and(|(_, e)| IMAGE_EXTS.contains(&e.to_ascii_lowercase().as_str()))
+                && !referenced.contains(*f)
+        })
+        .collect();
+    unlisted.sort();
+    for f in unlisted {
+        sink.warn(None, format!("images/{f} 未在配图说明中出现"));
+    }
+}
+
+/// 正式配图 before 1029: flat `images/00-…` names, the 省流卡 and 速览聚合图
+/// right after the cover, 事件卡 and 吠点卡 in main-post order.
+fn lint_flat_rows(
+    rows: &[(&str, &str)],
+    era: Era,
+    spec: Option<&card::Spec>,
+    kind: Kind,
+    sink: &mut Sink,
+) {
     // Right after the cover come the 省流卡, then the 速览聚合图; a 速览专帖
     // has only the latter.
     let mut lead: Vec<(&str, &str)> = Vec::new();
@@ -728,14 +770,6 @@ fn lint_images(
     if era.roundup {
         lead.push(("00-roundup.", "速览聚合图 00-roundup.png"));
     }
-    // Each row of 正式配图 with the first image it names.
-    let rows: Vec<(&str, &str)> = md
-        .lines()
-        .skip_while(|l| !l.starts_with("## 正式配图"))
-        .skip(1)
-        .take_while(|l| !l.starts_with("## "))
-        .filter_map(|l| image_refs_in_line(l).first().map(|f| (*f, l)))
-        .collect();
     for (k, (stem, what)) in lead.iter().enumerate() {
         if rows.get(k).is_some_and(|(f, _)| !f.starts_with(stem)) {
             sink.warn(None, format!("“正式配图”第 {} 张应为{what}", k + 1));
@@ -789,14 +823,16 @@ fn lint_images(
         }
         last = Some(k);
     }
+}
 
-    let files: Vec<String> = fs::read_dir(images)
-        .map(|rd| {
-            rd.filter_map(Result::ok)
-                .filter_map(|e| e.file_name().into_string().ok())
-                .collect()
-        })
-        .unwrap_or_default();
+/// The required covers and 省流卡 and 速览聚合图 files, before 1029.
+fn lint_flat_covers(
+    files: &[String],
+    era: Era,
+    kind: Kind,
+    offsite: &BTreeSet<String>,
+    sink: &mut Sink,
+) {
     for (stem, what, required) in [
         ("00-cover.", "3:4 封面", true),
         ("00-cover-wide.", "2.35:1 横版封面", true),
@@ -811,17 +847,145 @@ fn lint_images(
             sink.error(None, format!("缺少{what} images/{stem}*"));
         }
     }
-    let mut unlisted: Vec<&String> = files
-        .iter()
-        .filter(|f| {
-            f.rsplit_once('.')
-                .is_some_and(|(_, e)| IMAGE_EXTS.contains(&e.to_ascii_lowercase().as_str()))
-                && !referenced.contains(*f)
+}
+
+/// `NN` of a `NN-name.png` upload-set file, if it has that shape.
+fn upload_number(name: &str) -> Option<u32> {
+    let (num, _) = name.split_once('-')?;
+    (num.len() == 2 && num.bytes().all(|b| b.is_ascii_digit()))
+        .then(|| num.parse().ok())
+        .flatten()
+}
+
+/// 1029 on: `images/publish/` holds exactly the images to upload, the two
+/// covers (`00-cover.*`, `00-cover-wide.*`) and then `01-…`, `02-…` in upload
+/// order without gaps; 正式配图 lists each of those rows in that order, as
+/// `publish/NN-….png`. Files that offsite.tsv vouches for count as present.
+fn lint_publish_dir(
+    images: &Path,
+    spec: Option<&card::Spec>,
+    rows: &[(&str, &str)],
+    offsite: &BTreeSet<String>,
+    sink: &mut Sink,
+) {
+    let dir = images.join(card::PUBLISH_DIR);
+    let remote = issue_rel("images", card::PUBLISH_DIR) + "/";
+    let mut present: BTreeSet<String> = fs::read_dir(&dir)
+        .map(|rd| {
+            (rd.filter_map(Result::ok))
+                .filter(|e| e.path().is_file())
+                .filter_map(|e| e.file_name().into_string().ok())
+                .collect()
         })
+        .unwrap_or_default();
+    present.extend(
+        (offsite.iter())
+            .filter_map(|p| p.strip_prefix(&remote))
+            .filter(|n| !n.contains('/'))
+            .map(str::to_string),
+    );
+    let is_cover = |n: &str| n.to_lowercase().starts_with("00-cover");
+    for (stem, what) in [
+        ("00-cover.", "3:4 封面"),
+        ("00-cover-wide.", "2.35:1 横版封面"),
+    ] {
+        if !present.iter().any(|f| f.to_lowercase().starts_with(stem)) {
+            sink.error(
+                None,
+                format!("缺少{what} images/publish/{stem}*（生图选定后复制进来）"),
+            );
+        }
+    }
+    // Byte order of the names is the upload order; the two covers lead.
+    let upload: Vec<&String> = present.iter().filter(|n| !is_cover(n)).collect();
+
+    // Rows of 正式配图 must name publish/ files.
+    let mut listed: Vec<&str> = Vec::new();
+    for (file, line) in rows {
+        let Some(name) = file.strip_prefix("publish/").filter(|n| !n.contains('/')) else {
+            sink.error(
+                None,
+                format!("“正式配图”里的 {file} 须写成 publish/NN-….png（1029 期起正式配图都在 images/publish/）"),
+            );
+            continue;
+        };
+        if is_cover(name) {
+            continue;
+        }
+        if listed.contains(&name) {
+            sink.error(None, format!("“正式配图”里 publish/{name} 列了不止一次"));
+        }
+        listed.push(name);
+        // 事件卡 and 吠点卡 duplicate the body for a reader of the images.
+        let card = name
+            .split_once('-')
+            .map(|(_, t)| t)
+            .is_some_and(|t| t.starts_with("event-") || t.starts_with("bark-"));
+        if card && !line.contains("公众号") {
+            sink.warn(
+                None,
+                format!("publish/{name} 一行须注明公众号不插（读者在读正文）"),
+            );
+        }
+    }
+
+    // The folder is the upload set: nothing in it that the table omits, no
+    // earlier numbering of this tool's own cards.
+    let leftovers =
+        spec.map(|s| s.leftovers(&upload.iter().map(|n| n.to_string()).collect::<Vec<_>>()));
+    for name in &upload {
+        if listed.contains(&name.as_str()) {
+            continue;
+        }
+        let old = leftovers
+            .as_ref()
+            .is_some_and(|(stale, _)| stale.contains(name));
+        let why = if old {
+            "是旧编号的残留（重跑 barking card 会清掉）"
+        } else {
+            "不在配图说明“正式配图”里（publish/ 只放要上传的图）"
+        };
+        sink.error(None, format!("images/publish/{name} {why}"));
+    }
+    // Listed order = upload order = name order.
+    let in_folder: Vec<&str> = listed
+        .iter()
+        .copied()
+        .filter(|n| upload.iter().any(|u| u.as_str() == *n))
         .collect();
-    unlisted.sort();
-    for f in unlisted {
-        sink.warn(None, format!("images/{f} 未在配图说明中出现"));
+    let mut sorted = in_folder.clone();
+    sorted.sort_unstable();
+    if in_folder != sorted {
+        sink.error(
+            None,
+            "“正式配图”的顺序与 images/publish/ 里按文件名排序不一致：上传时全选整个文件夹按名称排序，两者必须相同",
+        );
+    }
+    // 01, 02, … without gaps.
+    let numbers: Vec<Option<u32>> = upload.iter().map(|n| upload_number(n)).collect();
+    if let Some(i) = numbers.iter().position(Option::is_none) {
+        sink.error(
+            None,
+            format!(
+                "images/publish/{} 的文件名须以两位序号开头（NN-名字.png）",
+                upload[i]
+            ),
+        );
+    } else {
+        for (k, n) in numbers.iter().flatten().enumerate() {
+            if *n != k as u32 + 1 {
+                sink.error(
+                    None,
+                    format!(
+                        "images/publish/ 的序号不连续：第 {} 张应为 {:02}，实为 {}",
+                        k + 1,
+                        k + 1,
+                        upload[k]
+                    ),
+                );
+                break;
+            }
+        }
     }
 }
 
@@ -847,6 +1011,9 @@ fn lint_cards(
     };
     for msg in spec.structure_errors() {
         sink.error(None, msg);
+    }
+    for msg in spec.structure_warnings() {
+        sink.warn(None, msg);
     }
     if era.roundup && spec.roundup.is_empty() {
         sink.error(None, "缺少 [[roundup]]：2026-10-04 起每期都有速览聚合图");
@@ -877,8 +1044,8 @@ fn lint_cards(
     let mtime = |p: &Path| fs::metadata(p).and_then(|m| m.modified()).ok();
     if let Some(spec_time) = mtime(&path) {
         for o in spec.outputs() {
-            match mtime(&images.join(o)) {
-                None if offsite.contains(&issue_rel("images", o)) => {}
+            match mtime(&images.join(&o)) {
+                None if offsite.contains(&issue_rel("images", &o)) => {}
                 None => sink.error(None, format!("images/{o} 尚未渲染（barking card）")),
                 Some(t) if t < spec_time => sink.warn(
                     None,
@@ -1497,5 +1664,248 @@ mod tests {
     fn image_refs_resolve_relative_and_skip_urls_and_globs() {
         let line = "| [01-a.png](01-a.png) | ../sources/x.jpeg | `00-cover.*` | https://e.com/y.png | a.pngx |";
         assert_eq!(image_refs_in_line(line), ["01-a.png", "../sources/x.jpeg"]);
+    }
+
+    // ---- images/publish/ (1029 on) ----------------------------------------
+
+    const PUBLISH_ERA: Era = Era {
+        new_format: true,
+        roundup: true,
+        style: true,
+        bark: true,
+        event: true,
+        publish: true,
+    };
+
+    /// An `images/` directory with these files in `publish/` (and `top` in
+    /// `images/` itself) and a README whose 正式配图 holds `rows`. Returns
+    /// the `images/` path; its parent is the scratch root.
+    fn publish_images(name: &str, publish: &[&str], top: &[&str], rows: &[&str]) -> PathBuf {
+        let root = std::env::temp_dir()
+            .join("barking-lint-test")
+            .join(format!("{}-{name}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let images = root.join("images");
+        fs::create_dir_all(images.join("publish")).unwrap();
+        for f in publish {
+            fs::write(images.join("publish").join(f), b"x").unwrap();
+        }
+        for f in top {
+            fs::write(images.join(f), b"x").unwrap();
+        }
+        let mut md =
+            String::from("# 配图说明\n\n## 正式配图（封面之后）\n\n| 文件 | 说明 |\n|---|---|\n");
+        for r in rows {
+            md += &format!("| {r} |\n");
+        }
+        md += "\n## 备用图\n\n| 文件 | 用途 |\n|---|---|\n";
+        fs::write(images.join("README.md"), md).unwrap();
+        images
+    }
+
+    fn publish_findings(images: &Path, spec: Option<&card::Spec>, offsite: &[&str]) -> String {
+        let offsite: BTreeSet<String> = offsite.iter().map(|s| s.to_string()).collect();
+        let mut out = Vec::new();
+        lint_images(images, PUBLISH_ERA, spec, &offsite, &mut out);
+        let text = (out.iter())
+            .map(|f| {
+                let tag = if f.level == Level::Error {
+                    "error"
+                } else {
+                    "warn"
+                };
+                format!("{tag}: {}", f.msg)
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        // Each case has its own scratch root; nothing else reads it.
+        let _ = fs::remove_dir_all(images.parent().unwrap());
+        text
+    }
+
+    const GOOD: [&str; 7] = [
+        "00-cover.png",
+        "00-cover-wide.png",
+        "01-tldr.png",
+        "02-roundup.png",
+        "03-event-1.png",
+        "04-bark-1.png",
+        "05-carbon.png",
+    ];
+    const GOOD_ROWS: [&str; 5] = [
+        "publish/01-tldr.png | 省流",
+        "publish/02-roundup.png | 速览",
+        "publish/03-event-1.png | 事件卡；公众号不插",
+        "publish/04-bark-1.png | 吠点卡；公众号不插",
+        "publish/05-carbon.png | 批注图",
+    ];
+
+    #[test]
+    fn publish_folder_matching_the_table_is_clean() {
+        let d = publish_images("ok", &GOOD, &[], &GOOD_ROWS);
+        assert_eq!(publish_findings(&d, None, &[]), "");
+    }
+
+    #[test]
+    fn publish_folder_order_gaps_and_strays_are_errors() {
+        // Table order differs from name order.
+        let mut rows = GOOD_ROWS.to_vec();
+        rows.swap(0, 1);
+        let d = publish_images("order", &GOOD, &[], &rows);
+        assert!(publish_findings(&d, None, &[]).contains("顺序"));
+        // A file the table omits.
+        let more = [&GOOD[..], &["06-extra.png"]].concat();
+        let d = publish_images("stray", &more, &[], &GOOD_ROWS);
+        let f = publish_findings(&d, None, &[]);
+        assert!(f.contains("06-extra.png 不在"), "{f}");
+        // A gap: 03 is missing, so 04 is the third file.
+        let gap: Vec<&str> = (GOOD.iter().copied())
+            .filter(|n| !n.starts_with("03"))
+            .collect();
+        let rows: Vec<&str> = (GOOD_ROWS.iter().copied())
+            .filter(|r| !r.contains("03-"))
+            .collect();
+        let d = publish_images("gap", &gap, &[], &rows);
+        let f = publish_findings(&d, None, &[]);
+        assert!(f.contains("序号不连续") && f.contains("应为 03"), "{f}");
+        // No number at all.
+        let nonum = [&GOOD[..], &["zebra.png"]].concat();
+        let rows = [&GOOD_ROWS[..], &["publish/zebra.png | z"]].concat();
+        let d = publish_images("nonum", &nonum, &[], &rows);
+        assert!(publish_findings(&d, None, &[]).contains("两位序号"));
+        // Covers missing.
+        let d = publish_images("nocover", &GOOD[2..], &[], &GOOD_ROWS);
+        let f = publish_findings(&d, None, &[]);
+        assert!(
+            f.contains("缺少3:4 封面") && f.contains("缺少2.35:1 横版封面"),
+            "{f}"
+        );
+        // The wide cover alone is not the 3:4 one.
+        let d = publish_images("widecover", &GOOD[1..], &[], &GOOD_ROWS);
+        let f = publish_findings(&d, None, &[]);
+        assert!(
+            f.contains("缺少3:4 封面") && !f.contains("缺少2.35:1"),
+            "{f}"
+        );
+    }
+
+    #[test]
+    fn publish_rows_must_name_publish_files_and_cards_skip_the_account() {
+        // A row that points at images/ instead of images/publish/.
+        let mut rows = GOOD_ROWS.to_vec();
+        rows[0] = "01-tldr.png | 省流";
+        let d = publish_images("flatrow", &GOOD, &["01-tldr.png"], &rows);
+        let f = publish_findings(&d, None, &[]);
+        assert!(f.contains("须写成 publish/NN-"), "{f}");
+        assert!(f.contains("publish/01-tldr.png 不在"), "{f}");
+        // 事件卡 and 吠点卡 rows say 公众号不插, or it is a warning.
+        let mut rows = GOOD_ROWS.to_vec();
+        rows[2] = "publish/03-event-1.png | 事件卡";
+        let d = publish_images("nogzh", &GOOD, &[], &rows);
+        let f = publish_findings(&d, None, &[]);
+        assert_eq!(
+            f,
+            "warn: publish/03-event-1.png 一行须注明公众号不插（读者在读正文）"
+        );
+        // Listed twice.
+        let mut rows = GOOD_ROWS.to_vec();
+        rows.push("publish/05-carbon.png | again");
+        let d = publish_images("twice", &GOOD, &[], &rows);
+        assert!(publish_findings(&d, None, &[]).contains("不止一次"));
+    }
+
+    #[test]
+    fn publish_folder_offsite_names_count_and_old_numbers_are_named() {
+        // Nothing local (a fresh clone): offsite.tsv vouches for the files.
+        let remote: Vec<String> = (GOOD.iter())
+            .map(|n| format!("images/publish/{n}"))
+            .collect();
+        let mut remote: Vec<&str> = remote.iter().map(String::as_str).collect();
+        let d = publish_images("remote", &[], &[], &GOOD_ROWS);
+        assert_eq!(publish_findings(&d, None, &remote), "");
+        // ... but not for a file the table omits.
+        remote.push("images/publish/06-extra.png");
+        let d = publish_images("remote2", &[], &[], &GOOD_ROWS);
+        assert!(publish_findings(&d, None, &remote).contains("06-extra.png 不在"));
+
+        // After a renumber, the old file is called what it is.
+        let mut spec: card::Spec = toml::from_str(
+            "date = \"d\"\n[[tldr]]\ntag = \"A\"\nfact = \"f\"\n\
+             [[annot]]\nout = \"carbon\"\npost = 1\ntitle = \"t\"\nsource = \"s\"\n\
+             [[annot.note]]\nquote = \"q\"\ngloss = \"g\"\n",
+        )
+        .unwrap();
+        spec.publish = true;
+        // Current: 01-tldr, 02-carbon; 03-carbon is the earlier numbering.
+        let files = [
+            "00-cover.png",
+            "00-cover-wide.png",
+            "01-tldr.png",
+            "02-carbon.png",
+            "03-carbon.png",
+        ];
+        let rows = [
+            "publish/01-tldr.png | 省流",
+            "publish/02-carbon.png | 批注图",
+        ];
+        let d = publish_images("stale", &files, &[], &rows);
+        let f = publish_findings(&d, Some(&spec), &[]);
+        assert!(f.contains("03-carbon.png 是旧编号的残留"), "{f}");
+    }
+
+    #[test]
+    fn publish_era_checks_only_the_top_of_images_for_unlisted_files() {
+        // A forgotten file at the top of images/ is still reported, even when
+        // the table lists a publish/ file of the same name.
+        let d = publish_images(
+            "top",
+            &GOOD,
+            &["07-forgotten.png", "01-tldr.png"],
+            &GOOD_ROWS,
+        );
+        let f = publish_findings(&d, None, &[]);
+        assert!(
+            f.contains("images/07-forgotten.png 未在配图说明中出现"),
+            "{f}"
+        );
+        assert!(f.contains("images/01-tldr.png 未在配图说明中出现"), "{f}");
+    }
+
+    #[test]
+    fn old_era_still_wants_flat_names() {
+        // 1028 and before: rows without publish/, covers in images/.
+        let root = std::env::temp_dir()
+            .join("barking-lint-test")
+            .join(format!("{}-flat", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let images = root.join("images");
+        fs::create_dir_all(&images).unwrap();
+        for f in [
+            "00-cover.png",
+            "00-cover-wide.png",
+            "00-tldr.png",
+            "00-roundup.png",
+        ] {
+            fs::write(images.join(f), b"x").unwrap();
+        }
+        fs::write(
+            images.join("README.md"),
+            "## 正式配图\n\n| 1 | 00-tldr.png | 省流 |\n| 2 | 00-roundup.png | 速览 |\n\n## 备用图\n\n",
+        )
+        .unwrap();
+        let mut era = PUBLISH_ERA;
+        era.publish = false;
+        let mut out = Vec::new();
+        lint_images(&images, era, None, &BTreeSet::new(), &mut out);
+        let msgs: Vec<&str> = out.iter().map(|f| f.msg.as_str()).collect();
+        // The covers are not in the table, so they are the only unlisted files.
+        assert_eq!(
+            msgs,
+            [
+                "images/00-cover-wide.png 未在配图说明中出现",
+                "images/00-cover.png 未在配图说明中出现"
+            ]
+        );
+        let _ = fs::remove_dir_all(&root);
     }
 }

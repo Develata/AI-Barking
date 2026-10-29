@@ -53,6 +53,6 @@ codex exec -m gpt-6-astra -c 'model_reasoning_effort="medium"' -s danger-full-ac
 
 1. 逐字核对画面里的每个字与数字：必须与提示词引号内文字、正文一致；多字、漏字、错字、乱码、logo、真人脸即淘汰。小字裁出放大约 4 倍再看。
 2. 看板娘：数手、耳朵、尾巴；看她是不是保持二次元可爱风（2026-10-27 起 Develata 决定，不再随场景画风重画），且姿势、动作按本期抽签重新画，不是参考图原样贴进来。
-3. 与前几期比：用 Read 打开前 3 期的 `images/00-cover.png`，和候选一起看。缩略图一眼像同一系列（同样的底色、同样的标题字和位置、同样的看板娘姿势）就淘汰。
+3. 与前几期比：用 Read 打开前 3 期的封面（`images/00-cover.png`，1029 期起 `images/publish/00-cover.png`），和候选一起看。缩略图一眼像同一系列（同样的底色、同样的标题字和位置、同样的看板娘姿势）就淘汰。
 4. 横版：按居中 1:1（宽 = 图高）裁切检查，主标题与看板娘必须完整留在框内。竖版：手机缩略图下主标题可读，主体不拥挤。
-5. 选中的图复制为本期 `images/00-cover.png`、`images/00-cover-wide.png`。在 `images/README.md` 封面节记录：`封面抽签：…` 一行（选中组，整行照抄）、抽签种子、生成方式、候选数、选中哪组及理由、落选原因、逐字核对结果。
+5. 选中的图复制为本期 `images/publish/00-cover.png`、`images/publish/00-cover-wide.png`（1029 期起；`images/publish/` 不存在就先建；1028 及更早期次是 `images/00-cover.png`、`images/00-cover-wide.png`）。`{OUT}` 草稿目录里的候选与落选图不放进 `publish/`。在 `images/README.md` 封面节记录：`封面抽签：…` 一行（选中组，整行照抄）、抽签种子、生成方式、候选数、选中哪组及理由、落选原因、逐字核对结果。

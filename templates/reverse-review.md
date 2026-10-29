@@ -23,7 +23,7 @@ If you find no blocker, say `PASS / no blocker` and state what you did not cover
 下面这些都是公开说法或其依据，风险同级，不因为“只是图上一行字”而放宽：
 
 - 发布正文 `doc_{MMDD}_publish.txt`。
-- `images/cards.toml` 里会印到图上的文字：省流卡 `[[tldr]]` 的 `fact`；速览 `[[roundup]]` 的 `tag` 与 `text`；事件卡 `[[event]]` 的 `paras`（正文各主帖事实段的逐字全文）；吠点卡 `[[bark]]` 的 `points`（正文吠点段的逐字全文）；批注图的 `title`、`source` 和各条译注 `gloss`。
+- `images/cards.toml` 里会印到图上的文字：省流卡 `[[tldr]]` 的 `fact`；速览 `[[roundup]]` 的 `tag` 与 `text`；事件卡 `[[event]]` 的 `paras`（正文各主帖事实段的逐字全文）；吠点卡 `[[bark]]` 的 `points`（正文吠点段的逐字全文）；批注图的 `title`、`source` 和各条译注 `gloss`（1029 期起 `[[annot]]` 的 `out` 是不带序号的短名，`post` 是它所属的主帖，图在 `images/publish/NN-<out>.png`，底图 `images/<out>-raw.png`；核对 `post` 是否真属于该主帖）。
 - 事实清单 `sources/fact-check.md`（含“速览”“批注译注”等节）。它是核验的基准，也是被审对象：清单本身可能错。
 - 取证记录 `sources/evidence*.md`、`sources/capture-log*.md`，来源入口 `sources/README.md`，配图说明 `images/README.md`。
 - `sources/` 下的文本存档（页面文本、JSON、jsonl 日志、脚本）。PDF、HTML、截图等原件不入库，只在 `sources/offsite.tsv` 登记；本机若有就读，读不到就以文本存档为准，并在报告里写明哪些没核到。

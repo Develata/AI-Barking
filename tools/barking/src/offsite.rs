@@ -726,6 +726,27 @@ mod tests {
     }
 
     #[test]
+    fn the_publish_folder_is_its_own_remote_directory() {
+        // 1029 on: the upload set sits in images/publish/, next to the
+        // screenshots and raw bases in images/.
+        let f = files(&[
+            ("/R/2610/1029/images/carbon-raw.png", 5),
+            ("/R/2610/1029/images/publish/00-cover.png", 6),
+            ("/R/2610/1029/images/publish/01-tldr.png", 7),
+        ]);
+        let dirs: Vec<&str> = parents(&f, 0..f.len()).into_iter().collect();
+        assert_eq!(dirs, ["/R/2610/1029/images", "/R/2610/1029/images/publish"]);
+        // A listing of images/ alone does not vouch for what is in publish/.
+        let remote: HashMap<String, u64> =
+            [("/R/2610/1029/images/carbon-raw.png".to_string(), 5)].into();
+        assert_eq!(unmatched(&f, &remote, 0..f.len()), [1, 2]);
+        // The directory is created by its first file, alone.
+        let missing: BTreeSet<String> = ["/R/2610/1029/images/publish".into()].into();
+        let (seeds, rest) = split_seeds(&f, &[1, 2], &missing);
+        assert_eq!((seeds, rest), (vec![1], vec![2]));
+    }
+
+    #[test]
     fn first_file_of_each_missing_directory_goes_alone() {
         let f = files(&[
             ("/R/1027/images/a.png", 1),

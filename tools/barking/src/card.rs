@@ -62,6 +62,13 @@ const COVER_TEMPLATE: &str = include_str!("../../../templates/cards/cover.html")
 const BARK_TEMPLATE: &str = include_str!("../../../templates/cards/bark.html");
 const EVENT_TEMPLATE: &str = include_str!("../../../templates/cards/event.html");
 pub const SPEC_FILE: &str = "cards.toml";
+/// Issues dated on or after this `YYMM_MMDD` put the images to upload in
+/// `images/publish/`, numbered in upload order (EDITORIAL.md 省流卡与批注截图,
+/// 2026-10-29). Earlier issues keep the flat `images/00-…` names they were
+/// published with (EDITORIAL.md 纠错: no rewrites).
+pub const PUBLISH_FROM: u32 = 2610_1029;
+/// The sub-directory of `images/` holding the upload set.
+pub const PUBLISH_DIR: &str = "publish";
 pub const TLDR_OUT: &str = "00-tldr.png";
 pub const ROUNDUP_OUT: &str = "00-roundup.png";
 /// One 吠点卡 per main post, in the main posts' order. Fixed names keep the
@@ -130,6 +137,12 @@ pub struct Spec {
     pub bark: Vec<BarkCard>,
     #[serde(default)]
     pub annot: Vec<Annot>,
+    /// The 2026-10-29 layout ([`PUBLISH_FROM`]): outputs in `images/publish/`,
+    /// numbered in upload order; `[[annot]]` says which main post it belongs
+    /// to. Not in cards.toml: [`load_spec`] sets it from the issue's date. A
+    /// Spec parsed straight from text keeps the old layout.
+    #[serde(skip)]
+    pub publish: bool,
 }
 
 /// An 事件卡 (from 2026-10-29): one main post's fact paragraphs, so a reader
@@ -183,7 +196,15 @@ pub struct TldrItem {
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Annot {
+    /// Old layout: the file name in `images/` (`41-x.png`). 2026-10-29 on: a
+    /// short English name without number or extension (`carbon-rollout`); the
+    /// tool numbers it and writes `images/publish/NN-<out>.png`.
     pub out: String,
+    /// 2026-10-29 on: the main post (1-based, in 省流卡 order) the screenshot
+    /// belongs to, which fixes its place in the upload order. Not part of the
+    /// fingerprint: it only moves the file.
+    #[serde(default, skip_serializing)]
+    pub post: Option<usize>,
     pub title: String,
     pub source: String,
     #[serde(default = "default_lang")]
@@ -246,8 +267,8 @@ impl Spec {
     }
 
     /// The 事件卡 file names, one per [[event]] (no more than `EVENT_OUTS`).
-    pub fn event_outputs(&self) -> impl Iterator<Item = &'static str> {
-        EVENT_OUTS.iter().copied().take(self.event.len())
+    pub fn event_outputs(&self) -> Vec<String> {
+        self.names_where(|j| matches!(j, Job::Event(_)))
     }
 
     /// An 事件卡's heading: the main 速览 entry with its tag.
@@ -258,8 +279,15 @@ impl Spec {
     }
 
     /// The 吠点卡 file names, one per [[bark]] (no more than `BARK_OUTS`).
-    pub fn bark_outputs(&self) -> impl Iterator<Item = &'static str> {
-        BARK_OUTS.iter().copied().take(self.bark.len())
+    pub fn bark_outputs(&self) -> Vec<String> {
+        self.names_where(|j| matches!(j, Job::Bark(_)))
+    }
+
+    fn names_where(&self, keep: impl Fn(&Job) -> bool) -> Vec<String> {
+        (self.items().into_iter())
+            .filter(|(_, j)| keep(j))
+            .map(|(name, _)| name)
+            .collect()
     }
 
     /// A 吠点卡's heading: the main 速览 entry with its tag.
@@ -294,6 +322,7 @@ impl Spec {
         }
         errs.extend(self.event_errors());
         errs.extend(self.bark_errors());
+        errs.extend(self.annot_errors());
         if self.roundup.is_empty() {
             return errs;
         }
@@ -334,6 +363,60 @@ impl Spec {
             }
         }
         errs
+    }
+
+    /// The [[annot]] rules about `out` and `post`, which decide the upload
+    /// order (2026-10-29 on); older cards.toml files do not use `post`.
+    fn annot_errors(&self) -> Vec<String> {
+        let mut errs = Vec::new();
+        if !self.publish {
+            for a in self.annot.iter().filter(|a| a.post.is_some()) {
+                errs.push(format!(
+                    "{} 写了 post：1029 期之前的 cards.toml 不用 post（out 是 images/ 下的文件名）",
+                    a.out
+                ));
+            }
+            return errs;
+        }
+        let posts = self.tldr.len();
+        let mut seen: Vec<String> = Vec::new();
+        for a in &self.annot {
+            let at = |e: &str| format!("批注图「{}」：{e}", a.out);
+            match (self.kind, a.post) {
+                (Kind::Main, None) => errs.push(at("缺少 post（它属于第几个主帖，1 起）")),
+                (Kind::Main, Some(p)) if p == 0 || p > posts => errs.push(at(&format!(
+                    "post = {p} 越界：本期有 {posts} 个主帖（[[tldr]]），post 从 1 起"
+                ))),
+                (Kind::Roundup, Some(_)) => errs.push(at("速览专帖没有主帖，不写 post")),
+                _ => {}
+            }
+            errs.extend(out_name_problems(&a.out).into_iter().map(|e| at(&e)));
+            let low = a.out.to_lowercase();
+            if seen.contains(&low) {
+                errs.push(at("out 与前面的重复（文件名不分大小写）"));
+            }
+            seen.push(low);
+        }
+        errs
+    }
+
+    /// What is worth a look but not an error: a main post without a
+    /// screenshot to back it up.
+    pub fn structure_warnings(&self) -> Vec<String> {
+        if !self.publish || self.kind != Kind::Main {
+            return Vec::new();
+        }
+        (self.tldr.iter().enumerate())
+            .filter(|(i, _)| self.annot.iter().all(|a| a.post != Some(i + 1)))
+            .map(|(i, t)| {
+                format!(
+                    "第 {} 个主帖「{}」没有批注图（[[annot]] 的 post = {}）",
+                    i + 1,
+                    t.tag,
+                    i + 1
+                )
+            })
+            .collect()
     }
 
     /// The [[event]] rules decidable from cards.toml alone; lint checks the
@@ -436,35 +519,184 @@ impl Spec {
         tldr.chain(annot).collect()
     }
 
-    /// Image file names this spec renders.
-    pub fn outputs(&self) -> Vec<&str> {
+    /// Image file names this spec renders (relative to `images/`).
+    pub fn outputs(&self) -> Vec<String> {
         self.jobs().into_iter().map(|(out, _)| out).collect()
     }
 
     /// Each output with what renders it, in rendering order.
-    fn jobs(&self) -> Vec<(&str, Job<'_>)> {
+    fn jobs(&self) -> Vec<(String, Job<'_>)> {
+        (self.items().into_iter())
+            .filter(|(_, job)| !matches!(job, Job::Picked))
+            .collect()
+    }
+
+    /// Every image this issue uploads, with what makes it, in upload order and
+    /// relative to `images/`. Old layout: the rendered files only, as flat
+    /// `00-…` names. From [`PUBLISH_FROM`]: the whole of `images/publish/`,
+    /// the two covers first, then numbered 01, 02, … without gaps.
+    pub fn items(&self) -> Vec<(String, Job<'_>)> {
+        if self.publish {
+            self.publish_items()
+        } else {
+            self.flat_items()
+        }
+    }
+
+    fn flat_items(&self) -> Vec<(String, Job<'_>)> {
         let mut jobs = Vec::new();
         if self.kind == Kind::Roundup {
-            jobs.push((COVER_OUT, Job::Cover(CARD_SIZE)));
-            jobs.push((COVER_WIDE_OUT, Job::Cover(WIDE_SIZE)));
+            jobs.push((COVER_OUT.to_string(), Job::Cover(CARD_SIZE)));
+            jobs.push((COVER_WIDE_OUT.to_string(), Job::Cover(WIDE_SIZE)));
         }
         if !self.tldr.is_empty() {
-            jobs.push((TLDR_OUT, Job::Tldr));
+            jobs.push((TLDR_OUT.to_string(), Job::Tldr));
         }
         if !self.roundup.is_empty() {
-            jobs.push((ROUNDUP_OUT, Job::Roundup));
+            jobs.push((ROUNDUP_OUT.to_string(), Job::Roundup));
         }
         // Upload order: each main post's 事件卡, then its 吠点卡.
-        let mut barks = self.bark_outputs().enumerate().peekable();
-        for (i, o) in self.event_outputs().enumerate() {
-            jobs.push((o, Job::Event(i)));
-            if let Some((j, b)) = barks.next_if(|(j, _)| *j == i) {
-                jobs.push((b, Job::Bark(j)));
+        let (events, barks) = (self.event_count(), self.bark_count());
+        for i in 0..events.max(barks) {
+            if i < events {
+                jobs.push((EVENT_OUTS[i].to_string(), Job::Event(i)));
+            }
+            if i < barks {
+                jobs.push((BARK_OUTS[i].to_string(), Job::Bark(i)));
             }
         }
-        jobs.extend(barks.map(|(i, o)| (o, Job::Bark(i))));
-        jobs.extend(self.annot.iter().map(|a| (a.out.as_str(), Job::Annot(a))));
+        jobs.extend((self.annot.iter()).map(|a| (a.out.clone(), Job::Annot(a))));
         jobs
+    }
+
+    fn publish_items(&self) -> Vec<(String, Job<'_>)> {
+        let mut items: Vec<(String, Job)> = Vec::new();
+        let (cover, wide) = if self.kind == Kind::Roundup {
+            (Job::Cover(CARD_SIZE), Job::Cover(WIDE_SIZE))
+        } else {
+            (Job::Picked, Job::Picked)
+        };
+        items.push((format!("{PUBLISH_DIR}/{COVER_OUT}"), cover));
+        items.push((format!("{PUBLISH_DIR}/{COVER_WIDE_OUT}"), wide));
+        let mut number = 0;
+        let mut name = |tail: &str| {
+            number += 1;
+            format!("{PUBLISH_DIR}/{number:02}-{tail}.png")
+        };
+        if !self.tldr.is_empty() {
+            items.push((name("tldr"), Job::Tldr));
+        }
+        if !self.roundup.is_empty() {
+            items.push((name("roundup"), Job::Roundup));
+        }
+        // Per main post: 事件卡, 吠点卡, then its screenshots in cards.toml
+        // order. Screenshots that name no real post (an error) come last.
+        let (events, barks) = (self.event_count(), self.bark_count());
+        let mut placed = vec![false; self.annot.len()];
+        for k in 0..self.tldr.len().max(events).max(barks) {
+            if k < events {
+                items.push((name(&format!("event-{}", k + 1)), Job::Event(k)));
+            }
+            if k < barks {
+                items.push((name(&format!("bark-{}", k + 1)), Job::Bark(k)));
+            }
+            for (a, done) in self.annot.iter().zip(&mut placed) {
+                if a.post == Some(k + 1) {
+                    items.push((name(&a.out), Job::Annot(a)));
+                    *done = true;
+                }
+            }
+        }
+        for (a, _) in self.annot.iter().zip(&placed).filter(|(_, done)| !**done) {
+            items.push((name(&a.out), Job::Annot(a)));
+        }
+        items
+    }
+
+    /// 事件卡 and 吠点卡 that get a file (no more than the fixed names).
+    fn event_count(&self) -> usize {
+        self.event.len().min(EVENT_OUTS.len())
+    }
+
+    fn bark_count(&self) -> usize {
+        self.bark.len().min(BARK_OUTS.len())
+    }
+
+    /// The directory under `images/` that the outputs go to.
+    pub fn out_dir(&self, images: &Path) -> PathBuf {
+        if self.publish {
+            images.join(PUBLISH_DIR)
+        } else {
+            images.to_path_buf()
+        }
+    }
+
+    /// An annotated screenshot's base image, relative to `images/`: the
+    /// output's name plus `-raw` (old layout, `41-x.png` -> `41-x-raw.png`), or
+    /// the bare `out` plus `-raw` (`x-raw.png`), which carries no number
+    /// because the tool numbers the output.
+    pub fn raw_file(&self, a: &Annot) -> Option<String> {
+        if self.publish {
+            Some(format!("{}-raw.png", a.out))
+        } else {
+            a.out
+                .strip_suffix(".png")
+                .map(|stem| format!("{stem}-raw.png"))
+        }
+    }
+
+    fn raw_path(&self, a: &Annot, images: &Path) -> Option<PathBuf> {
+        self.raw_file(a).map(|f| images.join(f))
+    }
+
+    /// An output as typed on the command line: in the publish layout the
+    /// `publish/` directory may be left out.
+    fn output_name(&self, typed: &str) -> String {
+        let typed = typed.replace('\\', "/");
+        if self.publish && !typed.contains('/') {
+            format!("{PUBLISH_DIR}/{typed}")
+        } else {
+            typed
+        }
+    }
+
+    /// Names in `images/publish/` that the current outputs do not claim, as
+    /// `(stale, unknown)`: `stale` are this tool's own earlier products
+    /// (`NN-tldr.png`, `NN-roundup.png`, `NN-event-K.png`, `NN-bark-K.png`,
+    /// `NN-<name>.png` for an `[[annot]]` still in cards.toml) under a number
+    /// or post that has since changed; `unknown` is everything else. The
+    /// covers (`00-cover*`) are neither: they are copied in by hand.
+    pub fn leftovers(&self, names: &[String]) -> (Vec<String>, Vec<String>) {
+        let current: Vec<String> = (self.items().iter())
+            .map(|(n, _)| leaf_name(n).to_lowercase())
+            .collect();
+        let tails: Vec<String> = (self.annot.iter())
+            .map(|a| a.out.to_lowercase())
+            .chain(["tldr".to_string(), "roundup".to_string()])
+            .chain((1..=EVENT_OUTS.len()).map(|k| format!("event-{k}")))
+            .chain((1..=BARK_OUTS.len()).map(|k| format!("bark-{k}")))
+            .collect();
+        let (mut stale, mut unknown) = (Vec::new(), Vec::new());
+        for n in names {
+            let low = n.to_lowercase();
+            if low.starts_with("00-cover") || current.contains(&low) {
+                continue;
+            }
+            let own = low.strip_suffix(".png").is_some_and(|t| {
+                t.split_once('-').is_some_and(|(num, tail)| {
+                    num.len() == 2
+                        && num != "00"
+                        && num.bytes().all(|b| b.is_ascii_digit())
+                        && tails.iter().any(|x| x == tail)
+                })
+            });
+            if own {
+                stale.push(n.clone());
+            } else {
+                unknown.push(n.clone());
+            }
+        }
+        (stale, unknown)
     }
 
     /// Hash of everything that determines `job`'s image except Chrome and the
@@ -490,6 +722,7 @@ impl Spec {
         part(tool.as_bytes());
         part(&json(&(self.kind, &self.date)));
         match job {
+            Job::Picked => {}
             Job::Cover((w, h)) => {
                 part(COVER_TEMPLATE.as_bytes());
                 part(&json(&(w, h, &self.roundup)));
@@ -518,12 +751,56 @@ impl Spec {
             Job::Annot(a) => {
                 part(ANNOT_TEMPLATE.as_bytes());
                 part(&json(a));
-                part(&file(raw_path(a, images).as_deref()));
+                part(&file(self.raw_path(a, images).as_deref()));
                 part(ocr.as_bytes());
             }
         }
         hex(&hasher.finalize())
     }
+}
+
+/// An output name without its `publish/` directory.
+pub fn leaf_name(name: &str) -> &str {
+    name.strip_prefix(PUBLISH_DIR)
+        .and_then(|t| t.strip_prefix('/'))
+        .unwrap_or(name)
+}
+
+/// Why an `[[annot]]` `out` is not a valid short name (2026-10-29 on), if it
+/// is not: no number, no extension, plain ASCII, nothing the tool names itself.
+fn out_name_problems(out: &str) -> Vec<String> {
+    let mut errs = Vec::new();
+    let digits = out.bytes().take_while(u8::is_ascii_digit).count();
+    if out.trim().is_empty() {
+        errs.push("out 为空".to_string());
+        return errs;
+    }
+    if out.contains(['/', '\\']) || out.contains('.') {
+        errs.push(format!(
+            "out 写不带扩展名、不含路径的短英文名（如 carbon-rollout），.png 由工具加：「{out}」"
+        ));
+    }
+    if digits > 0 && out[digits..].starts_with('-') {
+        errs.push(format!(
+            "out 不带序号前缀（序号由工具按主帖顺序编，如 03-）：「{out}」"
+        ));
+    }
+    if !out
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        errs.push(format!("out 只用英文字母、数字、- 和 _：「{out}」"));
+    }
+    let low = out.to_lowercase();
+    let reserved = ["tldr", "roundup", "cover", "cover-wide"].contains(&low.as_str())
+        || ["event-", "bark-"].iter().any(|p| {
+            low.strip_prefix(p)
+                .is_some_and(|k| k.bytes().all(|b| b.is_ascii_digit()))
+        });
+    if reserved {
+        errs.push(format!("out「{out}」是工具自己用的名字，换一个"));
+    }
+    errs
 }
 
 /// Serialization of in-memory spec values cannot fail.
@@ -535,11 +812,14 @@ fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-/// What renders one output.
+/// What makes one image of the upload set.
 #[derive(Clone, Copy)]
-enum Job<'a> {
+pub enum Job<'a> {
     /// A 速览专帖 template cover of this size.
     Cover((u32, u32)),
+    /// A main post's cover: generated and copied in by hand, never rendered
+    /// here (2026-10-29 layout only; listed so the upload order is complete).
+    Picked,
     Tldr,
     Roundup,
     /// The 事件卡 of `spec.event[i]`.
@@ -549,7 +829,26 @@ enum Job<'a> {
     Annot(&'a Annot),
 }
 
-/// `Ok(None)` when the issue has no `images/cards.toml`.
+/// `docs/<YYMM>/<MMDD>` -> `YYMMMMDD` as a number; `None` if the path is not
+/// shaped like an issue directory.
+pub(crate) fn issue_key(dir: &Path) -> Option<u32> {
+    let four = |p: Option<&Path>| {
+        p.and_then(Path::file_name)
+            .and_then(|n| n.to_str())
+            .filter(|n| n.len() == 4 && n.bytes().all(|b| b.is_ascii_digit()))
+            .and_then(|n| n.parse::<u32>().ok())
+    };
+    Some(four(dir.parent())? * 10_000 + four(Some(dir))?)
+}
+
+/// Whether an issue (by [`issue_key`]) uses the `images/publish/` layout.
+/// Unrecognised paths get the current rules.
+pub(crate) fn publish_era(key: Option<u32>) -> bool {
+    key.is_none_or(|k| k >= PUBLISH_FROM)
+}
+
+/// `Ok(None)` when the issue has no `images/cards.toml`. The layout (flat
+/// `images/` or `images/publish/`) follows from the issue's date.
 pub fn load_spec(images: &Path) -> Result<Option<Spec>, String> {
     let path = images.join(SPEC_FILE);
     let text = match fs::read_to_string(&path) {
@@ -557,23 +856,40 @@ pub fn load_spec(images: &Path) -> Result<Option<Spec>, String> {
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
         Err(e) => return Err(format!("{}: {e}", path.display())),
     };
-    toml::from_str(&text)
-        .map(Some)
-        .map_err(|e| format!("{}: {e}", path.display()))
+    let mut spec: Spec = toml::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+    // Resolve `.` and relative paths so the YYMM/MMDD components are visible.
+    let issue = images
+        .parent()
+        .map(|p| p.canonicalize().unwrap_or_else(|_| p.to_path_buf()));
+    spec.publish = publish_era(issue.as_deref().and_then(issue_key));
+    Ok(Some(spec))
 }
 
-const USAGE: &str = "用法：barking card <期次目录> [输出文件名...|--all]";
+const USAGE: &str = "用法：barking card <期次目录> [输出文件名...|--all|--check]";
 
 pub fn run(args: &[String]) -> ExitCode {
     let all = args.iter().any(|a| a == "--all");
-    let rest: Vec<&String> = args.iter().filter(|a| *a != "--all").collect();
+    let check = args.iter().any(|a| a == "--check");
+    let rest: Vec<&String> = args
+        .iter()
+        .filter(|a| *a != "--all" && *a != "--check")
+        .collect();
     let Some((dir, only)) = rest.split_first() else {
         eprintln!("{USAGE}");
         return ExitCode::from(2);
     };
-    if rest.iter().any(|a| a.starts_with("--")) || (all && !only.is_empty()) {
-        eprintln!("{USAGE}（--all 与文件名不能同时用）");
+    if rest.iter().any(|a| a.starts_with("--")) || ((all || check) && !only.is_empty()) {
+        eprintln!("{USAGE}（--all、--check 与文件名不能同时用）");
         return ExitCode::from(2);
+    }
+    if check {
+        return match check_issue(Path::new(dir.as_str())) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                eprintln!("error: {e}");
+                ExitCode::FAILURE
+            }
+        };
     }
     let only: Vec<&str> = only.iter().map(|s| s.as_str()).collect();
     match render_issue(Path::new(dir.as_str()), &only, all) {
@@ -615,6 +931,10 @@ fn render_issue(dir: &Path, only: &[&str], all: bool) -> Result<Outcome, String>
             images.join(SPEC_FILE).display()
         )
     })?;
+    // In the publish layout a bare `03-x.png` means `publish/03-x.png`.
+    let only: Vec<String> = only.iter().map(|o| spec.output_name(o)).collect();
+    let only: Vec<&str> = only.iter().map(String::as_str).collect();
+    let only = only.as_slice();
     let problems = precheck(&spec, &images, only);
     if !problems.is_empty() {
         return Err(format!(
@@ -622,6 +942,9 @@ fn render_issue(dir: &Path, only: &[&str], all: bool) -> Result<Outcome, String>
             problems.len(),
             problems.join("\n")
         ));
+    }
+    for w in spec.structure_warnings() {
+        println!("note: {w}");
     }
     let avatar = match spec.kind {
         Kind::Roundup => Some(repo_root(dir)?.join(AVATAR)),
@@ -646,7 +969,7 @@ fn render_issue(dir: &Path, only: &[&str], all: bool) -> Result<Outcome, String>
     let mut todo = Vec::new();
     let mut skipped = Vec::new();
     for (out, job) in spec.jobs() {
-        if !only.is_empty() && !only.contains(&out) {
+        if !only.is_empty() && !only.contains(&out.as_str()) {
             continue;
         }
         let ocr = match job {
@@ -669,8 +992,8 @@ fn render_issue(dir: &Path, only: &[&str], all: bool) -> Result<Outcome, String>
         let fp = (tool.as_deref())
             .zip(ocr)
             .map(|(t, ocr)| spec.fingerprint(&job, &images, avatar.as_deref(), t, ocr));
-        let png = images.join(out);
-        let unchanged = fp.is_some() && cache.get(out) == fp.as_ref() && png.is_file();
+        let png = images.join(&out);
+        let unchanged = fp.is_some() && cache.get(&out) == fp.as_ref() && png.is_file();
         if only.is_empty() && !all && unchanged {
             // Keeps lint's mtime check ("older than cards.toml") meaningful.
             if let Err(e) = touch(&png) {
@@ -684,6 +1007,7 @@ fn render_issue(dir: &Path, only: &[&str], all: bool) -> Result<Outcome, String>
             todo.push((out, job, fp));
         }
     }
+    let whole = only.is_empty();
     if !skipped.is_empty() {
         println!(
             "跳过 {} 张（输入未变）：{}",
@@ -692,6 +1016,9 @@ fn render_issue(dir: &Path, only: &[&str], all: bool) -> Result<Outcome, String>
         );
     }
     if todo.is_empty() {
+        if whole {
+            clear_leftovers(&spec, &images, &mut cache, cache_file.as_deref());
+        }
         return Ok(Outcome {
             rendered: 0,
             skipped: skipped.len(),
@@ -704,12 +1031,14 @@ fn render_issue(dir: &Path, only: &[&str], all: bool) -> Result<Outcome, String>
         .join("barking-card")
         .join(std::process::id().to_string());
     fs::create_dir_all(&work).map_err(|e| format!("{}: {e}", work.display()))?;
+    let out_dir = spec.out_dir(&images);
+    fs::create_dir_all(&out_dir).map_err(|e| format!("{}: {e}", out_dir.display()))?;
     let mut failed = Vec::new();
     let mut rendered = 0;
     for (out, job, fp) in todo {
-        let result = render_one(&mut cache, cache_file.as_deref(), out, fp, || {
+        let result = render_one(&mut cache, cache_file.as_deref(), &out, fp, || {
             let (html, size) = job_html(&spec, job, &images, &work, avatar.as_deref())?;
-            render(&chrome, &work, &html, size, &images.join(out))
+            render(&chrome, &work, &html, size, &images.join(&out))
         });
         match result {
             Ok(()) => rendered += 1,
@@ -718,16 +1047,125 @@ fn render_issue(dir: &Path, only: &[&str], all: bool) -> Result<Outcome, String>
     }
     if !failed.is_empty() {
         return Err(format!(
-            "{} 张失败（另有 {rendered} 张已渲染，{} 张跳过）：\n{}",
+            "{} 张失败（另有 {rendered} 张已渲染，{} 张跳过；旧编号的残留文件待全部渲染成功后再清）：\n{}",
             failed.len(),
             skipped.len(),
             failed.join("\n")
         ));
     }
+    if whole {
+        clear_leftovers(&spec, &images, &mut cache, cache_file.as_deref());
+    }
     Ok(Outcome {
         rendered,
         skipped: skipped.len(),
     })
+}
+
+/// Files in `images/publish/` (names only), sorted; sub-directories skipped.
+fn publish_files(dir: &Path) -> Vec<String> {
+    let mut names: Vec<String> = fs::read_dir(dir)
+        .map(|rd| {
+            rd.filter_map(Result::ok)
+                .filter(|e| e.path().is_file())
+                .filter_map(|e| e.file_name().into_string().ok())
+                .collect()
+        })
+        .unwrap_or_default();
+    names.sort();
+    names
+}
+
+/// After a whole-issue run in the publish layout: deletes the files of this
+/// tool's own naming that are no longer outputs (a changed `post` or order
+/// renumbers files; the old numbers would otherwise be uploaded too), forgets
+/// their cache entries, and says what it did. Files it cannot account for are
+/// only reported. Never touches `00-cover*`.
+fn clear_leftovers(spec: &Spec, images: &Path, cache: &mut Cache, cache_file: Option<&Path>) {
+    if !spec.publish {
+        return;
+    }
+    let dir = spec.out_dir(images);
+    let (stale, unknown) = spec.leftovers(&publish_files(&dir));
+    let mut removed = Vec::new();
+    for name in stale {
+        match fs::remove_file(dir.join(&name)) {
+            Ok(()) => {
+                cache.remove(&format!("{PUBLISH_DIR}/{name}"));
+                removed.push(name);
+            }
+            Err(e) => println!(
+                "warn: 删不掉旧编号的 {PUBLISH_DIR}/{name}：{e}（它已不在输出清单里，手动清掉）"
+            ),
+        }
+    }
+    if !removed.is_empty() {
+        println!(
+            "删除 {} 个旧编号的残留（已不在输出清单里）：{}",
+            removed.len(),
+            removed
+                .iter()
+                .map(|n| format!("{PUBLISH_DIR}/{n}"))
+                .collect::<Vec<_>>()
+                .join("、")
+        );
+        if let Some(file) = cache_file
+            && let Err(e) = cache.save(file)
+        {
+            println!("（缓存写入失败，下次将重渲：{e}）");
+        }
+    }
+    for name in unknown {
+        println!(
+            "warn: {PUBLISH_DIR}/{name} 不是任何输出，也不是本工具的旧产物，未动它；不上传的图不要放在 publish/"
+        );
+    }
+}
+
+/// `barking card <dir> --check`: the plan, read-only. Runs the checks that
+/// need neither Chrome nor OCR, lists every output with its path and whether
+/// the file exists, and names what a full run would delete. Writes nothing,
+/// takes no lock and leaves the render cache alone.
+fn check_issue(dir: &Path) -> Result<(), String> {
+    let images = dir.join("images");
+    let spec = load_spec(&images)?
+        .ok_or_else(|| format!("{} 不存在", images.join(SPEC_FILE).display()))?;
+    let layout = if spec.publish {
+        "images/publish/（1029 期起）"
+    } else {
+        "images/（1028 及更早期次）"
+    };
+    println!("版式：{layout}");
+    let problems = precheck(&spec, &images, &[]);
+    for p in &problems {
+        println!("error: {p}");
+    }
+    for w in spec.structure_warnings() {
+        println!("note: {w}");
+    }
+    for (name, job) in spec.items() {
+        let state = match job {
+            _ if images.join(&name).is_file() => "已存在",
+            Job::Picked => "缺（生图选定后复制进来）",
+            _ => "待渲染",
+        };
+        println!("{name}\t{state}");
+    }
+    if spec.publish {
+        let (stale, unknown) = spec.leftovers(&publish_files(&spec.out_dir(&images)));
+        for n in stale {
+            println!("{PUBLISH_DIR}/{n}\t旧编号残留，整期渲染时会删");
+        }
+        for n in unknown {
+            println!("{PUBLISH_DIR}/{n}\t未知文件，不会动它（lint 会报错）");
+        }
+    }
+    if problems.is_empty() {
+        println!("-- 检查通过，未渲染、未改动任何文件");
+        Ok(())
+    } else {
+        Err(format!("cards.toml 有 {} 处问题", problems.len()))
+    }
 }
 
 /// The page for one output and its viewport size.
@@ -739,6 +1177,7 @@ fn job_html(
     avatar: Option<&Path>,
 ) -> Result<(String, (u32, u32)), String> {
     match job {
+        Job::Picked => Err("主帖封面由生图得来，不由 barking card 渲染".into()),
         Job::Cover(size) => {
             let avatar = file_url(avatar.ok_or("速览专帖封面缺少看板娘路径")?)?;
             Ok((cover_html(spec, size, &avatar)?, size))
@@ -747,7 +1186,7 @@ fn job_html(
         Job::Roundup => Ok((roundup_html(spec)?, CARD_SIZE)),
         Job::Event(i) => Ok((event_html(spec, i)?, CARD_SIZE)),
         Job::Bark(i) => Ok((bark_html(spec, i)?, CARD_SIZE)),
-        Job::Annot(a) => Ok((annot_html(a, images, work)?, CARD_SIZE)),
+        Job::Annot(a) => Ok((annot_html(spec, a, images, work)?, CARD_SIZE)),
     }
 }
 
@@ -766,7 +1205,7 @@ fn precheck(spec: &Spec, images: &Path, only: &[&str]) -> Vec<String> {
         errs.push("cards.toml 里没有要渲染的卡片".into());
     }
     for (i, out) in outputs.iter().enumerate() {
-        if out.contains(['/', '\\']) || !out.ends_with(".png") {
+        if leaf_name(out).contains(['/', '\\']) || !out.ends_with(".png") {
             errs.push(format!(
                 "输出名「{out}」须为 images/ 下的 .png 文件名，不含路径"
             ));
@@ -775,7 +1214,10 @@ fn precheck(spec: &Spec, images: &Path, only: &[&str]) -> Vec<String> {
             errs.push(format!("输出名「{out}」与前面的重复（文件名不分大小写）"));
         }
     }
-    let unknown: Vec<&&str> = only.iter().filter(|o| !outputs.contains(o)).collect();
+    let unknown: Vec<&&str> = only
+        .iter()
+        .filter(|o| !outputs.iter().any(|out| out == **o))
+        .collect();
     if !unknown.is_empty() {
         errs.push(format!("cards.toml 中没有这些输出：{unknown:?}"));
     }
@@ -790,36 +1232,32 @@ fn precheck(spec: &Spec, images: &Path, only: &[&str]) -> Vec<String> {
                 .into(),
         );
     }
-    for a in &spec.annot {
+    for (name, job) in spec.jobs() {
+        let Job::Annot(a) = job else { continue };
         // Base images are git-ignored and may be absent from a fresh checkout;
         // when rendering named outputs, only theirs must be present.
-        let selected = only.is_empty() || only.contains(&a.out.as_str());
+        let selected = only.is_empty() || only.contains(&name.as_str());
         errs.extend(
-            annot_problems(a, images, selected)
+            annot_problems(spec, a, images, selected)
                 .into_iter()
-                .map(|e| format!("{}：{e}", a.out)),
+                .map(|e| format!("{name}：{e}")),
         );
     }
     errs
-}
-
-/// `images/<stem>-raw.png` for an annotated screenshot, if `out` is a .png.
-fn raw_path(a: &Annot, images: &Path) -> Option<PathBuf> {
-    let stem = a.out.strip_suffix(".png")?;
-    Some(images.join(format!("{stem}-raw.png")))
 }
 
 /// What is wrong with one [[annot]] short of OCR. Empty means `annot_html`
 /// can rely on: 1–4 notes, each with exactly one of quote/rects, rects inside
 /// the base image, underline only with quote, emph inside its gloss. Without
 /// `with_raw` the base image is not read, and rects go unchecked against it.
-fn annot_problems(a: &Annot, images: &Path, with_raw: bool) -> Vec<String> {
+fn annot_problems(spec: &Spec, a: &Annot, images: &Path, with_raw: bool) -> Vec<String> {
     let mut errs = Vec::new();
     if a.note.is_empty() || a.note.len() > MAX_NOTES {
         errs.push(format!("每张批注图需 1–{MAX_NOTES} 条 note"));
     }
     // A non-.png `out` has no base image; the output-name check reports it.
-    let size = raw_path(a, images)
+    let size = spec
+        .raw_path(a, images)
         .filter(|_| with_raw)
         .and_then(|raw| png_size(&raw).map_err(|e| errs.push(e)).ok());
     for (i, note) in a.note.iter().enumerate() {
@@ -1287,13 +1725,13 @@ pub(crate) fn repo_root(dir: &Path) -> Result<PathBuf, String> {
         .ok_or_else(|| format!("{} 不在 AI-Barking 仓库内", dir.display()))
 }
 
-fn annot_html(a: &Annot, images: &Path, work: &Path) -> Result<String, String> {
+fn annot_html(spec: &Spec, a: &Annot, images: &Path, work: &Path) -> Result<String, String> {
     // Normally already reported by `precheck`; repeated so this function
     // never relies on a caller for its own invariants.
-    if let Some(e) = annot_problems(a, images, true).into_iter().next() {
+    if let Some(e) = annot_problems(spec, a, images, true).into_iter().next() {
         return Err(e);
     }
-    let raw = raw_path(a, images).ok_or("out 须为 .png 文件名")?;
+    let raw = spec.raw_path(a, images).ok_or("out 须为 .png 文件名")?;
     let (w, h) = png_size(&raw)?;
     // OCR runs at most once per image, on first need.
     let mut ocr: Option<Vec<Word>> = None;
@@ -2161,23 +2599,31 @@ mod tests {
 
     #[test]
     fn example_spec_parses_and_lists_quoted_texts() {
-        let spec: Spec =
+        let mut spec: Spec =
             toml::from_str(include_str!("../../../templates/cards/example.toml")).unwrap();
+        // The sample is written for the layout of 1029 on.
+        spec.publish = true;
         assert_eq!(spec.tldr.len(), 2);
         // Two 省流 facts and the two main-post 速览 titles.
         assert_eq!(spec.quoted_texts().len(), 4);
         assert!(spec.retired_barks().is_empty());
-        assert!(spec.structure_errors().is_empty());
+        assert!(
+            spec.structure_errors().is_empty(),
+            "{:?}",
+            spec.structure_errors()
+        );
+        assert!(spec.structure_warnings().is_empty());
         assert_eq!(
             spec.outputs(),
             [
-                TLDR_OUT,
-                ROUNDUP_OUT,
-                "00-event-1.png",
-                "00-bark-1.png",
-                "00-event-2.png",
-                "00-bark-2.png",
-                "01-openai-dns-pause.png"
+                "publish/01-tldr.png",
+                "publish/02-roundup.png",
+                "publish/03-event-1.png",
+                "publish/04-bark-1.png",
+                "publish/05-openai-dns-pause.png",
+                "publish/06-event-2.png",
+                "publish/07-bark-2.png",
+                "publish/08-claude-nine-loop.png",
             ]
         );
     }
@@ -3095,5 +3541,408 @@ note = []
         ] {
             assert!(parse_tess(&version, &p(true, bad, "")).is_none(), "{bad:?}");
         }
+    }
+    // ---- 2026-10-29 layout: images/publish/, numbered in upload order -----
+
+    /// Three main posts A, B, C with all cards, plus `annot` appended. Parsed
+    /// from text, so it starts in the old layout; the caller says which.
+    fn posts_spec(annot: &str, publish: bool) -> Spec {
+        let mut head = String::from("date = \"d\"\n");
+        for t in ["A", "B", "C"] {
+            head += &format!("[[tldr]]\ntag = \"{t}\"\nfact = \"f\"\n");
+            head += &format!("[[roundup]]\ntag = \"{t}\"\nmain = true\ntext = \"标题{t}\"\n");
+            head += &format!("[[event]]\ntag = \"{t}\"\nparas = [\"p\"]\n");
+            head += &format!("[[bark]]\ntag = \"{t}\"\npoints = [\"q\"]\n");
+        }
+        for i in 0..3 {
+            head += &format!("[[roundup]]\ntag = \"x{i}\"\ntext = \"t\"\n");
+        }
+        let mut spec: Spec = toml::from_str(&format!("{head}{annot}")).unwrap();
+        spec.publish = publish;
+        spec
+    }
+
+    fn annot_toml(out: &str, post: Option<usize>) -> String {
+        let post = post.map_or(String::new(), |p| format!("post = {p}\n"));
+        format!(
+            "[[annot]]\nout = \"{out}\"\n{post}title = \"t\"\nsource = \"s\"\n\
+                 [[annot.note]]\nquote = \"q\"\ngloss = \"g\"\n"
+        )
+    }
+
+    fn names(spec: &Spec) -> Vec<String> {
+        spec.outputs()
+    }
+
+    #[test]
+    fn publish_numbers_follow_the_main_posts() {
+        // Out of order in the file; post 3 has no screenshot.
+        let annots = [
+            annot_toml("late", Some(2)),
+            annot_toml("first", Some(1)),
+            annot_toml("also-late", Some(2)),
+        ]
+        .concat();
+        let spec = posts_spec(&annots, true);
+        assert!(
+            spec.structure_errors().is_empty(),
+            "{:?}",
+            spec.structure_errors()
+        );
+        assert_eq!(
+            names(&spec),
+            [
+                "publish/01-tldr.png",
+                "publish/02-roundup.png",
+                "publish/03-event-1.png",
+                "publish/04-bark-1.png",
+                "publish/05-first.png",
+                "publish/06-event-2.png",
+                "publish/07-bark-2.png",
+                "publish/08-late.png",
+                "publish/09-also-late.png",
+                "publish/10-event-3.png",
+                "publish/11-bark-3.png",
+            ]
+        );
+        // The covers lead the upload set but are not rendered here.
+        let items = spec.items();
+        assert_eq!(items[0].0, "publish/00-cover.png");
+        assert_eq!(items[1].0, "publish/00-cover-wide.png");
+        assert!(items[..2].iter().all(|(_, j)| matches!(j, Job::Picked)));
+        assert_eq!(items.len(), names(&spec).len() + 2);
+        // A post without a screenshot is a warning, not an error.
+        let warns = spec.structure_warnings();
+        assert_eq!(warns.len(), 1);
+        assert!(warns[0].contains("第 3 个主帖") && warns[0].contains("post = 3"));
+        // Cards of the same post come before its screenshots, by file name.
+        assert_eq!(spec.event_outputs().len(), 3);
+        assert_eq!(spec.bark_outputs()[2], "publish/11-bark-3.png");
+        let mut sorted = names(&spec);
+        sorted.sort();
+        assert_eq!(sorted, names(&spec), "name order is upload order");
+
+        // Moving a screenshot to another post renumbers what follows.
+        let moved = [
+            annot_toml("late", Some(2)),
+            annot_toml("first", Some(3)),
+            annot_toml("also-late", Some(2)),
+        ]
+        .concat();
+        let after = names(&posts_spec(&moved, true));
+        assert_eq!(after[4], "publish/05-event-2.png");
+        assert_eq!(after[5], "publish/06-bark-2.png");
+        assert_eq!(after[6], "publish/07-late.png");
+        assert_eq!(after[10], "publish/11-first.png");
+    }
+
+    #[test]
+    fn old_layout_keeps_flat_names_and_rejects_post() {
+        let annots = [
+            "[[annot]]\nout = \"41-x.png\"\ntitle = \"t\"\nsource = \"s\"\n\
+                 [[annot.note]]\nquote = \"q\"\ngloss = \"g\"\n",
+            "[[annot]]\nout = \"40-y.png\"\ntitle = \"t\"\nsource = \"s\"\n\
+                 [[annot.note]]\nquote = \"q\"\ngloss = \"g\"\n",
+        ]
+        .concat();
+        let spec = posts_spec(&annots, false);
+        assert!(
+            spec.structure_errors().is_empty(),
+            "{:?}",
+            spec.structure_errors()
+        );
+        assert!(spec.structure_warnings().is_empty());
+        assert_eq!(
+            names(&spec),
+            [
+                "00-tldr.png",
+                "00-roundup.png",
+                "00-event-1.png",
+                "00-bark-1.png",
+                "00-event-2.png",
+                "00-bark-2.png",
+                "00-event-3.png",
+                "00-bark-3.png",
+                "41-x.png",
+                "40-y.png",
+            ]
+        );
+        // No covers in the list, and nothing under publish/.
+        assert_eq!(spec.items().len(), names(&spec).len());
+        assert_eq!(spec.out_dir(Path::new("images")), Path::new("images"));
+        let a = &spec.annot[0];
+        assert_eq!(spec.raw_file(a).as_deref(), Some("41-x-raw.png"));
+        // `post` belongs to the new layout.
+        let with_post = posts_spec(&annot_toml("41-x.png", Some(1)), false);
+        assert!(
+            with_post
+                .structure_errors()
+                .join("\n")
+                .contains("不用 post")
+        );
+    }
+
+    #[test]
+    fn publish_annot_names_and_posts_are_checked() {
+        let errs = |annot: String| posts_spec(&annot, true).structure_errors().join("\n");
+        // Fine: a digit-led stem that is not a number prefix.
+        assert!(errs(annot_toml("36kr-overstated", Some(1))).is_empty());
+        for (out, needle) in [
+            ("03-carbon", "序号前缀"),
+            ("carbon.png", "扩展名"),
+            ("a/b", "扩展名"),
+            ("carbón", "英文字母"),
+            ("tldr", "工具自己用"),
+            ("Event-2", "工具自己用"),
+            ("cover-wide", "工具自己用"),
+            ("", "为空"),
+        ] {
+            let e = errs(annot_toml(out, Some(1)));
+            assert!(e.contains(needle), "{out}: {e}");
+        }
+        assert!(errs(annot_toml("x", None)).contains("缺少 post"));
+        assert!(errs(annot_toml("x", Some(0))).contains("越界"));
+        let e = errs(annot_toml("x", Some(4)));
+        assert!(e.contains("post = 4 越界") && e.contains("3 个主帖"), "{e}");
+        let dup = [annot_toml("Same", Some(1)), annot_toml("same", Some(2))].concat();
+        assert!(errs(dup).contains("重复"));
+        // An out-of-range screenshot is still listed (last), so nothing is lost.
+        let bad = posts_spec(&annot_toml("x", Some(9)), true);
+        assert_eq!(names(&bad).last().unwrap(), "publish/09-x.png");
+    }
+
+    #[test]
+    fn publish_roundup_issue_numbers_from_one() {
+        let mut solo: Spec = toml::from_str(
+            "kind = \"roundup\"\ndate = \"d\"\n\
+                 [[roundup]]\ntag = \"a\"\ntext = \"t\"\n[[roundup]]\ntag = \"b\"\ntext = \"t\"\n\
+                 [[roundup]]\ntag = \"c\"\ntext = \"t\"\n[[roundup]]\ntag = \"d\"\ntext = \"t\"\n\
+                 [[roundup]]\ntag = \"e\"\ntext = \"t\"\n",
+        )
+        .unwrap();
+        solo.publish = true;
+        assert!(solo.structure_errors().is_empty());
+        assert_eq!(
+            names(&solo),
+            [
+                "publish/00-cover.png",
+                "publish/00-cover-wide.png",
+                "publish/01-roundup.png"
+            ]
+        );
+        assert!(solo.structure_warnings().is_empty());
+        // The template covers are rendered; a post number makes no sense here.
+        assert!(
+            solo.jobs()
+                .iter()
+                .take(2)
+                .all(|(_, j)| matches!(j, Job::Cover(_)))
+        );
+        let with_post: Spec = {
+            let mut s = toml::from_str::<Spec>(&format!(
+                "kind = \"roundup\"\ndate = \"d\"\n{}{}",
+                (0..5)
+                    .map(|i| format!("[[roundup]]\ntag = \"t{i}\"\ntext = \"t\"\n"))
+                    .collect::<String>(),
+                annot_toml("x", Some(1))
+            ))
+            .unwrap();
+            s.publish = true;
+            s
+        };
+        assert!(
+            with_post
+                .structure_errors()
+                .join("\n")
+                .contains("不写 post")
+        );
+    }
+
+    #[test]
+    fn raw_base_has_no_number_in_the_new_layout() {
+        let spec = posts_spec(&annot_toml("carbon-rollout", Some(1)), true);
+        let a = &spec.annot[0];
+        assert_eq!(spec.raw_file(a).as_deref(), Some("carbon-rollout-raw.png"));
+        assert_eq!(
+            spec.raw_path(a, Path::new("images")),
+            Some(Path::new("images").join("carbon-rollout-raw.png"))
+        );
+        assert_eq!(
+            spec.out_dir(Path::new("images")),
+            Path::new("images").join("publish")
+        );
+        // `03-event-1.png` on the command line means the file in publish/.
+        assert_eq!(spec.output_name("03-event-1.png"), "publish/03-event-1.png");
+        assert_eq!(
+            spec.output_name("publish/03-event-1.png"),
+            "publish/03-event-1.png"
+        );
+        assert_eq!(
+            posts_spec("", false).output_name("00-tldr.png"),
+            "00-tldr.png"
+        );
+    }
+
+    #[test]
+    fn leftovers_are_only_this_tools_old_numbering() {
+        // Now: tldr 01, roundup 02, event-1 03, bark-1 04, first 05, ...
+        let annots = [annot_toml("first", Some(1)), annot_toml("late", Some(2))].concat();
+        let spec = posts_spec(&annots, true);
+        let listed = [
+            "00-cover.png",
+            "00-cover-wide.png",
+            "01-tldr.png",
+            "02-roundup.png",
+            "03-event-1.png",
+            "04-bark-1.png",
+            "05-first.png",
+            "05-event-2.png", // renumbered since: old number
+            "06-bark-2.png",  // renumbered since: old number
+            "06-late.png",    // current name is 08-late.png, so 06 is old
+            "08-late.png",
+            "09-removed-from-toml.png", // not in cards.toml any more: unknown
+            "07-event-3.png",
+            "00-tldr.png", // never ours to delete here
+            "Thumbs.db",
+            "notes.txt",
+            "00-COVER.PNG",
+        ]
+        .map(String::from);
+        let (stale, unknown) = spec.leftovers(&listed);
+        assert_eq!(
+            stale,
+            [
+                "05-event-2.png",
+                "06-bark-2.png",
+                "06-late.png",
+                "07-event-3.png"
+            ]
+            .map(String::from),
+            "{stale:?}"
+        );
+        assert_eq!(
+            unknown,
+            [
+                "09-removed-from-toml.png",
+                "00-tldr.png",
+                "Thumbs.db",
+                "notes.txt"
+            ]
+            .map(String::from)
+        );
+    }
+
+    #[test]
+    fn clearing_leftovers_deletes_only_stale_products() {
+        let annots = [annot_toml("first", Some(1)), annot_toml("late", Some(2))].concat();
+        let spec = posts_spec(&annots, true);
+        let images = scratch("clear");
+        let publish = images.join("publish");
+        fs::create_dir_all(&publish).unwrap();
+        // A sub-directory is neither stale nor deleted.
+        fs::create_dir_all(publish.join("keep-dir")).unwrap();
+        let files = [
+            "00-cover.png",      // by hand: kept
+            "00-cover-wide.png", // by hand: kept
+            "03-event-1.png",    // current: kept
+            "04-bark-1.png",     // current: kept
+            "09-bark-2.png",     // old number of a tool product: deleted
+            "04-first.png",      // old number: deleted
+            "10-removed.png",    // not ours to know: kept, reported
+            "notes.txt",         // unknown: kept
+        ];
+        for f in files {
+            fs::write(publish.join(f), b"x").unwrap();
+        }
+        // The raw base in images/ is out of reach.
+        fs::write(images.join("first-raw.png"), b"x").unwrap();
+        let mut cache = Cache::default();
+        cache.insert("publish/09-bark-2.png", "fp".into());
+        cache.insert("publish/03-event-1.png", "fp".into());
+
+        clear_leftovers(&spec, &images, &mut cache, None);
+
+        let left: Vec<String> = publish_files(&publish);
+        assert_eq!(
+            left,
+            [
+                "00-cover-wide.png",
+                "00-cover.png",
+                "03-event-1.png",
+                "04-bark-1.png",
+                "10-removed.png",
+                "notes.txt"
+            ]
+        );
+        assert!(images.join("first-raw.png").is_file());
+        assert!(publish.join("keep-dir").is_dir());
+        assert!(cache.get("publish/09-bark-2.png").is_none());
+        assert!(cache.get("publish/03-event-1.png").is_some());
+
+        // The old layout never deletes anything.
+        let old = posts_spec("", false);
+        fs::write(publish.join("04-bark-1.png"), b"y").unwrap();
+        clear_leftovers(&old, &images, &mut cache, None);
+        assert!(publish.join("04-bark-1.png").is_file());
+        let _ = fs::remove_dir_all(&images);
+    }
+
+    #[test]
+    fn the_layout_follows_the_issue_date() {
+        let layout = |yymm: &str, mmdd: &str| {
+            let root = scratch(&format!("era-{yymm}-{mmdd}"));
+            let images = root.join("docs").join(yymm).join(mmdd).join("images");
+            fs::create_dir_all(&images).unwrap();
+            fs::write(images.join(SPEC_FILE), "date = \"d\"\n").unwrap();
+            let publish = load_spec(&images).unwrap().unwrap().publish;
+            let _ = fs::remove_dir_all(&root);
+            publish
+        };
+        assert!(!layout("2610", "1028"));
+        assert!(!layout("2610", "1027"));
+        assert!(!layout("2609", "0930"));
+        assert!(layout("2610", "1029"));
+        assert!(layout("2610", "1030"));
+        assert!(layout("2611", "0101"));
+        // A path that is not an issue directory gets the current rules.
+        let loose = scratch("era-loose");
+        fs::write(loose.join(SPEC_FILE), "date = \"d\"\n").unwrap();
+        assert!(load_spec(&loose).unwrap().unwrap().publish);
+        let _ = fs::remove_dir_all(&loose);
+        assert!(!publish_era(Some(2610_1028)) && publish_era(Some(PUBLISH_FROM)));
+    }
+
+    /// The committed issues from before the change keep their file names and
+    /// pass the structure rules: 1028 is checked too while it is in the tree.
+    #[test]
+    fn published_issues_keep_their_flat_layout() {
+        let docs = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/2610");
+        let mut seen = 0;
+        for issue in ["1026", "1027", "1028"] {
+            let images = docs.join(issue).join("images");
+            let Some(spec) = load_spec(&images).unwrap_or(None) else {
+                continue;
+            };
+            seen += 1;
+            assert!(!spec.publish, "{issue}");
+            assert!(spec.structure_errors().is_empty(), "{issue}");
+            assert!(spec.structure_warnings().is_empty(), "{issue}");
+            let outs = spec.outputs();
+            assert!(outs.iter().all(|o| !o.contains('/')), "{issue}: {outs:?}");
+            assert_eq!(outs.len(), spec.items().len(), "{issue}");
+            assert_eq!(outs[0], TLDR_OUT, "{issue}");
+            assert_eq!(outs[1], ROUNDUP_OUT, "{issue}");
+            for a in &spec.annot {
+                assert!(outs.contains(&a.out), "{issue}: {}", a.out);
+                assert_eq!(
+                    spec.raw_file(a).unwrap(),
+                    format!("{}-raw.png", a.out.trim_end_matches(".png")),
+                    "{issue}"
+                );
+            }
+            assert_eq!(spec.out_dir(&images), images);
+        }
+        // 1026 and 1027 are committed; without them the test proves nothing.
+        assert!(seen >= 2, "found {seen} of the published issues");
     }
 }

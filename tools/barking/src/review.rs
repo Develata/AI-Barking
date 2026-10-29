@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 use std::time::Instant;
 
-use crate::card::{self, Kind, Spec};
+use crate::card::{self, Job, Kind, Spec};
 use crate::offsite;
 use crate::repo::Issue;
 
@@ -577,12 +577,18 @@ fn read_lf(path: &Path) -> Result<String, String> {
         .map_err(|e| format!("{}: {e}", path.display()))
 }
 
-/// Images the visual reviewer should see, in review order: 省流卡, 速览图,
-/// each main post's 事件卡 then 吠点卡, covers, then each annotated screenshot followed by its `-raw` base (the
-/// reviewer compares the two to confirm no source pixel was altered).
+/// Images the visual reviewer should see, in review order. 1029 on: the
+/// contents of `images/publish/` in upload order, each annotated screenshot
+/// followed by its `images/<name>-raw.png` base. Before: 省流卡, 速览图, each
+/// main post's 事件卡 then 吠点卡, covers, then each annotated screenshot
+/// followed by its `-raw` base (the reviewer compares the two to confirm no
+/// source pixel was altered).
 /// `exists` answers for issue-relative paths. Missing images are reported,
 /// not silently dropped: a review that skipped one is not a full review.
 fn attachments(spec: &Spec, exists: impl Fn(&str) -> bool) -> (Vec<Attachment>, Vec<String>) {
+    if spec.publish {
+        return publish_attachments(spec, exists);
+    }
     let outputs = spec.outputs();
     let (mut out, mut warns) = (Vec::new(), Vec::new());
     // Attaches `images/<name>` if it exists; says whether it did.
@@ -595,14 +601,18 @@ fn attachments(spec: &Spec, exists: impl Fn(&str) -> bool) -> (Vec<Attachment>, 
         found
     };
     let missing = |name: &str| format!("images/{name} 不存在，未附（复核不完整）");
-    if outputs.contains(&card::TLDR_OUT) && !add(card::TLDR_OUT, "省流卡") {
+    if outputs.iter().any(|o| o == card::TLDR_OUT) && !add(card::TLDR_OUT, "省流卡") {
         warns.push(missing(card::TLDR_OUT));
     }
-    if outputs.contains(&card::ROUNDUP_OUT) && !add(card::ROUNDUP_OUT, "速览聚合图") {
+    if outputs.iter().any(|o| o == card::ROUNDUP_OUT) && !add(card::ROUNDUP_OUT, "速览聚合图")
+    {
         warns.push(missing(card::ROUNDUP_OUT));
     }
     // Per main post: 事件卡 first, then 吠点卡, as they are uploaded.
-    let (mut events, mut barks) = (spec.event_outputs(), spec.bark_outputs());
+    let (mut events, mut barks) = (
+        spec.event_outputs().into_iter(),
+        spec.bark_outputs().into_iter(),
+    );
     loop {
         let (e, b) = (events.next(), barks.next());
         if e.is_none() && b.is_none() {
@@ -610,9 +620,9 @@ fn attachments(spec: &Spec, exists: impl Fn(&str) -> bool) -> (Vec<Attachment>, 
         }
         for (name, label) in [(e, "事件卡"), (b, "吠点卡")] {
             if let Some(name) = name
-                && !add(name, label)
+                && !add(&name, label)
             {
-                warns.push(missing(name));
+                warns.push(missing(&name));
             }
         }
     }
@@ -640,6 +650,53 @@ fn attachments(spec: &Spec, exists: impl Fn(&str) -> bool) -> (Vec<Attachment>, 
                 "images/{raw} 不存在：复核者无法核对 {} 有没有改动原文像素",
                 a.out
             ));
+        }
+    }
+    (out, warns)
+}
+
+/// The 1029-on version of [`attachments`]: `images/publish/` in upload order.
+/// A 速览专帖 renders its covers (so they are required); a main post's covers
+/// are generated images that exist only once picked.
+fn publish_attachments(
+    spec: &Spec,
+    exists: impl Fn(&str) -> bool,
+) -> (Vec<Attachment>, Vec<String>) {
+    let (mut out, mut warns) = (Vec::new(), Vec::new());
+    for (name, job) in spec.items() {
+        let file = format!("images/{name}");
+        let (label, required) = match job {
+            Job::Picked if name.ends_with(card::COVER_WIDE_OUT) => ("宽封面", false),
+            Job::Picked => ("封面", false),
+            Job::Cover((w, _)) if w > 1500 => ("模板封面（宽）", true),
+            Job::Cover(_) => ("模板封面", true),
+            Job::Tldr => ("省流卡", true),
+            Job::Roundup => ("速览聚合图", true),
+            Job::Event(_) => ("事件卡", true),
+            Job::Bark(_) => ("吠点卡", true),
+            Job::Annot(_) => ("批注图", true),
+        };
+        if !exists(&file) {
+            if required {
+                warns.push(format!("{file} 不存在，未附（复核不完整）"));
+            }
+            continue;
+        }
+        out.push(Attachment { file, label });
+        if let Job::Annot(a) = job
+            && let Some(raw) = spec.raw_file(a)
+        {
+            let raw_file = format!("images/{raw}");
+            if exists(&raw_file) {
+                out.push(Attachment {
+                    file: raw_file,
+                    label: "该批注图的原始底图",
+                });
+            } else {
+                warns.push(format!(
+                    "{raw_file} 不存在：复核者无法核对 {name} 有没有改动原文像素"
+                ));
+            }
         }
     }
     (out, warns)
@@ -1054,6 +1111,79 @@ gloss = "g"
         let (att, warns) = attachments(&main_spec(), present(&[]));
         assert!(att.is_empty());
         assert_eq!(warns.len(), 6); // tldr, roundup, 事件卡, 吠点卡, two annotated images
+    }
+
+    /// `main_spec` in the 1029-on layout: the screenshots take `out` without
+    /// number and `post`.
+    fn publish_spec() -> Spec {
+        let mut s = main_spec();
+        s.publish = true;
+        s.annot[0].out = "x".into();
+        s.annot[1].out = "y".into();
+        s.annot[0].post = Some(1);
+        s.annot[1].post = Some(1);
+        s
+    }
+
+    #[test]
+    fn publish_attachments_follow_the_upload_order() {
+        let s = publish_spec();
+        // (Too few 速览 entries for a real issue; the screenshots are fine.)
+        assert!(
+            (s.structure_errors().iter()).all(|e| e.contains("速览共")),
+            "{:?}",
+            s.structure_errors()
+        );
+        let all = [
+            "images/publish/00-cover.png",
+            "images/publish/00-cover-wide.png",
+            "images/publish/01-tldr.png",
+            "images/publish/02-roundup.png",
+            "images/publish/03-event-1.png",
+            "images/publish/04-bark-1.png",
+            "images/publish/05-x.png",
+            "images/x-raw.png",
+            "images/publish/06-y.png",
+            "images/y-raw.png",
+        ];
+        let (att, warns) = attachments(&s, present(&all));
+        assert!(warns.is_empty(), "{warns:?}");
+        assert_eq!(files(&att), all);
+        let labels: Vec<&str> = att.iter().map(|a| a.label).collect();
+        assert_eq!(
+            labels,
+            [
+                "封面",
+                "宽封面",
+                "省流卡",
+                "速览聚合图",
+                "事件卡",
+                "吠点卡",
+                "批注图",
+                "该批注图的原始底图",
+                "批注图",
+                "该批注图的原始底图"
+            ]
+        );
+
+        // Missing: not-yet-picked covers are fine; a card, a screenshot and a
+        // base are reported, and a screenshot's base follows only its own.
+        let have = [
+            "images/publish/01-tldr.png",
+            "images/publish/02-roundup.png",
+            "images/publish/05-x.png",
+            "images/publish/06-y.png",
+            "images/y-raw.png",
+        ];
+        let (att, warns) = attachments(&s, present(&have));
+        assert_eq!(files(&att), have);
+        assert_eq!(warns.len(), 3, "{warns:?}");
+        assert!(warns[0].contains("03-event-1.png"));
+        assert!(warns[1].contains("04-bark-1.png"));
+        assert!(warns[2].contains("x-raw.png") && warns[2].contains("05-x.png"));
+        let (att, warns) = attachments(&s, present(&[]));
+        assert!(att.is_empty());
+        assert_eq!(warns.len(), 6);
     }
 
     #[test]

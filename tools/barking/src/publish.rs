@@ -290,7 +290,7 @@ fn chunk_by_len<T: AsRef<OsStr>>(items: &[T], limit: usize) -> Vec<&[T]> {
     out
 }
 
-/// `images/*.png`, sorted; sub-directories are not entered.
+/// `*.png` directly in `dir`, sorted; sub-directories are not entered.
 fn top_level_pngs(images: &Path) -> Result<Vec<PathBuf>, String> {
     let rd = match fs::read_dir(images) {
         Ok(rd) => rd,
@@ -319,7 +319,9 @@ fn step_oxipng(issue: &Issue) -> Step {
 }
 
 fn compress_pngs(issue: &Issue) -> Result<Step, String> {
-    let pngs = top_level_pngs(&issue.images())?;
+    // `images/` and, from 1029, the upload set `images/publish/`.
+    let mut pngs = top_level_pngs(&issue.images())?;
+    pngs.extend(top_level_pngs(&issue.images().join(card::PUBLISH_DIR))?);
     if pngs.is_empty() {
         return Ok(Step::pass(vec!["images/ 下没有 PNG，跳过".to_string()]));
     }
@@ -342,7 +344,14 @@ fn compress_pngs(issue: &Issue) -> Result<Step, String> {
     for p in &pngs {
         let bytes = fs::read(p).map_err(|e| format!("{}: {e}", p.display()))?;
         let name = p.file_name().and_then(OsStr::to_str).unwrap_or("");
-        if already_registered(&manifest, &format!("images/{name}"), &sha256_hex(&bytes)) {
+        let in_publish =
+            p.parent().and_then(Path::file_name) == Some(OsStr::new(card::PUBLISH_DIR));
+        let rel = if in_publish {
+            format!("images/{}/{name}", card::PUBLISH_DIR)
+        } else {
+            format!("images/{name}")
+        };
+        if already_registered(&manifest, &rel, &sha256_hex(&bytes)) {
             skipped += 1;
         } else {
             before += bytes.len() as u64;

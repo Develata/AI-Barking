@@ -16,7 +16,7 @@ Develata 在对话中说“已发布”，即授权 Claude 对当期完成下面
 2. **检查**：`barking publish-check <期次目录>`，按固定顺序做下面七项，任一不过就停下报告：
    - lint，0 个错误；
    - 发布后标记齐全：README 索引行、已发过行（无占位）、速览已收条目与 `cards.toml` 逐字一致；
-   - 配图无损压缩（默认执行，2026-10-02 起）：`oxipng -o 4 --strip safe`，只压 `images/` 下的 PNG。像素不变，但文件字节和 SHA-256 会变、文本类元数据会被删，所以必须在 offsite 清单和上传**之前**做；已记入 `offsite.tsv` 且 SHA-256 未变的文件不再压（已上传的期次因此不会被重压）；不加 `-a`（它会改全透明像素的颜色值，不是严格无损）；JPEG、WebP 不动；需要逐字节保留的原件放进 `sources/`；
+   - 配图无损压缩（默认执行，2026-10-02 起）：`oxipng -o 4 --strip safe`，只压 `images/` 与 `images/publish/`（1029 期起的上传集）下的 PNG。像素不变，但文件字节和 SHA-256 会变、文本类元数据会被删，所以必须在 offsite 清单和上传**之前**做；已记入 `offsite.tsv` 且 SHA-256 未变的文件不再压（已上传的期次因此不会被重压）；不加 `-a`（它会改全透明像素的颜色值，不是严格无损）；JPEG、WebP 不动；需要逐字节保留的原件放进 `sources/`；
    - 生成 `sources/offsite.tsv`（全部图片与原件都在清单里）；
    - 大文件：待提交文件中没有单个超过 1 MB 的，有就先问；
    - 身份：按 `templates/codex-evidence.md` 第 7 条，用 `.env` 里 `BARKING_IDENTITY_HANDLES` 列出的抓取账号 X handle，经 fxtwitter 公开接口解析出显示名、头像 ID 与数字用户 ID（缓存在 `~/.config/barking/identity.json`，一天后自动刷新，改名后旧名仍保留在缓存里），加上 `BARKING_IDENTITY_PATTERNS` 手填的片段，搜索待提交文件与文件名，确认未入库（两者都未配置时只警告）；
@@ -31,11 +31,11 @@ Develata 在对话中说“已发布”，即授权 Claude 对当期完成下面
 | 存放处 | 内容 |
 |---|---|
 | GitHub（本仓库） | 只入库文字：发布正文、配图说明 `images/README.md`、`images/cards.toml`、`sources/` 中的文本（md、txt、json、jsonl、py、ps1 等）、`sources/offsite.tsv` |
-| OpenList（`openlist.develata.me`） | `images/` 下的全部图片（封面、省流卡、速览聚合图、吠点卡、批注截图、备用图），以及 `sources/` 中的 PDF、WPS/DOC 文档、HTML、图片与音视频原件；逐个文件直传，不打压缩包 |
+| OpenList（`openlist.develata.me`） | `images/` 下（含 1029 期起的 `images/publish/`）的全部图片（封面、省流卡、速览聚合图、事件卡、吠点卡、批注截图、备用图），以及 `sources/` 中的 PDF、WPS/DOC 文档、HTML、图片与音视频原件；逐个文件直传，不打压缩包 |
 
-- 分界写在根目录 `.gitignore`：`images/` 下所有 png、jpg、jpeg、webp、gif，和 `sources/` 下的 PDF、WPS/DOC 文档（2026-10-16 起）、HTML、图片与音视频。0924–1001 期原先已入库的图片与原件，已于 2026-10-02 全部补传 OpenList（417 个文件逐个核对远端大小一致）、记入各期 `offsite.tsv`，并用 `git filter-repo` 从 Git 历史中移出。
+- 分界写在根目录 `.gitignore`：`images/` 与 `images/publish/` 下所有 png、jpg、jpeg、webp、gif（`*` 不跨目录，所以 `publish/` 单独列了一组），和 `sources/` 下的 PDF、WPS/DOC 文档（2026-10-16 起）、HTML、图片与音视频。0924–1001 期原先已入库的图片与原件，已于 2026-10-02 全部补传 OpenList（417 个文件逐个核对远端大小一致）、记入各期 `offsite.tsv`，并用 `git filter-repo` 从 Git 历史中移出。
 - 没有图片的克隆里，`barking lint` 把 `offsite.tsv` 列出的图片视为存在；重渲卡片前，先从 OpenList 的同一路径取回 `-raw` 底图。
-- OpenList 目标路径：`<OPENLIST_ROOT>/<YYMM>/<MMDD>/<相对期次目录的路径>`，与仓库目录一一对应。
+- OpenList 目标路径：`<OPENLIST_ROOT>/<YYMM>/<MMDD>/<相对期次目录的路径>`，与仓库目录一一对应；1029 期起要上传的图在 `<YYMM>/<MMDD>/images/publish/`，文件名即上传顺序（`00-cover.png`、`00-cover-wide.png`、`01-…`），从网盘取图上传时全选该文件夹、按名称排序即可；取证截图与批注底图在上一级 `images/`，不混在里面。
 - `sources/offsite.tsv` 每行一个存于 OpenList 的文件：相对期次目录的路径、字节数、SHA-256。它入库，用来证明网盘上的原件就是当时取证的那一份。
 - 单文件 1 MB 为提交上限。超过的文本文件（如大 JSON 采样）先问是否必须入库；入库的历史无法靠 `.gitignore` 撤回。
 
