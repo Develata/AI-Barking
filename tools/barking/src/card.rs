@@ -1,4 +1,4 @@
-//! `barking card`: render one issue's 省流卡, 速览聚合图, 吠点卡 and annotated
+//! `barking card`: render one issue's 省流卡, 速览聚合图, 事件卡, 吠点卡 and annotated
 //! screenshots (plus the template covers of a 速览专帖) from
 //! `images/cards.toml`, filling the HTML templates in `templates/cards/` and
 //! screenshotting them with headless Chrome.
@@ -60,6 +60,7 @@ const ANNOT_TEMPLATE: &str = include_str!("../../../templates/cards/annot.html")
 const ROUNDUP_TEMPLATE: &str = include_str!("../../../templates/cards/roundup.html");
 const COVER_TEMPLATE: &str = include_str!("../../../templates/cards/cover.html");
 const BARK_TEMPLATE: &str = include_str!("../../../templates/cards/bark.html");
+const EVENT_TEMPLATE: &str = include_str!("../../../templates/cards/event.html");
 pub const SPEC_FILE: &str = "cards.toml";
 pub const TLDR_OUT: &str = "00-tldr.png";
 pub const ROUNDUP_OUT: &str = "00-roundup.png";
@@ -73,6 +74,15 @@ const BARK_OUTS: [&str; 6] = [
     "00-bark-4.png",
     "00-bark-5.png",
     "00-bark-6.png",
+];
+/// One 事件卡 per main post, same fixed names and limit as `BARK_OUTS`.
+const EVENT_OUTS: [&str; 6] = [
+    "00-event-1.png",
+    "00-event-2.png",
+    "00-event-3.png",
+    "00-event-4.png",
+    "00-event-5.png",
+    "00-event-6.png",
 ];
 pub const COVER_OUT: &str = "00-cover.png";
 pub const COVER_WIDE_OUT: &str = "00-cover-wide.png";
@@ -115,9 +125,23 @@ pub struct Spec {
     #[serde(default)]
     pub roundup: Vec<RoundupItem>,
     #[serde(default)]
+    pub event: Vec<EventCard>,
+    #[serde(default)]
     pub bark: Vec<BarkCard>,
     #[serde(default)]
     pub annot: Vec<Annot>,
+}
+
+/// An 事件卡 (from 2026-10-29): one main post's fact paragraphs, so a reader
+/// who only flips through the images gets the event before the 吠点. Its
+/// heading is the main post's 速览 entry with the same tag.
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EventCard {
+    pub tag: String,
+    /// The section's lines between its heading and the `吠点：` line, verbatim
+    /// and in order, one per paragraph.
+    pub paras: Vec<String>,
 }
 
 /// A 吠点卡 (from 2026-10-28): one main post's whole 吠点 section, so a reader
@@ -203,6 +227,9 @@ impl Spec {
     pub fn own_texts(&self) -> Vec<&str> {
         let tldr = self.tldr.iter().flat_map(|t| [t.tag.as_str(), &t.fact]);
         let roundup = self.roundup.iter().flat_map(|r| [r.tag.as_str(), &r.text]);
+        let event = (self.event.iter()).flat_map(|e| {
+            std::iter::once(e.tag.as_str()).chain(e.paras.iter().map(String::as_str))
+        });
         let bark = (self.bark.iter()).flat_map(|b| {
             std::iter::once(b.tag.as_str()).chain(b.points.iter().map(String::as_str))
         });
@@ -211,7 +238,23 @@ impl Spec {
                 .into_iter()
                 .chain(a.note.iter().map(|n| n.gloss.as_str()))
         });
-        tldr.chain(roundup).chain(bark).chain(annot).collect()
+        tldr.chain(roundup)
+            .chain(event)
+            .chain(bark)
+            .chain(annot)
+            .collect()
+    }
+
+    /// The 事件卡 file names, one per [[event]] (no more than `EVENT_OUTS`).
+    pub fn event_outputs(&self) -> impl Iterator<Item = &'static str> {
+        EVENT_OUTS.iter().copied().take(self.event.len())
+    }
+
+    /// An 事件卡's heading: the main 速览 entry with its tag.
+    fn event_heading(&self, e: &EventCard) -> Option<&str> {
+        self.main_entries()
+            .find(|r| r.tag == e.tag)
+            .map(|r| r.text.as_str())
     }
 
     /// The 吠点卡 file names, one per [[bark]] (no more than `BARK_OUTS`).
@@ -249,6 +292,7 @@ impl Spec {
                 errs.push("速览专帖没有主帖，[[roundup]] 不应写 main = true".into());
             }
         }
+        errs.extend(self.event_errors());
         errs.extend(self.bark_errors());
         if self.roundup.is_empty() {
             return errs;
@@ -287,6 +331,48 @@ impl Spec {
             }
             if r.tag.chars().count() > TAG_MAX {
                 errs.push(format!("速览 tag「{}」超过 {TAG_MAX} 字", r.tag));
+            }
+        }
+        errs
+    }
+
+    /// The [[event]] rules decidable from cards.toml alone; lint checks the
+    /// paragraphs against the publish text.
+    fn event_errors(&self) -> Vec<String> {
+        let mut errs = Vec::new();
+        if self.event.is_empty() {
+            return errs;
+        }
+        if self.kind == Kind::Roundup {
+            errs.push("速览专帖没有主帖，不应有 [[event]]".into());
+            return errs;
+        }
+        let event_tags: Vec<&str> = self.event.iter().map(|e| e.tag.as_str()).collect();
+        let tldr_tags: Vec<&str> = self.tldr.iter().map(|t| t.tag.as_str()).collect();
+        if event_tags != tldr_tags {
+            errs.push(format!(
+                "事件卡 [[event]] 的 tag {event_tags:?} 须与省流卡 [[tldr]] 的 tag {tldr_tags:?} 一一对应、顺序相同"
+            ));
+        }
+        if self.event.len() > EVENT_OUTS.len() {
+            errs.push(format!(
+                "[[event]] 有 {} 张，最多 {}（每个主帖一张）",
+                self.event.len(),
+                EVENT_OUTS.len()
+            ));
+        }
+        for e in &self.event {
+            if self.event_heading(e).is_none() {
+                errs.push(format!(
+                    "事件卡「{}」的小标题取自速览里同 tag 的主帖条目（main = true），没找到",
+                    e.tag
+                ));
+            }
+            if e.paras.is_empty() {
+                errs.push(format!("事件卡「{}」没有 paras", e.tag));
+            }
+            if e.paras.iter().any(|p| p.trim().is_empty()) {
+                errs.push(format!("事件卡「{}」有一段是空的", e.tag));
             }
         }
         errs
@@ -368,11 +454,15 @@ impl Spec {
         if !self.roundup.is_empty() {
             jobs.push((ROUNDUP_OUT, Job::Roundup));
         }
-        jobs.extend(
-            self.bark_outputs()
-                .enumerate()
-                .map(|(i, o)| (o, Job::Bark(i))),
-        );
+        // Upload order: each main post's 事件卡, then its 吠点卡.
+        let mut barks = self.bark_outputs().enumerate().peekable();
+        for (i, o) in self.event_outputs().enumerate() {
+            jobs.push((o, Job::Event(i)));
+            if let Some((j, b)) = barks.next_if(|(j, _)| *j == i) {
+                jobs.push((b, Job::Bark(j)));
+            }
+        }
+        jobs.extend(barks.map(|(i, o)| (o, Job::Bark(i))));
         jobs.extend(self.annot.iter().map(|a| (a.out.as_str(), Job::Annot(a))));
         jobs
     }
@@ -413,6 +503,12 @@ impl Spec {
                 part(ROUNDUP_TEMPLATE.as_bytes());
                 part(&json(&self.roundup));
             }
+            Job::Event(i) => {
+                // The index sets the colour; the heading comes from 速览.
+                let e = &self.event[*i];
+                part(EVENT_TEMPLATE.as_bytes());
+                part(&json(&(i, e, self.event_heading(e))));
+            }
             Job::Bark(i) => {
                 // The index sets the colour; the heading comes from 速览.
                 let b = &self.bark[*i];
@@ -446,6 +542,8 @@ enum Job<'a> {
     Cover((u32, u32)),
     Tldr,
     Roundup,
+    /// The 事件卡 of `spec.event[i]`.
+    Event(usize),
     /// The 吠点卡 of `spec.bark[i]`.
     Bark(usize),
     Annot(&'a Annot),
@@ -647,6 +745,7 @@ fn job_html(
         }
         Job::Tldr => Ok((tldr_html(spec)?, CARD_SIZE)),
         Job::Roundup => Ok((roundup_html(spec)?, CARD_SIZE)),
+        Job::Event(i) => Ok((event_html(spec, i)?, CARD_SIZE)),
         Job::Bark(i) => Ok((bark_html(spec, i)?, CARD_SIZE)),
         Job::Annot(a) => Ok((annot_html(a, images, work)?, CARD_SIZE)),
     }
@@ -683,10 +782,12 @@ fn precheck(spec: &Spec, images: &Path, only: &[&str]) -> Vec<String> {
     let dated = spec.kind == Kind::Roundup
         || !spec.tldr.is_empty()
         || !spec.roundup.is_empty()
+        || !spec.event.is_empty()
         || !spec.bark.is_empty();
     if dated && spec.date.is_none() {
         errs.push(
-            "cards.toml 缺少 date（省流卡、速览聚合图、吠点卡与速览专帖封面都要写日期）".into(),
+            "cards.toml 缺少 date（省流卡、速览聚合图、事件卡、吠点卡与速览专帖封面都要写日期）"
+                .into(),
         );
     }
     for a in &spec.annot {
@@ -1073,6 +1174,34 @@ fn roundup_html(spec: &Spec) -> Result<String, String> {
     }
     Ok(ROUNDUP_TEMPLATE
         .replace("{{DATE}}", &esc(date))
+        .replace("{{ITEMS}}", &items))
+}
+
+/// The 事件卡 of `spec.event[i]`: its colour is the 省流卡 colour of the same
+/// main post, so the cards of one topic read as one.
+fn event_html(spec: &Spec, i: usize) -> Result<String, String> {
+    let date = spec
+        .date
+        .as_deref()
+        .ok_or("cards.toml 有 [[event]] 但缺少 date")?;
+    let e = spec.event.get(i).ok_or("没有这张事件卡")?;
+    let heading = spec
+        .event_heading(e)
+        .ok_or_else(|| format!("事件卡「{}」在速览里没有同 tag 的主帖条目", e.tag))?;
+    let mut items = String::new();
+    for p in &e.paras {
+        let _ = writeln!(
+            items,
+            r#"    <div class="pt"><div class="{}">{}</div></div>"#,
+            hang("tx", p.trim()),
+            esc(p.trim())
+        );
+    }
+    Ok(EVENT_TEMPLATE
+        .replace("{{CLASS}}", &format!("c{}", i % MAX_NOTES + 1))
+        .replace("{{DATE}}", &esc(date))
+        .replace("{{TAG}}", &esc(&e.tag))
+        .replace("{{TITLE}}", &esc(heading))
         .replace("{{ITEMS}}", &items))
 }
 
@@ -2044,7 +2173,9 @@ mod tests {
             [
                 TLDR_OUT,
                 ROUNDUP_OUT,
+                "00-event-1.png",
                 "00-bark-1.png",
+                "00-event-2.png",
                 "00-bark-2.png",
                 "01-openai-dns-pause.png"
             ]
@@ -2124,6 +2255,82 @@ mod tests {
         let images = Path::new("unused");
         let fp = |s: &Spec, i| s.fingerprint(&Job::Bark(i), images, None, "t", "");
         // A card follows its own points and its heading in 速览, not the other card's.
+        assert_eq!(fp(&spec, 0), fp(&ab("四", "乙标题"), 0));
+        assert_ne!(fp(&spec, 1), fp(&ab("四", "乙标题"), 1));
+        assert_ne!(fp(&spec, 1), fp(&ab("三", "丙标题"), 1));
+    }
+
+    #[test]
+    fn event_cards_follow_the_main_posts() {
+        let ev = "[[event]]\ntag = \"A\"\nparas = [\"一\", \"二\"]\n\
+                  [[event]]\ntag = \"B\"\nparas = [\"三\"]\n";
+        let bk = "[[bark]]\ntag = \"A\"\npoints = [\"p\"]\n\
+                  [[bark]]\ntag = \"B\"\npoints = [\"q\"]\n";
+        let ok = bark_spec(&format!("{ev}{bk}"));
+        assert!(
+            ok.structure_errors().is_empty(),
+            "{:?}",
+            ok.structure_errors()
+        );
+        // Upload order: each main post's 事件卡, then its 吠点卡.
+        assert_eq!(
+            ok.outputs(),
+            [
+                TLDR_OUT,
+                ROUNDUP_OUT,
+                "00-event-1.png",
+                "00-bark-1.png",
+                "00-event-2.png",
+                "00-bark-2.png"
+            ]
+        );
+        // Paragraphs are quoted from the body by lint section by section, not here.
+        assert_eq!(ok.quoted_texts().len(), 4);
+        assert!(ok.own_texts().contains(&"三"));
+
+        // Out of the 省流卡 order; empty paragraph; no paras; unknown tag.
+        let ba = "[[event]]\ntag = \"B\"\nparas = [\"三\"]\n\
+                  [[event]]\ntag = \"A\"\nparas = [\"一\", \" \"]\n\
+                  [[event]]\ntag = \"C\"\nparas = []\n";
+        let errs = bark_spec(ba).structure_errors().join("\n");
+        for needle in ["一一对应", "有一段是空的", "没有 paras", "「C」的小标题"]
+        {
+            assert!(errs.contains(needle), "missing {needle}: {errs}");
+        }
+        // A 速览专帖 has no main post, hence no 事件卡.
+        let solo = roundup(
+            "kind = \"roundup\"\n[[event]]\ntag = \"x\"\nparas = [\"p\"]\n",
+            &[("x", "t", false); 5],
+        );
+        assert!(
+            solo.structure_errors()
+                .iter()
+                .any(|e| e.contains("[[event]]"))
+        );
+    }
+
+    #[test]
+    fn event_card_page_and_fingerprint() {
+        let ab = |second: &str, title: &str| {
+            let mut s = bark_spec(&format!(
+                "[[event]]\ntag = \"A\"\nparas = [\"一\", \"“二”\"]\n\
+                 [[event]]\ntag = \"B\"\nparas = [\"{second}\"]\n"
+            ));
+            s.roundup[1].text = title.into();
+            s
+        };
+        let spec = ab("三", "乙标题");
+        let html = event_html(&spec, 1).unwrap();
+        assert!(html.contains(r#"<body class="c2">"#));
+        assert!(html.contains("乙标题") && html.contains(">B<"));
+        // No numbers; a leading full-width quote hangs.
+        assert!(html.contains(r#"<div class="pt"><div class="tx">三</div></div>"#));
+        let first = event_html(&spec, 0).unwrap();
+        assert!(first.contains(r#"<div class="tx q">“二”</div>"#));
+        assert!(!first.contains(r#"class="n""#));
+
+        let images = Path::new("unused");
+        let fp = |s: &Spec, i| s.fingerprint(&Job::Event(i), images, None, "t", "");
         assert_eq!(fp(&spec, 0), fp(&ab("四", "乙标题"), 0));
         assert_ne!(fp(&spec, 1), fp(&ab("四", "乙标题"), 1));
         assert_ne!(fp(&spec, 1), fp(&ab("三", "丙标题"), 1));

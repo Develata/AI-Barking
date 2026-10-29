@@ -38,6 +38,9 @@ const STYLE_FROM: u32 = 2610_1025;
 /// Issues from this date carry one 吠点卡 `images/00-bark-N.png` per main
 /// post (EDITORIAL.md 省流卡与批注截图, 2026-10-28).
 const BARK_FROM: u32 = 2610_1027;
+/// Issues from this date also carry one 事件卡 `images/00-event-N.png` per
+/// main post, ahead of its 吠点卡 (EDITORIAL.md 省流卡与批注截图, 2026-10-29).
+const EVENT_FROM: u32 = 2610_1028;
 /// Names with one canonical spelling. Another casing in a title is only a
 /// warning: Develata may choose one on purpose (1021 used `claude`).
 const BRANDS: [&str; 13] = [
@@ -188,6 +191,7 @@ pub fn lint_issue(dir: &Path) -> Vec<Finding> {
         roundup: roundup_era,
         style: key.is_none_or(|k| k >= STYLE_FROM),
         bark: key.is_none_or(|k| k >= BARK_FROM),
+        event: key.is_none_or(|k| k >= EVENT_FROM),
     };
 
     let fc_path = dir.join("sources").join("fact-check.md");
@@ -620,6 +624,8 @@ struct Era {
     style: bool,
     /// 1027 on: a 吠点卡 per main post.
     bark: bool,
+    /// 1028 on: an 事件卡 per main post.
+    event: bool,
 }
 
 /// The mechanical parts of EDITORIAL.md 标题 and 文风. All warnings: each
@@ -735,7 +741,37 @@ fn lint_images(
             sink.warn(None, format!("“正式配图”第 {} 张应为{what}", k + 1));
         }
     }
-    // 吠点卡: in 正式配图, in main-post order, each row saying 公众号 skips it.
+    // 事件卡 and 吠点卡: in 正式配图, in main-post order, each row saying
+    // 公众号 skips it; a post's 事件卡 comes before its 吠点卡.
+    let mut last = None;
+    for (i, out) in spec
+        .into_iter()
+        .flat_map(card::Spec::event_outputs)
+        .enumerate()
+    {
+        let Some(k) = rows.iter().position(|(f, _)| *f == out) else {
+            sink.warn(None, format!("事件卡 {out} 应列在“正式配图”里"));
+            continue;
+        };
+        if last.is_some_and(|l| k < l) {
+            sink.warn(None, format!("事件卡 {out} 应按主帖顺序排列"));
+        }
+        if !rows[k].1.contains("公众号") {
+            sink.warn(
+                None,
+                format!("事件卡 {out} 一行须注明公众号不插（读者在读正文）"),
+            );
+        }
+        let bark = spec
+            .into_iter()
+            .flat_map(card::Spec::bark_outputs)
+            .nth(i)
+            .and_then(|b| rows.iter().position(|(f, _)| *f == b));
+        if bark.is_some_and(|b| b < k) {
+            sink.warn(None, format!("事件卡 {out} 应排在同一主帖的吠点卡之前"));
+        }
+        last = Some(k);
+    }
     let mut last = None;
     for out in spec.into_iter().flat_map(card::Spec::bark_outputs) {
         let Some(k) = rows.iter().position(|(f, _)| *f == out) else {
@@ -818,7 +854,13 @@ fn lint_cards(
     if era.bark && spec.kind == Kind::Main && spec.bark.is_empty() {
         sink.error(None, "缺少 [[bark]]：1027 期起每个主帖一张吠点卡");
     }
+    if era.event && spec.kind == Kind::Main && spec.event.is_empty() {
+        sink.error(None, "缺少 [[event]]：1028 期起每个主帖一张事件卡");
+    }
     for msg in card_text_errors(&spec.quoted_texts(), body_lines) {
+        sink.error(None, msg);
+    }
+    for msg in event_card_errors(&spec.event, body_lines) {
         sink.error(None, msg);
     }
     for msg in bark_card_errors(&spec.bark, body_lines) {
@@ -901,6 +943,74 @@ fn blocked_msg(name: &str) -> String {
     format!(
         "「{name}」是中国大陆无法访问的平台，正文与卡片文字不写（截图可以）：官方账号发言写“某公司称”，媒体报道写“据外媒报道”"
     )
+}
+
+/// Whether a (whitespace-free) publish line heads a main-post section:
+/// 一、二、… (a Chinese numeral and 、).
+fn is_section_heading(line: &str) -> bool {
+    let mut cs = line.chars();
+    cs.next()
+        .is_some_and(|c| "一二三四五六七八九十".contains(c))
+        && cs.find(|c| !"一二三四五六七八九十".contains(*c)) == Some('、')
+}
+
+/// The publish text's main-post fact sections in order: the non-empty lines
+/// after each heading line (一、 二、 …) up to its `吠点：` line (or the next
+/// heading, or the closing `AI吠点：` line).
+fn event_sections(body_lines: &[String]) -> Vec<Vec<&str>> {
+    let mut sections: Vec<Vec<&str>> = Vec::new();
+    let mut open = false;
+    for l in body_lines {
+        if is_section_heading(l) {
+            sections.push(Vec::new());
+            open = true;
+        } else if l.starts_with("吠点：") || l.starts_with("AI吠点：") {
+            open = false;
+        } else if open && let Some(s) = sections.last_mut() {
+            s.push(l);
+        }
+    }
+    sections
+}
+
+/// An 事件卡 carries its main post's whole fact section, verbatim and in
+/// order (whitespace and trailing full stops ignored), one paragraph per
+/// line. The n-th [[event]] is the n-th section.
+fn event_card_errors(events: &[card::EventCard], body_lines: &[String]) -> Vec<String> {
+    let mut errs = Vec::new();
+    if events.is_empty() {
+        return errs;
+    }
+    let sections = event_sections(body_lines);
+    if sections.len() != events.len() {
+        errs.push(format!(
+            "正文有 {} 个主帖小节，[[event]] 有 {} 张事件卡，须按主帖顺序一一对应",
+            sections.len(),
+            events.len()
+        ));
+        return errs;
+    }
+    for (e, section) in events.iter().zip(&sections) {
+        if e.paras.len() != section.len() {
+            errs.push(format!(
+                "事件卡「{}」有 {} 段，正文对应小节标题与“吠点：”之间有 {} 段：须逐字、完整、同序列出",
+                e.tag,
+                e.paras.len(),
+                section.len()
+            ));
+            continue;
+        }
+        for (k, (p, line)) in e.paras.iter().zip(section).enumerate() {
+            if compact(p) != compact(line) {
+                errs.push(format!(
+                    "事件卡「{}」第 {} 段与正文不一致：卡片「{p}」／正文「{line}」",
+                    e.tag,
+                    k + 1
+                ));
+            }
+        }
+    }
+    errs
 }
 
 /// The publish text's 吠点 sections in order: the lines after each `吠点：`
@@ -1271,6 +1381,60 @@ mod tests {
         let errs = bark_card_errors(&edited, &lines);
         assert_eq!(errs.len(), 1, "{errs:?}");
         assert!(errs[0].contains("第 1 条"));
+    }
+
+    #[test]
+    fn event_cards_carry_whole_sections() {
+        // As lint reads the body: whitespace removed, blank lines dropped.
+        let lines: Vec<String> = [
+            "省流：甲乙。",
+            "一、甲",
+            "甲发布了乙。",
+            "据报道丙。",
+            "吠点：",
+            "①丙不等于丁。",
+            "二、乙",
+            "乙做了戊。",
+            "吠点：①己。",
+            "三、丙",
+            "AI吠点：聊AI沸点，轻松识破吠点。",
+        ]
+        .iter()
+        .map(|l| l.to_string())
+        .collect();
+        assert!(is_section_heading("一、甲") && is_section_heading("十二、乙"));
+        assert!(!is_section_heading("省流：甲") && !is_section_heading("一二三"));
+        assert!(!is_section_heading("、甲"));
+        assert_eq!(
+            event_sections(&lines),
+            [
+                vec!["甲发布了乙。", "据报道丙。"],
+                vec!["乙做了戊。"],
+                vec![]
+            ]
+        );
+        let card = |tag: &str, paras: &[&str]| card::EventCard {
+            tag: tag.into(),
+            paras: paras.iter().map(|p| p.to_string()).collect(),
+        };
+        let lines = &lines[..9];
+        // Whitespace and a dropped full stop are fine.
+        let ok = [
+            card("A", &["甲发布了 乙", "据报道丙。"]),
+            card("B", &["乙做了戊"]),
+        ];
+        assert!(event_card_errors(&ok, lines).is_empty());
+        // A missing card, a missing paragraph, an altered paragraph.
+        assert!(event_card_errors(&ok[..1], lines)[0].contains("2 个主帖小节"));
+        let short = [card("A", &["甲发布了乙"]), card("B", &["乙做了戊"])];
+        assert!(event_card_errors(&short, lines)[0].contains("1 段"));
+        let edited = [
+            card("A", &["甲发布了乙", "据报道丙，已证实"]),
+            card("B", &["乙做了戊"]),
+        ];
+        let errs = event_card_errors(&edited, lines);
+        assert_eq!(errs.len(), 1, "{errs:?}");
+        assert!(errs[0].contains("第 2 段"));
     }
 
     #[test]
