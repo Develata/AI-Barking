@@ -1,0 +1,711 @@
+安全公告：Cursor 扩展市场中发现恶意版本的 Anthropic.claude-code（2.1.313） · Cursor
+
+跳至内容 [#main]
+Cursor [/cn/home]
+
+模型 [/grok]↓
+
+Grok [/grok]
+
+评估 [/evals]
+
+产品 [/product]↓
+
+智能体 [/product]
+
+云端 [/cloud]
+
+Grok Bot ↗ [https://x.ai/bot]
+
+移动端 [/mobile]
+
+自动化 [/automate]
+
+CLI [/cli]
+
+应用市场 ↗ [https://cursor.com/marketplace]
+
+代码审查 [/bugbot]
+
+企业 [/cn/enterprise]
+
+定价 [/cn/pricing]
+
+资源 [/changelog]↓
+
+更新日志 [/changelog]
+
+Blog [/blog]
+
+文档 [/docs]
+
+社区 [/cn/community]
+
+帮助 ↗ [https://cursor.com/help]
+
+工作坊 [/workshops]
+
+论坛 ↗ [https://forum.cursor.com/]
+
+招聘 [/careers]
+
+模型 →
+
+产品 →
+
+企业 [/cn/enterprise]
+
+定价 [/cn/pricing]
+
+资源 →
+
+登录 [/dashboard]联系联系销售 [/contact-sales?source=navbar]下载 [/cn/download]
+
+Blog [/cn/blog] / 公司 [/cn/blog/topic/company]
+
+Oct 29, 2026·公司 [/cn/blog/topic/company]
+
+安全公告：Cursor 扩展市场中发现恶意版本的 Anthropic.claude-code（2.1.313）
+
+2 分钟阅读
+
+目录
+↑
+
+事件经过 [#]
+
+我们采取的措施 [#]
+
+您应该采取的措施 [#]
+
+检查你是否受到影响 [#]
+
+修复受影响的机器 [#]
+
+入侵指标 [#]
+
+软件包 [#]
+
+网络 [#]
+
+SSH [#ssh]
+
+文件与持久化 [#]
+
+进程 / 命令行 [#]
+
+今天，我们发现了一起安全事件，涉及 Cursor VS Code 扩展市场中的一个特定扩展包：Anthropic.claude-code 2.1.313 版本。该恶意版本扩展并非由 Anthropic 开发。受影响用户最多 5,000 名，我们将直接与他们联系。
+
+# [#]事件经过
+
+今天太平洋时间凌晨约 2:27 至下午 1:35 期间，Cursor VS Code 扩展市场中上架了一个遭恶意篡改的 Anthropic Claude Code 扩展版本。该扩展会运行恶意代码，试图植入一个长期生效的 SSH 后门。具体而言，它会：
+
+收集主机和用户信息：主机名、用户名、操作系统、架构、主目录路径、环境变量名称、工作目录、已配置的 Git 邮箱以及公网 IP。
+
+尝试将攻击者控制的 SSH 键添加到 authorized_keys，启用本地 SSH 服务，并建立反向 SSH 隧道。由于恶意代码存在错误，除非 Cursor 是以管理员权限启动的 (这种情况极为罕见) ，否则这一步会失败。
+
+尝试通过 LaunchAgent (macOS) 或计划任务 (Windows，该任务会尝试以 SYSTEM 身份运行，并以启动脚本作为回退) 使反向 SSH 隧道长期生效。后台脚本大约每 60 秒重试一次建立隧道。
+
+通过 HTTP POST 将主机详情和后门状态上报至 8099 端口上的 /beacon。
+
+注意：攻击者的服务器已停止运行。
+
+我们已与托管该服务器的云服务提供商合作将其下线，因此反向 shell 和主机详情上报均已失效。
+
+上述发现仅涉及已识别的这个软件包。目前没有证据表明该扩展的其他版本或官方分发版本受到影响。
+
+此外，开启本地 SSH 服务需要管理员权限，而在大多数 macOS 和 Windows 主机上，该恶意扩展并不具备此权限。在这些主机上，该步骤会失败，攻击者也无法通过隧道登录。但该扩展仍会添加攻击者的 SSH 键、安装持久化机制，并将主机详情发送给攻击者。因此，无论如何都请按照下方的修复步骤进行处理。
+
+# [#-1]我们采取的措施
+
+检测到恶意版本后，我们立即将其从市场中移除，并阻止其继续分发。出于审慎考虑，我们随后全面关闭了 VSCode Marketplace。
+
+我们对访问记录进行了审计，确认没有其他扩展遭到篡改。
+
+我们轮换了密钥，重新构建了市场，并使其重新上线
+
+我们与托管提供商合作，将恶意服务器下线，并通过阻断与该服务器的连接来瓦解此次攻击。
+
+# [#-2]您应该采取的措施
+
+如果您在 2026 年 10 月 29 日太平洋时间凌晨 2:27 至下午 1:35 之间，从 Cursor VS Code 扩展市场安装了 Anthropic.claude-code 2.1.313 或更新到该版本：
+
+运行下方的检查，验证您是否受到影响。
+
+在端点、网络和扩展安装遥测数据中搜索下列入侵指标。
+
+隔离存在有效载荷执行或后门安装迹象的主机。
+
+使用下方的修复脚本移除未经授权的 SSH 键、持久化机制以及正在运行的隧道进程，并评估是否需要重建该主机。仅卸载扩展可能不够，因为该有效载荷会释放独立的持久化脚本，并在卸载后继续运行。
+
+在受信任的系统上，轮换受影响主机可访问的凭证和会话。虽然该有效载荷收集的环境变量有限，但仍不能排除攻击者之后通过后门访问凭证的可能。
+
+# [#-3]检查你是否受到影响
+
+该恶意扩展会将攻击者的公键 (标签为 svc-telemetry) 追加到你的 SSH 授权键 (authorized keys) 中。检查方法如下：
+
+在 macOS 上，运行：
+
+grep -qs svc-telemetry ~/.ssh/authorized_keys && echo "svc-telemetry key found" || echo "No key found; machine not impacted"
+
+在 Windows 上，请在 PowerShell 中运行：
+
+$files = "$HOME\.ssh\authorized_keys", "C:\ProgramData\ssh\administrators_authorized_keys" | Where-Object { Test-Path $_ }
+if ($files -and (Select-String svc-telemetry $files)) { "svc-telemetry key found" } else { "No key found; machine not impacted" }
+
+如果找到该键，说明你的机器已受影响。请按照上文第 3 至 5 步操作，并运行下方对应你所用平台的修复脚本。
+
+# [#-4]修复受影响的机器
+
+这些脚本会移除恶意扩展、持久化机制、正在运行的隧道进程以及攻击者的 SSH 键。如果仍有任何残留，脚本将以 non-zero 状态退出。
+
+在 macOS 上，请下载 remediate-macos.sh [/static/security/claude-code-extension/remediate-macos.sh]，然后在保存该脚本的文件夹中，以受影响用户 (而非 root) 的身份运行：
+
+bash remediate-macos.sh
+
+在 Windows 上，请下载 remediate-windows.ps1 [/static/security/claude-code-extension/remediate-windows.ps1]，然后通过 以管理员身份运行 打开 PowerShell，并在该文件所保存的文件夹中运行它：
+
+powershell -ExecutionPolicy Bypass -File .\remediate-windows.ps1
+
+# [#-5]入侵指标
+
+# [#-6]软件包
+
+被篡改的 VSIX SHA-256 (darwin-arm64) ：432ccdee3801f99e52b8fe31f69ea9870118e96ea7ef9ecabed1479621b5ab62 (MD5 da5469c4221775e9fe2e413e59ca7fd9)
+
+被篡改的 VSIX SHA-256 (win32-x64) ：3de1722901165769893bef57c72594e9a54459faa23f3091b136b79966edd081 (MD5 bd3b71ddf3d0cc3af76249afd2c0eda1)
+
+被篡改的代码：anthropic.claude-code-2.1.313-darwin-arm64 (macOS) 或 anthropic.claude-code-2.1.313-win32-x64 (Windows) 扩展文件夹中的 extension.js 包含 134[.]209[.]82[.]225 和 svc-telemetry
+
+# [#-7]网络
+
+攻击者端点：134[.]209[.]82[.]225
+
+反向 SSH：tunnel@134[.]209[.]82[.]225，TCP 22
+
+外部信标：hxxp://134[.]209[.]82[.]225:8099/beacon (HTTP POST)
+
+本地信标尝试：127[.]0[.]0[.]1:8099/beacon (HTTP POST，环回)
+
+向 ifconfig[.]me / api[.]ipify[.]org 查询公网 IP：均为合法服务，仅有访问行为本身不构成入侵指标
+
+# [#ssh]SSH
+
+未经授权的公键：ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDdvylCEJ/k2TpezcTfedrkHyFSK9IZ3vmP6vhY4Ss0P svc-telemetry
+
+未经授权的键指纹：SHA256:0Z6R+DF64Do2nwQic8a7kkfDLNNk4IiK+2U2Rci4htk
+
+反向隧道键指纹：SHA256:KOAU57+ZG6u3MG4WwzPzPX2O5YEe9qdOC1Bl+6MVyDQ
+
+键注释：svc-telemetry
+
+# [#-8]文件与持久化
+
+macOS：~/.ssh/authorized_keys 中存在未经授权的键；~/.config/.smt、~/.config/.smtk；$TMPDIR/.stk_<10 hex>；~/Library/LaunchAgents/com.apple.sysmond.plist (标签为 com.apple.sysmond)
+
+Windows：%USERPROFILE%\.ssh\authorized_keys、%USERPROFILE%\.config\smt.cmd、%USERPROFILE%\.config\smtk、%TEMP%\.stk_<10 hex>；计划任务 SysMon (会尝试以 SYSTEM 身份运行) ；回退路径 %APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\sysmon.cmd
+
+# [#-9]进程 / 命令行
+
+ssh -N -R '*:0:localhost:22'、autossh -M 0
+
+SSH 选项：StrictHostKeyChecking=no、UserKnownHostsFile=/dev/null、ServerAliveInterval=30、ServerAliveCountMax=3、ExitOnForwardFailure=yes、IdentitiesOnly=yes
+
+schtasks /create /tn SysMon
+
+systemsetup -setremotelogin on
+
+Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+
+如有其他疑问，请联系 security@cursor.com [mailto:security@cursor.com]。
+
+分类： 公司 [/cn/blog/topic/company]
+
+作者: Cursor Team
+
+相关文章
+
+Aug 14, 2026·公司
+
+Cursor 现已成为 SpaceX 的一部分
+
+Cursor Team · 1 分钟阅读
+
+ [/cn/blog/joining-spacex]
+
+Aug 13, 2026·公司
+
+Firetiger 加入 Cursor
+
+Maxime Prades · 1 分钟阅读
+
+ [/cn/blog/firetiger]
+
+Aug 13, 2026·公司
+
+Cursor 获得 AIUC-1 智能体安全与可靠性认证
+
+Kenneth Moras · 1 分钟阅读
+
+ [/cn/blog/aiuc-1]
+
+查看更多文章 → [/cn/blog]
+
+产品
+
+智能体 [/cn/product]
+
+团队版 [/cn/business/teams]
+
+企业 [/cn/enterprise]
+
+定价 [/cn/pricing]
+
+代码审查 [/cn/bugbot]
+
+CLI [/cn/cli]
+
+云端智能体 [/agents]
+
+Composer [/cn/composer]
+
+应用市场 ↗ [https://cursor.com/marketplace]
+
+资源
+
+下载 [/cn/download]
+
+更新日志 [/cn/changelog]
+
+文档 [/docs]
+
+了解更多 ↗ [https://cursor.com/learn]
+
+论坛 ↗ [https://forum.cursor.com/]
+
+帮助 ↗ [https://cursor.com/help]
+
+研讨会 [/cn/workshops]
+
+状态 ↗ [https://status.cursor.com/]
+
+公司
+
+招聘 [/cn/careers]
+
+Blog [/cn/blog]
+
+社区 [/cn/community]
+
+学生 [/cn/students]
+
+品牌 [/cn/brand]
+
+未来 [/cn/future]
+
+Anysphere ↗ [https://anysphere.inc/]
+
+法律
+
+服务条款 [/cn/terms-of-service]
+
+可接受使用政策 [/cn/acceptable-use-policy]
+
+Grok Bot 条款 [/cn/terms/grok-bot]
+
+SpaceXSI 订阅条款 ↗ [https://x.ai/legal]
+
+隐私政策 [/cn/privacy]
+
+Cookie 政策 [/cn/cookie-policy]
+
+数据使用 [/cn/data-use]
+
+安全 [/cn/security]
+
+连接
+
+X ↗ [https://x.com/cursor_ai]
+
+LinkedIn ↗ [https://www.linkedin.com/company/cursorai]
+
+YouTube ↗ [https://www.youtube.com/@cursor_ai]
+
+© 2026 Anysphere, Inc. [https://anysphere.inc]🛡 SOC 2 | ISO27001 | ISO42001 | 已获 AIUC-1 认证 [/cn/security]
+
+🌐简体中文↓
+
+English
+
+简体中文✓
+
+日本語
+
+繁體中文
+
+Español
+
+Français
+
+Português
+
+한국어
+
+Deutsch
+
+हिन्दी
+
+跳至内容 [#main]
+Cursor [/cn/home]
+
+模型 [/grok]↓
+
+Grok [/grok]
+
+评估 [/evals]
+
+产品 [/product]↓
+
+智能体 [/product]
+
+云端 [/cloud]
+
+Grok Bot ↗ [https://x.ai/bot]
+
+移动端 [/mobile]
+
+自动化 [/automate]
+
+CLI [/cli]
+
+应用市场 ↗ [https://cursor.com/marketplace]
+
+代码审查 [/bugbot]
+
+企业 [/cn/enterprise]
+
+定价 [/cn/pricing]
+
+资源 [/changelog]↓
+
+更新日志 [/changelog]
+
+Blog [/blog]
+
+文档 [/docs]
+
+社区 [/cn/community]
+
+帮助 ↗ [https://cursor.com/help]
+
+工作坊 [/workshops]
+
+论坛 ↗ [https://forum.cursor.com/]
+
+招聘 [/careers]
+
+模型 →
+
+产品 →
+
+企业 [/cn/enterprise]
+
+定价 [/cn/pricing]
+
+资源 →
+
+登录 [/dashboard]联系联系销售 [/contact-sales?source=navbar]下载 [/cn/download]
+
+Blog [/cn/blog] / 公司 [/cn/blog/topic/company]
+
+Oct 29, 2026·公司 [/cn/blog/topic/company]
+
+安全公告：Cursor 扩展市场中发现恶意版本的 Anthropic.claude-code（2.1.313）
+
+2 分钟阅读
+
+目录
+↑
+
+事件经过 [#]
+
+我们采取的措施 [#]
+
+您应该采取的措施 [#]
+
+检查你是否受到影响 [#]
+
+修复受影响的机器 [#]
+
+入侵指标 [#]
+
+软件包 [#]
+
+网络 [#]
+
+SSH [#ssh]
+
+文件与持久化 [#]
+
+进程 / 命令行 [#]
+
+今天，我们发现了一起安全事件，涉及 Cursor VS Code 扩展市场中的一个特定扩展包：Anthropic.claude-code 2.1.313 版本。该恶意版本扩展并非由 Anthropic 开发。受影响用户最多 5,000 名，我们将直接与他们联系。
+
+# [#]事件经过
+
+今天太平洋时间凌晨约 2:27 至下午 1:35 期间，Cursor VS Code 扩展市场中上架了一个遭恶意篡改的 Anthropic Claude Code 扩展版本。该扩展会运行恶意代码，试图植入一个长期生效的 SSH 后门。具体而言，它会：
+
+收集主机和用户信息：主机名、用户名、操作系统、架构、主目录路径、环境变量名称、工作目录、已配置的 Git 邮箱以及公网 IP。
+
+尝试将攻击者控制的 SSH 键添加到 authorized_keys，启用本地 SSH 服务，并建立反向 SSH 隧道。由于恶意代码存在错误，除非 Cursor 是以管理员权限启动的 (这种情况极为罕见) ，否则这一步会失败。
+
+尝试通过 LaunchAgent (macOS) 或计划任务 (Windows，该任务会尝试以 SYSTEM 身份运行，并以启动脚本作为回退) 使反向 SSH 隧道长期生效。后台脚本大约每 60 秒重试一次建立隧道。
+
+通过 HTTP POST 将主机详情和后门状态上报至 8099 端口上的 /beacon。
+
+注意：攻击者的服务器已停止运行。
+
+我们已与托管该服务器的云服务提供商合作将其下线，因此反向 shell 和主机详情上报均已失效。
+
+上述发现仅涉及已识别的这个软件包。目前没有证据表明该扩展的其他版本或官方分发版本受到影响。
+
+此外，开启本地 SSH 服务需要管理员权限，而在大多数 macOS 和 Windows 主机上，该恶意扩展并不具备此权限。在这些主机上，该步骤会失败，攻击者也无法通过隧道登录。但该扩展仍会添加攻击者的 SSH 键、安装持久化机制，并将主机详情发送给攻击者。因此，无论如何都请按照下方的修复步骤进行处理。
+
+# [#-1]我们采取的措施
+
+检测到恶意版本后，我们立即将其从市场中移除，并阻止其继续分发。出于审慎考虑，我们随后全面关闭了 VSCode Marketplace。
+
+我们对访问记录进行了审计，确认没有其他扩展遭到篡改。
+
+我们轮换了密钥，重新构建了市场，并使其重新上线
+
+我们与托管提供商合作，将恶意服务器下线，并通过阻断与该服务器的连接来瓦解此次攻击。
+
+# [#-2]您应该采取的措施
+
+如果您在 2026 年 10 月 29 日太平洋时间凌晨 2:27 至下午 1:35 之间，从 Cursor VS Code 扩展市场安装了 Anthropic.claude-code 2.1.313 或更新到该版本：
+
+运行下方的检查，验证您是否受到影响。
+
+在端点、网络和扩展安装遥测数据中搜索下列入侵指标。
+
+隔离存在有效载荷执行或后门安装迹象的主机。
+
+使用下方的修复脚本移除未经授权的 SSH 键、持久化机制以及正在运行的隧道进程，并评估是否需要重建该主机。仅卸载扩展可能不够，因为该有效载荷会释放独立的持久化脚本，并在卸载后继续运行。
+
+在受信任的系统上，轮换受影响主机可访问的凭证和会话。虽然该有效载荷收集的环境变量有限，但仍不能排除攻击者之后通过后门访问凭证的可能。
+
+# [#-3]检查你是否受到影响
+
+该恶意扩展会将攻击者的公键 (标签为 svc-telemetry) 追加到你的 SSH 授权键 (authorized keys) 中。检查方法如下：
+
+在 macOS 上，运行：
+
+grep -qs svc-telemetry ~/.ssh/authorized_keys && echo "svc-telemetry key found" || echo "No key found; machine not impacted"
+
+在 Windows 上，请在 PowerShell 中运行：
+
+$files = "$HOME\.ssh\authorized_keys", "C:\ProgramData\ssh\administrators_authorized_keys" | Where-Object { Test-Path $_ }
+if ($files -and (Select-String svc-telemetry $files)) { "svc-telemetry key found" } else { "No key found; machine not impacted" }
+
+如果找到该键，说明你的机器已受影响。请按照上文第 3 至 5 步操作，并运行下方对应你所用平台的修复脚本。
+
+# [#-4]修复受影响的机器
+
+这些脚本会移除恶意扩展、持久化机制、正在运行的隧道进程以及攻击者的 SSH 键。如果仍有任何残留，脚本将以 non-zero 状态退出。
+
+在 macOS 上，请下载 remediate-macos.sh [/static/security/claude-code-extension/remediate-macos.sh]，然后在保存该脚本的文件夹中，以受影响用户 (而非 root) 的身份运行：
+
+bash remediate-macos.sh
+
+在 Windows 上，请下载 remediate-windows.ps1 [/static/security/claude-code-extension/remediate-windows.ps1]，然后通过 以管理员身份运行 打开 PowerShell，并在该文件所保存的文件夹中运行它：
+
+powershell -ExecutionPolicy Bypass -File .\remediate-windows.ps1
+
+# [#-5]入侵指标
+
+# [#-6]软件包
+
+被篡改的 VSIX SHA-256 (darwin-arm64) ：432ccdee3801f99e52b8fe31f69ea9870118e96ea7ef9ecabed1479621b5ab62 (MD5 da5469c4221775e9fe2e413e59ca7fd9)
+
+被篡改的 VSIX SHA-256 (win32-x64) ：3de1722901165769893bef57c72594e9a54459faa23f3091b136b79966edd081 (MD5 bd3b71ddf3d0cc3af76249afd2c0eda1)
+
+被篡改的代码：anthropic.claude-code-2.1.313-darwin-arm64 (macOS) 或 anthropic.claude-code-2.1.313-win32-x64 (Windows) 扩展文件夹中的 extension.js 包含 134[.]209[.]82[.]225 和 svc-telemetry
+
+# [#-7]网络
+
+攻击者端点：134[.]209[.]82[.]225
+
+反向 SSH：tunnel@134[.]209[.]82[.]225，TCP 22
+
+外部信标：hxxp://134[.]209[.]82[.]225:8099/beacon (HTTP POST)
+
+本地信标尝试：127[.]0[.]0[.]1:8099/beacon (HTTP POST，环回)
+
+向 ifconfig[.]me / api[.]ipify[.]org 查询公网 IP：均为合法服务，仅有访问行为本身不构成入侵指标
+
+# [#ssh]SSH
+
+未经授权的公键：ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDdvylCEJ/k2TpezcTfedrkHyFSK9IZ3vmP6vhY4Ss0P svc-telemetry
+
+未经授权的键指纹：SHA256:0Z6R+DF64Do2nwQic8a7kkfDLNNk4IiK+2U2Rci4htk
+
+反向隧道键指纹：SHA256:KOAU57+ZG6u3MG4WwzPzPX2O5YEe9qdOC1Bl+6MVyDQ
+
+键注释：svc-telemetry
+
+# [#-8]文件与持久化
+
+macOS：~/.ssh/authorized_keys 中存在未经授权的键；~/.config/.smt、~/.config/.smtk；$TMPDIR/.stk_<10 hex>；~/Library/LaunchAgents/com.apple.sysmond.plist (标签为 com.apple.sysmond)
+
+Windows：%USERPROFILE%\.ssh\authorized_keys、%USERPROFILE%\.config\smt.cmd、%USERPROFILE%\.config\smtk、%TEMP%\.stk_<10 hex>；计划任务 SysMon (会尝试以 SYSTEM 身份运行) ；回退路径 %APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\sysmon.cmd
+
+# [#-9]进程 / 命令行
+
+ssh -N -R '*:0:localhost:22'、autossh -M 0
+
+SSH 选项：StrictHostKeyChecking=no、UserKnownHostsFile=/dev/null、ServerAliveInterval=30、ServerAliveCountMax=3、ExitOnForwardFailure=yes、IdentitiesOnly=yes
+
+schtasks /create /tn SysMon
+
+systemsetup -setremotelogin on
+
+Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+
+如有其他疑问，请联系 security@cursor.com [mailto:security@cursor.com]。
+
+分类： 公司 [/cn/blog/topic/company]
+
+作者: Cursor Team
+
+相关文章
+
+Aug 14, 2026·公司
+
+Cursor 现已成为 SpaceX 的一部分
+
+Cursor Team · 1 分钟阅读
+
+ [/cn/blog/joining-spacex]
+
+Aug 13, 2026·公司
+
+Firetiger 加入 Cursor
+
+Maxime Prades · 1 分钟阅读
+
+ [/cn/blog/firetiger]
+
+Aug 13, 2026·公司
+
+Cursor 获得 AIUC-1 智能体安全与可靠性认证
+
+Kenneth Moras · 1 分钟阅读
+
+ [/cn/blog/aiuc-1]
+
+查看更多文章 → [/cn/blog]
+
+产品
+
+智能体 [/cn/product]
+
+团队版 [/cn/business/teams]
+
+企业 [/cn/enterprise]
+
+定价 [/cn/pricing]
+
+代码审查 [/cn/bugbot]
+
+CLI [/cn/cli]
+
+云端智能体 [/agents]
+
+Composer [/cn/composer]
+
+应用市场 ↗ [https://cursor.com/marketplace]
+
+资源
+
+下载 [/cn/download]
+
+更新日志 [/cn/changelog]
+
+文档 [/docs]
+
+了解更多 ↗ [https://cursor.com/learn]
+
+论坛 ↗ [https://forum.cursor.com/]
+
+帮助 ↗ [https://cursor.com/help]
+
+研讨会 [/cn/workshops]
+
+状态 ↗ [https://status.cursor.com/]
+
+公司
+
+招聘 [/cn/careers]
+
+Blog [/cn/blog]
+
+社区 [/cn/community]
+
+学生 [/cn/students]
+
+品牌 [/cn/brand]
+
+未来 [/cn/future]
+
+Anysphere ↗ [https://anysphere.inc/]
+
+法律
+
+服务条款 [/cn/terms-of-service]
+
+可接受使用政策 [/cn/acceptable-use-policy]
+
+Grok Bot 条款 [/cn/terms/grok-bot]
+
+SpaceXSI 订阅条款 ↗ [https://x.ai/legal]
+
+隐私政策 [/cn/privacy]
+
+Cookie 政策 [/cn/cookie-policy]
+
+数据使用 [/cn/data-use]
+
+安全 [/cn/security]
+
+连接
+
+X ↗ [https://x.com/cursor_ai]
+
+LinkedIn ↗ [https://www.linkedin.com/company/cursorai]
+
+YouTube ↗ [https://www.youtube.com/@cursor_ai]
+
+© 2026 Anysphere, Inc. [https://anysphere.inc]🛡 SOC 2 | ISO27001 | ISO42001 | 已获 AIUC-1 认证 [/cn/security]
+
+🌐简体中文↓
+
+English
+
+简体中文✓
+
+日本語
+
+繁體中文
+
+Español
+
+Français
+
+Português
+
+한국어
+
+Deutsch
+
+हिन्दी

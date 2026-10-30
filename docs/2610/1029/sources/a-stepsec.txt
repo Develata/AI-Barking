@@ -1,0 +1,421 @@
+Trojanized Claude Code Extension Delivered Persistent SSH Backdoor to Developer Machines - StepSecurity
+
+Skip to main content
+ [/#main]
+
+ [/]
+
+Platform
+
+Platform Overview
+ [/platform]
+
+Dev Machine Guard
+ [/dev-machine-guard]
+
+Code Repo Security
+ [/code-repo-security]
+
+Secure Registry
+ [/secure-registry]
+
+CI/CD Security
+ [/cicd-security]
+Threat Intel
+ [/threat-intel]
+
+Customers
+ [/case-studies]
+
+Pricing
+ [/pricing]
+
+Resources
+
+Blog
+ [/blog]
+
+Product Tour
+ [https://stepsecurity.storylane.io/hub/dp0qcfmksp15]
+
+Dev Machine Guard on GitHub
+ [https://github.com/step-security/dev-machine-guard]
+
+Harden Runner on GitHub
+ [https://github.com/step-security/harden-runner]
+
+GitHub Actions Audit
+ [/github-actions-audit]
+
+Documentation
+ [https://docs.stepsecurity.io/]
+
+Company
+
+About Us
+ [/company]
+
+Newsroom
+ [/newsroom]
+
+Trust Center
+ [https://trust.stepsecurity.io/]
+
+Request a Demo [https://calendly.com/d/d34r-p3q-7s4]
+
+Login
+ [https://app.stepsecurity.io/login]
+
+ [/]
+
+Platform
+
+Platform Overview
+ [/platform]
+
+Dev Machine Guard
+ [/dev-machine-guard]
+
+Code Repo Security
+ [/code-repo-security]
+
+Secure Registry
+ [/secure-registry]
+
+CI/CD Security
+ [/cicd-security]
+Threat Intel
+ [/threat-intel]
+
+Customers
+ [/case-studies]
+
+Pricing
+ [/pricing]
+
+Resources
+
+Blog
+ [/blog]
+
+Product Tour
+ [https://stepsecurity.storylane.io/hub/dp0qcfmksp15]
+
+Dev Machine Guard on GitHub
+ [https://github.com/step-security/dev-machine-guard]
+
+Harden Runner on GitHub
+ [https://github.com/step-security/harden-runner]
+
+GitHub Actions Audit
+ [/github-actions-audit]
+
+Documentation
+ [https://docs.stepsecurity.io/]
+
+Company
+
+About Us
+ [/company]
+
+Newsroom
+ [/newsroom]
+
+Trust Center
+ [https://trust.stepsecurity.io/]
+
+Start Free
+ [/start-free]
+
+Login
+ [https://app.stepsecurity.io/login?utm_source=homepage&utm_medium=loginbutton]
+
+Back to Blog
+
+ [/blog]
+
+Threat Intel
+ [/blog?category=Threat Intel]
+
+Trojanized Claude Code Extension Delivered Persistent SSH Backdoor to Developer Machines
+
+On October 29, 2026, a trojanized version (2.1.313) of the official Claude Code VS Code extension was published to Open-VSX and mirrored to Cursor's marketplace, reaching up to 5,000 Cursor users during an 11-hour window. Sandbox and registry analysis confirmed that on load it planted an attacker SSH key, set up persistence on each OS, opened a reverse SSH tunnel to attacker infrastructure, and sent host reconnaissance data over plain HTTP.
+
+Rohan Prabhu
+
+View LinkedIn
+ [https://www.linkedin.com/in/rohan-prabhu05/]
+
+October 30, 2026
+
+Share on X
+ [#]
+Share on X
+ [#]
+Share on LinkedIn
+ [#]
+Share on Facebook
+ [#]
+Follow our RSS feed
+ [https://www.stepsecurity.io/blog/rss.xml]
+
+Table of Contents
+
+Loading nav...
+ [#]
+
+ [#]
+
+On October 29, 2026, version 2.1.313 of the Claude Code VS Code extension, anthropic.claude-code, was published to Open-VSX carrying a malicious loader embedded in its extension.js bundle. The version was distributed through the Open-VSX registry and Cursor's extension marketplace, which mirrors it. Cursor reports that at most 5,000 of its users received the trojanized build during an 11-hour window. We verified the payload's behavior through sandbox analysis and independent registry analysis: on load, the extension planted an attacker SSH key, installed per-OS persistence, opened a reverse SSH tunnel to attacker infrastructure, and beaconed host reconnaissance over plain HTTP.
+
+The malicious build is the official extension in every respect except one: extension.js carries a small self-contained loader embedded in the legitimate bundle. The malicious file (SHA-256 ecb58cb29078d9646ad1dcdbe51526f2d9cfea06be5fb2ab183e8ecc3ab6bf15, 3,692,922 bytes) is roughly 7 KB larger than the preceding clean release, and sandbox telemetry shows the payload executes under plain Node.js with no VS Code APIs: loading the extension module is enough. No Claude conversation is needed, and no package-manager lifecycle hooks are involved. This was not an Anthropic release: the build repackages the official extension, and per Cursor's notice the malicious version was not developed by Anthropic.
+
+‍
+
+ACTION REQUIRED if anthropic.claude-code 2.1.313 was installed on any machine between October 29, 09:27 UTC and October 30: treat it as compromised. Check ~/.ssh/authorized_keys for the svc-telemetry key below, remove the persistence artifacts, and rotate credentials reachable from that machine. Uninstalling the extension alone is not sufficient: the loader drops standalone persistence that survives removal.
+
+‍
+
+Background: the extension and its distribution paths
+
+The Claude Code VS Code extension is Anthropic's official IDE integration, with tens of millions of lifetime downloads on Open-VSX alone. Open-VSX is the open extension registry used by default or by option in VSCodium, Cursor, Windsurf, and Gitpod; it is separate from the Microsoft Visual Studio Marketplace. The Anthropic namespace on Open-VSX is owned and published by an Anthropic employee and has been since 2025, so version 2.1.313 appeared under the legitimate publisher identity, not a typosquat. The malicious version was not developed or released by Anthropic, and how it entered the registry, whether through compromised publisher credentials or another mechanism, has not been publicly established.
+
+This matters for the blast radius: one upstream publish on Open-VSX propagated automatically to every downstream consumer of the registry. Cursor's marketplace, which serves the extension via its Open-VSX mirror, exposed the malicious build to its users within the same window. Cursor states it has no evidence that other versions or the official distribution were affected, and the version is likewise no longer served by the Microsoft Marketplace.
+
+We independently confirmed the registry state: Open-VSX now serves 2.1.312 and 2.1.314 but returns "not found" for 2.1.313 across the API and its content CDN, and the Microsoft Marketplace download endpoint returns 404 for 2.1.313 while serving both neighbors. We downloaded the clean 2.1.312 (October 27) and 2.1.314 (October 30) builds from Open-VSX and verified both contain none of the indicators below.
+
+‍
+
+Attack flow
+
+Oct 27, 20:26 UTC
+
+Clean 2.1.312 published to Open-VSX (verified by us)
+
+By Oct 29, ~09:27 UTC
+
+Trojanized 2.1.313 live on Open-VSX and, via mirror sync, in Cursor's marketplace (2:27am PT, per Cursor)
+
+Oct 29, 09:27 to 20:35 UTC
+
+Exposure window; at most 5,000 Cursor users received it
+
+Oct 29, 20:35 UTC (1:35pm PT)
+
+Cursor removes the version and takes its marketplace fully offline; later audits find no other extensions tampered with; keys rotated
+
+Oct 30, 01:07 UTC
+
+Clean 2.1.314 published to Open-VSX (verified by us)
+
+Oct 30
+
+2.1.313 purged from Open-VSX and the Microsoft Marketplace listing; the C2 at 134.209.82.225 is taken offline with the cooperation of its hosting provider, per Cursor
+
+Indicators of Compromise
+
+Type
+Value
+Significance
+
+Local beacon attempt
+127.0.0.1:8099/beacon (HTTP POST, loopback)
+Loopback beacon attempt by the loader
+
+Malicious version
+anthropic.claude-code@2.1.313
+Presence confirms exposure; Open-VSX and Cursor channels
+
+C2
+134.209.82.225
+Reverse tunnel (TCP 22, user tunnel) and HTTP beacon (8099); now offline
+
+Beacon
+http://134.209.82.225:8099/beacon
+POST of host recon JSON
+
+SSH key (authorized_keys)
+SHA256:0Z6R+DF64Do2nwQic8a7kkfDLNNk4IiK+2U2Rci4htk, comment svc-telemetry
+Interactive access implant
+
+SSH key (tunnel identity)
+SHA256:KOAU57+ZG6u3MG4WwzPzPX2O5YEe9qdOC1Bl+6MVyDQ
+Embedded private key dropped as .stk_*
+
+Malicious VSIX (darwin-arm64)
+432ccdee3801f99e52b8fe31f69ea9870118e96ea7ef9ecabed1479621b5ab62 (MD5 da5469c4221775e9fe2e413e59ca7fd9)
+Per Cursor
+
+Malicious VSIX (win32-x64)
+3de1722901165769893bef57c72594e9a54459faa23f3091b136b79966edd081 (MD5 bd3b71ddf3d0cc3af76249afd2c0eda1)
+Per Cursor
+
+Malicious extension.js
+ecb58cb29078d9646ad1dcdbe51526f2d9cfea06be5fb2ab183e8ecc3ab6bf15 (md5 f49bcd657ef1e626e85ce858958c1769)
+3,692,922 bytes
+
+On-disk detection
+extension folders anthropic.claude-code-2.1.313-darwin-arm64 / -win32-x64: extension.js contains 134.209.82.225 and svc-telemetry
+Fleet sweep: grep installed extension bundles for either string
+
+Dropped smt.cmd
+22f682d9ff55264e934d0f43fcfbb46d58be5cfb8fe1b3a7cbb38fe089c818b0
+Windows persistence script, 330 bytes
+
+Dropped tunnel key
+7e0a52885fadee05544a9e99eb18c792bec05900a5e1a66d68f8383decb0e278
+Written as .stk_<id>
+
+Modified authorized_keys
+49d616941deb44840dc89061c617ad7a325aa32113819ddc14e9c8dc238c83d1
+Post-implant hash
+
+File paths
+~/.config/.smt, ~/.config/.smtk, ~/.config/smt.cmd, $TMPDIR/.stk_*, ~/Library/LaunchAgents/com.apple.sysmond.plist, Startup\sysmon.cmd
+Persistence and key artifacts
+
+Scheduled objects
+task SysMon (SYSTEM, onstart), LaunchAgent com.apple.sysmond, cron @reboot
+Persistence
+
+Process / command-line
+ssh -N -R '*:0:localhost:22', autossh -M 0 (StrictHostKeyChecking=no, UserKnownHostsFile=/dev/null, ServerAliveInterval=30, IdentitiesOnly=yes), schtasks /create /tn SysMon, systemsetup -setremotelogin on, Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+Tunnel and enablement
+
+Clean neighbors
+2.1.312 ext.js 1195816b..., 2.1.314 ext.js 927fe022...
+Verified clean by us
+
+Not indicators on their own: ifconfig.me and api.ipify.org are legitimate public-IP services, and sandbox telemetry showed connections to ordinary Microsoft infrastructure; access alone does not indicate compromise.
+
+‍
+
+Remediation
+
+If 2.1.313 was installed on a machine, in order:
+
+Check for the implant: grep authorized_keys for svc-telemetry (macOS/Linux: grep svc-telemetry ~/.ssh/authorized_keys; Windows: inspect %USERPROFILE%\.ssh\authorized_keys).
+
+Collect evidence, then remove persistence: the LaunchAgent com.apple.sysmond.plist, the SysMon scheduled task or Startup\sysmon.cmd, cron @reboot entries, and ~/.config/.smt, .smtk, smt.cmd, plus $TMPDIR/.stk_* key files. Cursor publishes remediate-macos.sh and remediate-windows.ps1 scripts for this.
+
+Remove the extension version and reinstall 2.1.314 or later. Removing the extension alone does not remove standalone persistence.
+
+Rotate credentials reachable from that machine: source-control tokens (GitHub, GitLab), CI/CD tokens (the beacon collected environment variable names matching KEY/TOKEN/SECRET/PASS/AWS/GCP, which reveals which credentials were present), cloud keys, SSH keys, and package registry tokens. Do this from a known-clean machine.
+
+Hunt for follow-on: the authorized key granted interactive SSH access where the tunnel succeeded (primarily elevated-editor runs). Review SSH, shell, process, and authentication logs. If the tunnel is confirmed to have connected, rebuilding the host is safer than cleaning it.
+
+Note: Cursor has provided additional remediation steps, detection guidance, and remediation scripts in its security notice [https://cursor.com/blog/claude-code-extension-security-notice]; check the Cursor blog post for the full walkthrough.
+
+‍
+
+‍
+
+How StepSecurity Helps
+
+Threat Center
+
+StepSecurity Enterprise customers can visit the Threat Center for the complete alert on this incident, including the full IOC set, affected version details, and the machines in their organization that installed anthropic.claude-code 2.1.313.
+
+Dev Machine Guard
+
+StepSecurity Dev Machine Guard [https://docs.stepsecurity.io/dev-machine-guard] flags anthropic.claude-code version 2.1.313 as malicious on developer machines, so machines that pulled the trojanized build during the exposure window are identified immediately rather than waiting for a user report. Identification is version-level intelligence: 2.1.312 and 2.1.314 are recognized as clean.
+
+‍
+
+References
+
+Cursor: security notice on Anthropic.claude-code 2.1.313 [https://cursor.com/blog/claude-code-extension-security-notice]
+
+Open-VSX: Anthropic.claude-code extension [https://open-vsx.org/extension/Anthropic/claude-code]
+
+‍
+
+Blog
+
+Explore Related Posts
+
+‍
+
+Trojanized Claude Code Extension Delivered Persistent SSH Backdoor to Developer Machines
+
+On October 29, 2026, a trojanized version (2.1.313) of the official Claude Code VS Code extension was published to Open-VSX and mirrored to Cursor's marketplace, reaching up to 5,000 Cursor users during an 11-hour window. Sandbox and registry analysis confirmed that on load it planted an attacker SSH key, set up persistence on each OS, opened a reverse SSH tunnel to attacker infrastructure, and sent host reconnaissance data over plain HTTP.
+
+Rohan Prabhu
+
+View LinkedIn
+ [https://www.linkedin.com/in/rohan-prabhu05/]
+
+October 30, 2026
+
+Read
+
+ [/blog/claude-code-extension-trojanized]
+
+ [/blog/claude-code-extension-trojanized]
+
+GitHub Actions Native Egress Firewall vs. Harden-Runner: Five Differences That Matter 
+
+GitHub’s native egress firewall covers GitHub-hosted Linux runners. See five ways Harden-Runner goes further, from anomaly detection to build tampering
+
+Varun Sharma
+
+View LinkedIn
+ [https://www.linkedin.com/in/varunsharma07]
+
+October 28, 2026
+
+Read
+
+ [/blog/github-actions-native-egress-firewall-vs-harden-runner-five-differences-that-matter]
+
+ [/blog/github-actions-native-egress-firewall-vs-harden-runner-five-differences-that-matter]
+
+StepSecurity Now Inventories AI Agent Plugins in Your GitHub Repositories and on Developer Machines 
+
+Inventory the Claude Code and Codex plugins on developer machines and in your GitHub repositories: where each came from, what it bundles, whether it is enabled, and which repositories distribute it. 
+
+Balijepalli Vamshi Krishna
+
+View LinkedIn
+ [https://www.linkedin.com/in/vamshi-krishna-04b63a203/]
+
+October 26, 2026
+
+Read
+
+ [/blog/stepsecurity-now-inventories-ai-agent-plugins-in-your-github-repositories-and-on-developer-machines]
+
+ [/blog/stepsecurity-now-inventories-ai-agent-plugins-in-your-github-repositories-and-on-developer-machines]
+
+ [#]
+
+LinkedIn
+ [https://www.linkedin.com/company/step-security/]
+Github
+ [https://github.com/step-security]
+X
+ [https://x.com/step_security]
+
+Request a Demo
+
+ [https://calendly.com/d/d34r-p3q-7s4]
+
+Start Free
+
+ [/start-free]
+
+System Status [https://status.stepsecurity.io/]Trust Center [https://trust.stepsecurity.io/]
+
+Docs [https://docs.stepsecurity.io/]Pricing [/pricing]
+
+Contact Us [/contact]Product Tour [/product-tour]
+
+© 2026 All rights reserved
+
+Privacy Policy
+ [https://app.stepsecurity.io/privacy]
+
+Terms of Service
+ [https://app.stepsecurity.io/terms]
+
+Our first annual report: The State of Open Source Supply Chain Attacks. Read it → [/blog/state-of-open-source-supply-chain-attacks]

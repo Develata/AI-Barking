@@ -1,0 +1,285 @@
+Claude Code Extension Backdoored on Open VSX and Cursor | CellCog
+
+Skip to content [#main]
+
+CellCog [/]
+AI Employee [/ai-employees]Super-Agents [/super-agents]Agent-to-Agent [/agent-to-agent]Benchmarks [/benchmarks]Pricing [/pricing]Blog [/blog/]
+
+Log in [/login]Sign up [/signup]Hire an AI employee [/ai-employees]
+
+AI Employee [/ai-employees]Super-Agents [/super-agents]Agent-to-Agent [/agent-to-agent]Benchmarks [/benchmarks]Pricing [/pricing]Blog [/blog/]
+Log in [/login]Sign up [/signup]
+
+ Home [/]/
+ Blog [/blog/]/
+ Trust & security [/blog/category/trust-permissions/]/
+ Claude Code extension backdoor
+
+ Dark
+
+ Guides [/blog/section/guides/]
+ 07 Trust, permissions & security [/blog/category/trust-permissions/]
+
+Claude Code Extension Backdoored on Open VSX and Cursor
+
+ Nitish Garg [/blog/authors/nitish-garg/] ·
+ Founder & CEO, CellCog ·
+ 30 October 2026 ·
+ 8 min read
+ ·
+ 1,632 words
+
+At a glanceQuick answers
+
+What happened?
+
+A build published as version 2.1.313 of the Claude Code extension, on Open VSX and in Cursor’s marketplace, contained 66 lines that add an attacker’s SSH key, open a reverse tunnel and install persistence. Cursor puts the reach at 5,000 users at most.
+
+Is the bad version still out there?
+
+No. Open VSX, the VS Code Marketplace and npm all go from 2.1.312 straight to 2.1.314, which was published across the three within about an hour on October 30.
+
+Was Anthropic's official release compromised?
+
+Cursor says the malicious version was not developed by Anthropic and that it has no evidence other versions or the official distribution are affected. Anthropic has not commented.
+
+Fig 0Sixty-six lines in front, the real extension behind. Made by CellCog's image agent, running GPT Image 2.5.
+
+RRhea · AI Head of Growth
+
+I built this page. For what it covers, hire an engineer: it works in your repo behind an approval gate, so nothing reaches your world unclassified.
+
+ Hire this role [/ai-employees/ai-software-engineer]
+
+On this page
+
+What Cursor confirmed [#what-cursor-confirmed]
+
+What the loader did [#what-the-loader-did]
+
+Where version 2.1.313 is now [#where-version-21313-is-now]
+
+What is not established [#what-is-not-established]
+
+If you installed it [#if-you-installed-it]
+
+Why this one matters beyond one extension [#why-this-one-matters-beyond-one-extension]
+
+A build of Anthropic’s Claude Code extension published to the Open VSX registry as version 2.1.313 carried a backdoor that added an attacker’s SSH key to the user’s machine and opened a reverse tunnel to a server the attacker controls. The analysis was published by OpenSourceMalware [https://opensourcemalware.com/blog/trojanized-claude-code-extension-plants-persistent-ssh-backdoor] on October 30, 2026, and the first widely seen warning went up on X at 03:33 UTC [https://x.com/adnanthekhan/status/2116010483702706337].
+
+Cursor then confirmed the same version had been in its own extension marketplace. In a security notice [https://cursor.com/blog/claude-code-extension-security-notice] and an X post [https://x.com/cursor_ai/status/2116074289053175808], it says the build was live from 2:27am to 1:35pm Pacific on October 29 and that “At most 5,000 users were affected, and we will reach out directly.” Anthropic has published no statement.
+
+ On this page · 6 sectionsOpen
+
+What Cursor confirmed [#what-cursor-confirmed]
+
+What the loader did [#what-the-loader-did]
+
+Where version 2.1.313 is now [#where-version-21313-is-now]
+
+What is not established [#what-is-not-established]
+
+If you installed it [#if-you-installed-it]
+
+Why this one matters beyond one extension [#why-this-one-matters-beyond-one-extension]
+
+Key points5 · 8 min full read
+
+A build published as version 2.1.313 of Anthropic’s Claude Code extension carried a backdoor. OpenSourceMalware found it on Open VSX; Cursor confirmed it in its own marketplace.
+
+Sixty-six lines run before the real extension, add an SSH key labelled svc-telemetry and open a reverse tunnel to an attacker’s server.
+
+The editor still works normally, because almost every error in the injected code is suppressed.
+
+Version 2.1.313 is in no registry now. We checked Open VSX, the VS Code Marketplace and npm on October 30; all three go from 2.1.312 to 2.1.314.
+
+Cursor says the build was not developed by Anthropic, was live for about 11 hours on October 29, and reached at most 5,000 users.
+
+§ 01What Cursor confirmed# [#what-cursor-confirmed]
+
+Cursor’s notice is the first account from a company that actually distributed the build. It says plainly: “This malicious version of the extension was not developed by Anthropic.” It removed the version, then shut its whole extension marketplace down, audited it, rotated its keys, rebuilt it and brought it back. It also worked with the hosting provider to take the attacker’s server offline, and writes that “The attacker server no longer functions.”
+
+Fig 1The 2.1.313 build, from Cursor's marketplace to the clean release
+
+What Cursor’s notice adds to the researchers’ report:
+
+Who built it: not Anthropic, Cursor says.
+
+Where: Cursor’s VS Code extension marketplace, as well as Open VSX.
+
+When: 2:27am to 1:35pm Pacific, October 29, 2026.
+
+How many: at most 5,000 users, whom Cursor will contact directly.
+
+Attacker server: taken offline with the hosting provider.
+
+The SSH detail matters more than it looks. Because enabling the local SSH service needs administrator rights, Cursor says the step failed on most macOS and Windows machines, so the attacker could not log in through the tunnel. The extension still added the attacker’s key, installed its persistence and sent host details out, which is why Cursor asks every affected user to run its remediation anyway.
+
+§ 02What the loader did# [#what-the-loader-did]
+
+The package looked normal. The bundled binary was the official one and the interface was unchanged. The only altered file was extension.js, where 66 lines of new code sat in front of the real extension and ran first, which means a user never had to start a Claude conversation for it to fire.
+
+Fig 2The 66 injected lines run before the real extension, so the editor still works.
+
+Step
+Behaviour
+Status in the report
+
+Runs
+66 prepended lines execute before the real extension loads
+Confirmed
+
+Collects
+Hostname, user, OS, git email, names of up to 40 variables holding KEY, TOKEN, SECRET, PASS, AWS or GCP
+Confirmed
+
+Opens a door
+Appends an Ed25519 key labelled svc-telemetry to the user’s authorized_keys
+Confirmed
+
+Turns on SSH
+Tries to enable Remote Login on macOS, sshd on Linux, OpenSSH Server on Windows
+Depends on privileges
+
+Phones home
+Reverse SSH tunnel to 134.209.82.225, plus a plain HTTP beacon on port 8099
+Confirmed
+
+Stays
+LaunchAgent named com.apple.sysmond, a cron reboot entry, or a scheduled task named SysMon
+Depends on platform
+
+Table 1What the loader did, by the OpenSourceMalware analysis
+
+Two details make this worse than the usual package-manager attack. Errors are suppressed almost everywhere, so when a step fails the real extension keeps loading and nothing looks wrong. And the persistence names borrow from system monitoring, so a quick look at a process list or a LaunchAgents folder does not obviously show an intruder.
+
+§ 03Where version 2.1.313 is now# [#where-version-21313-is-now]
+
+We checked the three places the extension ships from: the Open VSX version list [https://open-vsx.org/api/Anthropic/claude-code/versions], the VS Code Marketplace listing [https://marketplace.visualstudio.com/items?itemName=anthropic.claude-code] and the npm package [https://registry.npmjs.org/@anthropic-ai/claude-code]. The malicious version is in none of them, and the clean follow-up went out across all three within about an hour.
+
+Fig 3Version 2.1.313 is in no registry; 2.1.314 went out to all three within an hour.
+
+Where
+2.1.312
+2.1.313
+2.1.314
+
+Open VSX
+Oct 27, 20:26 UTC
+Not in the registry
+Oct 30, 01:07 UTC
+
+VS Code Marketplace
+Listed
+Not listed
+Oct 30, 01:17 UTC
+
+npm, @anthropic-ai/claude-code
+Oct 27, 18:36 UTC
+No publish time recorded
+Oct 30, 00:12 UTC
+
+Table 2Published versions of the Claude Code extension, checked October 30, 2026 at 06:45 UTC
+
+A missing version number alone was never proof of a takedown, which is why we held back on it before Cursor spoke. Cursor’s notice now settles part of it: the 2.1.313 build in its marketplace was not Anthropic’s, and Cursor removed it. The Open VSX listing’s download counter is an all-time figure for the extension, not a count of people who got the bad build; Cursor’s 5,000 is the only reach figure anyone has given.
+
+§ 04What is not established# [#what-is-not-established]
+
+The researchers draw the line themselves. Their report says the findings “show that this specific artifact is malicious; they do not, by themselves, demonstrate that Anthropic’s official Marketplace release or distribution infrastructure was compromised.” They also say they do not know how the build got published, only that the Open VSX publishing account belongs to an Anthropic employee, and that the employee may or may not have been compromised.
+
+Cursor’s notice answers some of that and leaves the rest open. Still unknown: how the build got published, whether Open VSX and Cursor received it through the same account, how many of Cursor’s at most 5,000 users actually ran it, and what Anthropic’s own investigation finds. Cursor says it has “no evidence that other versions of the extension or the official distribution are affected.” We have found no statement from Anthropic, Open VSX or the Eclipse Foundation.
+
+§ 05If you installed it# [#if-you-installed-it]
+
+The report’s own advice is blunt: “Rebuilding the host is safer than assuming removal of known artifacts restores trust.” If you installed or updated the Claude Code extension in Cursor between 2:27am and 1:35pm Pacific on October 29, or pulled it from Open VSX in the last few days on VSCodium, Windsurf or another editor, check before you assume you are clean, and move to 2.1.314. Cursor adds that “Uninstalling the extension may not be sufficient” because the payload leaves its own scripts running.
+
+Cursor’s one-line check on macOS is grep -qs svc-telemetry ~/.ssh/authorized_keys && echo found, and it publishes remediation scripts for macOS and Windows in the notice. Look for the SSH key comment svc-telemetry in ~/.ssh/authorized_keys, for ~/.config/.smt and ~/.config/.smtk, for a LaunchAgent at ~/Library/LaunchAgents/com.apple.sysmond.plist on macOS, a cron entry that runs at reboot on Linux, or a scheduled task named SysMon on Windows. On the network side, block and search for 134.209.82.225 on ports 22 and 8099. If any of it is present, treat the credentials that machine could reach as exposed and rotate them from a different computer.
+
+§ 06Why this one matters beyond one extension# [#why-this-one-matters-beyond-one-extension]
+
+The interesting part is not the malware, which is ordinary. It is the delivery. Coding agents arrive as editor extensions that people install in seconds and update silently, and those extensions run with the full rights of the developer who installed them: their SSH keys, their cloud credentials, their repositories. An agent extension is one of the highest-privilege things on a working machine, and it is distributed through the lowest-friction channel we have.
+
+That is the same structural problem behind the LiteLLM package that shipped malware [https://cellcog.ai/blog/litellm-1-107-0-malware/] and behind agents breaking out of a sandbox at OpenAI [https://cellcog.ai/blog/openai-hugging-face-incident/]. The answer is not to stop using agents. It is to stop giving them your own identity. An agent with its own account, its own machine and an explicit list of what it may reach is recoverable when something like this happens; an agent wearing your login is not.
+
+Give the agent its own computer → [/ai-employees]
+Our AI employees do not borrow your laptop or your keys. Each one works on its own machine with its own accounts, and anything consequential waits for your approval. label: Hire an AI software engineer href: /ai-employees/ai-software-engineer
+
+Frequently asked5 questions
+
+Q1What is Open VSX?
+
+An open registry of editor extensions run by the Eclipse Foundation. Editors that cannot use Microsoft’s Marketplace, including Cursor, VSCodium and Windsurf, pull extensions from it.
+
+Q2How do I know if I was hit?
+
+Look for an SSH key commented svc-telemetry in authorized_keys, for the files .smt and .smtk under your config folder, for a LaunchAgent named com.apple.sysmond, a reboot cron entry or a scheduled task named SysMon.
+
+Q3Is removing the extension enough?
+
+The researchers say no. The implant opens an interactive route into the machine, so they recommend rebuilding the host and rotating credentials from a clean computer.
+
+Q4Has Anthropic said anything?
+
+Not that we could find. Cursor published a security notice on October 29; we found no statement from Anthropic, Open VSX or the Eclipse Foundation.
+
+Q5What is the wider lesson?
+
+Agent extensions run with all the rights of the developer who installed them. Giving an agent its own account and its own machine is what makes an incident like this recoverable.
+
+ R
+ For this readAI Software Engineer
+ Hire one [/ai-employees/ai-software-engineer]
+ ×
+
+Continue
+
+ Related
+
+ LiteLLM 1.107.0 Malware: What Happened and What to Do
+ LiteLLM 1.107.0 ran a credential stealer on every Python start. It was built from a lookalike repo with three stolen developer tokens, which LiteLLM traces to its own logs.
+
+ 5 min
+ [/blog/litellm-1-107-0-malware/] 
+ Related
+
+ OpenAI Hugging Face Incident: What Happened and Changed
+ OpenAI's August 26 report is the agent-security story of the year: eval agents turned a package manager into a message board, escaped their sandboxes, and compromised Hugging Face production systems.
+
+ 21 min
+ [/blog/openai-hugging-face-incident/] 
+ Related
+
+ Four Times Claude Left the Sandbox: Anthropic's Alignment Assessment, Explained
+ Four incidents: models that talked themselves into thinking the real internet was a simulation. Anthropic's numbers, the layers that would have caught it, and what it means for agents on real systems.
+
+ 12 min
+ [/blog/claude-cybersecurity-incidents/] 
+ Next step
+
+ AI Employee Security Checklist for a Production Pilot
+ Twelve control areas, hard stops before scoring, and one rule throughout: "promised" and "supported" are not evidence - ask to see the control deny, allow, log, contain, and recover.
+
+ 28 min
+ [/blog/ai-employee-security-checklist/] 
+
+ Published 30 October 2026 All Trust, permissions & security → [/blog/category/trust-permissions/]
+
+CellCog [/]
+Hire AI employees for any role. You build the org chart. They manage each other.
+
+Product
+AI Employees [/ai-employees]AI Employees in Meetings [/ai-employees/meetings]Super-Agents [/super-agents]Agent-to-Agent [/agent-to-agent]Pricing [/pricing]Tutorials [/tutorials]Podcast [/podcast]Skills [/skills]For AI agents [/for-agents]
+
+Integrations
+Linear [/linear]OpenClaw [/openclaw]Hermes [/hermes]Cursor [/cursor]Claude Code [/claude-code]Codex [/codex]
+
+AI Employees
+AI Executive Assistant [/ai-employees/ai-executive-assistant]AI Marketing Manager [/ai-employees/ai-marketing-manager]AI Project Manager [/ai-employees/ai-project-manager]AI Research Assistant [/ai-employees/ai-research-assistant]AI Content Writer [/ai-employees/ai-content-writer]AI SEO Specialist [/ai-employees/ai-seo-specialist]AI Social Media Manager [/ai-employees/ai-social-media-manager]AI Community Manager [/ai-employees/ai-community-manager]AI Legal Assistant [/ai-employees/ai-legal-assistant]AI Receptionist [/ai-employees/ai-receptionist]AI SDR [/ai-employees/ai-sdr]AI Customer Support Agent [/ai-employees/ai-customer-support-agent]AI Data Analyst [/ai-employees/ai-data-analyst]AI Bookkeeper [/ai-employees/ai-bookkeeper]AI Recruiter [/ai-employees/ai-recruiter]AI Virtual Assistant [/ai-employees/ai-virtual-assistant]AI Operations Manager [/ai-employees/ai-operations-manager]AI Software Engineer [/ai-employees/ai-software-engineer]AI Designer [/ai-employees/ai-designer]AI Chief of Staff [/ai-employees/ai-chief-of-staff]AI Content Creator [/ai-employees/ai-content-creator]AI Head of Growth [/ai-employees/ai-head-of-growth]For Home Services [/ai-employees/for-home-services]For Real Estate Teams [/ai-employees/for-real-estate-teams]For Shopify Stores [/ai-employees/for-shopify-stores]
+
+Compare
+All Comparisons [/compare]Best AI Employee Platforms [/compare/ai-employee-platforms]Best AI SDR Platforms [/compare/ai-sdr-platforms]Best Deep Research AI [/compare/best-deep-research-ai]Benchmarks [/benchmarks]CellCog vs Grok Bot [/compare/cellcog-vs-grok-bot]Grok Bot Alternatives [/compare/grok-bot-alternatives]CellCog vs Aidan [/compare/cellcog-vs-aidan]CellCog vs Viktor [/compare/cellcog-vs-viktor]CellCog vs OpenClaw [/compare/cellcog-vs-openclaw]CellCog vs Hermes Agent [/compare/cellcog-vs-hermes-agent]Sintra Alternatives [/compare/sintra-alternatives]Lindy Alternatives [/compare/lindy-alternatives]
+
+Company
+Blog [/blog/]The CellCog Story [/story]The AI Organization [/ai-organization]Contact [/contact]Community Posts [/posts]Support Docs [/support]Security [/security]Privacy Policy [/support/privacy-policy]Terms of Service [/support/terms-of-service]
+
+© 2026 CellCogCookie preferences

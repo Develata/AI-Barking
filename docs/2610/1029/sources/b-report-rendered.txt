@@ -1,0 +1,1250 @@
+Skip to content
+CLEAR
+The Problem
+The Coalition
+Blog
+Join CLEAR
+All posts
+The Tokenizer Tax
+
+Why using the same model could cost up to 17x more in emerging markets
+
+Noah Perry, Anjali Kantharuban, Sarah Luger, Francisco Guzmán
+·
+September 29, 2026
+From text to tokens
+
+Large language models (LLMs) don't read words the way we do. They use a tokenizer to first break text into chunks, called tokens, which correspond to words, pieces of words, individual characters, punctuation, and sometimes even bytes.
+
+A good tokenizer is trained to group text into efficient, meaningful blocks. However, because digitized data is less abundant in some languages, tokenizers tend to handle those languages less optimally. Text in less digitally represented languages tends to be split into smaller fragments, which increases the token count. LLM providers typically charge by the token, irrespective of language. Anthropic's Fable 5 model, for example, costs 10 USD per million input tokens and 50 USD per million output tokens. The implication is that, for many people, using an LLM in their own language can cost significantly more than using it in English.
+
+Same meaning, different language, a very different cost
+
+Take the following English sentence: "People should benefit from AI, regardless of the language they speak."
+
+Its equivalent in Malayalam and Amharic would be:
+
+Malayalam: "ആളുകൾ ഏത് ഭാഷ സംസാരിക്കുന്നവരായാലും, AI-യിൽ നിന്ന് പ്രയോജനം നേടണം."
+
+Amharic: "ሰዎች የሚናገሩት ቋንቋ ምንም ይሁን ምን ከ AI ተጠቃሚ መሆን አለባቸው።"
+
+Each of these sentences convey the same meaning; the content is equivalent and they contain nearly the same number of characters. Tokenized with the GPT-5 tokenizer, the English sentence requires 13 tokens while the Malayalam one requires 26 because each word is split up far more, with some characters divided into their base and diacritic. In Amharic, this is even worse: each of the Ge’ez characters are split into two tokens, one byte each, resulting in 78 total tokens. That makes providing input to GPT-5 in Amharic six times more expensive than English.
+
+Figure 1: Tokenization example. A graphic representation of the tokenization of the sentence “People should benefit from AI, regardless of the language they speak.” in English, Malayalam, and Amharic using The OpenAI tokenizer API (https://platform.openai.com/tokenizer) . The English sentence gets split into recognizable words, while the Malayalam sentence gets multiple fragments per word without respect for multi-byte characters and all the Ge’ez characters in the Amharic sentence get split into two individual bytes each (which are not renderable, as denoted by the <?> sign). Notably, the word “AI” and the whitespaces are tokenized properly.
+
+Measuring cost inequity at scale
+
+Petrov et al. (2023) and Ahia et al. (2023) first documented this phenomenon, showing that scripts with less digital presence carry a disproportionate token cost. Three years and several model generations later, we find these disparities remain unchanged in frontier models, meaning that little to no effort has been focused on reducing cost inequities of LLMs across languages.
+
+For most LLMs, the disparity in tokenization efficiency across languages works like a regressive tax: the less digital presence a language has, the higher the rate its speakers pay. This tax rate varies enormously by model.
+
+To find out which models do the best job of minimizing this tokenizer tax, we ran a systematic study using FLORES-200, a benchmark of sentences professionally translated into roughly 200 languages. We tokenized the equivalent content in each language with models from every major lab.
+
+Our headline metric is the max/min token count ratio, which measures how many times more tokens the most expensive language needs compared to the cheapest one for the same content. We complement it with the Gini coefficient, a distributional measure borrowed from economics that is commonly used to study income inequality.
+
+But some languages are naturally more verbose, right?
+
+True, but that effect is measured in tens of percent. For example, Shan, the most verbose language available in the FLORES-200 dataset, is only 42% longer than English at the character level. Yet, the gaps we measure run significantly higher than that: Malayalam and Amharic have fewer characters in the example above yet 2x and 6x more tokens than English, respectively. Verbosity alone can't explain a 6x token gap.
+
+Tokenization strategies are an engineering design choice. Most modern tokenizers learn by compressing commonly seen sequences of characters iteratively, and they only get an opportunity to “see” English plus a handful of high-resource, often Latin-script languages. This is evidenced by the variance of token counts across models for identical text in the same language. Among the tokenizers in our study, the exact same Amharic sentences in FLORES-200 cost anywhere from ~2x to ~8x more than the tokenizer’s most favored language. The text is the same, but the tokenizer design choices differ.
+
+Beyond 20 languages
+
+The most surprising part is how and where the inequity begins. For the world’s top 20 languages by web presence, the models in our study are nearly equitable: max/min token ratios sit between 1.5x and 3.1x with only one exception. Labs have optimized for the same short list. Beyond the top 20 languages, however, the models are more differentiated. Across the FLORES-200 languages, the ratio ranges from 2.7x for the most equitable tokenizer to 17x in the worst case.
+
+To simplify the comparison across models and languages, we define a grading scheme based on the max/min token count ratio across the FLORES-200 languages. Under our rubric, models receive an A for a ratio of 3x or less, a B for ≤ 6x, a C for ≤ 9x, a D for ≤ 12x, and an F for any ratio exceeding 12x.
+
+In our analysis, no general purpose frontier model earns better than a B, and most get an F. The max/min ratio is a deliberately unforgiving metric: it captures what the worst-served language pays because that’s the language whose speakers are priced out first. We also report the Gini coefficient as a distributional check. In some cases, the two methods disagree. For instance, Moonshot’s Kimi K3 has a strong Gini coefficient of 0.20 but a poor max/min ratio of 11.3x across all the FLORES-200 languages.
+
+The table below summarizes the token count ratios, vocabulary sizes, Gini coefficients, and letter grades assigned by CLEAR across the evaluated model families.
+
+Model Family
+
+	
+
+Vocabulary Size
+
+	
+
+Max/Min
+
+Ratio
+
+(Top 20 Languages)
+
+	
+
+Max/Min
+
+Ratio
+
+(FLORES-200)
+
+	
+
+Gini
+
+Coefficient
+
+(FLORES-
+
+200)
+
+	
+
+CLEAR Grade
+
+
+
+
+NLLB-200 (Meta, translation)
+
+	
+
+~256k
+
+	
+
+1.5x
+
+	
+
+2.7x
+
+	
+
+0.08
+
+	
+
+A
+
+
+
+
+Gemini 3.8 Flash /
+
+Gemini 3.1 Pro /
+
+Gemma 3 / Gemma 4 (Google)
+
+	
+
+~262k
+
+	
+
+1.6x
+
+	
+
+5.1x
+
+	
+
+0.15
+
+	
+
+B
+
+
+
+
+Claude Fable 5 / Opus 4.8 (Anthropic)
+
+	
+
+Not public
+
+	
+
+1.8x
+
+	
+
+9.3x
+
+	
+
+0.20
+
+	
+
+D
+
+
+
+
+Llama 4 Scout / Muse Glimmer (Meta)
+
+	
+
+~200k
+
+	
+
+1.6x
+
+	
+
+9.5x
+
+	
+
+0.21
+
+	
+
+D
+
+
+
+
+Qwen 3 (Alibaba)
+
+	
+
+~152k
+
+	
+
+2.5x
+
+	
+
+10.5x
+
+	
+
+0.28
+
+	
+
+D
+
+
+
+
+DeepSeek V4.1 Flash (DeepSeek AI)
+
+	
+
+~128k
+
+	
+
+2.3x
+
+	
+
+10.6x
+
+	
+
+0.23
+
+	
+
+D
+
+
+
+
+Kimi K3 (Moonshot)
+
+	
+
+~160k
+
+	
+
+3.1x
+
+	
+
+11.3x
+
+	
+
+0.20
+
+	
+
+D
+
+
+
+
+Command A 03-2025 (Cohere)
+
+	
+
+~255k
+
+	
+
+1.6x
+
+	
+
+12.2x
+
+	
+
+0.33
+
+	
+
+F
+
+
+
+
+Qwen 3.6 (Alibaba)
+
+	
+
+~248k
+
+	
+
+1.9x
+
+	
+
+13.1x
+
+	
+
+0.26
+
+	
+
+F
+
+
+
+
+GLM-5.2 / GLM 5.3 (Z.ai)
+
+	
+
+~155k
+
+	
+
+2.0x
+
+	
+
+13.2x
+
+	
+
+0.30
+
+	
+
+F
+
+
+
+
+GPT-5 / gpt-oss (OpenAI)
+
+	
+
+~200k
+
+	
+
+1.8x
+
+	
+
+13.8x
+
+	
+
+0.23
+
+	
+
+F
+
+
+
+
+Command A+ 05-2026 (Cohere)
+
+	
+
+~255k
+
+	
+
+1.9x
+
+	
+
+14.2x
+
+	
+
+0.30
+
+	
+
+F
+
+
+
+
+Llama 3.3 (Meta)
+
+	
+
+~128k
+
+	
+
+1.9x
+
+	
+
+14.8x
+
+	
+
+0.33
+
+	
+
+F
+
+
+
+
+Ministral 3 (Mistral)
+
+	
+
+~131k
+
+	
+
+1.7x
+
+	
+
+14.9x
+
+	
+
+0.30
+
+	
+
+F
+
+
+
+
+Nemotron 3.5 (NVIDIA)
+
+	
+
+~131k
+
+	
+
+1.7x
+
+	
+
+14.9x
+
+	
+
+0.30
+
+	
+
+F
+
+
+
+
+Olmo 3.1 (Allen AI)
+
+	
+
+~100k
+
+	
+
+3.0x
+
+	
+
+15.0x
+
+	
+
+0.33
+
+	
+
+F
+
+
+
+
+Phi-4 (Microsoft)
+
+	
+
+~100k
+
+	
+
+3.0x
+
+	
+
+15.0x
+
+	
+
+0.33
+
+	
+
+F
+
+
+
+
+Granite 4.1 (IBM)
+
+	
+
+~100k
+
+	
+
+3.0x
+
+	
+
+15.0x
+
+	
+
+0.33
+
+	
+
+F
+
+
+
+
+Falcon 3 (TII)
+
+	
+
+~131k
+
+	
+
+4.5x
+
+	
+
+17.0x
+
+	
+
+0.34
+
+	
+
+F
+
+Table 1: Equity results by model. Models are sorted by max/min ratio for the FLORES-200 languages.
+
+Some labs are intentionally multilingual
+
+Vocabulary size alone does not explain the disparities observed here in multilingual tokenization efficiency. For instance, Llama 4 has a smaller vocabulary budget than Qwen 3.6 (~200k vs ~248k slots), yet Llama 4 outperforms Qwen 3.6 in equity across 200 languages.
+
+NLLB, a translation model whose tokenizer was deliberately built for 200 languages, achieves an A grade with a max ratio of 2.7x. While it’s not a fair bar for a frontier model as it doesn’t have to compress code, math, or English at frontier quality, it is a proof of what an intentionally multilingual-first vocabulary can do. Google’s Gemini/Gemma family, which achieves a B grade at a 5.1x ratio, shows that a general-purpose frontier model can get most of the way there. Models receive failing grades (max/min ratio above 12x) because tokenizer equity wasn’t prioritized, not because it is technically infeasible.
+
+These results are dynamic; they change with every new model that is released. Some model families have improved dramatically (e.g. from Llama 3 to Llama 4, the max/min ratio went from 14.8x to 9.5x), while others (as the Qwen example shows) can regress in these metrics.
+
+Degradation of Tokenization Efficiency per Model
+
+To detect where the largest degradation of tokenization efficiency occurs, we analyzed how much the max/min ratio for each model is affected by adding one additional language. We add languages in order of resourcedness. Common Crawl reports statistics on the distribution of languages detected in their monthly crawls. We used Common Crawl page count (primarily) and total number of speakers (secondarily) together as a proxy for how much each language is available in training data. Figure 2 below plots this max/min token cost ratio across cumulative language sets, illustrating how sharply the tokenizer tax escalates across different model families as lower-resourced languages are included.
+
+We find that tokenizers degrade on different languages. Qwen 3’s greatest single-language degradation occurs at Greek (ranked #26) while Kimi K3’s occurs at Central Atlas Tamazight (ranked #174). We also found that the degradation of tokenization efficiency is relatively smooth for some models (e.g. Google models) while for others the drop off is steep at specific languages (e.g. Ministral 3, Nemotron 3.5).
+
+Note that newer models within a family are not necessarily more equitable. Alibaba’s newer flagship Qwen 3.6 scores worse on the 200-language ratio (13.1x) than the older Qwen 3 (10.5x). Without a public scoreboard, regressions like this are hard to detect and silently harm early technology adopters.
+
+Figure 2: Tokenizer tax as a function of language count. Max tokenizer tax is the max/min token count ratio as languages are incrementally added from highest to lowest resource. Differences between models become especially pronounced in lower-resource languages. Shaded bands indicate the CLEAR grading thresholds (A ≤3x, B ≤6x, C ≤9x, D ≤12x, F >12x).
+
+A different take on equity
+
+A possible criticism of using the max/min ratio as a measure of equity is that some models with low grades actually tokenize the majority of languages well. Their high max/min ratios are driven by a small number of languages on which the tokenizer performs very poorly. Consequently, their grade could be easily improved by adding targeted support for these additional languages.
+
+In Table 2, we report the number of languages for which the ratio is under 2x in relation to the model’s most efficiently tokenized language. This comes closer to true equity, and provides a higher standard for labs to strive towards. A max/min ratio of 1x across all languages is likely not achievable as languages differ in verbosity while 3x still implies a substantial amount of inequity beyond what verbosity would account for. Under this alternative measure, the best performing model is GPT-5, which tokenizes 78% of languages within the 2x threshold.
+
+Model Family
+
+	
+
+Largest Jump in Max/Min Ratio
+
+	
+
+Language Where Largest Jump Occurs
+
+	
+
+Highest Resource Language Outside Grade A
+
+	
+
+Number of Languages Where Token Count is Less Than 2x of Model Min
+
+
+
+
+NLLB-200 (Meta, translation)
+
+	
+
+0.6
+
+	
+
+Santali
+
+Script: Ol Chiki
+
+Rank: 160
+
+	
+
+N/A
+
+(always has Grade A)
+
+	
+
+194
+
+(96%)
+
+
+
+
+Gemini 3.8 Flash / Gemini 3.1 Pro / Gemma 3 /
+
+Gemma 4 (Google)
+
+	
+
+1.0
+
+	
+
+Santali
+
+Script: Ol Chiki
+
+Rank: 160
+
+	
+
+Odia
+
+Script: Odia
+
+Rank: 75
+
+	
+
+151
+
+(74%)
+
+
+
+
+DeepSeek V4.1 Flash (DeepSeek AI)
+
+	
+
+2.1
+
+	
+
+Central Atlas Tamazight
+
+Script: Tifinagh
+
+Rank: 174
+
+	
+
+Nepali
+
+Script: Devanagari
+
+Rank: 43
+
+	
+
+67
+
+(33%)
+
+
+
+
+Olmo 3.1 (Allen AI)
+
+	
+
+2.2
+
+	
+
+Georgian
+
+Script: Georgian
+
+Rank: 48
+
+	
+
+Standard Arabic
+
+Script: Arabic
+
+Rank: 20
+
+	
+
+58
+
+(29%)
+
+
+
+
+Phi-4 (Microsoft)
+
+	
+
+2.2
+
+	
+
+Georgian
+
+Script: Georgian
+
+Rank: 48
+
+	
+
+Standard Arabic
+
+Script: Arabic
+
+Rank: 20
+
+	
+
+58
+
+(29%)
+
+
+
+
+Granite 4.1 (IBM)
+
+	
+
+2.2
+
+	
+
+Georgian
+
+Script: Georgian
+
+Rank: 48
+
+	
+
+Standard Arabic
+
+Script: Arabic
+
+Rank: 20
+
+	
+
+58
+
+(29%)
+
+
+
+
+Llama 3.3 (Meta)
+
+	
+
+2.2
+
+	
+
+Georgian
+
+Script: Georgian
+
+Rank: 48
+
+	
+
+Hebrew
+
+Script: Hebrew
+
+Rank: 32
+
+	
+
+82
+
+(40%)
+
+
+
+
+Qwen 3 (Alibaba)
+
+	
+
+2.3
+
+	
+
+Greek
+
+Script: Greek
+
+Rank: 26
+
+	
+
+Greek
+
+Script: Greek
+
+26
+
+	
+
+81
+
+(40%)
+
+
+
+
+Command A 03-2025 (Cohere)
+
+	
+
+2.6
+
+	
+
+Malayalam
+
+Script: Malayalam
+
+Rank: 58
+
+	
+
+Thai
+
+Script: Thai
+
+29
+
+	
+
+116
+
+(57%)
+
+
+
+
+Kimi K3 (Moonshot)
+
+	
+
+2.8
+
+	
+
+Central Atlas Tamazight
+
+Script: Tifinagh
+
+Rank: 174
+
+	
+
+Vietnamese
+
+Script: Latin
+
+Rank: 16
+
+	
+
+30
+(15%)
+
+
+
+
+Falcon 3 (TII)
+
+	
+
+2.8
+
+	
+
+Kannada
+
+Script: Kannada
+
+Rank: 60
+
+	
+
+Russian
+
+Script: Cyrillic
+
+Rank: 2
+
+	
+
+62
+
+(31%)
+
+
+
+
+Claude Fable 5 / Opus 4.8 (Anthropic)
+
+	
+
+2.9
+
+	
+
+Santali
+
+Script: Ol Chiki
+
+Rank: 160
+
+	
+
+Tamil
+
+Script: Tamil
+
+Rank: 47
+
+	
+
+134
+
+(66%)
+
+
+
+
+Command A+ 05-2026 (Cohere)
+
+	
+
+3.3
+
+	
+
+Burmese
+
+Script: Myanmar
+
+Rank: 63
+
+	
+
+Georgian
+
+Script: Georgian
+
+Rank: 48
+
+	
+
+109
+
+(54%)
+
+
+
+
+GLM-5.2 / GLM-5.3 (Z.ai)
+
+	
+
+3.6
+
+	
+
+Odia
+
+Script: Odia
+
+Rank: 75
+
+	
+
+Thai
+
+Script: Thai
+
+Rank: 29
+
+	
+
+76
+
+(37%)
+
+
+
+
+Llama 4 Scout (Meta)
+
+	
+
+3.7
+
+	
+
+Odia
+
+Script: Odia
+
+Rank: 75
+
+	
+
+Tamil
+
+Script: Tamil
+
+Rank: 47
+
+	
+
+131
+
+(65%)
+
+
+
+
+Qwen 3.6 (Alibaba)
+
+	
+
+4.3
+
+	
+
+Santali
+
+Script: Ol Chiki
+
+Rank: 160
+
+	
+
+Hindi
+
+Script: Devanagari
+
+Rank: 34
+
+	
+
+92
+
+(45%)
+
+
+
+
+GPT-5 / gpt-oss (OpenAI)
+
+	
+
+4.6
+
+	
+
+Santali
+
+Script: Ol Chiki
+
+Rank: 160
+
+	
+
+Burmese
+
+Script: Myanmar
+
+Rank: 63
+
+	
+
+158
+
+(78%)
+
+
+
+
+Ministral 3 (Mistral)
+
+	
+
+11.6
+
+	
+
+Khmer
+
+Script: Khmer
+
+Rank: 68
+
+	
+
+Burmese
+
+Script: Myanmar
+
+Rank: 63
+
+	
+
+113
+
+(56%)
+
+
+
+
+Nemotron 3.5 (NVIDIA)
+
+	
+
+11.6
+
+	
+
+Khmer
+
+Script: Khmer
+
+Rank: 68
+
+	
+
+Burmese
+
+Script: Myanmar
+
+Rank: 63
+
+	
+
+113
+
+(56%)
+
+Table 2: Where issues emerge for each tokenizer. The model min is the token count for the most efficiently tokenized language for that model, which is English or Mandarin Chinese (Simplified) in most cases. There are 204 language-script pairs in FLORES-200 corresponding to 196 unique ISO 639-3 codes (8 languages are represented in 2 different scripts). One of the ISO 639-3 codes (ajp) has been deprecated since FLORES-200 was published, so we included 203 language-script pairs in our analysis.
+
+The problem is largely driven by the script
+
+Figure 3: FLORES-200 token counts by language for select models. The group of yellow bars at the far right indicates that the least efficiently tokenized languages all have less common scripts.
+
+As seen in Figure 3, when we color-code each language’s token cost by script, the pattern is hard to miss. Latin-script languages, even smaller ones, get a discount. Asturian, for example, is a Latin-script language with relatively few speakers. It is not found in the Common Crawl data but benefits from the Latin-script advantage, as well as the representation from other related Romance languages like Italian. The languages that are at the biggest disadvantage are written in scripts the tokenizer rarely saw: Burmese, Tibetan, Tifinagh, Khmer, Lao, and Ol Chiki. This pattern is consistent across nearly all models in our analysis.
+
+This is not confined to small languages. If we sort by speakers instead of web presence, the tax lands on enormous populations: Punjabi (~200 million speakers), Bengali (~266 million), Urdu (~288 million), Burmese (~36 million), Amharic (~36 million). This means hundreds of millions of people, billed at multiples of the English rate for the same intelligence.
+
+Why this matters for AI adoption
+
+The tokenizer tax is a significant barrier to adoption. A startup in Bangalore may pay a surcharge on every prompt and completion while its competitor in Austin does not. The tokenizer tax also has implications beyond cost. Higher token counts translate into higher latency and reduced effective context capacity. A nominal 128k-token context window can only hold a fraction of the content in a heavily taxed language, putting long-document and agentic use cases out of reach. These penalties hit hardest where compute and connectivity are already limited. Tokenizer inequity is a constraint on who can participate in the AI economy.
+
+A call to action for labs
+
+Publish the max/min token count ratio across the FLORES-200 languages and the percentage of languages under 2x ratio in model cards as a standard benchmark score.
+
+Set vocabulary allocation targets for the next tokenizer generation to significantly improve the percentage of languages under 2x ratio across the suggested ~200 languages. Tokenizers are a design choice that can be changed or optimized for multilinguality and script variation if that is a priority of the lab
+
+Fix pricing now. Tokenizers can’t change until the next base model is trained. However, prices can change more easily. Character-normalized or language-normalized pricing would eliminate the tokenizer tax immediately. While this is helpful only for models behind APIs that charge per token, the first lab to do it will set the standard for others to follow.
+
+What can other actors do?
+
+Procurement moves labs faster than blog posts. Public contracts for AI systems serving multilingual populations should require multilingual tokenization cost disclosure and set minimum token equity grades as a qualification criterion. Research funders and language advocacy organizations should support open text corpora in taxed languages, when aligned with a language community’s wishes, to address multilingual imbalance in training data, which is a root cause of the tokenization tax.
+
+How can you help?
+
+Join CLEAR and help make AI work more equitably across languages. Contribute evaluations, models, data, or expertise; and help us build a shared standard for measuring and reducing language inequity in AI. Join our community.
+
+Try it yourself
+
+Code for reproducing our results in full and running this benchmark for additional models is available at https://github.com/clear-coalition-ai/token-cost-equity
+
+References
+
+Petrov, A., La Malfa, E., Torr, P., and Bibi, A. "Language Model Tokenizers Introduce Unfairness Between Languages." Advances in Neural Information Processing Systems 36 (NeurIPS 2023).
+
+Ahia, O., Kumar, S., Gonen, H., Kasai, J., Mortensen, D., Smith, N., and Tsvetkov, Y. "Do All Languages Cost the Same? Tokenization in the Era of Commercial Language Models." Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing (EMNLP 2023).
+
+This is the first of CLEAR’s equity studies. A companion study on quality equity across languages is underway. Published by CLEAR — the Coalition for Language Equity in AI Research (clear-languages.org).
+
+Back to all posts
