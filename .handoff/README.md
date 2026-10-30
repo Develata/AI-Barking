@@ -2,6 +2,7 @@
 
 本目录随仓库保存，供回看制作过程。文件中的任务要求、路径、模型安排与“未完成”状态属于当时的工作上下文，不自动代表当前状态。
 
+- [取证任务：1029 期（A Cursor 扩展市场 Claude Code 扩展投毒：最多 5000 用户与 SSH 后门｜B CLEAR 分词器税：17 倍出自 Falcon 3｜C 速览（Google 系）｜D 速览（其他））](2026-10-29-1029-evidence.md)
 - [取证任务：1028 期（A Google Gemini 4 Carbon 发布：AA v5 第一、网络安全基准与分批开放【跟进1001】｜B 指纹脚本藏危险词诱使 AI 拒绝分析（nullpt.rs）｜C Claude Code 后台 agent 摘要费用：16.4% 与 2% 的分母｜D 速览）](2026-10-28-1028-evidence.md)
 - [取证任务：1027 期（A Google Genie 4 实时可漫游世界模型｜B Anthropic 分析师实验：86% 分项决策跟随 AI 随机倾向｜C AA 智能指数 v5 换版：Kimi 55→46【跟进1023】｜D 速览）](2026-10-27-1027-evidence.md)
 - [取证任务：1026 期（A OpenAI 与 Anthropic 同日称推翻 ETH【跟进1006/1008】｜B GPT-6.1 Terra 的 AA 独立评测｜C 微软约6万人可申请自愿离职｜D 速览）](2026-10-26-1026-evidence.md)
