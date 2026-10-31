@@ -2,8 +2,9 @@
 //! adds to `README.md` (内容目录) and `daily-scan.md` (近 3 天速览已收, 已发过);
 //! step 1 of docs/workflow/publish.md.
 //!
-//! Run it only after Develata says 已发布: a topic written into daily-scan.md
-//! and pushed before publication is excluded from the next scheduled search.
+//! Run it when the issue goes to Develata for final review; commit, but do not
+//! push before 已发布: a topic written into daily-scan.md and pushed before
+//! publication is excluded from the next scheduled search.
 //! The 已发过 row is editorial, so the tool only writes a placeholder
 //! (`待填…`) that `publish-check` refuses to let through.
 //!
@@ -20,7 +21,7 @@ use crate::offsite::write_if_changed;
 use crate::repo::{Date, Issue};
 
 const USAGE: &str = "用法：barking scan-rows <期次目录> [--dry-run]\n\
-只在 Develata 说“已发布”后运行；--dry-run 只打印将要添加或删除的行，不写文件";
+交付终审时运行，提交后在“已发布”前不推送；--dry-run 只打印将要添加或删除的行，不写文件";
 
 const README: &str = "README.md";
 const DAILY_SCAN: &str = "daily-scan.md";

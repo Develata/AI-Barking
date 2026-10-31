@@ -26,7 +26,7 @@ const USAGE: &str = "\
   barking cover-draw <期次目录> [--seed N]  按 templates/cover-styles.toml 抽两组封面画风轴（A、B），排除前几期用过的取值
   barking publish-check <期次目录>          发布后检查七步：lint、标记行、oxipng、offsite 清单、大文件、身份、凭据（docs/workflow/publish.md）
   barking stage <期次目录> [--batch 1|2|3] [--add]  按提交约定分三批列出待提交文件与建议提交信息；--add 暂存该批（不 commit）
-  barking scan-rows <期次目录> [--dry-run]  发布后补 README 期次索引与 daily-scan 的速览已收/已发过行；只在 Develata 说“已发布”后运行
+  barking scan-rows <期次目录> [--dry-run]  发布后补 README 期次索引与 daily-scan 的速览已收/已发过行；交付终审时运行，“已发布”前不推送
   barking handoff <期次目录> --groups \"A=主题,B=速览\" [--note 要点]... [--force] [--out 文件] | --index  生成取证派工单（.handoff/）并重写其索引
   barking shot <期次目录> <组前缀> <动作>   网页或 PDF 渲染截图，按锚点或像素框裁切、拼接（render|pdf|lines|crop|cropbox|stack；不带动作看用法）
   barking fetch <期次目录> <组前缀> <清单|-> [--jobs 6] [--force]  按 name<TAB>url 清单批量存档网页与 PDF（.html/.pdf、.headers、.txt），限时、并发，日志记入 sources/<组前缀>-fetch-log.jsonl

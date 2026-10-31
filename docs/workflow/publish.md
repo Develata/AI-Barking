@@ -1,10 +1,15 @@
-# 发布后：提交、推送与归档
+# 交付与发布：提交、上传与推送
 
-Develata 在对话中说“已发布”，即授权 Claude 对当期完成下面全部步骤，包括推送到 `origin/main` 和上传 OpenList。授权只覆盖当期这一轮；发布后的标题、文字或配图修订各自单独提交，推送前另行确认。
+分两段（2026-10-31 起，Develata 决定，为省一轮等待）：
+
+- **交付终审时**（lint 0 个错误，两轮反向核验、读者稿检查与视觉复核都回来、BLOCKER 改完）：Claude 不等“已发布”，直接做下面第 1、2、3、5 步——补发布标记、检查、按三批提交、上传 OpenList。这些都只在本地与网盘，远端 `main` 不变，定时检索看不到未发布的选题。
+- **Develata 说“已发布”后**：只做第 4 步推送，并回报。“已发布”授权推送当期三批及其终审改动提交；授权只覆盖当期这一轮。
+
+终审时 Develata 改了标题、文字或配图：照改，各自单独小提交（标题改了，同步改 `daily-scan.md` 的“已发过”行与 `README.md` 索引行）；改了图就重渲、重跑 `publish-check` 与上传。上传按大小判断是否已传，改动后大小恰好不变的图会被跳过，此时逐个核对 `offsite.tsv` 的 SHA-256 变化并单独补传。已上传的图若改了文件名，网盘上的旧文件上传账号删不掉，回报里列出请 Develata 清理。发布后的修订照旧各自单独提交，推送前另行确认。
 
 ## 为什么要及时推送
 
-选题检索由 ChatGPT 定时任务完成：每天 0、6、12、18 点各一次，读取 GitHub 上 `main` 分支的 `daily-scan.md` 作为 prompt，检索此前 36 小时的新闻。各次结果彼此可见，但不是增量检索。定时任务只能从远端看到“已发过”，所以发布后要尽快推送，最好赶在下一个整点前；GitHub 的 raw 文件可能有几分钟缓存。
+选题检索由 ChatGPT 定时任务完成：每天 0、6、12、18 点各一次，读取 GitHub 上 `main` 分支的 `daily-scan.md` 作为 prompt，检索此前 36 小时的新闻。各次结果彼此可见，但不是增量检索。定时任务只能从远端看到“已发过”，所以发布后要尽快推送（提交与上传已在交付终审时做完，“已发布”后只剩推送），最好赶在下一个整点前；GitHub 的 raw 文件可能有几分钟缓存。
 
 检索结果由 Develata 汇总回贴给 Claude。Claude 以本地 `daily-scan.md` 的“已发过”为准去重，因为本地可能比远端新。
 
@@ -12,7 +17,7 @@ Develata 在对话中说“已发布”，即授权 Claude 对当期完成下面
 
 下面的 `barking` 即 `cargo run --release --manifest-path tools/barking/Cargo.toml --`。
 
-1. **已发过与索引**：`barking scan-rows <期次目录>` 生成机械部分：`README.md` 的期次索引行；`daily-scan.md`“近 3 天速览已收”的本期条目（`cards.toml` 中没有 `main = true` 的 `[[roundup]]`，每条一行：期次、标签、图上那句事实），并删掉期次日期早于或等于本期减三天的行（如发 1008 时删 1005）；“已发过”的占位行（速览专帖没有主帖，不写）。然后把占位行改成本期摘要：按最终发布版的标题和口径写选题、关键数字与吠点——这是编辑内容，工具只放占位，`待填` 没改掉时 `publish-check` 与 `stage --batch 1` 都会拒绝。只在发布后写：未发布的选题一旦写入并推送，就会被定时检索排除。
+1. **已发过与索引**：`barking scan-rows <期次目录>` 生成机械部分：`README.md` 的期次索引行；`daily-scan.md`“近 3 天速览已收”的本期条目（`cards.toml` 中没有 `main = true` 的 `[[roundup]]`，每条一行：期次、标签、图上那句事实），并删掉期次日期早于或等于本期减三天的行（如发 1008 时删 1005）；“已发过”的占位行（速览专帖没有主帖，不写）。然后把占位行改成本期摘要：按最终发布版的标题和口径写选题、关键数字与吠点——这是编辑内容，工具只放占位，`待填` 没改掉时 `publish-check` 与 `stage --batch 1` 都会拒绝。交付终审时写、提交，但在“已发布”前不推送：未发布的选题一旦推送，就会被定时检索排除。
 2. **检查**：`barking publish-check <期次目录>`，按固定顺序做下面七项，任一不过就停下报告：
    - lint，0 个错误；
    - 发布后标记齐全：README 索引行、已发过行（无占位）、速览已收条目与 `cards.toml` 逐字一致；
@@ -22,9 +27,9 @@ Develata 在对话中说“已发布”，即授权 Claude 对当期完成下面
    - 身份：按 `templates/codex-evidence.md` 第 7 条，用 `.env` 里 `BARKING_IDENTITY_HANDLES` 列出的抓取账号 X handle，经 fxtwitter 公开接口解析出显示名、头像 ID 与数字用户 ID（缓存在 `~/.config/barking/identity.json`，一天后自动刷新，改名后旧名仍保留在缓存里），加上 `BARKING_IDENTITY_PATTERNS` 手填的片段，搜索待提交文件与文件名，确认未入库（两者都未配置时只警告）；
    - 凭据与会话状态（`.env`、cookies、storage-state）仍被 `.gitignore` 排除，且没有进入待提交集合。
 3. **提交**：`barking stage <期次目录>` 列出三批文件与建议提交信息；按 `AGENTS.md` 的提交约定依序 `barking stage <期次目录> --batch 1 --add` 后 `git commit`，再 `--batch 2`、`--batch 3`。第②批的提交信息要按组描述存档内容后再提交；工具只暂存精确路径，不提交。
-4. **推送**：先 `git log --oneline origin/main..HEAD`，除当期三批外还列出别的提交，就先问 Develata：“已发布”只授权推送当期三批（1025 期曾把三个此前未推送的规范改动一并推了出去）。确认后 `git push origin main`，再 `git fetch` 核对 `origin/main` 上的 `daily-scan.md` 与本地一致。
+4. **推送**（Develata 说“已发布”后）：先 `git log --oneline origin/main..HEAD`，除当期三批及其终审改动提交外还列出别的提交，就先问 Develata：“已发布”只授权推送当期的提交（1025 期曾把三个此前未推送的规范改动一并推了出去）。确认后 `git push origin main`，再 `git fetch` 核对 `origin/main` 上的 `daily-scan.md` 与本地一致。
 5. **上传**：`cargo run --release --manifest-path tools/barking/Cargo.toml -- offsite <期次目录> --upload`：每个远端目录先列一次，已有且大小一致的文件跳过；其余默认 4 路并发上传（单个文件失败自动重试，共 3 次；远端缺目录时，该目录的第一个文件单独先传），传完再列一次远端，逐个核对大小一致。网盘报请求过频时加 `--jobs 1` 串行。
-6. **回报**：各批提交哈希、推送结果、上传数量与失败项。
+6. **回报**：交付终审时回报各批提交哈希、上传数量与失败项；“已发布”后回报推送结果。
 
 ## 存储分工
 
