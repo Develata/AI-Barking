@@ -16,7 +16,7 @@
 | Codex 当取证执行方 | `danger-full-access`（要联网、跑 cargo 与 opencli） | 同左 |
 | 包管理 | Scoop | apt（系统库）、`cargo binstall`（Rust CLI）、Bun（JS CLI） |
 | oxipng（`publish-check`） | `scoop install oxipng` | `cargo binstall oxipng`（已装） |
-| Tesseract（`barking card` 批注图） | `scoop install tesseract tesseract-languages`（设了 `TESSDATA_PREFIX`，装前打开的终端要重开） | `sudo apt install tesseract-ocr tesseract-ocr-chi-sim`（2026-11-01 尚未装，需 Develata 输密码） |
+| Tesseract（`barking card` 批注图） | `scoop install tesseract tesseract-languages`（设了 `TESSDATA_PREFIX`，装前打开的终端要重开） | `sudo apt install tesseract-ocr tesseract-ocr-chi-sim`（2026-11-01 已装 5.5.0，语言 `chi_sim`、`eng`；需 sudo，由 Develata 装） |
 | poppler（`barking shot pdf`、`fetch` 的 PDF 转文本） | Scoop 的 poppler；barking 先找 `~/scoop/apps/poppler/current/bin`，因为 Git Bash PATH 上的 xpdf 版 `pdftotext` 没有 `-bbox-layout` | apt 的 `poppler-utils`（已装），走 PATH |
 | Chrome（headless 渲染） | `C:\Program Files\…` 自动找到 | `/usr/bin/google-chrome` 自动找到 |
 | opencli | 照旧 | Bun 全局，已装 |
@@ -31,4 +31,3 @@
 
 1. `.env`：照 `.env.example` 建，值（OpenList 账号、`BARKING_IDENTITY_HANDLES` 等）从 Windows 检出拷过来，不入库、不贴进对话。没有它，`barking offsite` 上传与 `publish-check` 的身份检查都做不了（后者只警告）。
 2. 往期图片：`images/` 与 `sources/` 里的二进制原件只在 OpenList 与 Windows 检出里。要用往期图（封面比对“前 3 期”、重跑旧期的视觉复核、取用批注底图）时，从 Windows 检出拷或从 OpenList 下载，拷完按 `sources/offsite.tsv` 核对 SHA-256。新一期从 Linux 开工则无此问题。
-3. Tesseract：见上表。
