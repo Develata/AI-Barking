@@ -383,7 +383,12 @@ fn compress_pngs(issue: &Issue) -> Result<Step, String> {
         {
             Ok(o) => o,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                notes.push("找不到 oxipng：scoop install oxipng".to_string());
+                let install = if cfg!(windows) {
+                    "scoop install oxipng"
+                } else {
+                    "cargo binstall oxipng"
+                };
+                notes.push(format!("找不到 oxipng：{install}"));
                 return Ok(Step::fail(notes));
             }
             Err(e) => return Err(format!("无法运行 oxipng：{e}")),

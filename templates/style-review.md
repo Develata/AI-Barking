@@ -7,8 +7,10 @@
 `{OUT}` 为草稿目录下的新子目录。把下面 `---` 之间的提示词填好（`{标题候选}` 取自 `sources/titles.md`，每行一个；`{正文}` 是 `doc_<MMDD>_publish.txt` 全文，去掉第一行标题）写入 `{OUT}/prompt.md`：
 
 ```bash
-codex exec -m gpt-6-astra -c 'model_reasoning_effort="medium"' -s danger-full-access --skip-git-repo-check --ephemeral -C "{OUT}" -o "{OUT}/report.md" - < "{OUT}/prompt.md"
+codex exec -m gpt-6-astra -c 'model_reasoning_effort="medium"' -s read-only --skip-git-repo-check --ephemeral -C "{OUT}" -o "{OUT}/report.md" - < "{OUT}/prompt.md"
 ```
+
+这是 Linux 写法；Windows 把 `-s read-only` 换成 `-s danger-full-access`（Windows 原生 Codex 沙箱不可靠，见 `docs/workflow/hosts.md`）。
 
 GPT 起草时改用（在 `{OUT}` 里运行）：
 

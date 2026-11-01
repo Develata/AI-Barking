@@ -9,7 +9,7 @@
 | `example.toml` | `images/cards.toml` 样例（0926 期），字段说明在注释里 |
 | `visual-review.md` | 视觉复核提示词 |
 
-工具：Chrome 无头模式渲染（荧光笔依赖 CSS 正片叠底；Typst 0.15 尚无混合模式，见 typst/typst#8815），Tesseract 定位关键句，ffmpeg 放大底图。安装：`scoop install tesseract tesseract-languages`（ffmpeg、Chrome 已有）。找不到 Chrome 时用环境变量 `BARKING_CHROME` 指定。Scoop 安装语言包时设置了用户环境变量 `TESSDATA_PREFIX`，安装前已打开的终端要重开才生效。
+工具：Chrome 无头模式渲染（荧光笔依赖 CSS 正片叠底；Typst 0.15 尚无混合模式，见 typst/typst#8815），Tesseract 定位关键句，ffmpeg 放大底图。安装命令按主机不同（Windows 用 Scoop，Linux 用 apt），见 `docs/workflow/hosts.md`。找不到 Chrome 时用环境变量 `BARKING_CHROME` 指定。
 
 ## 步骤
 
@@ -37,7 +37,13 @@
    cargo run --release --manifest-path tools/barking/Cargo.toml -- review docs/<YYMM>/<MMDD> --visual
    ```
 
-   它按 `visual-review.md` 填好提示词（附图清单 = 省流卡、速览图、每个主帖的事件卡与吠点卡、封面、每张批注图及其 `-raw` 底图，末尾附 `EDITORIAL.md` 的“省流卡与批注截图”“速览”两节），写进临时目录，并打印交给 WSL 中 Codex（`gpt-6-astra`，effort `medium`，只读）的完整命令；加 `--run` 则直接执行（Codex 慢，放后台运行，等完成通知后读报告）。等价的手工命令，每张图一个 `--image=` 参数（1029 期起图在 `images/publish/`），路径用 `wsl -d Debian -e wslpath -a` 转换：
+   它按 `visual-review.md` 填好提示词（附图清单 = 省流卡、速览图、每个主帖的事件卡与吠点卡、封面、每张批注图及其 `-raw` 底图，末尾附 `EDITORIAL.md` 的“省流卡与批注截图”“速览”两节），写进临时目录，并打印交给 Codex（`gpt-6-astra`，effort `medium`，只读；Windows 经 WSL，Linux 直接调用本机 Codex，见 `docs/workflow/hosts.md`）的完整命令；加 `--run` 则直接执行（Codex 慢，放后台运行，等完成通知后读报告）。等价的手工命令，每张图一个 `--image=` 参数（1029 期起图在 `images/publish/`）。Linux：
+
+   ```bash
+   cd "<期次目录>" && timeout 1200 codex exec -m gpt-6-astra -c 'model_reasoning_effort="medium"' -s read-only --skip-git-repo-check --ephemeral -C . -o "<报告路径>" --image=images/00-tldr.png --image=images/01-x.png --image=images/01-x-raw.png - < "<提示词路径>"
+   ```
+
+   Windows（路径用 `wsl -d Debian -e wslpath -a` 转换）：
 
    ```bash
    MSYS_NO_PATHCONV=1 wsl -d Debian -e bash -lc 'cd "$1" && exec timeout 1200 "$0" exec -m gpt-6-astra -c "model_reasoning_effort=\"medium\"" -s read-only --skip-git-repo-check --ephemeral -C "$1" -o "$2" --image=images/00-tldr.png --image=images/01-x.png --image=images/01-x-raw.png - < "$3"' /home/deve/.bun/bin/codex "<期次目录的 WSL 路径>" "<报告的 WSL 路径>" "<提示词的 WSL 路径>"

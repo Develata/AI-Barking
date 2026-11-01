@@ -101,7 +101,7 @@ const USAGE: &str = "\
   任一条目已有输出则整批拒绝；加 --force 时，每条写入前先删去该条上次的全部输出（同一 name 只留一版）。
   每条在 sources/<组前缀>-fetch-log.jsonl 追加一行（北京时间、清单 URL（凭据类查询参数打码）、最终 URL、状态、字节、sha256、输出、结果与归类后的原因；详细报错只打到 stderr）。
   部分条目失败仍以 0 退出，末行写明失败数；用法错误、拒绝覆盖与日志写入失败以非 0 退出。
-  pdftotext 先找环境变量 BARKING_POPPLER 指定的目录，再找 ~/scoop/apps/poppler/current/bin，最后 PATH。";
+  pdftotext 先找环境变量 BARKING_POPPLER 指定的目录，再找 ~/scoop/apps/poppler/current/bin（Windows），最后 PATH（Linux 用 apt 的 poppler-utils）。";
 
 const DEFAULT_JOBS: usize = 6;
 const MAX_JOBS: usize = 16;
@@ -1686,9 +1686,11 @@ fn pdf_to_text(tool: &Path, pdf: &Path, cap: u64, timeout: Duration) -> Result<V
         .map_err(|e| {
             eprintln!("warn: {}：{e}", tool.display());
             match e.kind() {
-                ErrorKind::NotFound => {
-                    fail("未找到 pdftotext，可用 Scoop 装 poppler 或设 BARKING_POPPLER")
-                }
+                ErrorKind::NotFound => fail(if cfg!(windows) {
+                    "未找到 pdftotext，可用 Scoop 装 poppler 或设 BARKING_POPPLER"
+                } else {
+                    "未找到 pdftotext，可用 apt 装 poppler-utils 或设 BARKING_POPPLER"
+                }),
                 _ => fail("无法启动"),
             }
         })?;

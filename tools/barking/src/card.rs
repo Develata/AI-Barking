@@ -2097,7 +2097,12 @@ pub(crate) fn run_ocr(
         .args(["--psm", "6", "-l", lang, "-c", "tessedit_create_tsv=1"])
         .output()
         .map_err(|e| {
-            format!("无法运行 tesseract（scoop install tesseract tesseract-languages）：{e}")
+            let install = if cfg!(windows) {
+                "scoop install tesseract tesseract-languages"
+            } else {
+                "sudo apt install tesseract-ocr tesseract-ocr-chi-sim"
+            };
+            format!("无法运行 tesseract（{install}）：{e}")
         })?;
     if !out.status.success() {
         return Err(format!(

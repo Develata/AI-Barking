@@ -23,13 +23,21 @@ cargo run --release --manifest-path tools/barking/Cargo.toml -- cover-draw docs/
 
 ## 3. 运行
 
-`{OUT}` 为草稿目录下的新子目录（如 `cover-A/`、`cover-B/`），候选图不放进仓库。两组可以同时在后台跑：
+`{OUT}` 为草稿目录下的新子目录（如 `cover-A/`、`cover-B/`），候选图不放进仓库；`<仓库根>` 见 `docs/workflow/hosts.md`。两组可以同时在后台跑。
+
+Linux（沙箱只开 `{OUT}` 可写）：
+
+```bash
+codex exec -m gpt-6-astra -c 'model_reasoning_effort="medium"' -s workspace-write --skip-git-repo-check --ephemeral -C "{OUT}" -i "<仓库根>/common_images/mascot-reference.png" -o "{OUT}/report.md" - < "{OUT}/prompt.md"
+```
+
+Windows：
 
 ```bash
 codex exec -m gpt-6-astra -c 'model_reasoning_effort="medium"' -s danger-full-access --skip-git-repo-check --ephemeral -C "E:/gitclone/AI-Barking" -i "E:/gitclone/AI-Barking/common_images/mascot-reference.png" -o "{OUT}/report.md" - < "{OUT}/prompt.md"
 ```
 
-约 3 分钟。`image_generation` 是 Codex CLI 的内置功能（0.156 起为 stable，默认开启）。本机拦下 `danger-full-access` 时改用 `-s workspace-write`，并以 `{OUT}` 为工作区（1024 期如此）。
+约 3 分钟。`image_generation` 是 Codex CLI 的内置功能（0.156 起为 stable，默认开启）。Windows 拦下 `danger-full-access` 时同样改用 `-s workspace-write`，并以 `{OUT}` 为工作区（1024 期如此）。Linux 的 `workspace-write` 写法尚未实跑过；生成失败或图没落到 `{OUT}` 时，退回 Windows 那条的 `danger-full-access`（`-C` 换成 Linux 仓库根），并在 `images/README.md` 封面节记一笔。
 
 ### prompt.md
 

@@ -1,9 +1,9 @@
 //! `barking review`: assemble the cross-model review of an issue (EDITORIAL.md
 //! 核验流程 step 5, templates/cards/README.md step 5) and, with `--run`,
-//! hand it to the WSL Codex.
+//! hand it to Codex: through WSL on Windows, directly elsewhere.
 //!
 //! This module only does the mechanical part: fill the prompt template, pick
-//! the images, convert paths for WSL and build the command line. Reading the
+//! the images, convert paths for the host and build the command line. Reading the
 //! report, judging each finding and recording the verdict in `fact-check.md`
 //! stay with Claude; the reviewer must be independent, so nothing about the
 //! expected outcome goes into the prompt.
@@ -31,7 +31,9 @@ const EFFORTS: [&str; 4] = ["medium", "high", "xhigh", "max"];
 /// hours, so there is no cap (`timeout 0`).
 const MEDIUM_TIMEOUT_SECS: u32 = 1200;
 const DEFAULT_DISTRO: &str = "Debian";
-const DEFAULT_CODEX: &str = "/home/deve/.bun/bin/codex";
+const DEFAULT_WSL_CODEX: &str = "/home/deve/.bun/bin/codex";
+/// Native hosts find Codex on PATH unless `BARKING_CODEX` says otherwise.
+const DEFAULT_NATIVE_CODEX: &str = "codex";
 /// Lines of the report echoed after `--run`.
 const REPORT_PREVIEW_LINES: usize = 40;
 /// EDITORIAL.md sections the visual reviewer needs as its rule book.
@@ -197,8 +199,9 @@ fn execute(opts: &Opts) -> Result<ExitCode, String> {
     fs::create_dir_all(&work).map_err(|e| format!("{}: {e}", work.display()))?;
     let (prompt_path, report_path) = claim_serial(&work, opts.mode, &review.prompt)?;
 
-    // Shown before the WSL hop: when WSL is unavailable the prompt still goes
-    // to the fallback reviewer (templates/cards/README.md step 5).
+    // Shown before any path conversion: when WSL or Codex is unavailable the
+    // prompt still goes to the fallback reviewer (templates/cards/README.md
+    // step 5).
     println!("== {}：{}", opts.mode.heading(), issue.rel());
     for w in &review.warnings {
         println!("warn: {w}");
@@ -211,19 +214,25 @@ fn execute(opts: &Opts) -> Result<ExitCode, String> {
     println!("报告：{}", report_path.display());
     println!("{}", review.scope);
 
-    let distro = std::env::var("BARKING_WSL_DISTRO").unwrap_or_else(|_| DEFAULT_DISTRO.into());
-    let codex = std::env::var("BARKING_WSL_CODEX").unwrap_or_else(|_| DEFAULT_CODEX.into());
-    if !codex.starts_with('/') {
-        return Err(format!(
-            "BARKING_WSL_CODEX 应为 WSL 内的绝对路径，现在是「{codex}」（Git Bash 会改写以 / 开头的变量值，设置时加 MSYS_NO_PATHCONV=1）"
-        ));
-    }
+    let (host, codex) = if cfg!(windows) {
+        let distro = std::env::var("BARKING_WSL_DISTRO").unwrap_or_else(|_| DEFAULT_DISTRO.into());
+        let codex = std::env::var("BARKING_WSL_CODEX").unwrap_or_else(|_| DEFAULT_WSL_CODEX.into());
+        if !codex.starts_with('/') {
+            return Err(format!(
+                "BARKING_WSL_CODEX 应为 WSL 内的绝对路径，现在是「{codex}」（Git Bash 会改写以 / 开头的变量值，设置时加 MSYS_NO_PATHCONV=1）"
+            ));
+        }
+        (Host::Wsl { distro }, codex)
+    } else {
+        let codex = std::env::var("BARKING_CODEX").unwrap_or_else(|_| DEFAULT_NATIVE_CODEX.into());
+        (Host::Native, codex)
+    };
     let invocation = Invocation {
-        distro: distro.clone(),
+        cwd: host.path(&review.cwd)?,
+        report: host.path(&report_path)?,
+        prompt: host.path(&prompt_path)?,
+        host,
         codex,
-        cwd: wslpath(&distro, &review.cwd)?,
-        report: wslpath(&distro, &report_path)?,
-        prompt: wslpath(&distro, &prompt_path)?,
         effort: opts.effort.clone(),
         secs: timeout_secs(&opts.effort),
         images: review.images.clone(),
@@ -238,7 +247,7 @@ fn execute(opts: &Opts) -> Result<ExitCode, String> {
             s => format!("限时 {s} 秒"),
         }
     );
-    println!("命令（可直接粘到 Git Bash 运行）：");
+    println!("命令（可直接粘到 {} 运行）：", invocation.host.shell());
     println!("{}", invocation.display());
     println!(
         "-- 执行方是 GPT 时不要跑这条命令，也不要加 --run（同家族）：把上面的提示词交 Claude Opus，见 EDITORIAL.md“核验流程”的“执行方”"
@@ -260,12 +269,16 @@ fn execute(opts: &Opts) -> Result<ExitCode, String> {
 fn run_and_report(inv: &Invocation, report: &Path) -> Result<ExitCode, String> {
     println!("-- 开始运行（同步等待；Codex 通常需要数分钟）");
     let started = Instant::now();
-    let status = Command::new("wsl")
-        .env("MSYS_NO_PATHCONV", "1")
+    let program = inv.host.program();
+    let mut cmd = Command::new(program);
+    if matches!(inv.host, Host::Wsl { .. }) {
+        cmd.env("MSYS_NO_PATHCONV", "1");
+    }
+    let status = cmd
         .args(inv.argv())
         .stdin(Stdio::null())
         .status()
-        .map_err(|e| format!("无法运行 wsl：{e}"))?;
+        .map_err(|e| format!("无法运行 {program}：{e}"))?;
     let code = status.code().unwrap_or(-1);
     println!(
         "-- 退出码 {code}{}，用时 {}",
@@ -779,13 +792,50 @@ fn artifact_names(mode: Mode, serial: u32) -> (String, String) {
     }
 }
 
-// ---- WSL command ------------------------------------------------------
+// ---- Codex command ----------------------------------------------------
 
-/// Everything the `wsl … bash -lc` line needs; paths are already WSL paths.
+/// Where Codex runs. On Windows it goes through WSL, since the Windows-native
+/// Codex sandbox is unreliable (~/.claude/agents/codex-reviewer.md); on Linux
+/// Codex's own read-only sandbox works, so it runs directly.
+enum Host {
+    Wsl { distro: String },
+    Native,
+}
+
+impl Host {
+    fn program(&self) -> &'static str {
+        match self {
+            Host::Wsl { .. } => "wsl",
+            Host::Native => "bash",
+        }
+    }
+
+    /// The shell the printed line is meant for.
+    fn shell(&self) -> &'static str {
+        match self {
+            Host::Wsl { .. } => "Git Bash",
+            Host::Native => "bash",
+        }
+    }
+
+    /// `path` as Codex will see it: a WSL path, or the absolute local path.
+    fn path(&self, path: &Path) -> Result<String, String> {
+        match self {
+            Host::Wsl { distro } => wslpath(distro, path),
+            Host::Native => std::path::absolute(path)
+                .map_err(|e| format!("{}: {e}", path.display()))?
+                .to_str()
+                .map(str::to_string)
+                .ok_or_else(|| format!("{}: 路径不是 UTF-8", path.display())),
+        }
+    }
+}
+
+/// Everything the `bash -c` line needs; paths are already in the host's form.
 /// They travel as positional arguments (`$0`…`$5`), never spliced into the
 /// script, so spaces and quotes in them cannot break the command.
 struct Invocation {
-    distro: String,
+    host: Host,
     codex: String,
     cwd: String,
     report: String,
@@ -818,32 +868,36 @@ impl Invocation {
         s
     }
 
-    /// Arguments after `wsl`.
+    /// Arguments after `Host::program`.
     fn argv(&self) -> Vec<String> {
-        [
-            "-d",
-            &self.distro,
-            "-e",
-            "bash",
-            "-lc",
-            &self.script(),
-            &self.codex,
-            &self.cwd,
-            &self.report,
-            &self.prompt,
-            &self.effort,
-            &self.secs.to_string(),
-        ]
-        .iter()
-        .map(|s| s.to_string())
-        .collect()
+        let mut argv: Vec<String> = match &self.host {
+            Host::Wsl { distro } => ["-d", distro, "-e", "bash", "-lc"]
+                .map(str::to_string)
+                .to_vec(),
+            Host::Native => vec!["-c".to_string()],
+        };
+        argv.extend([
+            self.script(),
+            self.codex.clone(),
+            self.cwd.clone(),
+            self.report.clone(),
+            self.prompt.clone(),
+            self.effort.clone(),
+            self.secs.to_string(),
+        ]);
+        argv
     }
 
-    /// The same command as one line for Git Bash. `MSYS_NO_PATHCONV` keeps
-    /// Git Bash from rewriting the `/mnt/…` arguments.
+    /// The same command as one line for the host's shell. On Windows
+    /// `MSYS_NO_PATHCONV` keeps Git Bash from rewriting the `/mnt/…`
+    /// arguments.
     fn display(&self) -> String {
         let args: Vec<String> = self.argv().iter().map(|a| sh_quote(a)).collect();
-        format!("MSYS_NO_PATHCONV=1 wsl {}", args.join(" "))
+        let lead = match self.host {
+            Host::Wsl { .. } => "MSYS_NO_PATHCONV=1 wsl",
+            Host::Native => "bash",
+        };
+        format!("{lead} {}", args.join(" "))
     }
 }
 
@@ -1305,7 +1359,9 @@ text = "a"
 
     fn invocation(images: &[&str], search: bool, effort: &str) -> Invocation {
         Invocation {
-            distro: "Debian".into(),
+            host: Host::Wsl {
+                distro: "Debian".into(),
+            },
             codex: "/home/deve/.bun/bin/codex".into(),
             cwd: "/mnt/e/gitclone/AI-Barking/docs/2610/1009".into(),
             report: "/mnt/c/Users/QQ/AppData/Local/Temp/barking-review/1009/visual-report.md"
@@ -1371,6 +1427,25 @@ text = "a"
         let mut inv = invocation(&[], false, "medium");
         inv.cwd = "/mnt/e/my repo".into();
         assert!(inv.display().contains("'/mnt/e/my repo'"));
+    }
+
+    #[test]
+    fn native_host_runs_the_same_script_without_wsl() {
+        let mut inv = invocation(&["images/00-tldr.png"], false, "medium");
+        let script = inv.script();
+        inv.host = Host::Native;
+        inv.codex = "codex".into();
+        inv.cwd = "/home/u/AI-Barking/docs/2610/1009".into();
+        assert_eq!(inv.host.program(), "bash");
+        let argv = inv.argv();
+        assert_eq!(argv[0], "-c");
+        assert_eq!(argv[1], script);
+        assert_eq!(&argv[2..4], ["codex", "/home/u/AI-Barking/docs/2610/1009"]);
+        assert_eq!(&argv[6..], ["medium", "1200"]);
+        assert_eq!(argv.len(), 8);
+        let line = inv.display();
+        assert!(line.starts_with("bash -c 'cd "), "{line}");
+        assert!(!line.contains("wsl") && !line.contains("MSYS"), "{line}");
     }
 
     #[test]

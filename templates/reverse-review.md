@@ -1,6 +1,6 @@
 # 反向核验提示词
 
-`barking review <期次目录> --reverse` 填好占位符后交给跨模型复核者（WSL Codex，`gpt-6-astra`，只读，联网）。规则见 `EDITORIAL.md`“核验流程”第 5 条；视觉复核另用 `templates/cards/visual-review.md`。下面 `---` 以下是提示词，占位符由 barking 填：`{期次目录}`（`docs/<YYMM>/<MMDD>`）、`{MMDD}`、`{范围说明}`（文件清单前的一段：默认只列正文、卡片、事实清单、两份 README 与清单点名的 `sources/` 存档，并要求其余存档只按需 grep；加 `--full` 改为列出全部入库文本文件）、`{文件清单}`（期次目录下入库文本文件的相对路径，范围同上）。开头三段 charter 与 `~/.claude/agents/codex-reviewer.md` 的 charter 一字不差，那边改了这里同步。提示词里不写期望结论，也不写作者对稿件的自评。
+`barking review <期次目录> --reverse` 填好占位符后交给跨模型复核者（Codex，`gpt-6-astra`，只读，联网；Windows 经 WSL，Linux 直接调用，见 `docs/workflow/hosts.md`）。规则见 `EDITORIAL.md`“核验流程”第 5 条；视觉复核另用 `templates/cards/visual-review.md`。下面 `---` 以下是提示词，占位符由 barking 填：`{期次目录}`（`docs/<YYMM>/<MMDD>`）、`{MMDD}`、`{范围说明}`（文件清单前的一段：默认只列正文、卡片、事实清单、两份 README 与清单点名的 `sources/` 存档，并要求其余存档只按需 grep；加 `--full` 改为列出全部入库文本文件）、`{文件清单}`（期次目录下入库文本文件的相对路径，范围同上）。开头三段 charter 与 `~/.claude/agents/codex-reviewer.md` 的 charter 一字不差，那边改了这里同步。提示词里不写期望结论，也不写作者对稿件的自评。
 
 执行方是 GPT 时（见 `EDITORIAL.md`“核验流程”的“执行方”），复核者改为 Claude Opus：不加 `--run`，在仓库根目录把 barking 打印的提示词文件交给 Claude Code，报告写进它打印的报告路径（工具限为只读加联网；约十几分钟，放后台跑）：
 

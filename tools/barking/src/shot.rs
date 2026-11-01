@@ -45,7 +45,7 @@ const USAGE: &str = "\
   每次出图在 sources/<组>-shots-log.jsonl 追加一行记录（路径记仓库内相对路径，库外文件只记文件名；
   URL 与 --chrome-arg 去掉 user:pass@，键名像凭据的查询参数值记为 [REDACTED]）。
   只裁切、拼接，不改像素；iCCP / sRGB / gAMA / cHRM / pHYs 原样带到输出；含 cICP / mDCV / cLLI 的 PNG 拒绝处理。
-  pdf 需要 poppler：先找环境变量 BARKING_POPPLER 指定的目录，再找 ~/scoop/apps/poppler/current/bin，最后 PATH。";
+  pdf 需要 poppler：先找环境变量 BARKING_POPPLER 指定的目录，再找 ~/scoop/apps/poppler/current/bin（Windows），最后 PATH（Linux 用 apt 的 poppler-utils）。";
 
 /// A hung Chrome must not hang the session; the page timeout flag alone does
 /// not bound the process.
