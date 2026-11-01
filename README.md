@@ -49,6 +49,7 @@ AI 吠点是由 **[Develata](https://github.com/Develata)** 主理的独立内�
 | 2026 / 1028 | [谷歌新模型登顶，你却用不上？](docs/2610/1028/doc_1028_publish.txt) | [配图说明](docs/2610/1028/images/README.md) | [来源入口](docs/2610/1028/sources/README.md) |
 | 2026 / 1029 | [假Claude插件混进Cursor？](docs/2610/1029/doc_1029_publish.txt) | [配图说明](docs/2610/1029/images/README.md) | [来源入口](docs/2610/1029/sources/README.md) |
 | 2026 / 1030 | [Claude取消5小时限制？苹果接千问](docs/2610/1030/doc_1030_publish.txt) | [配图说明](docs/2610/1030/images/README.md) | [来源入口](docs/2610/1030/sources/README.md) |
+| 2026 / 1031 | [AI给鼠脑打针？ChatGPT额度合并](docs/2610/1031/doc_1031_publish.txt) | [配图说明](docs/2610/1031/images/README.md) | [来源入口](docs/2610/1031/sources/README.md) |
 
 正文采用可直接复制的纯文本，图片单独保存。阅读或发布时不需要依赖 Markdown 插图。
 
