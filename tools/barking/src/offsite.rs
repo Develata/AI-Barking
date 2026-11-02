@@ -637,7 +637,7 @@ fn encode_path(p: &str) -> String {
 }
 
 /// `KEY=VALUE` lines from the repo's `.env`; `#` comments and blank lines are
-/// skipped, one pair of surrounding double quotes is stripped.
+/// skipped, one pair of matching surrounding quotes (`"` or `'`) is stripped.
 pub(crate) fn load_env(root: &Path) -> HashMap<String, String> {
     fs::read_to_string(root.join(".env"))
         .unwrap_or_default()
@@ -648,19 +648,32 @@ pub(crate) fn load_env(root: &Path) -> HashMap<String, String> {
                 return None;
             }
             let (k, v) = l.split_once('=')?;
-            let v = v.trim();
-            let v = v
-                .strip_prefix('"')
-                .and_then(|x| x.strip_suffix('"'))
-                .unwrap_or(v);
-            Some((k.trim().to_string(), v.to_string()))
+            Some((k.trim().to_string(), unquote(v.trim()).to_string()))
         })
         .collect()
+}
+
+/// Strips one pair of matching surrounding quotes; no escape processing.
+fn unquote(v: &str) -> &str {
+    ['"', '\'']
+        .into_iter()
+        .find_map(|q| v.strip_prefix(q)?.strip_suffix(q))
+        .unwrap_or(v)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unquote_strips_one_matching_pair() {
+        assert_eq!(unquote("\"a b\""), "a b");
+        assert_eq!(unquote("'a\"b'"), "a\"b");
+        assert_eq!(unquote("plain"), "plain");
+        assert_eq!(unquote("'mixed\""), "'mixed\"");
+        assert_eq!(unquote("'"), "'");
+        assert_eq!(unquote("''"), "");
+    }
 
     #[test]
     fn encodes_non_ascii_and_spaces() {
