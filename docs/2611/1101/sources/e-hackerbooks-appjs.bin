@@ -1,0 +1,1275 @@
+// Hacker Books — vanilla ES-module single-page app (hash routing, no build step).
+// Sections: utils · data · covers/cards · feeds · pages · trends · router · UI chrome · keyboard · boot
+
+/* ============================== utils ============================== */
+const $ = (sel, root = document) => root.querySelector(sel);
+const main = $('#main');
+const BATCH = 60; // cards rendered per infinite-scroll step
+const HN = 'https://news.ycombinator.com';
+
+/** localStorage wrapper that never throws (private mode, blocked storage…). */
+const store = {
+  get(key, fallback) {
+    try { const v = localStorage.getItem(key); return v == null ? fallback : JSON.parse(v); } catch { return fallback; }
+  },
+  set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ } },
+  remove(key) { try { localStorage.removeItem(key); } catch { /* ignore */ } },
+};
+
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = (n) => Number(n || 0).toLocaleString('en-US');
+const plural = (n, one, many) => `${fmt(n)} ${n === 1 ? one : many}`;
+/** Lowercase + strip diacritics, for search. */
+const norm = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\p{L}\p{N}\s]+/gu, ' ').replace(/\s+/g, ' ').trim();
+const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+const hashStr = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+/** Small seeded PRNG so the Home feed is stable for a whole (UTC) day. */
+const mulberry32 = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+const hashFor = (path, params = {}) => {
+  const q = Object.entries(params).filter(([, v]) => v !== '' && v != null && v !== 0).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+  return `#${path}${q ? '?' + q : ''}`;
+};
+
+/* ============================== data ============================== */
+// Content-hashed data URLs are injected by tools/bundle.py as window.__ASSETS; from site/ (dev) fall back to plain names.
+const ASSETS = window.__ASSETS || {};
+const URLS = {
+  meta: ASSETS.meta || 'data/meta.json',
+  topics: ASSETS.topics || 'data/topics.json',
+  books: ASSETS.books || 'data/books.json', // full index
+  trends: ASSETS.trends || 'data/trends.json', // lazy: only fetched by #/trends
+  buy: ASSETS.buy || 'data/buy.json', // lazy: only fetched by book pages ({book_id: ISBN-13})
+  top: ASSETS.top || null, // first-paint index: the first TOP_N rows of the full index (absent in dev)
+};
+// Per-book files aren't content-hashed, so tag them with the books index hash ("data/books.74193949.json" -> "?v=74193949").
+// Dev (no __ASSETS) gets no query string.
+const BOOK_VER = (/\.([0-9a-f]+)\.json$/.exec(ASSETS.books || '') || [])[1];
+const bookURL = (id) => `data/book/${encodeURIComponent(id)}.json${BOOK_VER ? `?v=${BOOK_VER}` : ''}`;
+const TOP_N = 600;
+const EAGER = 12; // first cards get eager, high-priority cover images
+/*
+ * state.books is the best index we have: the top-TOP_N slice until the full index arrives (state.full), then everything.
+ * Both are sorted by s desc and the slice is an exact prefix of the full list.
+ * Index rows are slimmed by the bundler: y, c, r and a may be missing (treat as null / 0 / []).
+ */
+const state = { meta: null, topics: [], topicByslug: new Map(), books: [], byId: new Map(), full: false, searchIdx: null, trends: null, buy: null, cache: {} };
+
+/* ------- buy links (affiliate) ------- */
+const AFF = { bookshop: '130774', amazon: 'roansh-20' };
+let buyPromise = null;
+const ensureBuy = () => (buyPromise ||= getJSON(URLS.buy).then((m) => (state.buy = m || {}), () => (state.buy = {})));
+const isbn10of = (i13) => {  // only 978-prefixed ISBN-13s have an ISBN-10
+  if (!/^978\d{10}$/.test(i13 || '')) return null;
+  const core = i13.slice(3, 12); let s = 0;
+  for (let k = 0; k < 9; k++) s += (10 - k) * +core[k];
+  const c = (11 - (s % 11)) % 11; return core + (c === 10 ? 'X' : String(c));
+};
+function buyHTML(book) {
+  const i13 = state.buy?.[book.id] || (/^97[89]\d{10}$/.test(book.isbn || '') ? book.isbn : null);
+  const q = encodeURIComponent([book.t, (book.a || [])[0]].filter(Boolean).join(' '));
+  const shop = i13 ? `https://bookshop.org/a/${AFF.bookshop}/${i13}` : `https://bookshop.org/search?keywords=${q}`;
+  const i10 = isbn10of(i13);
+  const amz = i10 ? `https://www.amazon.com/dp/${i10}?tag=${AFF.amazon}` : `https://www.amazon.com/s?k=${q}&i=stripbooks&tag=${AFF.amazon}`;
+  const a = (href, label) => `<a class="btn buy" href="${esc(href)}" target="_blank" rel="sponsored noopener">${label}</a>`;
+  return `<div class="buy-row"><span class="buy-lbl">Buy</span>${a(shop, 'Bookshop.org')}${a(amz, 'Amazon')}</div>
+    <p class="aff-note">Affiliate links · supports the site</p>`;  /* full disclosure incl. Amazon's required sentence: footer + About */
+}
+
+async function getJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) {
+    if (r.status === 404) reloadIfStale(url);
+    throw new Error(`${url}: ${r.status}`);
+  }
+  return r.json();
+}
+
+/*
+ * A content-hashed URL from window.__ASSETS only 404s when this page came from an older deploy whose files are gone
+ * (tab left open across deploys, or a restored tab). Reload once to pick up the current index.html; the hash route
+ * survives the reload. buy.json is left out: its failure already falls back to search links, so it isn't worth
+ * interrupting the reader. Rate-limited via sessionStorage so a genuinely missing file can never cause a reload loop.
+ */
+const STALE_RELOAD = new Set([URLS.meta, URLS.topics, URLS.top, URLS.books, URLS.trends].filter((u) => /\.[0-9a-f]{8}\.json$/.test(u || '')));
+function reloadIfStale(url) {
+  if (!STALE_RELOAD.has(url)) return;
+  try {
+    if (Date.now() - (+sessionStorage.getItem('hb.staleReload') || 0) < 60000) return;
+    sessionStorage.setItem('hb.staleReload', String(Date.now()));
+  } catch { return; } // no sessionStorage: we can't guard against a loop, so don't reload
+  location.reload();
+}
+
+function setBooks(books, full) {
+  state.books = books;
+  state.byId = new Map(books.map((b) => [b.id, b]));
+  state.full = full;
+}
+
+/** Load (once) the full index. Resolves immediately when already loaded; a failure can be retried. */
+let fullPromise = null;
+function ensureFull() {
+  if (state.full) return Promise.resolve();
+  return (fullPromise ??= getJSON(URLS.books).then((books) => {
+    // The contract says the index is pre-sorted by s desc; make sure, cheaply.
+    for (let i = 1; i < books.length; i++) if (books[i - 1].s < books[i].s) { books.sort((a, b) => b.s - a.s); break; }
+    setBooks(books, true);
+  }).catch((err) => { fullPromise = null; throw err; }));
+}
+
+/** First-paint data: meta + topics + the small top index (or the full index when there is no top file). */
+async function loadBoot() {
+  const topP = URLS.top ? getJSON(URLS.top).catch(() => null) : Promise.resolve(null);
+  const [meta, topics, top] = await Promise.all([getJSON(URLS.meta), getJSON(URLS.topics), topP]);
+  state.meta = meta;
+  state.topics = topics;
+  state.topicByslug = new Map(topics.map((t) => [t.slug, t]));
+  if (top) setBooks(top, false); else await ensureFull();
+}
+
+/** Fetch the rest of the index in the background once the page has settled. */
+function loadFullWhenIdle() {
+  if (state.full) return;
+  let started = false;
+  const go = () => {
+    if (started) return;
+    started = true;
+    const run = () => ensureFull().catch(() => { /* routes that need it retry and show an error */ });
+    if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 3000 }); else setTimeout(run, 300);
+  };
+  if (document.readyState === 'complete') go(); else window.addEventListener('load', go, { once: true });
+  setTimeout(go, 4000); // don't let a slow image hold the index back
+}
+
+/* ------- per-book detail JSON: in-memory cache + hover/focus prefetch ------- */
+const bookCache = new Map(); // id -> Promise<detail>
+function getBook(id) {
+  let p = bookCache.get(id);
+  if (!p) {
+    p = getJSON(bookURL(id));
+    bookCache.set(id, p);
+    p.catch(() => { if (bookCache.get(id) === p) bookCache.delete(id); });
+    if (bookCache.size > 60) bookCache.delete(bookCache.keys().next().value); // keep it small
+  }
+  return p;
+}
+
+/* ------- derived lists (computed lazily, cached) ------- */
+const cached = (key, fn) => (state.cache[key] ??= fn());
+
+/** Home: weighted random order biased by score, deterministic per UTC day. */
+// Efraimidis–Spirakis weighted shuffle: key = -ln(U)/w, ascending.
+const shuffled = (books, seed) => {
+  const rnd = mulberry32(hashStr(seed));
+  return books.map((b) => ({ b, k: -Math.log(rnd() || 1e-9) / Math.pow(b.s + 1, 2) })).sort((x, y) => x.k - y.k).map((x) => x.b);
+};
+/**
+ * The first TOP_N rows are shuffled on their own (so Home renders from the small index and the order never changes
+ * when the full index arrives); the rest of the catalogue is shuffled separately and appended after them.
+ */
+const homeOrder = () => {
+  const day = new Date().toISOString().slice(0, 10);
+  const head = cached('home:head:' + day, () => shuffled(state.books.slice(0, TOP_N), 'hackerbooks:' + day));
+  return state.full ? cached('home:all:' + day, () => head.concat(shuffled(state.books.slice(TOP_N), 'hackerbooks:tail:' + day))) : head;
+};
+/** "Most recommended": distinct commenters who recommended the book (stance labels), at least 3; ties by score. */
+const MIN_REC = 3;
+const hasStance = () => state.books.some((b) => b.ru);
+const recommendedOrder = () => cached('recommended', () =>
+  state.books.filter((b) => (b.ru || 0) >= MIN_REC).sort((x, y) => y.ru - x.ru || y.s - x.s));
+const risingOrder = () => cached('rising', () =>
+  state.books.filter((b) => b.n >= 5).map((b) => ({ b, v: (b.r || 0) * Math.log(b.n) })).sort((x, y) => y.v - x.v).map((x) => x.b));
+
+/* ------- personalisation (local only) ------- */
+const profile = {
+  views: () => store.get('hb.views', []),
+  aff: () => store.get('hb.aff', {}),
+  record(book) {
+    const views = this.views();
+    if (views.includes(book.id)) return;
+    views.push(book.id);
+    store.set('hb.views', views.slice(-400));
+    const aff = this.aff();
+    for (const t of book.tp || []) aff[t] = (aff[t] || 0) + 1;
+    store.set('hb.aff', aff);
+  },
+  clear() { store.remove('hb.views'); store.remove('hb.aff'); },
+};
+
+function forYouList() {
+  const viewed = new Set(profile.views());
+  const aff = profile.aff();
+  const scored = [];
+  for (const b of state.books) {
+    if (viewed.has(b.id)) continue;
+    let a = 0;
+    for (const t of b.tp || []) a += aff[t] || 0;
+    if (a > 0) scored.push({ b, v: a * (0.6 + b.s / 100) });
+  }
+  return scored.sort((x, y) => y.v - x.v).map((x) => x.b);
+}
+
+/* ------- search ------- */
+function search(query) {
+  const q = norm(String(query ?? '').replace(/&/g, ' and ')); // "k&r" -> "k and r", matching how aliases are indexed
+  if (!q) return [];
+  const tokens = q.split(' ');
+  state.searchIdx ??= state.books.map((b) => ({
+    t: norm(b.t), a: norm((b.a || []).join(' ')),
+    k: (b.k || []).map((x) => norm(String(x).replace(/&/g, ' and '))), // HN abbreviations: sicp, taocp, k&r ...
+  }));
+  const hits = [];
+  state.books.forEach((b, i) => {
+    const { t, a, k } = state.searchIdx[i];
+    let rank = -1;
+    if (k.includes(q)) rank = -0.5; // exact alias beats everything, incl. exact title (rank 0)
+    else if (t === q) rank = 0;
+    else if (t.startsWith(q)) rank = 1;
+    else if (q.length >= 3 && k.some((x) => x.startsWith(q))) rank = 1.5;
+    else if (t.includes(' ' + q)) rank = 2;
+    else if (t.includes(q)) rank = 3;
+    else if (q.length >= 3 && k.some((x) => x.includes(q))) rank = 3.5;
+    else {
+      const all = t + ' ' + a;
+      if (tokens.every((w) => all.includes(w))) rank = tokens.every((w) => t.includes(w)) ? 4 : tokens.every((w) => a.includes(w)) ? 5 : 6;
+    }
+    if (rank > -1) hits.push({ b, rank, i });
+  });
+  // books are already ordered by s, so the index breaks ties by popularity
+  return hits.sort((x, y) => x.rank - y.rank || x.i - y.i).map((h) => h.b);
+}
+
+/* ============================== covers & cards ============================== */
+// Primary: our own R2-backed domain (s = ~200px, l = ~400px webp). Fallback: Open Library. Last resort: typographic placeholder.
+const coverUrl = (c) => `https://covers.hackerbooks.org/c/${c}.webp`;  // single 320px WebP for cards + book page
+const olCoverUrl = (c, large) => `https://covers.openlibrary.org/b/id/${c}-${large ? 'L' : 'M'}.jpg?default=false`;
+
+/** Generated typographic cover: colour from a hash of the title. */
+function placeholderHTML(b) {
+  const hue = hashStr(b.t || '') % 360;
+  return `<div class="cover ph" style="--h:${hue}"><span class="ph-t">${esc(b.t)}</span><span class="ph-rule"></span><span class="ph-a">${esc((b.a || []).join(', '))}</span></div>`;
+}
+/** Cover box: our cover when we have an id, placeholder otherwise (or when every source fails). `eager` = above the fold. */
+function coverHTML(b, large = false, badge = '', eager = false) {
+  if (b.c == null) return badge ? placeholderHTML(b).replace(/<\/div>$/, badge + '</div>') : placeholderHTML(b);
+  const [w, h] = large ? [400, 600] : [200, 300]; // intrinsic size; CSS keeps the 2:3 box so nothing shifts
+  const prio = eager ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"';
+  return `<div class="cover"><img src="${coverUrl(b.c, large)}" alt="Cover of ${esc(b.t)}" ${prio} decoding="async" width="${w}" height="${h}" data-id="${esc(b.id)}" data-c="${b.c}"${large ? ' data-l="1"' : ''}>${badge}</div>`;
+}
+// Image errors don't bubble, so listen in the capture phase once for the whole document.
+document.addEventListener('error', (e) => {
+  const img = e.target;
+  if (!(img instanceof HTMLImageElement) || !img.dataset.id) return;
+  if (!img.dataset.fb && img.dataset.c) { img.dataset.fb = '1'; img.src = olCoverUrl(img.dataset.c, !!img.dataset.l); return; } // 2nd chance: Open Library
+  const b = state.byId.get(img.dataset.id) || { t: img.alt.replace(/^Cover of /, ''), a: [] };
+  const box = img.closest('.cover');
+  if (!box) return;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = placeholderHTML(b);
+  box.className = tmp.firstChild.className;
+  box.style.cssText = tmp.firstChild.style.cssText;
+  box.innerHTML = tmp.firstChild.innerHTML + (box.querySelector('.badge')?.outerHTML || '');
+  img.remove();
+}, true);
+
+const yearSpan = (b) => (b.f && b.l ? (b.f === b.l ? `${b.f}` : `${b.f}–${b.l}`) : '');
+
+/** Count line under a card. With stance labels: "Recommended by R · mentioned by N", shortened by the card's width
+ *  (container queries in app.css); a labelled book with no recommender says so ("0 recommend · 14 mentioned").
+ *  Without stance data (ru absent): the plain mention count. */
+function recLine(b) {
+  if (b.ru === 0) {
+    return `<p class="rec rec-st" title="No recommenders · mentioned by ${fmt(b.u)} HNers"><span class="rl"><b>0</b> recommend · ${fmt(b.u)} mentioned</span><span class="rm"><b>0</b> recommend · ${fmt(b.u)} mention</span><span class="rs"><b>0</b> recommend · ${fmt(b.u)}</span><span class="rx"><b>0</b> recommend</span></p>`;
+  }
+  if (!b.ru) return `<p class="rec">Mentioned by <b>${fmt(b.u)}</b> ${b.u === 1 ? 'HNer' : 'HNers'}</p>`;
+  const tip = `Recommended by ${fmt(b.ru)} · mentioned by ${fmt(b.u)} HNers`;
+  return `<p class="rec rec-st" title="${tip}"><span class="rl">Recommended by <b>${fmt(b.ru)}</b> · mentioned by ${fmt(b.u)}</span><span class="rm"><b>${fmt(b.ru)}</b> recommend · ${fmt(b.u)} mention</span><span class="rs"><b>${fmt(b.ru)}</b> recommend · ${fmt(b.u)}</span><span class="rx"><b>${fmt(b.ru)}</b> recommend</span></p>`;
+}
+
+function cardHTML(b, eager = false) {
+  const span = yearSpan(b);
+  const badge = span ? `<span class="badge" title="Mentioned ${esc(span)}">${span}</span>` : '';
+  return `<a class="card" href="#/book/${encodeURIComponent(b.id)}">${coverHTML(b, false, badge, eager)}
+    <h3>${esc(b.t)}</h3><p class="au">${esc((b.a || []).join(', '))}</p>
+    ${recLine(b)}</a>`;
+}
+
+/* ============================== feeds (incremental grids) ============================== */
+let current = null; // { raw, shown(), dispose() } for the active route
+
+/**
+ * Render `list` into `container` in batches as the sentinel nears the viewport.
+ * `partial` = the list is only the top slice of the catalogue; extend() appends the rest once the full index is in
+ * (until then the end of the list shows "Loading more…"). `initial` lets us restore scroll depth on back-nav.
+ * Returns { shown(), dispose(), extend(items), fail() }.
+ */
+function mountInfinite(container, list, initial = 0, partial = false) {
+  let shown = 0, waiting = partial, failed = false;
+  const sentinel = document.createElement('div');
+  sentinel.className = 'sentinel';
+  container.after(sentinel);
+  const io = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) more(); }, { rootMargin: '900px 0px' });
+
+  function more(count = BATCH) {
+    if (shown < list.length) {
+      const slice = list.slice(shown, shown + count);
+      container.insertAdjacentHTML('beforeend', slice.map((b, i) => cardHTML(b, shown + i < EAGER)).join(''));
+      shown += slice.length;
+    }
+    if (shown >= list.length) {
+      io.disconnect();
+      sentinel.className = 'end';
+      sentinel.textContent = failed ? 'Couldn’t load the rest of the catalogue. Refresh to try again.'
+        : waiting ? 'Loading more books…'
+        : list.length > BATCH ? `That's all ${fmt(list.length)} books.` : '';
+    } else {
+      // Re-arm: IntersectionObserver only fires on changes, so nudge it in case we're still near the edge.
+      requestAnimationFrame(() => { io.unobserve(sentinel); io.observe(sentinel); });
+    }
+  }
+  more(Math.max(BATCH, initial));
+  if (shown < list.length || waiting) io.observe(sentinel);
+  return {
+    shown: () => shown,
+    dispose: () => io.disconnect(),
+    extend(items) {
+      list = list.concat(items);
+      waiting = false;
+      sentinel.className = 'sentinel';
+      sentinel.textContent = '';
+      if (!items.length) { more(); return; } // nothing more after all: show the real end-of-list text
+      io.disconnect();
+      io.observe(sentinel); // fires straight away if the sentinel is already near the viewport
+    },
+    fail() { waiting = false; failed = true; if (shown >= list.length) more(); },
+  };
+}
+
+const DECADES = [['pre', 'Before 1950'], ['1950', '1950s'], ['1960', '1960s'], ['1970', '1970s'], ['1980', '1980s'], ['1990', '1990s'], ['2000', '2000s'], ['2010', '2010s'], ['2020', '2020s']];
+const inDecade = (b, d) => b.y != null && (d === 'pre' ? b.y < 1950 : b.y >= +d && b.y < +d + 10);
+
+/**
+ * Render a book feed page with optional filter chips (decade, "first mentioned").
+ * `items` is a function returning the route's current list: the top slice before the full index arrives, everything
+ * after (always starting with the same rows). Filtered views are only rendered once the full index is in.
+ */
+function renderFeed({ title, sub = '', path, query, items, pre = '', restore }) {
+  const dec = query.get('dec') || '';
+  const since = +query.get('since') || 0;
+  const filter = (all) => (dec || since ? all.filter((b) => (!dec || inDecade(b, dec)) && (!since || (b.f || 0) >= since)) : all);
+  const ly = state.meta.last_year;
+  const chip = (label, params, on) => `<a class="chip${on ? ' on' : ''}" href="${hashFor(path, { dec, since, ...params })}"${on ? ' aria-current="true"' : ''}>${esc(label)}</a>`;
+  const sinceOpts = [2015, 2020, ly - 1].filter((y, i, a) => a.indexOf(y) === i && y > state.meta.first_year);
+  const chipsHTML = (all) => {
+    const present = DECADES.filter(([d]) => all.some((b) => inDecade(b, d)));
+    return `<div class="chips" aria-label="Filter by publication decade"><span class="lbl">Published</span>${chip('Any', { dec: '' }, !dec)}${present.map(([d, l]) => chip(l, { dec: d }, dec === d)).join('')}</div>
+    <div class="chips" aria-label="Filter by year first mentioned on Hacker News"><span class="lbl">First mentioned</span>${chip('Any', { since: 0 }, !since)}${sinceOpts.map((y) => chip(y + '+', { since: y }, since === y)).join('')}</div>`;
+  };
+
+  const all = items();
+  const list = filter(all);
+  main.innerHTML = `<div class="page-h"><h1>${esc(title)}</h1></div>${sub ? `<p class="sub">${sub}</p>` : ''}${pre}
+    <div id="chips">${chipsHTML(all)}</div>
+    <div class="grid" id="grid"></div>`;
+  if (!list.length) { $('#grid').outerHTML = `<p class="empty">No books match these filters. <a data-replace href="${hashFor(path)}">Clear filters</a></p>`; return; }
+  const partial = !state.full;
+  const ctl = current = mountInfinite($('#grid'), list, restore?.shown || 0, partial);
+  if (partial) {
+    const token = routeToken;
+    ensureFull().then(() => {
+      if (token !== routeToken || current !== ctl) return;
+      const all2 = items();
+      $('#chips').innerHTML = chipsHTML(all2);
+      ctl.extend(filter(all2).slice(list.length));
+    }, () => { if (token === routeToken && current === ctl) ctl.fail(); });
+  }
+}
+
+/* ============================== pages ============================== */
+function setPage(title, desc) {
+  document.title = title ? `${title} — Hacker Books` : 'Hacker Books — books mentioned in Hacker News comments';
+  const d = desc || 'Browse thousands of books mentioned in Hacker News comments, 2007–2026.';
+  $('meta[name="description"]').content = d;
+  $('meta[property="og:title"]').content = document.title;
+  $('meta[property="og:description"]').content = d;
+  $('#live').textContent = document.title;
+}
+
+function renderHome(q, restore) {
+  setPage('');
+  const m = state.meta;
+  renderFeed({
+    title: 'Today’s shelf', path: '/', query: q, items: homeOrder, restore,
+    sub: `A fresh mix of well-loved books from ${fmt(m.n_books)} mentioned on Hacker News, reshuffled daily. Rank by score on <a href="#/top">Top all-time</a>.`,
+  });
+}
+function renderTop(q, restore) {
+  setPage('Top all-time', 'The most-mentioned books in Hacker News comments, ranked.');
+  renderFeed({ title: 'Top all-time', sub: 'Ranked by overall score: how often and by how many different people a book was mentioned.', path: '/top', query: q, items: () => state.books, restore });
+}
+function renderRecommended(q, restore) {
+  setPage('Most recommended', 'Books that the most different Hacker News commenters recommended, not just mentioned.');
+  const sub = 'Ranked by how many different people recommended a book (not just mentioned it). Labels are by Claude Sonnet 5.5 reading each mention; ~85% agreement with a careful reference — expect some noise.';
+  if (!hasStance()) {
+    main.innerHTML = `<div class="page-h"><h1>Most recommended</h1></div><p class="sub">${sub}</p><p class="empty">Recommendation labels aren’t available in this build. See <a href="#/top">Top all-time</a> instead.</p>`;
+    return;
+  }
+  renderFeed({ title: 'Most recommended', sub, path: '/recommended', query: q, items: recommendedOrder, restore });
+}
+function renderRising(q, restore) {
+  setPage('Rising', 'Books whose mentions on Hacker News are growing fastest.');
+  renderFeed({ title: 'Rising', sub: 'Books more HN commenters brought up in the last 12 months than their usual yearly rate (across 3+ threads).', path: '/rising', query: q, items: risingOrder, restore });
+}
+function renderTopic(slug, q, restore) {
+  const topic = state.topicByslug.get(slug);
+  if (!topic) return renderNotFound('Unknown topic.');
+  setPage(topic.name, `Books about ${topic.name} mentioned in Hacker News comments.`);
+  const items = cached('topic:' + slug, () => state.books.filter((b) => (b.tp || []).includes(slug)));
+  renderFeed({ title: topic.name, sub: `${fmt(items.length)} books, ranked by score.`, path: '/topic/' + slug, query: q, items: () => items, restore });
+}
+
+function renderForYou(q, restore) {
+  setPage('For You', 'Personalised picks, computed locally in your browser.');
+  const views = profile.views();
+  if (!views.length) {
+    main.innerHTML = `<div class="empty"><h2>For You is empty (for now)</h2>
+      <p>Open a few books and we’ll recommend more in the same topics. Everything stays in your browser (localStorage); nothing is sent anywhere.</p>
+      <p><a class="btn primary" href="#/top">Browse top books</a></p></div>`;
+    return;
+  }
+  const clear = `<p><button class="btn" id="clear-profile" type="button">Clear my history</button></p>`;
+  const picks = forYouList();
+  renderFeed({
+    title: 'For You', path: '/foryou', query: q, restore, items: () => picks,
+    sub: `Based on the ${plural(views.length, 'book', 'books')} you opened, minus the ones you’ve already seen. Stored only on this device.`,
+    pre: clear,
+  });
+  $('#clear-profile').onclick = () => { profile.clear(); route(); };
+}
+
+function renderSearch(q) {
+  const text = (q.get('q') || '').trim();
+  setPage(text ? `Search: ${text}` : 'Search');
+  const input = $('#q');
+  if (document.activeElement !== input) input.value = text;
+  if (!text) { main.innerHTML = '<p class="empty">Type a title or author in the search box.</p>'; return; }
+  const results = search(text);
+  main.innerHTML = `<div class="page-h"><h1>Results for “${esc(text)}”</h1></div><p class="sub">${plural(results.length, 'book', 'books')} found.</p><div class="grid" id="grid"></div>`;
+  if (!results.length) { $('#grid').outerHTML = '<p class="empty">No matches. Try fewer words or a different spelling.</p>'; return; }
+  current = mountInfinite($('#grid'), results);
+}
+
+function renderNotFound(msg = 'That page doesn’t exist.') {
+  setPage('Not found');
+  main.innerHTML = `<div class="empty"><h2>Not found</h2><p>${esc(msg)}</p><p><a class="btn primary" href="#/">Back to Home</a></p></div>`;
+}
+
+function renderAbout() {
+  setPage('About', 'What Hacker Books is, and how the data was built.');
+  const m = state.meta;
+  main.innerHTML = `<article class="prose">
+    <h1>About Hacker Books</h1>
+    <p>Hacker Books is a bookshelf of the books people mention in <a href="https://news.ycombinator.com" rel="noopener">Hacker News</a> comments, from ${m.first_year} to ${m.last_year}. A mention isn’t an endorsement, so the site also tells you how many people actually <i>recommended</i> each book.
+    It currently covers <b>${fmt(m.n_books)}</b> books across <b>${fmt(m.n_mentions)}</b> mentions in <b>${fmt(m.n_comments)}</b> comments by <b>${fmt(m.n_commenters)}</b> different commenters.</p>
+    <p>Browse <a href="#/top">Top all-time</a>, see what’s <a href="#/rising">Rising</a>, follow a topic from the sidebar, or open a book to read the comments that mention it.</p>
+    <h2>How it was built</h2>
+    <ol>
+      <li><b>HN dump.</b> Start from the public archive of every Hacker News item and comment.</li>
+      <li><b>Seed extraction.</b> Regexes and light NLP find phrases that look like book references (quoted titles, “by <i>Author</i>”, Amazon/Goodreads/Open Library links, ISBNs).</li>
+      <li><b>Open Library resolution.</b> Candidates are matched to Open Library works, which gives a stable ID, authors, first-publish year, covers and subjects.</li>
+      <li><b>Corpus-wide mention counting.</b> Every resolved title is then searched for across the whole corpus, so books are counted even when nobody linked them.</li>
+      <li><b>LLM disambiguation.</b> A small language model is used only for ambiguous titles (“Dune”, “Influence”, “Range”…) to decide whether a comment is really about the book.</li>
+    </ol>
+    <p>Scores weigh the number of <i>distinct</i> commenters more than raw mentions, so one enthusiastic person can’t dominate. “Rising” compares recent mentions with a book’s history.</p>
+    <h2>Recommended vs. mentioned</h2>
+    <p>Counting mentions alone makes a book that people merely discuss (or warn about) look like a favourite. So every mention was also labelled by Claude Sonnet 5.5 as <i>recommend</i>, <i>neutral</i>, <i>critical</i> or <i>not about the book</i>. “Recommended by” counts the different people who recommended a book at least once; “mentioned by” counts everyone. Mentions that aren’t about the book at all (a film, a game, a same-named work) are dropped. The <a href="#/recommended">Most recommended</a> page ranks by recommenders.
+    The labels were checked against Claude Opus 5.5 on 400 mentions and agreed 85% of the time, so expect some noise. Simpler approaches (keyword rules, sentiment scoring, a TF-IDF classifier) were tried first and were less accurate.</p>
+    <h2>Download the data</h2>
+    <p>The book-level dataset is available as CSV: <a href="data/hackerbooks.csv" download>data/hackerbooks.csv</a>. Data generated ${esc(m.generated)}.</p>
+    <h2>Privacy</h2>
+    <p>No accounts and no tracking. “For You” is computed entirely in your browser from the books you open, and is stored in localStorage on your device. If you subscribe to update emails, your address is stored by this site (in a Cloudflare database) and used only for those emails. To be removed, message me on <a href="https://x.com/roansh_">X</a>.</p>
+    <h2>Credits</h2>
+    <p>Built by roansh with Claude Code. Find me on <a href="https://x.com/roansh_" rel="author">X @roansh_</a> or at <a href="https://rohitshinde.in">rohitshinde.in</a>.</p>
+    <p>Book pages link to Bookshop.org (which supports independent bookstores) and Amazon. These are affiliate links: if you buy through them the site earns a small commission at no extra cost to you, which pays for hosting. As an Amazon Associate I earn from qualifying purchases.</p>
+    <p>Inspired by Andrej Karpathy’s <a href="https://hackertube.org" rel="noopener">HackerTube</a>, a YouTube-style browser for videos recommended on HN. Book metadata and covers come from <a href="https://openlibrary.org" rel="noopener">Open Library</a>; comment text belongs to its authors and links back to the original thread.</p>
+    <p>Hacker Books is an independent project. It is not affiliated with Y Combinator or Hacker News.</p>
+  </article>`;
+}
+
+/* ------- book page ------- */
+const fmtDate = (ts) => new Date(ts * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
+
+/** Escape text and wrap occurrences of the title (or its main part) in <mark>. */
+function highlight(text, title) {
+  const variants = [title, title.split(/[:(–—]| - /)[0].trim()].filter((v) => v && v.length >= 4);
+  if (!variants.length) return esc(text);
+  const pat = [...new Set(variants)].sort((a, b) => b.length - a.length)
+    .map((v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/['’]/g, "['’]")).join('|');
+  let out = '', last = 0;
+  for (const m of text.matchAll(new RegExp(pat, 'gi'))) {
+    out += esc(text.slice(last, m.index)) + '<mark>' + esc(m[0]) + '</mark>';
+    last = m.index + m[0].length;
+  }
+  return out + esc(text.slice(last));
+}
+
+/** Inline SVG bar chart of mentions per year. */
+function yearsChart(years, m) {
+  const keys = Object.keys(years || {}).map(Number);
+  if (!keys.length) return '';
+  const y0 = Math.min(m.first_year, ...keys), y1 = Math.max(m.last_year, ...keys);
+  const ys = Array.from({ length: y1 - y0 + 1 }, (_, i) => y0 + i);
+  const vals = ys.map((y) => years[y] || 0);
+  const max = Math.max(...vals, 1);
+  const W = 640, H = 150, L = 30, B = 22, T = 8, bw = (W - L) / ys.length;
+  const bars = ys.map((y, i) => {
+    const h = Math.round(((H - B - T) * vals[i]) / max);
+    return `<rect class="bar" x="${(L + i * bw + bw * 0.12).toFixed(1)}" y="${H - B - h}" width="${(bw * 0.76).toFixed(1)}" height="${h}" rx="2"><title>${y}: ${plural(vals[i], 'mention', 'mentions')}</title></rect>`;
+  }).join('');
+  const label = (i, anchor) => `<text x="${(L + i * bw + bw / 2).toFixed(1)}" y="${H - 6}" text-anchor="${anchor}">${ys[i]}</text>`;
+  const mid = Math.floor(ys.length / 2);
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Mentions per year, ${y0} to ${y1}; peak ${max}">
+    <line x1="${L}" x2="${W}" y1="${H - B}" y2="${H - B}"/><line x1="${L}" x2="${W}" y1="${T}" y2="${T}" stroke-dasharray="3 4"/>
+    <text x="${L - 4}" y="${T + 4}" text-anchor="end">${max}</text><text x="${L - 4}" y="${H - B}" text-anchor="end">0</text>
+    ${bars}${label(0, 'start')}${ys.length > 4 ? label(mid, 'middle') : ''}${label(ys.length - 1, 'end')}</svg>`;
+}
+
+/** Share of commenters who recommended / were neutral about / criticised the book (d.stance = {r, c, n}). */
+function stanceBarHTML(st) {
+  const tot = st ? st.r + st.n + st.c : 0;
+  if (!tot) return '';
+  const pct = (v) => Math.round((100 * v) / tot);
+  const parts = [['r', 'recommend', st.r], ['n', 'neutral', st.n], ['c', 'critical', st.c]];
+  const txt = parts.map(([, l, v]) => `${pct(v)}% ${l}`).join(', ');
+  return `<div class="stance" title="Share of commenters by what they said about the book (labelled by an LLM, so approximate)">
+    <div class="sbar" role="img" aria-label="Commenters: ${txt}">${parts.filter(([, , v]) => v).map(([k, , v]) => `<i class="s-${k}" style="flex:${v}"></i>`).join('')}</div>
+    <p class="slg">${parts.filter(([, , v]) => v).map(([k, l, v]) => `<span><i class="dot s-${k}"></i>${pct(v)}% ${l}</span>`).join('')}</p></div>`;
+}
+
+/** "Why HN recommends it": Claude-written summary of the recommending comments (+ the common criticism, if any). */
+function whyHTML(d) {
+  if (!d?.why) return '';
+  return `<section class="why" aria-labelledby="why-h"><h2 id="why-h">Why HN recommends it</h2><p>${esc(d.why)}</p>
+    ${d.caveat ? `<p class="why-c"><span>Common criticism:</span> ${esc(d.caveat)}</p>` : ''}
+    <p class="why-n">Summarised by Claude from recommending comments</p></section>`;
+}
+/** Free, legal online editions (Standard Ebooks, the author's site, Project Gutenberg …): plain links, not affiliate. */
+function freeHTML(d) {
+  const fl = (d?.free || []).filter((x) => /^https?:\/\//.test(x.url || ''));
+  if (!fl.length) return '';
+  const label = (src) => (/^online/i.test(src || '') ? 'Online edition' : src || 'Online');
+  return `<div class="free-row"><span class="buy-lbl">Read free</span>${fl.map((x) => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(label(x.src))}</a>`).join('<span class="sep" aria-hidden="true">·</span>')}</div>`;
+}
+
+const SV_TAG = { r: ['Recommends', 'recommends'], n: ['Mentions', 'mentions'], c: ['Critical', 'critical'] };
+function bookHTML(b, d) {
+  const full = { ...b, ...(d || {}) };
+  if (!full.f && d?.years) { // book not in the loaded index yet: derive first/last mention years from the detail file
+    const ys = Object.keys(d.years).map(Number);
+    if (ys.length) { full.f = Math.min(...ys); full.l = Math.max(...ys); }
+  }
+  const authors = (full.a || []).map((a) => `<a href="${hashFor('/search', { q: a })}">${esc(a)}</a>`).join(', ');
+  const topics = (full.tp || []).map((s) => `<a class="chip topic" href="#/topic/${encodeURIComponent(s)}">${esc(state.topicByslug.get(s)?.name || s)}</a>`).join('');
+  const span = yearSpan(full);
+  // Trend data covers books with 60+ commenter-years (>= 60 commenters always qualifies); exact once trends.json is loaded.
+  const trendLink = (state.trends ? !!state.trends.books[full.id] : full.u >= 60) ? `<a class="btn" href="#/trends?b=${encodeURIComponent(full.id)}">See how it trended</a>` : '';
+  // Recommenders: shown whenever the book has stance data, including an explicit 0 (no stance data -> no stat)
+  const st = d?.stance, stTot = st ? st.r + st.n + st.c : 0;
+  const recCount = full.ru != null ? full.ru : stTot ? st.r : null;
+  // Synthetic HB… books are not in Open Library: link their official online edition instead
+  const isHB = /^HB/.test(full.id || '');
+  const homeLink = isHB ? (/^https?:\/\//.test(d?.url || '') ? `<a class="btn primary" href="${esc(d.url)}" target="_blank" rel="noopener">Read online</a>` : '')
+    : `<a class="btn primary" href="https://openlibrary.org/works/${esc(full.id)}" target="_blank" rel="noopener">View on Open Library</a>`;
+  const isbnLink = d?.isbn ? `<a class="btn" href="https://openlibrary.org/isbn/${esc(d.isbn)}" target="_blank" rel="noopener">ISBN ${esc(d.isbn)}</a>` : '';
+  return `<article class="book">
+    <div>${coverHTML(full, true, '', true)}</div>
+    <div>
+      <h1>${esc(full.t)}</h1>
+      ${full.st ? `<p class="st">${esc(full.st)}</p>` : ''}
+      <p class="by"><span>by</span> ${authors || '<span>Unknown author</span>'}${full.y ? ` <span>· first published ${full.y}</span>` : ''}</p>
+      <div class="stats">
+        <div class="stat"><b>${fmt(full.n)}</b><span>mentions</span></div>
+        ${recCount != null ? `<div class="stat"><b>${fmt(recCount)}</b><span>recommended by</span></div>` : ''}
+        <div class="stat"><b>${fmt(full.u)}</b><span>HN commenters</span></div>
+        ${span ? `<div class="stat"><b>${span}</b><span>first – last mentioned</span></div>` : ''}
+      </div>
+      ${stanceBarHTML(d?.stance)}
+      ${whyHTML(d)}
+      <div class="chips">${topics}</div>
+      ${full.desc ? `<p class="desc">${esc(full.desc)}</p>` : ''}
+      <div id="buy">${buyHTML({ ...full, isbn: d?.isbn })}</div>
+      ${freeHTML(d)}
+      <div class="links">${homeLink}${isbnLink}${trendLink}</div>
+    </div>
+    ${d?.years ? `<section class="sec"><h2>Mentions per year</h2>${yearsChart(d.years, state.meta)}</section>` : ''}
+    ${d ? `<section class="sec" id="comments-sec"><h2>What Hacker News says</h2><ul class="comments" id="comments"></ul><p><button class="btn" id="more-comments" type="button" hidden>Show more comments</button></p></section>` : '<section class="sec"><p class="sub">Loading comments…</p></section>'}
+    <div id="related">${relatedHTML(d)}</div>
+  </article>`;
+}
+
+/** Related books need the full index to resolve ids (empty until it has loaded; renderBook fills it in then). */
+function relatedHTML(d) {
+  const related = state.full ? (d?.related || []).map((id) => state.byId.get(id)).filter(Boolean) : [];
+  return related.length ? `<section class="sec"><h2>Related books</h2><div class="row">${related.map((b) => cardHTML(b)).join('')}</div></section>` : '';
+}
+
+function commentHTML(c, title) {
+  const link = (url, text, cls = '') => `<a${cls ? ` class="${cls}"` : ''} href="${url}" target="_blank" rel="noopener noreferrer">${esc(text)}</a>`;
+  return `<li class="comment"><div class="comment-h">${link(`${HN}/user?id=${encodeURIComponent(c.by)}`, c.by, 'who')} · ${link(`${HN}/item?id=${c.id}`, fmtDate(c.ts))}${SV_TAG[c.sv] ? ` · <span class="tag tag-${SV_TAG[c.sv][1]}">${SV_TAG[c.sv][0]}</span>` : ''}</div>
+    <p>${highlight(c.x || '', title)}</p>
+    ${c.st ? `<a class="thread" href="${HN}/item?id=${c.sid}" target="_blank" rel="noopener noreferrer">on “${esc(c.st)}” ↗</a>` : ''}</li>`;
+}
+
+let routeToken = 0; // invalidates in-flight async renders when the route changes
+// Book ids merged away (overrides.json "remap" / "merge", 06a duplicate merges) or re-resolved to another Open Library
+// work, for books that had >= 20 commenters: old links shared on HN keep working.
+const BOOK_REDIRECTS = {OL999456W: 'OL1975712W', OL28649132W: 'OL82563W', OL27739326W: 'OL21385222W', OL30109689W: 'OL3902892W', OL21347460W: 'OL515289W', OL35082080W: 'OL35082079W', OL1821257W: 'OL1821254W', OL25231241W: 'OL25605325W', OL29408225W: 'OL14871946W', OL45406113W: 'OL1168083W', OL20659013W: 'OL24940564W', OL16997366W: 'OL17820325W', OL4278045W: 'OL52267W', OL28357945W: 'OL45971742W', OL5121517W: 'OL15955452W', OL24429090W: 'OL25605325W', OL27086753W: 'OL31439176W', OL40697371W: 'OL16336633W', OL43075578W: 'OL43754807W', OL36890850W: 'OL515289W', OL16300853W: 'OL5857527W', OL31093976W: 'OL16336633W', OL11376188W: 'OL12252851W', OL44100847W: 'OL44544498W', OL43339087W: 'OL43339089W', OL53919W: 'OL25639159W', OL15190817W: 'OL3509433W'};
+async function renderBook(id) {
+  if (BOOK_REDIRECTS[id]) { history.replaceState(null, '', `#/book/${BOOK_REDIRECTS[id]}`); id = BOOK_REDIRECTS[id]; }
+  const token = ++routeToken;
+  const base = state.byId.get(id);
+  // Buy links use the ISBN map (lazy, ~250 KB, cached forever); until it arrives they fall back to search links.
+  if (!state.buy) ensureBuy().then(() => {
+    const b = state.byId.get(id) || base;
+    if (token === routeToken && b && $('#buy')) $('#buy').innerHTML = buyHTML(b);  // buy.json already includes HN-linked ISBNs
+  });
+  if (base) { main.innerHTML = bookHTML(base, null); setPage(base.t, `${base.t} by ${(base.a || []).join(', ')} — mentioned by ${base.u} Hacker News commenters.`); profile.record(base); }
+  else main.innerHTML = '<div class="skel">Loading…</div>';
+  let d;
+  try { d = await getBook(id); } catch { d = null; }
+  if (token !== routeToken) return;
+  if (!d && !base) return renderNotFound('We couldn’t find that book.');
+  if (!d) { const s = $('.sec .sub'); if (s) s.textContent = 'Couldn’t load comments for this book.'; return; }
+  const book = { ...base, ...d };
+  setPage(book.t, `${book.t} by ${(book.a || []).join(', ')} — mentioned by ${fmt(book.u)} Hacker News commenters.${d.desc ? ' ' + d.desc : ''}`);
+  if (!base) profile.record(book);
+  main.innerHTML = bookHTML(base || book, d);
+  if (!state.full && d.related?.length) {
+    ensureFull().then(() => { if (token === routeToken && $('#related')) $('#related').innerHTML = relatedHTML(d); }, () => { /* no related books */ });
+  }
+  // Comments render in pages of 15 to keep the DOM light.
+  const list = $('#comments'), btn = $('#more-comments');
+  const comments = d.comments || [];
+  let shown = 0;
+  const more = () => {
+    list.insertAdjacentHTML('beforeend', comments.slice(shown, shown + 15).map((c) => commentHTML(c, book.t)).join(''));
+    shown = Math.min(comments.length, shown + 15);
+    btn.hidden = shown >= comments.length;
+    const total = (base || book).n || 0;
+    if (btn.hidden && total > comments.length) {  // we only ship a sample per book; say so instead of silently stopping
+      btn.insertAdjacentHTML('afterend', `<span class="sub">That's the ${comments.length} we keep per book (most-discussed first), out of ${fmt(total)} mentions in total. All mentions are in the <a href="data/mentions.csv.gz">dataset</a>.</span>`);
+    }
+  };
+  if (!comments.length) list.innerHTML = '<li class="sub">No comment snippets available.</li>';
+  else { btn.onclick = more; more(); }
+}
+
+/* ============================== trends ============================== */
+// #/trends: rank (bump) chart, evergreens, waves, compare. Data: data/trends.json (see pipeline/07b_trends.py), loaded only here.
+// Values are per-mille shares of a year's book mentions; the UI shows them as percentages (10 per mille = 1%).
+const TR_DEFAULT = ['OL16086010W', 'OL3510570W']; // The Lean Startup vs The Mythical Man-Month
+const TR_MAX = 5; // compared books (colour slots --tr-1 … --tr-5)
+let trendsPromise = null;
+function getTrends() {
+  return (trendsPromise ??= getJSON(URLS.trends).then((t) => (state.trends = t)).catch((err) => { trendsPromise = null; throw err; }));
+}
+
+const trTitle = (b) => String(b.t || '').replace(/\s+/g, ' ').replace(/\s*[:–-]\s*$/, '').trim();
+/** Short label for charts: main title (before ':'), or the HN abbreviation (SICP, TAOCP…) when it is still too long. */
+function trShort(b, max = 24) {
+  const full = trTitle(b), main = full.split(/\s*[:(–—]\s*|\s+-\s+/)[0] || full;
+  if (main.length <= max) return main;
+  const ab = (b.k || []).find((k) => /^[a-z]{3,6}$/.test(k));
+  if (ab) return ab.toUpperCase();
+  return main.slice(0, max - 1).replace(/\s+\S*$/, '') + '…';
+}
+const trPct = (p) => (!p ? '0%' : p < 0.1 ? '<0.01%' : `${(p / 10).toFixed(p >= 10 ? 1 : 2)}%`);
+const trYear = (T, y) => (y === T.years[T.years.length - 1] ? `${y} (so far)` : String(y));
+const trSvg = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+/** Re-run draw(width) whenever el's width changes (and once on mount). */
+function watchWidth(el, draw) {
+  let last = 0;
+  // Redraw on the next frame: drawing synchronously inside the observer callback resizes the observed element and
+  // triggers the browser's "ResizeObserver loop" warning.
+  let raf = 0;
+  const ro = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { const w = Math.floor(el.clientWidth); if (w > 0 && Math.abs(w - last) > 1) { last = w; draw(w); } }); });
+  ro.observe(el);
+  return ro;
+}
+/** Position tooltip `tip` (inside positioned box `box`) above the viewport point (cx, cy). */
+function placeTip(box, tip, cx, cy) {
+  const r = box.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = cx - r.left - w / 2;
+  x = Math.max(4, Math.min(x, r.width - w - 4));
+  let y = cy - r.top - h - 14;
+  if (y < 0) y = cy - r.top + 16;
+  tip.style.transform = `translate(${x.toFixed(0)}px, ${y.toFixed(0)}px)`;
+}
+
+/** Sparkline of a book's share over the years (scaled to its own maximum). */
+function sparkHTML(T, p, peakI) {
+  const W = 150, H = 36, pad = 3, max = Math.max(...p, 0.01), n = p.length;
+  const pt = p.map((v, i) => [pad + ((W - 2 * pad) * i) / (n - 1), H - pad - ((H - 2 * pad) * v) / max]);
+  const line = pt.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join('');
+  const dot = peakI == null ? '' : `<circle cx="${pt[peakI][0].toFixed(1)}" cy="${pt[peakI][1].toFixed(1)}" r="3" class="pk"/>`;
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" aria-hidden="true" focusable="false"><line x1="${pad}" x2="${W - pad}" y1="${H - pad}" y2="${H - pad}"/><path d="${line}L${W - pad},${H - pad}L${pad},${H - pad}Z" class="ar"/><path d="${line}" class="ln"/>${dot}</svg>
+    <div class="spark-x" aria-hidden="true"><span>${T.years[0]}</span><span>${T.years[n - 1]}</span></div>`;
+}
+function trendCardHTML(T, b, caption, peakI, sr) {
+  return `<a class="card tr-card" href="#/book/${encodeURIComponent(b.id)}">${coverHTML(b)}
+    <h3>${esc(trTitle(b))}</h3><p class="au">${esc((b.a || []).join(', '))}</p>
+    ${sparkHTML(T, T.books[b.id].p, peakI)}<p class="rec">${esc(caption)}</p><span class="sr-only">${esc(sr)}</span></a>`;
+}
+
+function evergreensHTML(T) {
+  const cards = T.evergreens.map((e) => state.byId.get(e.id) && trendCardHTML(T, state.byId.get(e.id), `Top 50 in ${e.n} of ${T.years.length} years`, null,
+    `Share of book mentions, ${T.years[0]} to ${T.years[T.years.length - 1]}: in the yearly top 50 for ${e.n} of ${T.years.length} years.`)).filter(Boolean);
+  return `<section class="tr-sec" aria-labelledby="tr-h-ever"><h2 id="tr-h-ever">Evergreens</h2>
+    <p class="sub">Books in each year’s top 50 for at least ${Math.min(...T.evergreens.map((e) => e.n))} of ${T.years.length} years. Shapes show a book’s share per year, each scaled to its own maximum (${T.years[0]} to ${T.years[T.years.length - 1]}).</p>
+    <div class="grid">${cards.join('')}</div></section>`;
+}
+function wavesHTML(T) {
+  const group = (ws, title, sub) => {
+    const cards = ws.map((w) => {
+      const b = state.byId.get(w.id);
+      return b && trendCardHTML(T, b, w.d, T.years.indexOf(w.py), `Share of book mentions peaked in ${w.py} at ${trPct(w.pk)} of that year’s mentions.`);
+    }).filter(Boolean).join('');
+    return cards ? `<h3 class="tr-gh">${title}${sub ? ` <span>${sub}</span>` : ''}</h3><div class="grid">${cards}</div>` : '';
+  };
+  const rising = T.waves.filter((w) => w.rising);
+  const byYear = [...new Set(T.waves.filter((w) => !w.rising).map((w) => w.py))].sort((a, b) => b - a);
+  return `<section class="tr-sec" aria-labelledby="tr-h-waves"><h2 id="tr-h-waves">Waves</h2>
+    <p class="sub">Books that surged for a year or two and then faded. The dot marks each book’s peak; “now” is its average share over the last three years compared with that peak.</p>
+    ${group(rising, 'Rising now', 'spiking in the last two years, too early to say if they will fade')}
+    ${byYear.map((y) => group(T.waves.filter((w) => !w.rising && w.py === y), `Peaked in ${y}`, y === T.years[0] ? '(HN’s first full year here: low volume, so noisier)' : '')).join('')}</section>`;
+}
+
+/* ---- rank (bump) chart ---- */
+function mountBump(box, T, ctl) {
+  const ys = T.years, n = ys.length, ly = ys[n - 1];
+  const pts = new Map(); // id -> [{i, r, u}]
+  ys.forEach((y, i) => T.top10[y].forEach(([id, u], k) => { if (!pts.has(id)) pts.set(id, []); pts.get(id).push({ i, r: k + 1, u }); }));
+  const ids = [...pts.keys()].filter((id) => state.byId.has(id));
+  const bookOf = (id) => state.byId.get(id);
+  let pinned = null; // { id, k } point index inside pts.get(id)
+  let geo = null;
+
+  function draw(width) {
+    const W = Math.max(780, width), L = 150, R = 150, top = 38, rowH = 33, H = top + 9 * rowH + 50;
+    const x = (i) => L + ((W - L - R) * i) / (n - 1), y = (r) => top + (r - 1) * rowH;
+    const short = W - L - R < 17 * 36; // narrow columns: '08 style year ticks
+    const seg = (a, b) => `M${x(a.i).toFixed(1)},${y(a.r)}C${((x(a.i) + x(b.i)) / 2).toFixed(1)},${y(a.r)} ${((x(a.i) + x(b.i)) / 2).toFixed(1)},${y(b.r)} ${x(b.i).toFixed(1)},${y(b.r)}`;
+    const marks = (id, cls) => { // lines + dots for one book (runs of consecutive years are joined; a gap breaks the line)
+      const p = pts.get(id);
+      let d = '';
+      for (let k = 1; k < p.length; k++) if (p[k].i === p[k - 1].i + 1) d += seg(p[k - 1], p[k]);
+      return `<path class="${cls}-l" d="${d}"/>` + p.map((q) => `<circle class="${cls}-d" cx="${x(q.i).toFixed(1)}" cy="${y(q.r)}" r="${cls === 'hl' ? 6 : 4.5}"/>`).join('');
+    };
+    const lab = (id, ax, px, py) => `<text class="tl" x="${px.toFixed(1)}" y="${py}" text-anchor="${ax}" dy=".32em">${trSvg(trShort(bookOf(id), 22))}</text>`;
+    // Labels: both margins (books in the top 10 in the first / last year) and the start of each #1 run along the top.
+    let labels = '';
+    for (const id of ids) {
+      const p = pts.get(id);
+      if (p[0].i === 0) labels += lab(id, 'end', x(0) - 12, y(p[0].r));
+      if (p[p.length - 1].i === n - 1) labels += lab(id, 'start', x(n - 1) + 12, y(p[p.length - 1].r));
+    }
+    let edge = 0;
+    ys.forEach((yr, i) => {
+      const [id] = T.top10[yr][0];
+      if (i === 0 || i === n - 1 || !bookOf(id) || (i && T.top10[ys[i - 1]][0][0] === id)) return;
+      const t = trShort(bookOf(id), 20), half = t.length * 3.1 + 2;
+      if (x(i) - half < edge || x(i) + half > W - R + 20) return; // sparse: skip a label that would collide
+      edge = x(i) + half + 6;
+      labels += `<text class="tl top" x="${x(i).toFixed(1)}" y="${y(1) - 17}" text-anchor="middle">${trSvg(t)}</text>`;
+    });
+    const grid = Array.from({ length: 10 }, (_, k) => `<line x1="30" x2="${W - 20}" y1="${y(k + 1)}" y2="${y(k + 1)}"/><text class="ax" x="12" y="${y(k + 1)}" text-anchor="middle" dy=".32em">${k + 1}</text>`).join('');
+    const xt = ys.map((yr, i) => `<text class="ax" x="${x(i).toFixed(1)}" y="${y(10) + 26}" text-anchor="middle">${short ? "’" + String(yr).slice(2) : yr}</text>`).join('')
+      + `<text class="ax" x="${x(n - 1).toFixed(1)}" y="${y(10) + 40}" text-anchor="middle">so far</text>`;
+    const books = ids.map((id) => {
+      const p = pts.get(id), b = bookOf(id);
+      const aria = `${trTitle(b)}: top 10 in ${p.map((q) => `${ys[q.i]} (#${q.r})`).join(', ')}. Press Enter to open.`;
+      return `<g class="bk" data-id="${esc(id)}" tabindex="0" role="link" aria-label="${esc(aria)}">${marks(id, 'bk')}</g>`;
+    }).join('');
+    geo = { W, H, x, y, points: ids.flatMap((id) => pts.get(id).map((q, k) => ({ id, k, px: x(q.i), py: y(q.r) }))), marks, lab, L, R };
+    box.querySelector('.tr-scroll').innerHTML = `<svg class="tr-bump" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="group" aria-labelledby="bump-t">
+      <title id="bump-t">Rank chart: the ten most-mentioned books each year, ${ys[0]} to ${ly}</title>
+      <g class="grid">${grid}</g><g class="xax">${xt}</g><g class="books">${books}</g><g class="labels" aria-hidden="true">${labels}</g><g class="over" aria-hidden="true"></g></svg>`;
+    if (pinned) show(pinned.id, pinned.k, true); else hide();
+  }
+
+  const svg = () => box.querySelector('.tr-bump');
+  const tip = box.querySelector('.tr-tip');
+  function show(id, k, pin = false) {
+    const p = pts.get(id)[k], b = bookOf(id), g = geo;
+    const s = svg();
+    s.classList.add('has-hl');
+    const ax = g.x(p.i) < g.L + 40 ? 'start' : g.x(p.i) > g.W - g.R - 40 ? 'end' : 'middle';
+    s.querySelector('.over').innerHTML = g.marks(id, 'hl') + `<text class="tl hl-t" x="${g.x(p.i).toFixed(1)}" y="${g.y(p.r) - 14}" text-anchor="${ax}">${trSvg(trShort(b, 30))}</text>` + `<circle class="cur" cx="${g.x(p.i).toFixed(1)}" cy="${g.y(p.r)}" r="9"/>`;
+    tip.innerHTML = `<b>#${p.r} in ${esc(trYear(T, ys[p.i]))}</b> · ${plural(p.u, 'commenter', 'commenters')}<br><span>${esc(trTitle(b))}</span>`
+      + (pin ? `<br><a href="#/book/${encodeURIComponent(id)}">Open book page →</a>` : '');
+    tip.hidden = false;
+    tip.dataset.k = k;
+    tip.classList.toggle('pin', pin);
+    const dot = s.querySelector('.cur').getBoundingClientRect();
+    placeTip(box, tip, dot.left + dot.width / 2, dot.top);
+    box.dataset.active = id;
+  }
+  function hide() {
+    const s = svg();
+    if (!s) return;
+    s.classList.remove('has-hl');
+    s.querySelector('.over').innerHTML = '';
+    tip.hidden = true;
+    delete box.dataset.active;
+  }
+  const nearest = (e) => {
+    const r = svg().getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    let best = null, bd = 22 * 22;
+    for (const q of geo.points) { const d = (q.px - mx) ** 2 + (q.py - my) ** 2; if (d < bd) { bd = d; best = q; } }
+    return best;
+  };
+  const sc = box.querySelector('.tr-scroll');
+  sc.addEventListener('pointermove', (e) => {
+    if (pinned || e.pointerType === 'touch') return;
+    const q = nearest(e);
+    if (q) { if (box.dataset.active !== q.id || tip.dataset.k !== String(q.k)) show(q.id, q.k); } else hide();
+  });
+  sc.addEventListener('pointerleave', () => { if (!pinned && !sc.contains(document.activeElement)) hide(); });
+  sc.addEventListener('click', (e) => { // click/tap pins a book (the tooltip then offers a link); click elsewhere unpins
+    if (e.target.closest('a')) return;
+    const q = nearest(e);
+    pinned = q && !(pinned && pinned.id === q.id && pinned.k === q.k) ? { id: q.id, k: q.k } : null;
+    if (pinned) show(pinned.id, pinned.k, true); else hide();
+  });
+  sc.addEventListener('focusin', (e) => {
+    const id = e.target.closest?.('.bk')?.dataset.id;
+    if (!id || pinned) return;
+    const p = pts.get(id);
+    show(id, p.reduce((m, q, k) => (q.r < p[m].r ? k : m), 0)); // start at the book's best rank
+  });
+  sc.addEventListener('focusout', (e) => { if (!pinned && !sc.contains(e.relatedTarget)) hide(); });
+  sc.addEventListener('keydown', (e) => {
+    const id = e.target.closest?.('.bk')?.dataset.id;
+    if (!id) return;
+    if (e.key === 'Enter') { e.preventDefault(); go(`#/book/${encodeURIComponent(id)}`); return; }
+    const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (!d) return;
+    e.preventDefault();
+    show(id, Math.max(0, Math.min(pts.get(id).length - 1, +(tip.dataset.k ?? 0) + d)));
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && pinned) { pinned = null; hide(); } }, { signal: ctl.signal });
+  document.addEventListener('click', (e) => { if (pinned && !box.contains(e.target)) { pinned = null; hide(); } }, { signal: ctl.signal });
+  ctl.ros.push(watchWidth(sc, draw));
+}
+
+function bumpSectionHTML(T) {
+  const ys = T.years, co = Object.values(T.stats.carryover), avg = Math.round(co.reduce((a, b) => a + b, 0) / co.length);
+  const rows = ys.map((y) => `<tr><th scope="row">${esc(trYear(T, y))}</th><td>${T.top10[y].map(([id, u]) => esc(trTitle(state.byId.get(id) || { t: id })) + ` (${u})`).join('; ')}</td></tr>`).join('');
+  return `<section class="tr-sec" aria-labelledby="tr-h-rank"><h2 id="tr-h-rank">The yearly top 10</h2>
+    <p class="sub">The ten books most-mentioned in each year, by number of different commenters. Some names sit near the top for years, others appear once. The list is sticky: on average ${avg} of each year’s top 20 were also in the previous year’s top 20 (never fewer than ${Math.min(...co)}).
+    Hover, tap or tab to a dot to follow one book.<span class="tr-sm"> Swipe the chart sideways to see every year.</span> ${ys[0]} has low volume, so it is noisier; ${ys[ys.length - 1]} runs to 1 November.</p>
+    <div class="tr-box" id="tr-bump"><div class="tr-scroll" tabindex="-1"></div><div class="tr-tip" role="status" hidden></div></div>
+    <div class="sr-only"><table><caption>The ten most-mentioned books each year, with the number of different commenters</caption><thead><tr><th scope="col">Year</th><th scope="col">Top 10, most mentioned first</th></tr></thead><tbody>${rows}</tbody></table></div>
+  </section>`;
+}
+
+/* ---- compare ---- */
+function mountCompare(host, T, ids0, ctl) {
+  const n = T.years.length, ly = T.years[n - 1];
+  let sel = ids0.map((id, i) => ({ id, slot: i + 1 }));
+  host.innerHTML = `<div class="tr-search"><label class="sr-only" for="tr-q">Add a book to compare</label>
+      <input id="tr-q" type="text" role="combobox" aria-expanded="false" aria-controls="tr-list" aria-autocomplete="list" autocomplete="off" spellcheck="false">
+      <ul id="tr-list" role="listbox" aria-label="Matching books" hidden></ul></div>
+    <ul class="tr-legend" id="tr-legend" aria-label="Books being compared"></ul>
+    <div class="tr-box" id="tr-cbox"><div class="tr-scroll"></div><div class="tr-tip" hidden></div></div>
+    <p class="sr-only" id="tr-live" aria-live="polite"></p><div id="tr-table"></div>`;
+  const input = $('#tr-q', host), list = $('#tr-list', host), legend = $('#tr-legend', host), cbox = $('#tr-cbox', host), tip = $('.tr-tip', cbox);
+  const live = (t) => { $('#tr-live', host).textContent = t; };
+  let width = 0, hover = null, results = [], active = -1;
+  const bk = (id) => state.byId.get(id);
+
+  let touched = false; // only rewrite the URL once the visitor changes the selection
+  function sync() {
+    if (touched) history.replaceState(null, '', '#/trends?b=' + sel.map((s) => s.id).join(','));
+    legend.innerHTML = sel.map((s) => `<li style="--c:var(--tr-${s.slot})"><i class="sw"></i><a href="#/book/${encodeURIComponent(s.id)}">${esc(trTitle(bk(s.id)))}</a>
+      <button type="button" class="x" data-id="${esc(s.id)}" aria-label="Remove ${esc(trTitle(bk(s.id)))} from the comparison">×</button></li>`).join('');
+    const full = sel.length >= TR_MAX;
+    input.disabled = full;
+    input.placeholder = full ? `Remove a book to add another (max ${TR_MAX})` : 'Add a book to compare: type a title or author…';
+    const rows = T.years.map((y, i) => `<tr><th scope="row">${esc(trYear(T, y))}</th>${sel.map((s) => `<td>${trPct(T.books[s.id].p[i])}</td>`).join('')}</tr>`).join('');
+    $('#tr-table', host).innerHTML = sel.length ? `<div class="sr-only"><table><caption>Share of all book mentions per year</caption><thead><tr><th scope="col">Year</th>${sel.map((s) => `<th scope="col">${esc(trTitle(bk(s.id)))}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>` : '';
+    drawChart();
+  }
+
+  function drawChart() {
+    hover = null;
+    tip.hidden = true;
+    const sc = $('.tr-scroll', cbox);
+    if (!sel.length) { sc.innerHTML = '<p class="empty tr-empty">Pick a book above to see how its share of Hacker News book mentions changed year by year.</p>'; return; }
+    const W = Math.max(300, width || cbox.clientWidth - 8), H = W < 480 ? 250 : 320, direct = W >= 560;
+    const L = 46, T0 = 16, B = 30, R = direct ? 150 : 16, pw = W - L - R, ph = H - T0 - B;
+    const vmax = Math.max(...sel.flatMap((s) => T.books[s.id].p), 0.5);
+    const step = [0.5, 1, 2, 2.5, 5, 10, 20, 25, 50].find((s) => vmax / s <= 5) || 50, top = Math.ceil(vmax / step) * step;
+    const x = (i) => L + (pw * i) / (n - 1), y = (v) => T0 + ph - (ph * v) / top;
+    const grid = Array.from({ length: top / step + 1 }, (_, k) => `<line x1="${L}" x2="${W - R}" y1="${y(k * step)}" y2="${y(k * step)}"/><text class="ax" x="${L - 8}" y="${y(k * step)}" text-anchor="end" dy=".32em">${trPct(k * step)}</text>`).join('');
+    const every = Math.ceil(34 / (pw / (n - 1)));
+    const xt = T.years.map((yr, i) => (n - 1 - i) % every === 0 ? `<text class="ax" x="${x(i).toFixed(1)}" y="${H - 8}" text-anchor="middle">${yr}</text>` : '').join('');
+    const lines = sel.map((s) => `<path class="cl" style="stroke:var(--tr-${s.slot})" d="${T.books[s.id].p.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('')}"/>`).join('');
+    let labs = '';
+    if (direct) { // end-of-line labels, nudged apart so they never overlap
+      const ends = sel.map((s) => ({ s, y: y(T.books[s.id].p[n - 1]) })).sort((a, b) => a.y - b.y);
+      ends.forEach((e, k) => { if (k && e.y < ends[k - 1].y + 14) e.y = ends[k - 1].y + 14; });
+      labs = ends.map((e) => `<text class="tl" x="${W - R + 8}" y="${e.y.toFixed(1)}" dy=".32em">${trSvg(trShort(bk(e.s.id), 22))}</text>`).join('');
+    }
+    sc.innerHTML = `<svg class="tr-cmpchart" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" tabindex="0" aria-label="Line chart: share of all book mentions per year, ${T.years[0]} to ${ly}, for ${esc(sel.map((s) => trTitle(bk(s.id))).join(', '))}. A table follows. Use the left and right arrow keys to read each year.">
+      <g class="grid">${grid}</g><g class="xax">${xt}</g><g>${lines}</g><g class="labels" aria-hidden="true">${labs}</g><g class="cross"></g></svg>`;
+    const s = $('svg', sc), cross = $('.cross', s);
+    const at = (i, cx, cy) => {
+      i = Math.max(0, Math.min(n - 1, i));
+      hover = i;
+      const rows = sel.map((q) => ({ q, v: T.books[q.id].p[i] })).sort((a, b) => b.v - a.v);
+      cross.innerHTML = `<line class="vl" x1="${x(i).toFixed(1)}" x2="${x(i).toFixed(1)}" y1="${T0}" y2="${T0 + ph}"/>` + rows.map((r) => `<circle cx="${x(i).toFixed(1)}" cy="${y(r.v).toFixed(1)}" r="5" style="fill:var(--tr-${r.q.slot})"/>`).join('');
+      tip.innerHTML = `<span>${esc(trYear(T, T.years[i]))}</span>` + rows.map((r) => `<div class="r"><i class="sw" style="--c:var(--tr-${r.q.slot})"></i><b>${trPct(r.v)}</b> <span>${esc(trShort(bk(r.q.id), 28))}</span></div>`).join('');
+      tip.hidden = false;
+      const r = s.getBoundingClientRect();
+      placeTip(cbox, tip, cx ?? r.left + x(i), cy ?? r.top + T0 + 24);
+    };
+    s.addEventListener('pointermove', (e) => {
+      const r = s.getBoundingClientRect(), i = Math.max(0, Math.min(n - 1, Math.round(((e.clientX - r.left - L) / pw) * (n - 1))));
+      at(i, r.left + x(i), r.top + T0 + 24);
+    });
+    s.addEventListener('pointerleave', () => { if (document.activeElement !== s) { cross.innerHTML = ''; tip.hidden = true; } });
+    s.addEventListener('focus', () => at(hover ?? n - 1));
+    s.addEventListener('blur', () => { cross.innerHTML = ''; tip.hidden = true; });
+    s.addEventListener('keydown', (e) => {
+      const d = { ArrowLeft: -1, ArrowRight: 1 }[e.key];
+      if (d || e.key === 'Home' || e.key === 'End') { e.preventDefault(); at(e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : (hover ?? n - 1) + d); }
+    });
+  }
+
+  function add(id) {
+    if (sel.length >= TR_MAX || sel.some((s) => s.id === id)) return;
+    const slot = [1, 2, 3, 4, 5].find((k) => !sel.some((s) => s.slot === k)); // colour follows the book, not its position
+    sel.push({ id, slot });
+    touched = true;
+    live(`Added ${trTitle(bk(id))}. Comparing ${sel.length} ${sel.length === 1 ? 'book' : 'books'}.`);
+    sync();
+  }
+  legend.addEventListener('click', (e) => {
+    const b = e.target.closest('button.x');
+    if (!b) return;
+    const i = sel.findIndex((s) => s.id === b.dataset.id);
+    live(`Removed ${trTitle(bk(sel[i].id))}.`);
+    sel.splice(i, 1);
+    touched = true;
+    sync();
+    (legend.querySelector('button.x') || input).focus();
+  });
+
+  // search box over the books that have trend data
+  const closeList = () => { list.hidden = true; input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); active = -1; };
+  const mark = () => { [...list.children].forEach((li, k) => li.classList.toggle('on', k === active)); if (active >= 0) input.setAttribute('aria-activedescendant', 'tr-o' + active); };
+  function find() {
+    const q = input.value.trim();
+    if (!q) return closeList();
+    results = search(q).filter((b) => T.books[b.id] && !sel.some((s) => s.id === b.id)).slice(0, 8);
+    list.innerHTML = results.length
+      ? results.map((b, k) => `<li id="tr-o${k}" role="option" data-id="${esc(b.id)}"><b>${esc(trTitle(b))}</b> <span>${esc((b.a || []).slice(0, 2).join(', '))}</span></li>`).join('')
+      : '<li class="none" role="presentation">No match among books with enough history (60+ commenter-years).</li>';
+    list.hidden = false;
+    input.setAttribute('aria-expanded', 'true');
+    active = results.length ? 0 : -1;
+    mark();
+  }
+  const pick = (id) => { add(id); input.value = ''; closeList(); if (!input.disabled) input.focus(); };
+  input.addEventListener('input', debounce(find, 80));
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (list.hidden) find(); else { active = (active + (e.key === 'ArrowDown' ? 1 : -1) + results.length) % results.length; mark(); } }
+    else if (e.key === 'Enter') { e.preventDefault(); if (!list.hidden && results[active]) pick(results[active].id); }
+    else if (e.key === 'Escape' && !list.hidden) { e.stopPropagation(); closeList(); }
+  });
+  list.addEventListener('pointerdown', (e) => { const li = e.target.closest('li[data-id]'); if (li) { e.preventDefault(); pick(li.dataset.id); } });
+  input.addEventListener('blur', closeList);
+  ctl.ros.push(watchWidth(cbox, (w) => { width = w - 8; drawChart(); }));
+  sync();
+}
+
+async function renderTrends(q, restore) {
+  const token = routeToken;
+  setPage('Trends', 'How books rise, peak and fade in Hacker News comments, 2008–2026: the yearly top 10, evergreens, one-year wonders and a book comparison tool.');
+  const ctl = current = { raw: '', shown: () => 0, ros: [], signal: null, dispose() { this.ros.forEach((r) => r.disconnect()); this.ac.abort(); }, ac: new AbortController() };
+  ctl.signal = ctl.ac.signal;
+  main.innerHTML = '<div class="skel">Loading trends…</div>';
+  let T;
+  try { T = await getTrends(); } catch (err) {
+    console.error(err);
+    if (token !== routeToken) return;
+    main.innerHTML = '<div class="empty"><h2>Couldn’t load the trends</h2><p>Check your connection and try again.</p><p><button class="btn primary" id="retry" type="button">Try again</button></p></div>';
+    $('#retry').onclick = () => route();
+    return;
+  }
+  if (token !== routeToken) return;
+  const asked = (q.get('b') || '').split(',').filter(Boolean).slice(0, TR_MAX);
+  const valid = [...new Set(asked)].filter((id) => T.books[id] && state.byId.has(id));
+  const ids = valid.length ? valid : TR_DEFAULT.filter((id) => T.books[id] && state.byId.has(id));
+  const ly = T.years[T.years.length - 1];
+  main.innerHTML = `<div class="page-h"><h1>Trends</h1></div>
+    <p class="sub">Some books are on Hacker News forever; others blow up for a year or two and then disappear. Every number here is a book’s share of all book mentions that year (counting different commenters), so HN’s growth doesn’t skew the comparison.</p>
+    ${bumpSectionHTML(T)}${evergreensHTML(T)}${wavesHTML(T)}
+    <section class="tr-sec" id="tr-compare" aria-labelledby="tr-h-cmp"><h2 id="tr-h-cmp">Compare books</h2>
+      <p class="sub">Share of all book mentions per year, ${T.years[0]}–${ly} (${ly} runs to 1 November). Add up to ${TR_MAX} books.${asked.length && !valid.length ? ' We have no trend data for the book in that link, so here is a default pair.' : ''}</p>
+      <div id="tr-cmp"></div></section>`;
+  mountBump($('#tr-bump'), T, ctl);
+  mountCompare($('#tr-cmp'), T, ids, ctl);
+  if (restore) window.scrollTo(0, restore.y);
+  else if (asked.length) $('#tr-compare').scrollIntoView({ block: 'start' });
+}
+
+/* ============================== router ============================== */
+const scrollMem = new Map(); // route -> { y, shown } for restoring list position on Back
+let navCount = 0, freshNav = false;
+history.scrollRestoration = 'manual';
+
+function parseHash() {
+  const raw = location.hash.slice(1) || '/';
+  const i = raw.indexOf('?');
+  return { raw, path: i < 0 ? raw : raw.slice(0, i), query: new URLSearchParams(i < 0 ? '' : raw.slice(i + 1)) };
+}
+
+function setActiveNav(name, slug) {
+  document.querySelectorAll('#sidebar a').forEach((a) => {
+    const on = slug ? a.dataset.slug === slug : a.dataset.route === name;
+    a.classList.toggle('active', on);
+    if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+  });
+}
+
+/** Routes that cannot render correctly from the top-slice index alone. */
+function needsFull(name, seg, query) {
+  switch (name) {
+    case 'home': case 'top': return !!(query.get('dec') || +query.get('since')); // filters must see every book
+    case 'rising': case 'trends': case 'recommended': return true;
+    case 'search': return !!(query.get('q') || '').trim();
+    case 'foryou': return profile.views().length > 0;
+    case 'topic': return state.topicByslug.has(seg[1]);
+    default: return false;
+  }
+}
+
+function route() {
+  if (!state.meta) return;
+  const { raw, path, query } = parseHash();
+  const isFresh = freshNav; freshNav = false;
+  if (current) { scrollMem.set(current.raw, { y: window.scrollY, shown: current.shown() }); current.dispose(); }
+  current = null;
+  routeToken++;
+  navCount++;
+  closeDrawer();
+
+  const restore = !isFresh ? scrollMem.get(raw) : null;
+  const seg = path.split('/').filter(Boolean).map(decodeURIComponent);
+  const name = seg[0] || 'home';
+  setActiveNav(name, name === 'topic' ? seg[1] : null);
+  if (name !== 'search' && $('#q').value && document.activeElement !== $('#q')) $('#q').value = '';
+
+  const render = () => {
+    switch (name) {
+      case 'home': renderHome(query, restore); break;
+      case 'top': renderTop(query, restore); break;
+      case 'recommended': renderRecommended(query, restore); break;
+      case 'rising': renderRising(query, restore); break;
+      case 'trends': renderTrends(query, restore); break;
+      case 'foryou': renderForYou(query, restore); break;
+      case 'topic': renderTopic(seg[1], query, restore); break;
+      case 'book': renderBook(seg[1]); break;
+      case 'search': renderSearch(query); break;
+      case 'about': renderAbout(); break;
+      default: renderNotFound();
+    }
+    if (current) current.raw = raw;
+    window.scrollTo(0, restore ? restore.y : 0);
+  };
+
+  if (!state.full && needsFull(name, seg, query)) {
+    // Deep link / early navigation: show a light loading state, then render once the full index is in.
+    const token = routeToken;
+    main.innerHTML = '<div class="skel">Loading the library…</div>';
+    window.scrollTo(0, 0);
+    ensureFull().then(() => { if (token === routeToken) render(); }, (err) => {
+      console.error(err);
+      if (token !== routeToken) return;
+      main.innerHTML = '<div class="empty"><h2>Couldn’t load the catalogue</h2><p>Check your connection and try again.</p><p><button class="btn primary" id="retry" type="button">Try again</button></p></div>';
+      $('#retry').onclick = () => route();
+    });
+  } else render();
+}
+
+const go = (hash) => { freshNav = true; location.hash = hash; };
+
+// Mark link-driven navigations as "fresh" (so we scroll to top) vs. Back/Forward (restore position).
+document.addEventListener('click', (e) => {
+  const a = e.target.closest?.('a[href^="#/"]');
+  if (!a || e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+  if (a.getAttribute('href') === (location.hash || '#/')) { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  if (a.classList.contains('chip') || a.hasAttribute('data-replace')) { // filter chips edit the current history entry instead of adding one
+    e.preventDefault();
+    freshNav = true;
+    history.replaceState(null, '', a.getAttribute('href')); // replaceState fires no hashchange: re-render ourselves
+    route();
+    return;
+  }
+  freshNav = true;
+});
+window.addEventListener('hashchange', route);
+
+/* ============================== UI chrome ============================== */
+const isMobile = () => window.matchMedia('(max-width: 899px)').matches;
+const menuBtn = $('#menu-btn');
+function closeDrawer() { document.body.classList.remove('drawer-open'); if (isMobile()) menuBtn.setAttribute('aria-expanded', 'false'); }
+menuBtn.addEventListener('click', () => {
+  if (isMobile()) {
+    const open = document.body.classList.toggle('drawer-open');
+    menuBtn.setAttribute('aria-expanded', String(open));
+  } else {
+    const collapsed = document.body.classList.toggle('side-collapsed');
+    menuBtn.setAttribute('aria-expanded', String(!collapsed));
+    store.set('hb.side', collapsed);
+  }
+});
+$('#scrim').addEventListener('click', closeDrawer);
+
+function applyTheme(t) { document.documentElement.dataset.theme = t; store.set('hb.theme', t); }
+$('#theme-btn').addEventListener('click', () => {
+  const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  applyTheme(cur === 'dark' ? 'light' : 'dark');
+});
+
+const help = $('#help');
+$('#help-btn').addEventListener('click', () => help.showModal());
+
+// Search: debounce while typing, immediate on submit. Typing edits history in place (replace).
+function goSearch(q, replace) {
+  q = q.trim();
+  if (!q) return;
+  const target = hashFor('/search', { q });
+  if (location.hash === target) return;
+  if (replace && parseHash().path === '/search') { freshNav = true; location.replace(target); } else go(target);
+}
+const typeSearch = debounce((q) => goSearch(q, true), 200);
+$('#q').addEventListener('input', (e) => typeSearch(e.target.value));
+$('#search-form').addEventListener('submit', (e) => { e.preventDefault(); goSearch($('#q').value, true); $('#q').blur(); });
+
+function renderSidebarTopics() {
+  $('#nav-topics').innerHTML = state.topics.map((t) =>
+    `<li><a href="#/topic/${encodeURIComponent(t.slug)}" data-slug="${esc(t.slug)}"><span>${esc(t.name)}</span><span class="count">${fmt(t.n)}</span></a></li>`).join('');
+}
+
+/* ============================== keyboard ============================== */
+let gAt = 0;
+const typing = (el) => el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+
+function moveFocus(dir) {
+  const cards = [...main.querySelectorAll('a.card')];
+  if (!cards.length) return;
+  let i = cards.indexOf(document.activeElement);
+  if (i < 0) { // start from the first card that is on screen
+    i = cards.findIndex((c) => c.getBoundingClientRect().top >= 56);
+    if (i < 0) i = 0; else i -= dir; // so that +dir lands on it
+  }
+  const next = cards[Math.min(cards.length - 1, Math.max(0, i + dir))];
+  next.focus();
+  next.scrollIntoView({ block: 'nearest' });
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (help.open) return; // <dialog> handles Esc itself
+  const el = document.activeElement;
+  if (e.key === 'Escape') {
+    if (typing(el)) { el.blur(); return; }
+    if (document.body.classList.contains('drawer-open')) { closeDrawer(); return; }
+    if (parseHash().path.startsWith('/book/')) { if (navCount > 1) history.back(); else go('#/'); }
+    return;
+  }
+  if (typing(el)) return;
+  const k = e.key;
+  if (gAt && Date.now() - gAt < 1000) {
+    gAt = 0;
+    const dest = { h: '#/', t: '#/top', m: '#/recommended', r: '#/rising', f: '#/foryou', a: '#/about' }[k];
+    if (dest) { e.preventDefault(); go(dest); return; }
+  }
+  if (k === '/') { e.preventDefault(); $('#q').focus(); $('#q').select(); }
+  else if (k === '?') { e.preventDefault(); help.showModal(); }
+  else if (k === 'j') moveFocus(1);
+  else if (k === 'k') moveFocus(-1);
+  else if (k === 'g') gAt = Date.now();
+});
+
+/* ============================== prefetch ============================== */
+// Warm data/book/<id>.json when a card is hovered or focused (debounced, once per id, never on Save-Data).
+if (!navigator.connection?.saveData) {
+  let timer = 0;
+  const arm = (e) => {
+    const a = e.target.closest?.('a.card');
+    if (!a) return;
+    const id = decodeURIComponent((a.getAttribute('href') || '').slice('#/book/'.length));
+    if (!id || bookCache.has(id)) return;
+    clearTimeout(timer);
+    timer = setTimeout(() => getBook(id).catch(() => {}), 80);
+  };
+  const disarm = () => clearTimeout(timer);
+  document.addEventListener('pointerenter', arm, true); // non-bubbling, so capture
+  document.addEventListener('pointerleave', disarm, true);
+  document.addEventListener('focusin', arm);
+  document.addEventListener('focusout', disarm);
+}
+
+/* ------- email updates (footer form) -------
+ * Posts to the separate signup Worker (subscribe/ in the repo, api.hackerbooks.org), which stores the address in D1.
+ * A form-encoded body keeps it a CORS "simple request" (no preflight). Local dev talks to `wrangler dev` on :8787. */
+const SUBSCRIBE_URL = location.hostname === 'localhost' ? 'http://localhost:8787/subscribe' : 'https://api.hackerbooks.org/subscribe';
+function initSubscribe() {
+  const form = $('#subscribe');
+  if (!form) return;
+  const msg = $('#sub-msg');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = form.email.value.trim();
+    if (!email) return;
+    const btn = form.querySelector('button');
+    btn.disabled = true;
+    msg.textContent = 'Subscribing…';
+    try {
+      const body = new URLSearchParams({ email, page: location.hash || '#/', website: form.website.value });
+      const res = await fetch(SUBSCRIBE_URL, { method: 'POST', body });
+      const out = await res.json().catch(() => ({}));
+      if (out.ok) { form.reset(); msg.textContent = 'Thanks! You’re on the list.'; }
+      else msg.textContent = out.error === 'invalid email' ? 'That email address doesn’t look right.' : 'That didn’t go through. Please try again.';
+    } catch {
+      msg.textContent = 'That didn’t go through. Please try again.';
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
+/* ============================== boot ============================== */
+(async function boot() {
+  initSubscribe();
+  if (store.get('hb.side', false) && !isMobile()) { document.body.classList.add('side-collapsed'); menuBtn.setAttribute('aria-expanded', 'false'); }
+  else menuBtn.setAttribute('aria-expanded', String(!isMobile()));
+  main.innerHTML = '<div class="skel">Loading the library…</div>';
+  try {
+    await loadBoot();
+  } catch (err) {
+    console.error(err);
+    main.innerHTML = '<div class="empty"><h2>Couldn’t load the data</h2><p>Please refresh the page to try again.</p></div>';
+    return;
+  }
+  renderSidebarTopics();
+  if (!hasStance()) $('#nav-main [data-route="recommended"]').parentElement.hidden = true; // build without stance labels
+  const m = state.meta;
+  $('#footer-meta').textContent = `${fmt(m.n_books)} books · ${fmt(m.n_mentions)} mentions · ${m.first_year}–${m.last_year} · generated ${m.generated}`;
+  route();
+  loadFullWhenIdle();
+})();

@@ -1,0 +1,236 @@
+Quick Start | LongCat API Docs
+
+Docs [/platform/docs/]
+
+Guide
+
+Quick Start [/platform/docs/]Token Pack [/platform/docs/token-pack]API Pay-As-You-Go [/platform/docs/api-pay-as-you-go]FAQ [/platform/docs/faq]Change Log [/platform/docs/change-log]
+
+API
+
+API Overview [/platform/docs/api-docs]Visual Understanding [/platform/docs/image-video-understanding]
+
+ Chat 
+
+POSTChat Completions [/platform/docs/api/chat]POSTResponses API [/platform/docs/api/responses]POSTAnthropic Messages [/platform/docs/api/messages]
+
+ Reference 
+
+Model Parameters [/platform/docs/api/model-params]
+
+ Models 
+
+GETList Models [/platform/docs/api/models]GETRetrieve Model [/platform/docs/api/model]
+
+Tools
+
+Overview of AI Tools [/platform/docs/tools-overview]Claude Code [/platform/docs/claude-code]Codex [/platform/docs/codex]OpenCode [/platform/docs/open-code]CatPaw [/platform/docs/catpaw]Cline [/platform/docs/cline]Kilo Code [/platform/docs/kilo-code]Cherry Studio [/platform/docs/cherry-studio]Chatbox [/platform/docs/chatbox]CodeBuddy [/platform/docs/code-buddy]OpenClaw [/platform/docs/open-claw]Hermes Agent [/platform/docs/hermes-agent]CC Switch [/platform/docs/cc-switch]WorkBuddy [/platform/docs/work-buddy]
+
+Pricing
+
+LongCat-2.5 [/platform/docs/pricing/longcat-2.5]
+
+ 简体中文 [/platform/docs/zh/]API Platform ↗ [/platform/]
+
+Docs [/platform/docs/]
+
+Search docs⌘K
+
+English
+English [/platform/docs/]简体中文 [/platform/docs/zh/]
+
+API Platform [/platform/]
+
+Guide [/platform/docs/]API [/platform/docs/api-docs]Tools [/platform/docs/tools-overview]Pricing [/platform/docs/pricing/longcat-2.5]
+
+Quick Start [/platform/docs/]Token Pack [/platform/docs/token-pack]API Pay-As-You-Go [/platform/docs/api-pay-as-you-go]FAQ [/platform/docs/faq]Change Log [/platform/docs/change-log]
+
+Copy
+
+LongCat API Platform Quick Start Guide ​ [#longcat-api-platform-quick-start-guide]
+
+Welcome to the LongCat API Platform! This document will help you get started quickly and begin using our large model services.
+
+How to Get an API Key? ​ [#how-to-get-an-api-key]
+
+Register an Account ​ [#register-an-account]
+
+Visit LongCat API Platform [https://longcat.chat/platform]
+
+Fill in the required information to complete account registration
+
+Create Your API Key ​ [#create-your-api-key]
+
+After registering and logging in, go to the API Keys [https://longcat.chat/platform/api_keys] page and click “Create API Key” to manually generate a key.
+
+Once created, you can view the following details in the list: 
+
+Name: Your custom identifier for the application
+
+Key: The system-generated secret (Your API key is only shown once upon creation. Please copy and store it securely — if lost, you'll need to create a new one.)
+
+Supported API Types ​ [#supported-api-types]
+
+LongCat API Platform is compatible with two mainstream API formats. You can choose according to your needs:
+
+OpenAI API Format ​ [#openai-api-format]
+
+Fully compatible with the OpenAI API specification, supporting the following endpoints:
+
+Chat Completion: /v1/chat/completions
+
+Anthropic API Format ​ [#anthropic-api-format]
+
+Compatible with the Anthropic Claude API specification, supporting the following endpoint:
+
+Message Chat: /v1/messages
+
+Endpoints ​ [#endpoints]
+
+OpenAI Format: https://api.longcat.chat/openai
+
+Anthropic Format: https://api.longcat.chat/anthropic
+
+Supported Models ​ [#supported-models]
+
+Model NameAPI FormatDescription
+
+LongCat-2.5OpenAI/AnthropicHigh-performance Agentic model
+
+Rate Limiting Rules ​ [#rate-limiting-rules]
+
+Single Request Limit ​ [#single-request-limit]
+
+Maximum context length: 
+
+LongCat-2.5: 1M token context window with a maximum output length of 128K tokens
+
+Over-limit Handling ​ [#over-limit-handling]
+
+When rate limiting is triggered, the API will return HTTP status code 429. Example response:
+
+json
+{
+ "error": {
+ "code": "rate_limit_exceeded",
+ "message": "Request rate limit exceeded, please try again later",
+ "type": "rate_limit_error",
+ "retry_after": 60
+ }
+}
+
+It is recommended to implement exponential backoff retry mechanism on the client side.
+
+Quick Integration Examples ​ [#quick-integration-examples]
+
+OpenAI API Format Example ​ [#openai-api-format-example]
+
+Python Example ​ [#python-example]
+
+python
+import requests
+
+url = "https://api.longcat.chat/openai/v1/chat/completions"
+headers = {
+ "Authorization": "Bearer YOUR_APP_KEY",
+ "Content-Type": "application/json"
+}
+
+data = {
+ "model": "LongCat-2.5",
+ "messages": [
+ {"role": "user", "content": "Hello, please introduce yourself."}
+ ],
+ "max_tokens": 1000,
+ "temperature": 0.7
+}
+
+response = requests.post(url, headers=headers, json=data)
+print(response.json())
+
+Using OpenAI SDK ​ [#using-openai-sdk]
+
+python
+from openai import OpenAI
+
+client = OpenAI(
+ api_key="YOUR_APP_KEY",
+ base_url="https://api.longcat.chat/openai"
+)
+
+response = client.chat.completions.create(
+ model="LongCat-2.5",
+ messages=[
+ {"role": "user", "content": "Hello!"}
+ ],
+ max_tokens=1000
+)
+
+print(response.choices[0].message.content)
+
+Anthropic API Format Example ​ [#anthropic-api-format-example]
+
+Using Anthropic SDK ​ [#using-anthropic-sdk]
+
+python
+from anthropic import Anthropic
+
+client = Anthropic(
+ api_key="Authorization: Bearer YOUR_APP_KEY",
+ base_url="https://api.longcat.chat/anthropic",
+ default_headers={
+ "Content-Type": "application/json",
+ "Authorization": "Bearer YOUR_APP_KEY",
+ }
+)
+
+response = client.messages.create(
+ model="LongCat-2.5",
+ max_tokens=1000,
+ messages=[
+ {"role": "user", "content": "Hello!"}
+ ]
+)
+
+print(response.content[0].text)
+
+cURL Example ​ [#curl-example]
+
+OpenAI Format ​ [#openai-format]
+
+bash
+curl -X POST https://api.longcat.chat/openai/v1/chat/completions \
+ -H "Authorization: Bearer YOUR_APP_KEY" \
+ -H "Content-Type: application/json" \
+ -d '{
+ "model": "LongCat-2.5",
+ "messages": [{"role": "user", "content": "Hello!"}],
+ "max_tokens": 1000
+ }'
+
+Anthropic Format ​ [#anthropic-format]
+
+bash
+curl -X POST https://api.longcat.chat/anthropic/v1/messages \
+ -H "Authorization: Bearer YOUR_APP_KEY" \
+ -H "Content-Type: application/json" \
+ -H "anthropic-version: 2023-06-01" \
+ -d '{
+ "model": "LongCat-2.5",
+ "max_tokens": 1000,
+ "messages": [{"role": "user", "content": "Hello!"}]
+ }'
+
+Important Reminders ​ [#important-reminders]
+
+Please keep your API Key safe to avoid quota theft due to leakage
+
+Now you have learned the basics of using the LongCat API Platform. Go ahead and try it out!
+
+Next
+
+Token Pack
+ [/platform/docs/token-pack]
+
+On this page
+How to Get an API Key? [#how-to-get-an-api-key]Register an Account [#register-an-account]Create Your API Key [#create-your-api-key]Supported API Types [#supported-api-types]OpenAI API Format [#openai-api-format]Anthropic API Format [#anthropic-api-format]Endpoints [#endpoints]Supported Models [#supported-models]Rate Limiting Rules [#rate-limiting-rules]Single Request Limit [#single-request-limit]Over-limit Handling [#over-limit-handling]Quick Integration Examples [#quick-integration-examples]OpenAI API Format Example [#openai-api-format-example]Anthropic API Format Example [#anthropic-api-format-example]cURL Example [#curl-example]Important Reminders [#important-reminders]

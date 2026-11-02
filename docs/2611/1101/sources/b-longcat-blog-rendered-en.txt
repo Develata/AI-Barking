@@ -1,0 +1,277 @@
+EN
+LongCat-2.5
+Native Multimodality for Agentic Tasks
+
+2026-11-1
+
+GitHub
+Coming soon
+HuggingFace
+Coming soon
+Try it
+API Access
+Overview
+Metrics
+Showcases
+Visual Modeling
+Agentic RL
+MOPD
+Long-Context Training
+Supernode Parallelism
+FSDP & Systems
+RL Infrastructure
+Consistency
+Rollout
+W4A4
+Evaluations
+
+We introduce LongCat-2.5, a native multimodal model for long-horizon agentic tasks. With 1.6 trillion total parameters and approximately 48 billion activated per token, it builds on LongCat-2.0 with stronger native visual understanding and agentic coding.
+
+We incorporate more long-horizon trajectories into long-sequence training and use large-scale long-horizon reinforcement learning to strengthen end-to-end engineering capabilities across complex codebase development and full-project builds. We continue to scale this training pipeline through data synthesis, environment construction, and mixed training across harnesses. We also convert real-world agent failure trajectories into reproducible, verifiable training tasks, continually adding targeted training data to address model capability gaps.
+
+LongCat-2.5 also represents visual signals as multi-level discrete tokens, enabling the backbone to process visual and textual inputs in a unified token-based format. Combining native visual understanding with agentic coding delivers strong visual coding performance, while also supporting creative design and 3D tasks.
+
+These advances are supported by continued infrastructure improvements. We optimize long-context training and W4A4 inference on domestic AI accelerators, while numerical consistency between training and inference and long-context rollout optimizations enable efficient large-scale long-horizon RL.
+
+Metrics Dashboard
+
+To provide a clear view of LongCat-2.5’s current capabilities, the charts below compare it with GPT-5.5, GPT-5.6-Sol, Claude-Opus-4.8, and Claude-Opus-5. Detailed evaluation results covering a broader set of models are presented in the table later in this post.
+
+Showcases
+
+Every case below was generated end-to-end by LongCat-2.5, spanning software development and professional office scenarios — from real-time fluid simulation, 3D digital exhibitions, and city dioramas to business analysis, feedback reports, and event operations. Click any case to watch the full demo.
+
+All
+8
+Software Development
+4
+Professional Office
+4
+Software Development · Web Visual
+DEMO 01 / 08
+Real-Time Fluid Simulation
+
+Build a real-time fluid simulation and VFX tool with LongCat-2.5 that generates high-FPS, interactive webpages with live fluid dynamics, enabling developers, designers, and science communicators to visualize complex physical phenomena interactively and beautifully.
+
+01
+Real-Time Fluid Simulation
+02
+Business Operations Analysis
+03
+3D Artifact Showcase
+04
+Feedback Analysis Report
+05
+City Diorama
+06
+Chinese-Style Aesthetics
+07
+Miniature Scene Assets
+08
+Event Invitation Generator
+Visual Primitive Modeling
+
+LongCat-2.5 represents visual signals as multi-level discrete tokens, enabling the backbone to process visual and textual inputs in a unified token-based format. This design combines native-resolution visual tokenization, offline visual preprocessing, and visual embeddings learned jointly with the backbone, supporting native multimodal integration while simplifying visual computation and workload management during training.
+
+Discrete Native Resolution Vision Transformer: To bring visual primitive modeling to a token-level abstraction analogous to language modeling, we represent visual signals as multi-level vocabulary tokens. We overcome the information bottleneck of visual discretization by applying Residual Vector Quantization (RVQ) to native-resolution features from a Semantic-and-Aligned Encoder (SAE), as in LongCat-Next.
+
+Figure 1. Native-resolution visual tokenization: images at different resolutions are encoded as discrete token sequences and reconstructed by a visual de-tokenizer.
+
+Offline Visual Preprocessing: To reduce online visual computation and workload heterogeneity, a fixed tokenizer allows visual token IDs to be precomputed and cached offline. The backbone therefore processes pretokenized sequences, simplifying long-sequence packing and partitioning and improving load balancing during distributed training.
+
+Native Visual Representation: Visual codebook embeddings are learned jointly with the backbone. Preliminary validation on a smaller MoE model with approximately 3B activated parameters on average shows interwoven visual and textual embeddings in t-SNE visualizations, suggesting integration within a shared semantic space.
+
+Figure 2. t-SNE comparison of visual and textual embeddings. The right panel shows validation on a MoE model with approximately 3B activated parameters on average.
+Scaling Agentic Reinforcement Learning
+
+RL scaling is a key lever for pushing model intelligence further. For LongCat-2.5, we scale an end-to-end agentic RL pipeline across data, environments, algorithms, and harnesses for long-horizon tasks.
+
+Figure 3. The agentic RL pipeline for long-horizon tasks, spanning data and environments, asynchronous training, reward design, and mixed training.
+
+Large-Scale Data Synthesis and Environment Construction: For agentic tasks such as coding, the model learns from real environment feedback. A scalable synthesis pipeline automatically generates training tasks, interactive environments, and verifiable tests. We filter GitHub pull requests and linked issues, then use agents to annotate tasks and synthesize environments, validated with fail-to-pass (F2P) and pass-to-pass (P2P) tests. Real internal coding tasks and evaluation criteria broaden coverage of everyday engineering needs. Live rollout pass rates guide re-labeling and filtering, while offline analysis of false-positive and false-negative trajectories continually corrects and extends F2P tests to cover task specifications more fully and improve verification accuracy.
+
+Asynchronous RL and Stability: To improve training efficiency, we adopt asynchronous partial rollouts: each RL step maintains an oversampling ratio, and once a full batch is collected, in-flight trajectories are interrupted, saved, and resumed in the next sampling phase. We increase oversampling based on precomputed pass rates and filter out zero-gradient groups whose rollouts all succeed or all fail, ensuring sufficient effective gradient signal. Tokens within one trajectory may be generated by different historical checkpoints, introducing staleness. We clip the discrepancy between sampling-policy and current-policy log-probs and rescale each token’s gradient contribution using accumulated historical discrepancy, bounding the gradient bias from staleness. Same-weight numerical differences are handled by the train–inference alignment described in the infrastructure section.
+
+Reward Hacking and Output Behavior: We disable network access in task environments, remove git history and cached files, and use an LLM judge to audit trajectories for exploits, curbing opportunistic behavior. Additional penalties suppress repetitive reasoning and repeated tool calls during multi-turn interaction. To counter overthinking and overly rapid growth in response length, we redistribute reward among positive samples.
+
+Mixed Training and Generalization: The model readily adapts to similar tasks and harnesses during RL. Only a small number of scaffold adaptation examples are needed in earlier training stages. During RL, we mix training tasks aligned with different benchmarks and scale their corresponding scaffolds in varying proportions. Mixed training across tasks and scaffolds improves generalization, with performance gains across tasks reinforcing one another.
+
+Learning from Multiple Teachers
+
+To integrate specialized capabilities into the main model, we retain LongCat-2.0’s expert groups for agent capabilities, reasoning, and interaction, covering multi-turn task execution, single-turn reasoning, fine-grained instruction following, and safety without compromising usefulness. During MOPD, the student samples online across task domains, and domain experts train it through full-vocabulary KL divergence on the sampled outputs.
+
+Samples must reflect the student’s actual task behavior while allowing teachers to provide reliable signals. To limit distribution shift, prior work uses per-turn prefixes from trajectories seen by teachers during SFT or RL as contexts for student sampling. We further split each teacher response into fixed-length segments to form per-cut prefixes and cap student self-sampling at the same length to address distribution shift within long single-turn responses.
+
+Figure 4. Per-cut prefixes for online student sampling.
+
+To control computation and storage costs, prefixes from the same teacher trajectory are grouped on one inference engine, sharing prefill computation and KV cache. For training, we assemble a tree with the teacher trajectory as the trunk and student samples as branches. Tree Attention completes OPD training for all samples in the group in one forward and backward pass, avoiding redundant computation and storage of the teacher trajectory.
+
+Long-Context Training on Domestic AI Accelerators
+
+LongCat-2.5 uses long-sequence training during both mid-training and SFT. With less than 80 GB of memory per domestic AI accelerator, the training system prioritizes memory efficiency and aligns its parallelism with the supernode architecture.
+
+Supernode-Aware Parallelism
+
+LongCat-2.5 aligns its parallel groups with the supernode topology, with FSDP and EP degrees equal to the number of accelerators per supernode and a CP degree no greater than that number. This keeps parameter all-gather, expert token all-to-all, and KV all-gather within the high-bandwidth supernode interconnect.
+
+Hybrid vocabulary parallelism further reduces memory consumption by sharding the base embedding layer, LM head, and N-gram embeddings across the DP × CP domain.
+
+To address load imbalance in large-scale expert parallelism, LongCat-2.5 introduces threshold-based dynamic expert replication built on MoonEP. Replication is only enabled when EP load imbalance reaches a configured threshold, avoiding communication overhead that outweighs the load-balancing gains, destination-side OOM caused by routed tokens, or sender-side OOM caused by communications.
+
+The discrete image-token design simplifies parallelization by removing the vision encoder from the training graph. With image token counts known during data packing and shuffling, modality load ratios are predictable; this allows us to keep modality proportions approximately uniform across data-parallel ranks.
+
+FSDP and System Optimizations
+
+LongCat-2.5 introduces dual-shard FSDP, which keeps model-parameter FSDP sharding within each supernode while further sharding FP32 master weights and optimizer states across FSDP domains through HSDP replicas, preserving efficient parameter communication and reducing persistent memory consumption.
+
+Parameters, gradients, and optimizer states are organized into contiguous flattened buffers to support uneven sharding and Muon optimizer sharding, while direct weight-gradient writes and temporary-buffer reuse reduce intermediate copies and peak memory usage.
+
+Zero-copy AllGather/ReduceScatter operations are involved to remove intermediate copies caused by default communication algorithms, while EP packs tokens and routing probabilities together for transmission and calls for AIV-based communication to alleviate AI-CPU task-expansion bottlenecks. Parameter prefetching overlaps all-gathers with computation while limiting contention with CP, and ScMoE overlaps EP communication with dense-branch computation.
+
+Batched gradient operations, coalesced metric reductions, CPU core binding, and NUMA-aware scheduling reduce host overhead. Overall, the FSDP configuration achieves 86% higher per-device throughput than the DDP baseline in long-sequence SFT tasks.
+
+Figure 5. Long-context training on domestic AI accelerators.
+Infrastructure for Agentic RL
+Numerical Consistency Between Training and Inference
+
+Building on IsoExec, GLM-5, and XoRL, we decouple the parallelism configurations of training, prefill, and decode while preserving bitwise-identical per-token log probabilities with near-zero performance overhead. Both engines use batch-invariant kernels and aligned framework logic, with backward support for training. Enabled by default in experimental and production jobs, the system provides a numerical regression baseline for kernel and framework changes. To address numerical mismatches caused by different parallelism configurations, we extend community approaches with train–inference consistency support for TP and DCP.
+
+TP replaces segmented summation with full-K GEMM, avoiding cross-rank summation with near-zero performance overhead. Training and prefill retain sharded weights, using weight AllGather and input AlltoAll. Decode uses column-parallel o_proj/fc2 with input AllGather and output AlltoAll, avoiding repeated full-weight gathering.
+
+For DCP, training forward and prefill use sparse-attention kernels that reproduce decode’s KV partitioning and reduction order under the specified DCP configuration, aligning the numerical results across training, prefill, and decode.
+
+Long-Context Rollout Optimization
+
+For multi-turn long-context rollouts with controlled workloads, we use prefill–decode disaggregation, selecting parallelism configurations for each phase and optimizing three areas:
+
+Effective cache capacity: Prefill uses QCP to partition Q by token and KVP to distribute KV by page, avoiding MLA’s TP-induced KV duplication. HiCache releases unreferenced host copies after reloading KV into device memory. Mooncake-based weight management and actor offloading free additional memory for HiCache.
+
+Cross-layer prefetching: LSA reuses each even-numbered layer’s top-k indices in the next odd-numbered layer. Decode offloads odd layers’ full KV to host memory, retaining a small device working cache. Prefetching selected KV overlaps with even-layer computation, nearly doubling decode KV capacity without increasing TPOT.
+
+Capacity-aware scheduling: The router controls admission based on L1 + L2 capacity and request token counts, prioritizing groups closer to completion to produce training batches and release cache sooner. This prevents repeated prefix eviction and large-scale recomputation across long trajectories.
+
+Figure 6. Prefill/decode configuration for the tested long-context workload; a 3:2 P/D instance ratio performed best in this setting.
+Efficient W4A4 Inference
+
+For a 1.6-trillion-parameter MoE model, we develop an efficient W4A4 inference solution by jointly optimizing quantization accuracy, low-level kernels, and inference pipelines, accounting for both the model architecture and the hardware characteristics of domestic AI accelerators.
+
+The solution quantizes both expert weights and activations to 4 bits and executes the corresponding matrix multiplications on native INT4 units.
+
+Building on FlatQuant’s learnable equivalent transformations, we further improve MoE quantization accuracy, achieving performance comparable to the unquantized model on all evaluated downstream tasks.
+
+At the kernel and data-path level, a shared input transformation across experts enables quantization before token replication and dispatch, allowing the same INT4 representation to be reused throughout expert communication and computation.
+
+We fuse transformation, scale computation, quantization, and packing into dedicated kernels, and optimize weight layouts and transposed memory access to reduce data movement and conversion overhead.
+
+At the system level, we optimize computation–communication pipeline overlap for the distinct execution patterns of prefill and decode, accounting for model data dependencies and hardware resource constraints.
+
++0.0%
+Prefill throughput gain
++0.00%
+Decode throughput gain
+−0.00%
+TTFT reduction
+−0.00%
+TPOT reduction
+0.00×
+GMM kernel speedup
+
+In online stress tests, prefill throughput improves by 43.3% and decode throughput by 42.77%, while TTFT and TPOT decrease by 15.91% and 19.72%, respectively, compared to the W8A8 INT8 baseline. At the kernel level, GMM achieves an average 1.73× speedup over W8A8.
+
+Evaluations
+	Benchmark	
+LongCat-2.5
+	
+LongCat-2.0
+	
+GPT-5.5
+	
+GPT-5.6-Sol
+	
+Claude-Opus-4.8
+	
+Claude-Opus-5
+	
+GLM-5.3
+	
+kimi-k3
+	
+DeepSeek-V4.1-Flash
+
+Code Agent	Terminal Bench v2.1	88.4	70.8	83.2*	88.8*	74.6*	89.1*	88.2*	88.3*	90.6*
+Terminal Bench v4.0	38.5	3.0	-	37.3*	23.6*	53.9*	41.8*	12.6*	31.2*
+Program Bench
+Almost Resolved
+	25.5	2.5	13.5*	23.0*	16.5*	37.0*	19.0*	17.5*	20.3*
+DeepSWE
+v1.1
+	64.6	9.7	67.0*	72.7*	59.0*	68.8*	66.9*	67.5*	74.2*
+PaperBench	82.1	45.2	80.0	83.3	72.9	79.1	73.7	77.5	-
+SWE Atlas - Codebase QnA	58.3	33.1	45.4*	46.0*	57.3*	63.2*	58.3	54.3	55.2
+SWE Atlas - Refactoring	55.2	35.7	44.8	-	46.7	51.9	-	49.5	56.7
+SWE Atlas - Test Writing	47.8	28.0	42.6	45.9	49.6	62.2	42.2	42.2	48.9
+NL2Repo	60.5	40.9	-	56.8*	69.7*	75.3*	58.0*	58.0*	65.4*
+LongCat AppDev
+Internal
+	73.7	47.7	-	68.8	-	76.4	73.5	75.1	-
+General Agent	BrowseComp	91.9	79.9	84.4*	90.4*	84.3*	90.8*	81.0	91.2*	91.5
+AutomationBench
+v1.0.6
+	51.8	15.8	39.7	45.8*	41.0*	50.3*	48.2*	46.7*	54.8*
+HLE
+w/ tools
+	63.1	37.5	52.2	58.0*	57.9*	64.7*	62.5*	56.0*	63.9*
+ALE
+v1.1
+	38.5	-	-	30.3*	-	-	26.2*	35.2*	-
+ResearchRubrics	81.0	71.9	-	74.2	-	72.9	79.9	78.8	80.9
+MCP Atlas	83.1	61.8	75.3*	81.8*	82.2*	85.8*	84.2*	84.2*	84.4
+JobBench	65.4	44.4	38.3*	45.4*	48.4*	66.7*	61.4*	52.9*	63.2
+SkillsBench	63.3	36.8	62.6*	54.1*	59.2*	60.4*	52.9	-	69.8*
+GDPVal-AA rubrics	84.8	72.9	-	-	-	87.7	87.7	86.6	86.8
+FrontierScience	77.0	66.0	-	-	-	78.0	75.0	70.0	73.0
+SpreadsheetBench 2	34.9	24.1	30.2	33.3	-	33.0	35.8	34.8*	33.0
+FinSearchComp
+T3
+	63.4	42.4	62.2	62.2	-	64.0	62.2	64.0	64.3
+Claw-Eval
+Pass^3
+	78.3	67.1	-	79.5	82.0	80.8	73.9	73.9	-
+LongCatClawBench
+FORTE
+	83.3	72.2	80.7	80.6	80.6	82.6	85.6	86.3	73.5
+Visual	3DCodeBench
+Text→3D
+	55.4	-	51.9	52.3	52.7	54.3	53.4	49.3	53.3
+Vision2Web	78.6	-	74.6	73.5*	76.1*	80.2*	77.8*	79.0*	79.2
+CharXiv-RQ
+w/ tools
+	90.2	-	89.0*	89.1*	89.9*	89.3*	-	91.3*	87.7
+MathVision
+w/ tools
+	96.5	-	96.8*	97.8*	97.1*	-	-	97.8*	97.4
+VideoMME	85.2	-	-	89.5*	86.0*	-	-	90.0*	-
+PosterBench	77.4	-	-	-	82.3	-	82.4	76.8	75.3
+LongCatClawBench-MM
+FORTE-MM
+	72.1	-	63.5	73.2	69.9	73.1	69.0	70.7	72.8
+
+Unless otherwise specified, all LongCat-2.5 results are obtained with enable_thinking=on, temperature = 1.0, top_p = 0.95. Scores of other models marked with * are from public technical report, blog posts or the official benchmark leaderboards, otherwise are self-run and are indicative only.
+
+京ICP备2024094994号-3
+Coding
+1. Terminal Bench v4.0 / v2.1, Program Bench, NL2Repo: Claude Code harness (v2.1.280) with max_seq_length = 512K; Terminal Bench v2.1 results are averaged over three independent runs.
+2. DeepSWE v1.1: mini-swe-agent at temperature = 1.0, top_p = 0.95 and max_seq_length = 1M; results are averaged over three independent runs.
+3. SWE Atlas - Codebase QnA and Test Writing: Claude Code (v2.1.116) with Claude Opus 4.5 as the judge (majority vote over three judgments); results are averaged over three independent runs.
+Agentic
+4. BrowseComp: Custom lightweight harness with Verify and Discard-All modules (Discard-All threshold 256K), capped at 1,024 exploration rounds; only the `search` and `browse_with_goal` tools are available.
+5. HLE w/ tools: Text-only subset, evaluated with Claude Code (v2.1.116); maximum generation length 256K tokens.
+6. MCP Atlas: Reasoning effort set to "max", temperature = 0.7, top_p = 0.95, 256K context.
+7. AutomationBench (public v1.0.6): All 600 public tasks, evaluated with the benchmark's official evaluation code; temperature = 1.0, top_p = 0.95.
+8. JobBench (Main 65): Claude Code harness (v2.1.280); scoring follows the official JobBench LLM-as-judge protocol (chained rubrics over the submitted deliverables) with gemini-3.6-flash as the judge; temperature = 1.0, top_p = 0.95, thinking enabled.
+9. SpreadsheetBench 2: Claude Code harness (v2.1.116), scoring follows the benchmark's official protocol; the Visualization subset is judged by gemini-3.6-flash, with charts rendered on Linux via headless LibreOffice (UNO object-level export) and a pure-Python OOXML/Pillow renderer as fallback.
+10. SkillsBench v1.1 (87 tasks): Evaluated with the Codex harness at temperature = 1.0, top_p = 0.95 and top_k = -1.
+Visual
+11. Vision2Web: Claude Code (v2.1.7) at temperature = 1.0, top_p = 0.95, top_k = 50 and a sequence length of 256K.
+12. VideoMME: At most 2,048 frames sampled per video (1 fps) and at most 256 tokens per frame, with thinking mode enabled, using the prompt "Answer with the option's letter from the given choices directly. You can only answer one letter from A, B, C, or D."
+13. CharXiv-RQ (w/ tools) and MathVision (w/ tools): Temperature = 1.0 and top_p = 0.95, with a maximum generation length of 131,972 tokens.

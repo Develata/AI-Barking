@@ -1,0 +1,259 @@
+Postgres 19 is late, and it's AI's fault - Neon
+
+Neon now has realtime: Live SQL with full reactivity. Try it in Beta today
+ [https://neon.com/blog/neon-now-has-realtime]
+
+Neon [/]
+
+Product
+
+Solutions
+
+Docs [/docs]
+
+Pricing [/pricing]
+
+Resources
+
+Core Primitives
+
+Lakebase PostgresServerless Postgres database [/lakebase]
+
+Object StorageS3-compatible storage that branches [/object-storage]
+
+FunctionsServerless compute next to your data [/functions]
+
+RealtimeLive SQL queries and reactive DX [/docs/realtime/overview]
+
+Managed Better AuthAuthentication built into your database [/auth]
+
+AI GatewayOne API for frontier and open-source models [/ai-gateway]
+
+Features
+
+Lakebase ArchitectureStorage-compute separation [/docs/introduction/architecture-overview]
+
+AutoscalingAutomatic instance sizing [/docs/introduction/autoscaling]
+
+BranchingFaster Postgres workflows [/branching]
+
+SearchVector, keyword, and hybrid search [/docs/ai/lakebase-search]
+
+Instant RestoreInstant recovery when mistakes happen [/docs/introduction/branch-restore]
+
+What is Neon
+
+Built around Lakebase Postgres, by Databricks
+
+ [/docs/get-started/why-neon]
+
+Use cases
+
+Full-stack appsDeploy backends via your agent [/use-cases/full-stack-apps]
+
+Branching workflowsSimplify DB ops to ship faster & safer [/use-cases/branching-workflows]
+
+Bursty workloadsAvoid overprovisioning & optimize performance [/use-cases/bursty-workloads]
+
+Large databasesRestore & replicate your DB in seconds [/use-cases/large-databases]
+
+Deploy at scale
+
+Agents
+
+Infra for app-generation agents like Replit & v0
+
+AI
+
+ [/use-cases/ai-agents]
+
+Platforms
+
+Deploy isolated backends for your end users
+
+ [/platforms]
+
+Learn
+
+BlogTechnical posts & product updates [/blog]
+
+Case studiesExplore customer stories [/case-studies]
+
+ChangelogProduct updates [/docs/changelog]
+
+CommunityConnect on Discord [https://neon.com/discord]
+
+StartupsBuild with Neon [/startups]
+
+Company
+
+About usThe company and the mission [/about-us]
+
+CareersJoin the team [https://www.databricks.com/company/careers/open-positions?department=engineering&location=all&itm_source=www&itm_category=company&itm_page=engineering-at-databricks&itm_location=body&itm_component=hero&itm_offer=open-positions]
+
+Contact salesContact sales team [/contact-sales]
+
+SecurityCompliance & privacy [/security]
+
+StatusService status [https://neonstatus.com]
+
+Discord [https://neon.com/discord]23.3k [https://github.com/neondatabase]
+
+Log in [https://console.neon.tech/login]Sign up [https://console.neon.tech/signup]
+
+Back to Blog [/blog]/Postgres [/blog/category/postgres]
+
+Postgres 19 is late, and it's AI's fault
+
+LLMs are finding bugs faster than committers can fix them
+
+Robert Haas–Postgres Committer, Databricks
+
+Oct 21, 2026
+
+Subscribe to our changelog
+
+Receive only our latest updates. No spam, guaranteed.
+
+Subscribe
+
+Over the past decade, the timing of PostgreSQL major releases has become very predictable: no earlier than the middle of September, and no later than the middle of October. This year is going to be different. PostgreSQL 19 most likely won’t be released until November, and it’s not impossible that the project could decide to postpone the release further.
+
+Moreover, this year, several rather large features were reverted quite late in the beta period: UPDATE/DELETE FOR PORTION OF, SQL Property Graph Queries (SQL/PGQ), and ALTER TABLE … MERGE PARTITION/SPLIT PARTITION [https://www.postgresql.org/about/news/postgresql-19-beta-1-released-3313/] were all reverted [https://www.postgresql.org/about/news/postgresql-19-beta-4-released-3386/] between August 27 and September 15. While major feature reverts are not especially uncommon immediately after feature freeze, which each year occurs on April 8, it is unusual to see multiple major features get pulled from the release at such a late date. So, what happened?
+
+The short answer is that LLMs happened. All software contains bugs, and PostgreSQL’s code base is large, complex, and old. Our git history – converted from CVS – now reaches back more than 30 years, and the first code was written a decade before that. There’s a huge amount of code, and that code contains a huge number of bugs. That’s always been true, and it hasn’t stopped PostgreSQL from being popular or successful. What’s different now is that it’s become vastly easier to find those bugs. Fixing them has also gotten easier, but not to the same degree.
+
+A Flood of Bug Fixes [#a-flood-of-bug-fixes]
+
+Between April 8th, 2025 and September 25, 2025, there were 1037 commits to PostgreSQL’s master branch [https://git.postgresql.org/gitweb/?p=postgresql.git;a=shortlog;h=refs/heads/master] and 724 commits to REL_18_STABLE [https://git.postgresql.org/gitweb/?p=postgresql.git;a=shortlog;h=refs/heads/REL_18_STABLE]. In 2026, during the same date range, there were 1443 commits to the master branch and 1169 commits to REL_19_STABLE [https://git.postgresql.org/gitweb/?p=postgresql.git;a=shortlog;h=refs/heads/REL_19_STABLE]. In other words, if you look at the number of commits that went into the master branch only between feature freeze and September 25th, it actually declined slightly from last year to this year, but the number of back-patched [https://www.postgresql.org/support/versioning/] commits jumped by more than 60%.
+
+It’s possible that some of this jump is the result of committers making more mistakes this year than they did last year, but I don’t think anyone who works on the project really believes that’s the main cause. Rather, it seems likely that PostgreSQL committers [https://wiki.postgresql.org/wiki/Committers] were about as conservative in 2026 as they were in preceding years, but a lot more of the mistakes they made were quickly found by LLMs.
+
+And it isn’t just mistakes in the latest release. In the same time period, during 2025, there were 248 commits to REL_17_STABLE [https://git.postgresql.org/gitweb/?p=postgresql.git;a=shortlog;h=refs/heads/REL_17_STABLE], and during 2026, there were 433 commits to REL_18_STABLE. In other words, the number of commits being back-patched not just to the release in progress but also to at least one prior release jumped by more than 74% in a single year. The reason for this is simply that a huge number of people on the Internet are now reporting bugs [https://www.postgresql.org/docs/current/bug-reporting.html] in PostgreSQL that they found using LLMs, and the PostgreSQL committers have been very, very busy fixing them.
+
+PostgreSQL Developers Are Stretched Thin [#postgresql-developers-are-stretched-thin]
+
+And I think that’s also why we had so many late reverts, and why the release itself is delayed. Two factors are at play here.
+
+First, because so many more bugs are being found now, it takes more time to fix them. LLMs can draft fixes, but those fixes aren’t always correct or compliant with PostgreSQL standards. So, they still need to be reviewed and committed by humans, and those humans have not gotten any smarter between 2025 and 2026.
+
+Second, time that would have been spent reviewing what went into the release got diverted into addressing security issues and other bugs in the back-branches, and so it took longer to figure out what needed to be reverted before shipping v19.
+
+What Now? [#what-now]
+
+In the end, I don’t think that the delay in shipping PostgreSQL 19 is particularly concerning. It is not a long delay in the grand scheme of things, and it emerges directly from the project’s concern for quality.
+
+The long-term picture is less clear and in some ways more troubling: given that we have forty years of bugs that humans were unable to find but LLMs are quite capable of discovering, how are we ever going to catch up, and how will PostgreSQL continue to innovate? Right now, I’m not sure. What I do know is that I, and many others, are working really hard to figure it out.
+
+I became a PostgreSQL developer partly because the PostgreSQL code base is some of the cleanest and highest-quality code upon which I have ever had the privilege to work. The recent success of AI in finding bugs in that code base does not change my high estimation of it. It is not perfect – no software product is – but if it had more defects visible even to human eyes, the number of things found by LLMs would likely be even greater.
+
+There’s no escaping the fact that LLMs are going to require every PostgreSQL developer – and some extent, every software developer on earth – to raise their game. Every feature that we write from now until the end of our careers will be scrutinized by AI, and things that would have escaped forever unnoticed in an earlier era will now be found, perhaps in a matter of hours. That’s both a challenge and an opportunity.
+
+On this page
+
+A Flood of Bug Fixes [#a-flood-of-bug-fixes]
+
+PostgreSQL Developers Are Stretched Thin [#postgresql-developers-are-stretched-thin]
+
+What Now? [#what-now]
+
+Share:
+
+Subscribe to our changelog
+
+Receive only our latest updates. No spam, guaranteed.
+
+Subscribe
+
+Share:
+
+More from Neon
+
+ [/blog/managed-better-auth-oauth-provider-mcp]
+
+Product [/blog/category/product]Nov 02, 2026
+
+Managed Better Auth is now an OAuth provider, with MCP support
+ [/blog/managed-better-auth-oauth-provider-mcp]
+
+ [/blog/building-with-stripe-data-pipeline-and-neon-backend]
+
+Product [/blog/category/product]Oct 26, 2026
+
+Building with Stripe Data Pipeline and the Neon backend
+ [/blog/building-with-stripe-data-pipeline-and-neon-backend]
+
+ [/blog/neon-docs-search-lakebase-search]
+
+Product [/blog/category/product]Oct 26, 2026
+
+Neon Docs search is now built on Neon
+ [/blog/neon-docs-search-lakebase-search]
+
+Neon is part of the Databricks Platform
+
+© Neon 2026. All rights reserved. Apache, Apache Spark, Spark, the Spark Logo, Apache Iceberg, Iceberg, and the Apache Iceberg logo are trademarks of the Apache Software Foundation [https://www.apache.org].
+
+Company
+
+About [/about-us]
+
+Blog [/blog]
+
+Careers [https://www.databricks.com/company/careers/open-positions?department=engineering&location=all&itm_source=www&itm_category=company&itm_page=engineering-at-databricks&itm_location=body&itm_component=hero&itm_offer=open-positions]
+
+Contact Sales [/contact-sales]
+
+Security [/security]
+
+Resources
+
+Docs [/docs]
+
+Changelog [/docs/changelog]
+
+Support [/docs/introduction/support]
+
+Community Guides [/guides]
+
+FAQs [/faqs]
+
+PostgreSQL Tutorial [/postgresql/tutorial]
+
+Startups [/startups]
+
+Community
+
+Discord [https://neon.com/discord]
+
+GitHub [https://github.com/neondatabase]
+
+X.com [https://x.com/neondatabase]
+
+LinkedIn [https://www.linkedin.com/company/neondatabase/]
+
+YouTube [https://www.youtube.com/channel/UCoMzQTJSIr7-RU1QbomQI2w]
+
+Compliance
+
+CCPACompliant [https://trust.neon.com/?itemUid=4064ac33-7b48-407b-aed7-ce02971d1ec1]
+
+GDPRCompliant [https://trust.neon.com/?itemUid=45220873-6e51-4dbb-b1b1-37d66ee9ef95]
+
+ISO 27001Certified [https://trust.neon.com/?itemUid=1fed9faa-4a87-427c-9a95-96b4d6bf66b7]
+
+ISO 27701Certified [https://trust.neon.com/?itemUid=dc79cbc7-c99d-4eb9-891e-f5dc44b943d7]
+
+SOC 2Certified [https://trust.neon.com/?itemUid=7bfa66da-33ab-49de-8391-e329738a1ae9]
+
+HIPAACompliant [/docs/security/hipaa]
+
+Compliance Guide [/docs/security/hipaa]
+
+Neon’s Sub Contractors [/hipaa-contractors]
+
+Trust Center [https://trust.neon.com]
+
+Neon status loading... [https://neonstatus.com/]
+
+Privacy Notice [https://www.databricks.com/legal/privacynotice]Terms of Use [https://www.databricks.com/legal/terms-of-use]Neon Platform Terms [/platform-terms]Modern Slavery Statement [https://www.databricks.com/legal/modern-slavery-policy-statement]California Privacy [https://www.databricks.com/legal/supplemental-privacy-notice-california-residents]

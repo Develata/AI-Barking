@@ -1,0 +1,415 @@
+LongCat-2.5 at $0.30/$1.20: Thinking Locks Temperature, 1M Context, and Vendor Benches Between Opus 4.8 and 5 - DEV Community
+
+ Skip to content [#main-content]
+
+ [/]
+
+ Powered by Algolia
+
+ [https://www.algolia.com/developers/?utm_source=devto&utm_medium=referral]
+
+ Log in
+ [https://dev.to/enter?signup_subforem=1]
+
+ Create account
+ [https://dev.to/enter?signup_subforem=1&state=new-user]
+
+DEV Community
+
+ Add reaction
+
+ Like
+
+ Unicorn
+
+ Exploding Head
+
+ Raised Hands
+
+ Fire
+
+ Jump to Comments
+
+ Save
+
+ Boost
+
+Pick as gem
+
+ Copy link
+
+Copied to Clipboard
+
+ Share to X
+ [https://twitter.com/intent/tweet?text=%22LongCat-2.5%20at%20%240.30%2F%241.20%3A%20Thinking%20Locks%20Temperature%2C%201M%20Context%2C%20and%20Vendor%20Benches%20Between%20Opus%204.8%20and%205%22%20by%20Yong%20Yu%20%23DEVCommunity%20https%3A%2F%2Fdev.to%2Fyong_yu_f98e15562e9b120a0%2Flongcat-25-at-030120-thinking-locks-temperature-1m-context-and-vendor-benches-between-opus-4i52]
+
+ Share to LinkedIn
+ [https://www.linkedin.com/shareArticle?mini=true&url=https%3A%2F%2Fdev.to%2Fyong_yu_f98e15562e9b120a0%2Flongcat-25-at-030120-thinking-locks-temperature-1m-context-and-vendor-benches-between-opus-4i52&title=LongCat-2.5%20at%20%240.30%2F%241.20%3A%20Thinking%20Locks%20Temperature%2C%201M%20Context%2C%20and%20Vendor%20Benches%20Between%20Opus%204.8%20and%205&summary=Attributed%20compile%20%2B%20one%20small%20offline%20run%20on%20my%20box%20Primary%20source%3A%20Introducing%20LongCat-2.5%20%E2%80%94...&source=DEV%20Community]
+
+ Share to Facebook
+ [https://www.facebook.com/sharer.php?u=https%3A%2F%2Fdev.to%2Fyong_yu_f98e15562e9b120a0%2Flongcat-25-at-030120-thinking-locks-temperature-1m-context-and-vendor-benches-between-opus-4i52]
+
+ Share to Mastodon
+ [https://s2f.kytta.dev/?text=https%3A%2F%2Fdev.to%2Fyong_yu_f98e15562e9b120a0%2Flongcat-25-at-030120-thinking-locks-temperature-1m-context-and-vendor-benches-between-opus-4i52]
+
+ Share Post via... [#]
+
+ Report Abuse [/report-abuse]
+
+ [/yong_yu_f98e15562e9b120a0]
+
+ Yong Yu [/yong_yu_f98e15562e9b120a0]
+
+ Posted on Nov 2
+
+ •
+ Originally published at yongboyu.hashnode.dev [https://yongboyu.hashnode.dev/longcat-2-5-at-0-30-1-20-thinking-locks-temperature-1m-context-and-vendor-benches-between-opus-4-8-and-5] 
+
+ LongCat-2.5 at $0.30/$1.20: Thinking Locks Temperature, 1M Context, and Vendor Benches Between Opus 4.8 and 5
+
+ #agents [/t/agents]
+ #ai [/t/ai]
+ #llm [/t/llm]
+ #machinelearning [/t/machinelearning]
+
+Attributed compile + one small offline run on my box
+
+Primary source: Introducing LongCat-2.5 — Native Multimodality for Agentic Tasks [https://longcat.ai/blog/longcat-2.5/] by Meituan / LongCat team, published 2026-11-1.
+
+Pricing / billing: LongCat-2.5 pricing [https://longcat.ai/platform/docs/pricing/longcat-2.5] and API Pay-As-You-Go [https://longcat.ai/platform/docs/api-pay-as-you-go] (limited-time discounted rates; platform billing authoritative).
+
+API: Chat Completions [https://longcat.ai/platform/docs/api/chat] + Platform Quick Start [https://longcat.ai/platform/docs/] — OpenAI-compat https://api.longcat.chat/openai, Anthropic-compat https://api.longcat.chat/anthropic, model id LongCat-2.5.
+
+Secondary CN press: 美团发布LongCat-2.5大模型，“国模国芯”实现新突破 [https://www.meituan.com/news/NN261102280001343] (Meituan / 经济观察报 framing, 2026-11-02) for the “scores between Claude-Opus-4.8 and Claude-Opus-5” claim and product/API availability.
+
+Benchmarks and prices below are vendor-reported unless I say otherwise. This box did not call chat completions. Offline preflight = public HTTP scrapes + list-price arithmetic only.
+
+Meituan shipped LongCat-2.5 on 2026-11-1 (blog) with wide coverage on 2026-11-2: a 1.6T-parameter MoE (~48B activated per token) pitched as a native multimodal model for long-horizon agentic work. For builders, the useful story is not “another 万亿 MoE.” It is four concrete checks: (1) OpenAI- and Anthropic-compatible endpoints with a single model string, (2) a thinking object that forces temperature (1.0 on / 0.7 off), (3) limited-time list price $0.30 / $0.006 cached / $1.20 per 1M tokens, and (4) vendor benches that Meituan’s own CN framing places between Claude Opus 4.8 and Opus 5 — which is a reason to run your golden eval, not a reason to merge their table into your prod decision.
+
+Try-it surface is longcat.ai; developers get a prepaid Pay-As-You-Go API the same week. That is enough to A/B against a current default without waiting for open weights — and also enough to over-trust a vendor dashboard if you skip your own tickets.
+
+ [#what-it-is-short]
+ What it is (short)
+
+LongCat-2.5 builds on LongCat-2.0 with stronger native visual understanding and agentic coding (vendor). Visual signals are represented as multi-level discrete tokens (RVQ over a Semantic-and-Aligned Encoder / SAE-style path), so vision and text share a unified token stream. Training emphasis is long-horizon RL: more long trajectories in long-sequence training, failure trajectories turned into verifiable tasks, mixed training across harnesses. Infra notes (for context only): long-context training and W4A4 inference on domestic AI accelerators; vendor online stress vs W8A8 INT8 cites prefill +43.3%, decode +42.77%, TTFT −15.91%, TPOT −19.72%, GMM kernel ~1.73×. That is serving math, not permission to skip quality gates.
+
+Site / docs language also says the model works across Claude Code, Codex, and Hermes harnesses. Treat that as compatibility marketing until you wire one harness and measure your own tasks. Blog eval footnotes themselves show different harnesses per bench (Claude Code on several coding rows, Codex on SkillsBench, custom browse harness on BrowseComp) — another reminder that “works across” is not “one config wins every leaderboard.”
+
+Skip the deep train–inference / supernode digression for day-one integration. Remember only: long context (1M) is a first-class claim, multimodal is native (not a bolted vision sidecar in the marketing story), and agentic RL is the capability bet.
+
+ [#how-to-call-it-dual-endpoints-the-temperature-lock]
+ How to call it: dual endpoints + the temperature lock
+
+Platform docs advertise two bases:
+
+Format
+Base URL
+Typical path
+
+OpenAI-compatible
+https://api.longcat.chat/openai
+/v1/chat/completions
+
+Anthropic-compatible
+https://api.longcat.chat/anthropic
+/v1/messages
+
+Model id: LongCat-2.5. Context window: 1M tokens; max output: 128K. Default top_p on chat docs: 0.95.
+
+Thinking is an object, not a free-form string:
+
+"thinking": { "type": "enabled" }
+
+or { "type": "disabled" }.
+
+Trap: chat docs say temperature is fixed at 1.0 with thinking enabled and 0.7 with thinking disabled; other values are overridden. If your client still sends temperature: 0 from an older Anthropic/OpenAI template, you are not getting determinism — you are getting the forced default for the thinking mode you picked. Eval note on the blog: LongCat-2.5 rows use enable_thinking=on, temperature=1.0, top_p=0.95 unless specified; other models marked * are public reports.
+
+OpenAI SDK shape is the usual base_url="https://api.longcat.chat/openai" + Bearer key. Anthropic SDK path uses https://api.longcat.chat/anthropic with the docs’ header pattern (Authorization: Bearer … plus Anthropic-style body). Pick one client stack for the A/B; do not flip formats mid-eval or you will confuse tool-schema bugs with model bugs.
+
+Builder rule: set thinking explicitly per route, assume temperature will be clamped, and pin the base URL + model string in config — do not guess. If you need lower temperature for classification, you likely want thinking disabled (and you still get 0.7, not 0.0). Document that in the route table so the next engineer does not “fix” sampling with a dead knob.
+
+ [#vendor-benches-label-as-vendor]
+ Vendor benches (label as vendor)
+
+From the LongCat-2.5 blog metrics table (selected high-signal rows). LongCat-2.5 only below; peer columns exist on the source page — do not invent third-party re-scores here.
+
+Benchmark (vendor table)
+LongCat-2.5
+vs LongCat-2.0 (same table)
+
+Terminal Bench v2.1
+88.4
+70.8
+
+Terminal Bench v4.0
+38.5
+3.0
+
+DeepSWE v1.1
+64.6
+9.7
+
+PaperBench
+82.1
+45.2
+
+BrowseComp
+91.9
+79.9
+
+AutomationBench v1.0.6
+51.8
+15.8
+
+HLE w/tools
+63.1
+37.5
+
+Vision2Web
+78.6
+—
+
+3DCodeBench Text→3D
+55.4
+—
+
+Meituan’s 2026-11-02 CN press frames results as sitting between Claude-Opus-4.8 and Claude-Opus-5 on several mainstream benches (and exceeding Opus-5 on some). That is a vendor / press claim next to their own charts — useful as a map of where they want you to look, useless as a substitute for your golden set. Same caution as this series always uses: do not paste “between Opus 4.8 and 5” into a slide that implies an independent Artificial Analysis or third-party harness unless that harness is cited.
+
+Jump vs 2.0 on Terminal Bench v4.0 (3.0 → 38.5) and DeepSWE (9.7 → 64.6) is the internal “agentic coding moved” signal. Still: those are their runs with their thinking/temp settings. Replicate on your repos before you retire the incumbent model string.
+
+ [#list-price-030-0006-cached-120-limitedtime]
+ List price: $0.30 / $0.006 cached / $1.20 (limited-time)
+
+Pay-As-You-Go currently lists LongCat-2.5 at discounted (limited-time) rates:
+
+Item
+USD / 1M tokens
+CNY / 1M tokens
+
+Uncached input
+$0.30
+¥2
+
+Cached input
+$0.006
+¥0.04
+
+Output
+$1.20
+¥8
+
+Prices are subject to change; platform UI + billing records win. Failed requests (401 / 403 / 429 / 500) are not billed; only HTTP 200 is.
+
+ [#listprice-arithmetic-my-assumptions-not-a-bill]
+ List-price arithmetic (my assumptions — not a bill)
+
+Offline preflight used those three USD rates only. Assumptions: one trajectory = 80k input + 20k output; “80% cache hit” means 80% of input tokens bill at the cached rate; no tax, retries, or tool-overhead tokens.
+
+Scenario
+USD (list math)
+
+1 traj, no cache
+$0.0480
+
+1 traj, 80% input cache
+$0.0292
+
+40-turn loop, no cache
+$1.9200
+
+40-turn loop, 80% input cache
+$1.1674
+
+1M in + 1M out, no cache
+$1.5000
+
+Cache is the swing factor on long agent loops. Thinking-on also tends to inflate reasoning / output tokens relative to thinking-off — price the knob and the rate card together, and remember temperature will not save you from that inflation. For a rough sanity check: at these list rates, 1M in + 1M out is $1.50 before cache; an 80k/20k turn with fat prefix reuse lands closer to ~$0.03 if the 80% cache assumption holds. Measure real cached vs uncached fields on usage before you put the middle rows in a forecast.
+
+CNY list (¥2 / ¥0.04 / ¥8) is on the same docs pages — use it if you bill in RMB; this post’s arithmetic sticks to USD for series consistency.
+
+ [#checklist-before-you-swap]
+ Checklist before you swap
+
+Freeze a golden eval on your agent failures (repo patches, terminal tasks, browse/tool traces, visual coding if that is your product). Vendor TB / BrowseComp / Vision2Web are someone else’s harness.
+
+Pin base URL + model id — LongCat-2.5 on either api.longcat.chat/openai or …/anthropic. Confirm which SDK headers your client needs (Anthropic path wants the usual Anthropic-shaped request).
+
+Set thinking explicitly. Assume temperature is overridden (1.0 on / 0.7 off). Do not rely on a silent temperature: 0 from old templates.
+
+Price both columns: list $0.30/$1.20/$0.006 and expected output tokens with thinking on. Re-run the arithmetic with your real prompt sizes. Treat rates as limited-time.
+
+Harness claim ≠ drop-in. If you use Claude Code / Codex / Hermes, prove one path with your tools and auth before you rewrite defaults.
+
+Multimodal only if you need it. Discrete visual tokens are the product story; your golden set should include the visual tasks you actually ship.
+
+Billing hygiene: prepaid balance; only HTTP 200 billed; do not forecast from failed 429 storms.
+
+Do not conflate Meituan vendor rows, CN “between Opus 4.8 and 5” framing, and any third-party index you have not opened yourself.
+
+ [#what-i-actually-ran-offline]
+ What I actually ran (offline)
+
+/workspace/reputation/runs/31-longcat-2.5/ — 2026-11-02 America/Toronto:
+
+LONGCAT_API_KEY: NOT SET
+Chat completions: NOT ATTEMPTED
+
+HTTP 200: longcat.ai/blog/longcat-2.5/
+HTTP 200: platform pricing + pay-as-you-go + chat + docs + homepage
+HTTP 200: meituan.com CN press (Opus 4.8–5 framing)
+Needle hits: $0.30 / $0.006 / $1.20, LongCat-2.5, openai/anthropic bases,
+ thinking + temperature lock language, 1M/128K, Claude Code/Codex/Hermes
+
+List-price math (assumptions above):
+ 1 traj no cache $0.0480 | 80% cache $0.0292
+ 40-turn no cache $1.9200 | 80% cache $1.1674
+ 1M+1M $1.5000
+
+NOT tested: live chat; thinking/temp override live; harness wiring;
+Terminal Bench / DeepSWE / BrowseComp re-score; real cache hits; W4A4 latency
+
+Costs are arithmetic on LongCat’s stated limited-time list rates under assumptions I state. They are not a bill, not latency, and not quality.
+
+ [#when-longcat25-might-become-a-default]
+ When LongCat-2.5 might become a default
+
+Only after a callable path and a golden eval win on your tickets:
+
+Long-horizon coding / agent loops where your current default fails and an OpenAI- or Anthropic-shaped client is already in the stack.
+
+You have chosen thinking on/off per route, knowing temperature is locked.
+
+Cost model survives realistic cache and thinking-on output inflation at $0.30/$1.20.
+
+You verified the harness you actually run (not only the brochure list).
+
+You can roll back without rewriting orchestration.
+
+If you are already deep in Anthropic- or OpenAI-shaped agent code, LongCat-2.5 is a same-week candidate for a side-by-side — not because the Opus framing is gospel, but because the integration surface is familiar and the list price is easy to model. If you need open weights, local GPUs, or a third-party index row before you trial anything, this drop is the wrong trigger; wait for a surface that matches that constraint.
+
+LongCat-2.5’s builder-relevant release is the dual-compat API, the thinking/temperature lock, the $0.30/$1.20 limited-time card, and vendor benches framed near Opus 4.8–5. Treat those as labeled inputs, run your own eval, and only then change the production model string.
+
+YongBo Yu · Toronto AI engineer · https://yongbo-yu.vercel.app [https://yongbo-yu.vercel.app] · GitHub YongBoYu1
+
+ Top comments (0)
+
+ Subscribe
+
+ Personal
+ Trusted User
+
+ Create template
+ [/settings/response-templates]
+
+Templates let you quickly answer FAQs or store snippets for re-use.
+
+ Submit
+ Preview
+ Dismiss [/404.html]
+
+ Code of Conduct [/code-of-conduct]
+ •
+ Report abuse [/report-abuse]
+
+ Are you sure you want to hide this comment? It will become hidden in your post, but will still be visible via the comment's permalink [#].
+
+Hide child comments as well
+
+ Confirm
+
+For further actions, you may consider blocking this person and/or reporting abuse [/report-abuse]
+
+ Yong Yu
+
+ [/yong_yu_f98e15562e9b120a0]
+
+ Follow
+
+ Joined
+
+ Sep 5, 2026
+
+ More from Yong Yu [/yong_yu_f98e15562e9b120a0]
+
+ Mistral Large 4 Open Weights: Vendor TB 41% vs AA's 25%, High Default Effort, and $0.70/$2.10 Before You Self-Host
+
+ #ai
+ #llm
+ #opensource
+ #machinelearning
+
+ [/yong_yu_f98e15562e9b120a0/mistral-large-4-open-weights-vendor-tb-41-vs-aas-25-high-default-effort-and-070210-3p4k]
+
+ Gemini 4 Carbon Is #1 on AA Index — Still Fairwind-Only: Cyber Benches, $2/$10 $4/$20, and What to Do Before the API
+
+ #ai
+ #llm
+ #google
+ #cybersecurity
+
+ [/yong_yu_f98e15562e9b120a0/gemini-4-carbon-is-1-on-aa-index-still-fairwind-only-cyber-benches-210-420-and-what-to-b66]
+
+ DEV Community [/] — A space to discuss and keep up software development and manage your software career
+
+ Home
+ [/]
+
+ DEV Challenges
+ [/challenges]
+
+ DEV++
+ [/++]
+
+ Videos
+ [/videos]
+
+ DEV Education Tracks
+ [/deved]
+
+ DEV Help
+ [/help]
+
+ Advertise on DEV
+ [/advertise]
+
+ Organization Accounts
+ [/organizations]
+
+ DEV Showcase
+ [/showcase]
+
+ About
+ [/about]
+
+ Contact
+ [/contact]
+
+ Free Postgres Database
+ [/free-postgres-database-tier]
+
+ DEV Shop
+ [https://shop.forem.com/]
+
+ MLH
+ [https://mlh.io/]
+
+ Code of Conduct
+ [/code-of-conduct]
+
+ Privacy Policy
+ [/privacy]
+
+ Terms of Use
+ [/terms]
+
+Built on Forem [https://www.forem.com] — the open source [https://dev.to/t/opensource] software that powers DEV [https://dev.to] and other inclusive communities.
+
+Made with love and Ruby on Rails [https://dev.to/t/rails]. DEV Community © 2016 - 2026.
+
+ We're a place where coders share, stay up-to-date and grow their careers.
+
+ Log in
+ [https://dev.to/enter?signup_subforem=1]
+
+ Create account
+ [https://dev.to/enter?signup_subforem=1&state=new-user]
