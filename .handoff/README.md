@@ -2,6 +2,7 @@
 
 本目录随仓库保存，供回看制作过程。文件中的任务要求、路径、模型安排与“未完成”状态属于当时的工作上下文，不自动代表当前状态。
 
+- [取证任务：1102 期（A GPT-6-Astra 直接改 Qwen 权重（Weight-Space Programming）｜B Anthropic 招股书修订版（S-1/A）【跟进1026速览】｜C 速览一｜D 速览二）](2026-11-02-1102-evidence.md)
 - [取证任务：1101 期（A SemiAnalysis GDPx 基准｜B 美团 LongCat-2.5｜C Calegari 客座文《数学已经变了》｜D 速览一｜E 速览二）](2026-11-01-1101-evidence.md)
 - [取证任务：1031 期（A ChatGPT 与 Codex 共用额度｜B Exin 让 AI 智能体给活小鼠做脑内注射｜C DeepSeek dsh-superagent 研究原型｜D 速览一｜E 速览二）](2026-10-31-1031-evidence.md)
 - [取证任务：1030 期（A Claude Max 20x 改名 Ultra：取消 5 小时窗口、周限额不变｜B OpenAI 撤回 Pro 200 降额：只把降下去的翻倍【跟进0929】｜C 苹果国行 Apple 智能接入千问：不含 Siri AI｜D 速览（公司与产品）｜E 速览（研究与安全））](2026-10-30-1030-evidence.md)
