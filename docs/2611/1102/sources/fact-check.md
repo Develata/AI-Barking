@@ -6,7 +6,7 @@
 
 | 文中事实 | 级 | 结果 | 一手来源 | 备注（条件、时区、口径） |
 |---|---|---|---|---|
-| 标题：AI改脑子数学变6倍？Claude亏了？ | — | ✅ | 见 A、B 节 | 前一问问的是作者帖 “up to 6x”、IT之家“数学成绩提升至原来 6 倍”、凤凰网 APPSO“爆改Qwen大脑……数学成绩疯涨”一类说法（evidence-A A7）；48.1÷7.9≈6.1。“改脑子”指改权重（APPSO 用“大脑”）。后一问：Claude 的开发商 Anthropic 第三季度 GAAP 经营亏损（B 节）；用产品名指代公司，正文第一句即点明 Anthropic。 |
+| 标题：AI改0.016%权重，数学能力变6倍？ | — | ✅ | 见 A 节 | 终审时 Develata 由“AI改脑子数学变6倍？Claude亏了？”改来（11/03）。0.016% 见 A 节；问号问的是 KuCoin/TechFlow 快讯 “enhance Qwen's mathematical ability by 6x”、IT之家“数学成绩提升至原来 6 倍”一类说法（evidence-A A7）；48.1÷7.9≈6.1。正文吠点①回答：研究者自己说修好循环“不等于让模型数学变好”。 |
 | MIT 研究者让 GPT-6-Astra 直接改一个小模型的权重，数学题正确率从7.9%升到48.1% | L2 | ✅ | 见 A 节 | — |
 | 但修好的是它复读停不下来，研究者自己说这不等于数学变好 | L2 | ✅ | 见 A 节吠点① | “复读停不下来”= loops / repeats the same text；“研究者”指博文作者（读者稿检查：“作者”易被读成本文作者）；“不等于数学变好”= “is not the same as making a model better at math”。 |
 | Claude 的开发商 Anthropic 第三季度经营亏损5.67亿美元 | L1 | ✅ | 见 B 节 | 点明 Claude 与 Anthropic 的关系（读者稿检查）。 |
