@@ -22,6 +22,11 @@ const USER_API: &str = "https://api.fxtwitter.com/";
 const MAX_AGE_SECS: u64 = 24 * 3600;
 /// Shorter patterns are too common in archives (ids, words) to be a signal.
 const MIN_PATTERN_LEN: usize = 4;
+/// The account's public byline (lower-case), written on purpose throughout
+/// the repository (editorial notes, indexes, handoffs). When a resolved
+/// display name equals it, matching it only flags the byline, so it is
+/// exempt; the handle, avatar id and user id are still searched.
+const PUBLIC_NAMES: &[&str] = &["develata"];
 
 #[derive(Serialize, Deserialize, Default)]
 struct Cache {
@@ -122,6 +127,14 @@ pub(crate) fn patterns(root: &Path) -> (Vec<String>, Vec<String>) {
             notes.push(format!("warn: 身份缓存未能写入 {}：{e}", path.display()));
         }
     }
+    let before = out.len();
+    out.retain(|p| !is_public(p));
+    let public = before - out.len();
+    if public > 0 {
+        notes.push(format!(
+            "{public} 个模式与公开署名相同，已豁免（PUBLIC_NAMES）"
+        ));
+    }
     let (kept, short): (Vec<String>, Vec<String>) = out.into_iter().partition(|p| usable(p));
     if !short.is_empty() {
         notes.push(format!(
@@ -175,6 +188,10 @@ pub(crate) fn patterns_from_user(user: &Value) -> Vec<String> {
         push(v.to_string());
     }
     out
+}
+
+fn is_public(p: &str) -> bool {
+    PUBLIC_NAMES.contains(&p)
 }
 
 /// Long enough to be a signal: four ASCII characters, or two CJK characters
@@ -308,6 +325,8 @@ mod tests {
         assert_eq!(e.patterns, ["old name", "new name"]);
         assert_eq!(split(" @A ;; b;"), ["@a", "b"]);
         assert!(usable("只影") && usable("abcd") && !usable("abc") && !usable("影"));
+        // Only the exact byline is exempt, not names that merely contain it.
+        assert!(is_public("develata") && !is_public("develata0") && !is_public("@develata"));
         let _ = fs::remove_dir_all(&dir);
     }
 }
