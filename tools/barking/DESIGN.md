@@ -67,7 +67,7 @@ barking stage <期次目录> [--batch 1|2|3] [--add]
 ```
 barking scan-rows <期次目录> [--dry-run]
 ```
-生成发布后 `README.md` 与 `daily-scan.md` 里纯机械的行（`publish.md` 第 1 步；**只能在 Develata 说“已发布”后运行**，命令说明里写明）。幂等：已存在的行不重复加。
+生成发布后 `README.md` 与 `daily-scan.md` 里纯机械的行（`publish.md` 第 1 步；交付终审时运行，提交后即推送（2026-11-04 起不等“已发布”），命令说明里写明）。幂等：已存在的行不重复加。
 
 - 输入：`Issue::title()`（正文首行）、`card::load_spec(images)`（`kind`、`roundup`）。
 - `README.md`“## 内容目录”表：行格式与现有行完全一致：

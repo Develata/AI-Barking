@@ -230,7 +230,7 @@ fn step_markers(issue: &Issue) -> Step {
         ]),
         Ok(mut problems) => {
             problems.push(format!(
-                "先运行 barking scan-rows {}（交付终审时运行，“已发布”前不推送）；“已发过”的占位须 Claude 按最终发布版填写",
+                "先运行 barking scan-rows {}（交付终审时运行，提交后即推送）；“已发过”的占位须 Claude 按最终发布版填写",
                 issue.rel()
             ));
             Step::fail(problems)
