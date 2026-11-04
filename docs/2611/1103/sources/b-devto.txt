@@ -1,0 +1,311 @@
+Postman Desktop Added Itself to Claude Code and Codex. Its Installer Trusts Its Own Hook - DEV Community
+
+ Skip to content [#main-content]
+
+ [/]
+
+ Powered by Algolia
+
+ [https://www.algolia.com/developers/?utm_source=devto&utm_medium=referral]
+
+ Log in
+ [https://dev.to/enter?signup_subforem=1]
+
+ Create account
+ [https://dev.to/enter?signup_subforem=1&state=new-user]
+
+DEV Community
+
+ Add reaction
+
+ Like
+
+ Unicorn
+
+ Exploding Head
+
+ Raised Hands
+
+ Fire
+
+ Jump to Comments
+
+ Save
+
+ Boost
+
+Pick as gem
+
+ Copy link
+
+Copied to Clipboard
+
+ Share to X
+ [https://twitter.com/intent/tweet?text=%22Postman%20Desktop%20Added%20Itself%20to%20Claude%20Code%20and%20Codex.%20Its%20Installer%20Trusts%20Its%20Own%20Hook%22%20by%20Gabriel%20Anhaia%20%23DEVCommunity%20https%3A%2F%2Fdev.to%2Fgabrielanhaia%2Fpostman-desktop-added-itself-to-claude-code-and-codex-its-installer-trusts-its-own-hook-2oga]
+
+ Share to LinkedIn
+ [https://www.linkedin.com/shareArticle?mini=true&url=https%3A%2F%2Fdev.to%2Fgabrielanhaia%2Fpostman-desktop-added-itself-to-claude-code-and-codex-its-installer-trusts-its-own-hook-2oga&title=Postman%20Desktop%20Added%20Itself%20to%20Claude%20Code%20and%20Codex.%20Its%20Installer%20Trusts%20Its%20Own%20Hook&summary=A%20Postman%20desktop%20update%20added%20its%20plugin%20to%20Claude%20Code%20and%20Codex%20for%20an%20existing%20user.%20Its%20installer%20is%20built%20to%20approve%20its%20own%20Codex%20hook.%20How%20to%20check.&source=DEV%20Community]
+
+ Share to Facebook
+ [https://www.facebook.com/sharer.php?u=https%3A%2F%2Fdev.to%2Fgabrielanhaia%2Fpostman-desktop-added-itself-to-claude-code-and-codex-its-installer-trusts-its-own-hook-2oga]
+
+ Share to Mastodon
+ [https://s2f.kytta.dev/?text=https%3A%2F%2Fdev.to%2Fgabrielanhaia%2Fpostman-desktop-added-itself-to-claude-code-and-codex-its-installer-trusts-its-own-hook-2oga]
+
+ Share Post via... [#]
+
+ Report Abuse [/report-abuse]
+
+ [https://media2.dev.to/dynamic/image/width=1000,height=420,fit=cover,gravity=auto,format=auto/https%3A%2F%2Fdev-to-uploads.s3.us-east-2.amazonaws.com%2Fuploads%2Farticles%2Fyelbfjps7cr82vc3i9yi.jpg]
+
+ [/gabrielanhaia]
+
+ Gabriel Anhaia [/gabrielanhaia]
+
+ Posted on Nov 4
+
+ •
+ Edited on Nov 4
+
+ •
+
+ AI-assisted
+
+ Postman Desktop Added Itself to Claude Code and Codex. Its Installer Trusts Its Own Hook
+
+ #ai [/t/ai]
+ #security [/t/security]
+ #devtools [/t/devtools]
+ #postman [/t/postman]
+
+Book: AI Agents Pocket Guide [https://www.amazon.com/dp/B0GYJZ2XJD]
+
+The series: Pocket Guides for Developers — 8 short books on agents, RAG, prompts, observability, events, databases and system design — the whole series [https://www.amazon.com/dp/B0GYLH38X4]
+
+My project: Hermes IDE [https://hermes-ide.com] | GitHub [https://github.com/hermes-hq/hermes-ide] — an IDE for developers who ship with Claude Code and other AI coding tools
+
+Me: xgabriel.com [https://xgabriel.com] | GitHub [https://github.com/gabrielanhaia]
+
+A developer opened the Postman [https://www.postman.com] desktop app, version 12.33.4, on a Mac on October 24. According to the GitHub issue they filed the next day [https://github.com/postmanlabs/postman-app-support/issues/14370], Postman's own log then recorded this:
+
+PostmanAgentPluginService~install: script completed
+{"source":"auto-existing-upgrade",
+ "results":["claude-code:installed","codex:installed"],
+ "installer":"script"}
+Main: autoInstall.plugin.existing-user finished
+
+The reporter describes the changes as unexpected: "the integrations were installed automatically." The trigger name says why it ran: auto-existing-upgrade, an install pushed to an existing desktop user. The issue is titled "[SEVERE] Desktop auto-installs Codex/Claude plugins; installer attempts to trust its own startup hook". On November 3 it was picked up by AI Weekly [https://aiweekly.co/alerts/postman-desktop-silently-installs-plugins-into-codex-claude-code] and a write-up here on dev.to [https://dev.to/frankchu/postman-installed-itself-into-codex-and-claude-e38], and The New Stack [https://thenewstack.io/postman-plugin-coding-agents/] has covered it too. That same day, a reply in the thread written in Postman's voice said the opt-in will get clearer.
+
+If you run Claude Code [https://code.claude.com/docs/en/plugins] or Codex [https://learn.chatgpt.com/docs/hooks] on a machine that also has Postman, this is worth five minutes.
+
+ [#what-the-installer-changed]
+ What the installer changed
+
+The issue lists the files the install touched on macOS. In ~/.codex/config.toml it added a [marketplaces.postman] table, a [plugins."postman@postman"] table with enabled = true, and records under [hooks.state]. In ~/.claude/settings.json it enabled postman@claude-plugins-official, and it recorded that install in ~/.claude/plugins/installed_plugins.json (issue #14370 [https://github.com/postmanlabs/postman-app-support/issues/14370]).
+
+It also dropped the Postman CLI into ~/.local/bin, and the Codex plugin's MCP config points at https://mcp.postman.com/mcp. The versions in the report were Codex plugin 1.1.0 and Claude Code plugin 2.0.1. A later commenter in the same thread reports the auto-install on a desktop app that updated from 12.31.3 to 12.35.1, so this isn't pinned to one build.
+
+What the reporter did not show is data leaving the machine. The dev.to write-up [https://dev.to/frankchu/postman-installed-itself-into-codex-and-claude-e38] notes the MCP connection failed with an auth error, and that the reporter says the sequence hasn't yet been reproduced on a clean Mac.
+
+ [https://media2.dev.to/dynamic/image/width=800%2Cheight=%2Cfit=scale-down%2Cgravity=auto%2Cformat=auto/https%3A%2F%2Fdev-to-uploads.s3.us-east-2.amazonaws.com%2Fuploads%2Farticles%2Fnt2s5u8ikz5q2hee6epz.png]
+
+One desktop update, two coding agents changed: the reported install wrote to both Codex's and Claude Code's config.
+
+ [#the-hook-that-approves-itself]
+ The hook that approves itself
+
+The Codex half is the part that drew the "SEVERE" label. Codex treats hooks as code you must vouch for. Its hooks docs [https://learn.chatgpt.com/docs/hooks] say: "Before a non-managed hook can run, Codex requires you to review and trust the exact hook definition." Trust is stored against a hash, so a changed hook needs a fresh review.
+
+Postman's plugin ships a SessionStart hook with the matcher startup|clear|compact. Per the issue, it prints a context file telling the agent: "Before responding to any non-trivial API engineering task", load the postman:api-engineer skill and follow it. That fires on every new, cleared or compacted session, whether or not you mentioned Postman.
+
+The installer then calls a function named approvePostmanHook, whose source comment reads "Approves only Postman's current hook after installation" (issue #14370 [https://github.com/postmanlabs/postman-app-support/issues/14370]). It writes a trusted_hash into Codex's [hooks.state], which is the record Codex's review prompt exists to create. The reporter is careful here: the code shows the approval attempt, not proof of who wrote the record on their machine.
+
+This was not an accident in the plugin repo. PR #124 [https://github.com/postmanlabs/postman-plugin/pull/124], "feat(installer): auto-approve Postman's Codex hook", was merged on October 21. Its description says "Hooks can run outside the sandbox." GitHub Copilot's automated review on that PR flagged it: "Automatically granting persistent trust to hooks that can execute outside the sandbox warrants human security review." Postman's install docs [https://learning.postman.com/docs/postman-plugin/install/detected-agents] say it plainly too: "The installer approves the hook for you."
+
+Claude Code has no per-hook trust prompt to skip. Its plugin docs [https://code.claude.com/docs/en/plugins] say an enabled plugin "is part of every session" and "what the plugin runs, it runs as you." There, the question is whether you agreed to the plugin at all.
+
+ [#what-postman-says]
+ What Postman says
+
+To be fair to the plugin: installing it on purpose is a documented, opt-in path. Postman's docs [https://learning.postman.com/docs/postman-plugin/install/overview] cover nine agents, from Claude Code and Codex to Cursor and OpenCode, and PR #45 [https://github.com/postmanlabs/postman-plugin/pull/45] added a single npx installer that finds the supported agents on your machine and installs into each one. For a developer who wants Postman inside their agents, that's one command instead of a setup per agent.
+
+The complaint is the auto-install for existing desktop users. The issue asks Postman to stop it "pending explicit opt-in" and to "Remove installer-side self-approval of hooks."
+
+On November 3, a reply in the thread [https://github.com/postmanlabs/postman-app-support/issues/14370] said "we bundle the Postman CLI and the agent plugins with the desktop app", because users had trouble setting them up separately. It added: "we're going to make the opt-in clearer, especially for existing users" and "we're reviewing the hook approval and session-start behavior you flagged." It also said the components can be uninstalled from inside the app. The account that posted it lists no company on its GitHub profile, so treat it as Postman's position once it shows up in Postman's own release notes.
+
+ [https://media2.dev.to/dynamic/image/width=800%2Cheight=%2Cfit=scale-down%2Cgravity=auto%2Cformat=auto/https%3A%2F%2Fdev-to-uploads.s3.us-east-2.amazonaws.com%2Fuploads%2Farticles%2Fz557iwbpe43t5cb69bj2.png]
+
+The three places to look: Codex's config.toml, Claude Code's settings.json, and ~/.local/bin.
+
+ [#check-your-machine]
+ Check your machine
+
+These are read-only. They print any Postman entries in each agent's config and any Postman binary in ~/.local/bin:
+
+# Codex: marketplace, plugin and hook-trust entries
+grep -n -i postman ~/.codex/config.toml
+
+# Claude Code: enabled plugins
+claude plugin list
+grep -n -i postman ~/.claude/settings.json
+
+# A CLI you may not have installed
+ls -l ~/.local/bin | grep -i postman
+
+If you didn't want the Claude Code plugin, the documented shell commands [https://code.claude.com/docs/en/plugins/install] turn it off or remove it:
+
+claude plugin disable postman@claude-plugins-official
+claude plugin uninstall postman@claude-plugins-official
+
+In Codex, run /hooks in a session. The docs [https://learn.chatgpt.com/docs/hooks] say it lets you "inspect hook sources, review new or changed hooks, trust hooks, or disable individual non-managed hooks." Disable the Postman SessionStart hook there. Postman's own remover is npx @postman/postman-plugin remove, per its install docs [https://learning.postman.com/docs/postman-plugin/install/detected-agents]. I haven't run it, and the docs don't say whether it clears the Codex trust record, so re-run the grep afterwards. The dev.to write-up [https://dev.to/frankchu/postman-installed-itself-into-codex-and-claude-e38] also warns that removing the desktop app may not remove these agent integrations.
+
+ [#your-agent-config-is-an-install-target-now]
+ Your agent config is an install target now
+
+The lesson travels past Postman. ~/.claude/settings.json and ~/.codex/config.toml decide what instructions your agent reads before your first prompt and which commands run as you. Any app with an installer and file access to your home directory can edit them. Postman's installer already supports nine agents.
+
+Two habits make this kind of change visible. Keep those files in a dotfiles repo, so a git diff shows any edit you didn't make. And read the session-start context your agent loads now and then. Postman's hook tells the agent to load its skill "Before responding to any non-trivial API engineering task", and that instruction lands in every session the hook starts.
+
+Would you want desktop apps to install agent plugins with a clear prompt, or never at all? Tell me in the comments.
+
+ [#if-this-was-useful]
+ If this was useful
+
+Hooks, skills and startup context are how you steer an agent before it does anything, and also how someone else can. The AI Agents Pocket Guide [https://www.amazon.com/dp/B0GYJZ2XJD] covers those guardrails: what an agent should be allowed to load, run and decide on its own. It's one of 8 short books in the Pocket Guides for Developers series [https://www.amazon.com/dp/B0GYLH38X4], on agents, RAG, prompts, observability, events, databases and system design.
+
+I also build Hermes IDE [https://hermes-ide.com/download], a free, source-available console that runs Claude Code, Codex and other agents side by side, each in its own terminal and worktree, with your own sign-ins (GitHub [https://github.com/hermes-hq/hermes-ide]).
+
+ [https://www.amazon.com/dp/B0GYJZ2XJD]
+
+ Top comments (0)
+
+ Subscribe
+
+ Personal
+ Trusted User
+
+ Create template
+ [/settings/response-templates]
+
+Templates let you quickly answer FAQs or store snippets for re-use.
+
+ Submit
+ Preview
+ Dismiss [/404.html]
+
+ Code of Conduct [/code-of-conduct]
+ •
+ Report abuse [/report-abuse]
+
+ Are you sure you want to hide this comment? It will become hidden in your post, but will still be visible via the comment's permalink [#].
+
+Hide child comments as well
+
+ Confirm
+
+For further actions, you may consider blocking this person and/or reporting abuse [/report-abuse]
+
+ Gabriel Anhaia
+
+ [/gabrielanhaia]
+
+ Follow
+
+ Senior Software Engineer @ Ordio · 10+ years in backend, distributed systems & AI agents · Creator of Hermes IDE (AI-native terminal) & Neural Playground · Author of 2 books · Open-source enthusiast
+
+ Location
+
+ Berlin, Germany
+
+ Work
+
+ Software Engineer and Book Author
+
+ Joined
+
+ Jul 6, 2020
+
+ More from Gabriel Anhaia [/gabrielanhaia]
+
+ A Read-Only Reviewer Subagent in Claude Code: 3 Tools, Haiku 5.5, a 100K Compact Window
+
+ #claudecode
+ #ai
+ #tutorial
+ #codereview
+
+ [/gabrielanhaia/a-read-only-reviewer-subagent-in-claude-code-3-tools-haiku-55-a-100k-compact-window-95j]
+
+ Claude's Watermark Now Covers Sonnet 4.6 and Opus 4.7. Sonnet's Temperature Can Drop It
+
+ #ai
+ #claude
+ #llm
+ #compliance
+
+ [/gabrielanhaia/claudes-watermark-now-covers-sonnet-46-and-opus-47-sonnets-temperature-can-drop-it-35j7]
+
+ DEV Community [/] — A space to discuss and keep up software development and manage your software career
+
+ Home
+ [/]
+
+ DEV Challenges
+ [/challenges]
+
+ DEV++
+ [/++]
+
+ Videos
+ [/videos]
+
+ DEV Education Tracks
+ [/deved]
+
+ DEV Help
+ [/help]
+
+ Advertise on DEV
+ [/advertise]
+
+ Organization Accounts
+ [/organizations]
+
+ DEV Showcase
+ [/showcase]
+
+ About
+ [/about]
+
+ Contact
+ [/contact]
+
+ Free Postgres Database
+ [/free-postgres-database-tier]
+
+ DEV Shop
+ [https://shop.forem.com/]
+
+ MLH
+ [https://mlh.io/]
+
+ Code of Conduct
+ [/code-of-conduct]
+
+ Privacy Policy
+ [/privacy]
+
+ Terms of Use
+ [/terms]
+
+Built on Forem [https://www.forem.com] — the open source [https://dev.to/t/opensource] software that powers DEV [https://dev.to] and other inclusive communities.
+
+Made with love and Ruby on Rails [https://dev.to/t/rails]. DEV Community © 2016 - 2026.
+
+ We're a place where coders share, stay up-to-date and grow their careers.
+
+ Log in
+ [https://dev.to/enter?signup_subforem=1]
+
+ Create account
+ [https://dev.to/enter?signup_subforem=1&state=new-user]
