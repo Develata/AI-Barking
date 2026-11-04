@@ -2,6 +2,7 @@
 
 本目录随仓库保存，供回看制作过程。文件中的任务要求、路径、模型安排与“未完成”状态属于当时的工作上下文，不自动代表当前状态。
 
+- [取证任务：1103 期（A 腾讯 Hy4 称“最强开源”与 Kimi-K3.1-Pro 权重到期【跟进1023】｜B Postman 桌面版自动给 Codex 与 Claude Code 装插件｜C 速览一｜D 速览二）](2026-11-03-1103-evidence.md)
 - [取证任务：1102 期（A GPT-6-Astra 直接改 Qwen 权重（Weight-Space Programming）｜B Anthropic 招股书修订版（S-1/A）【跟进1026速览】｜C 速览一｜D 速览二）](2026-11-02-1102-evidence.md)
 - [取证任务：1101 期（A SemiAnalysis GDPx 基准｜B 美团 LongCat-2.5｜C Calegari 客座文《数学已经变了》｜D 速览一｜E 速览二）](2026-11-01-1101-evidence.md)
 - [取证任务：1031 期（A ChatGPT 与 Codex 共用额度｜B Exin 让 AI 智能体给活小鼠做脑内注射｜C DeepSeek dsh-superagent 研究原型｜D 速览一｜E 速览二）](2026-10-31-1031-evidence.md)
