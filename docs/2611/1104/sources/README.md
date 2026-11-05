@@ -40,4 +40,4 @@
 
 ## 核验
 
-读者稿检查（Codex）、两轮反向核验与视觉复核结论见 `fact-check.md` 与 `style-review.md`。
+读者稿检查（Codex）、三轮反向核验与视觉复核结论见 `fact-check.md` 与 `style-review.md`。
