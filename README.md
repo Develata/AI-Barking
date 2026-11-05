@@ -53,6 +53,7 @@ AI 吠点是由 **[Develata](https://github.com/Develata)** 主理的独立内�
 | 2026 / 1101 | [最强AI只拿12分？美团模型超Opus？](docs/2611/1101/doc_1101_publish.txt) | [配图说明](docs/2611/1101/images/README.md) | [来源入口](docs/2611/1101/sources/README.md) |
 | 2026 / 1102 | [AI改0.016%权重，数学能力变6倍？](docs/2611/1102/doc_1102_publish.txt) | [配图说明](docs/2611/1102/images/README.md) | [来源入口](docs/2611/1102/sources/README.md) |
 | 2026 / 1103 | [腾讯最强开源没权重？软件偷装AI插件？](docs/2611/1103/doc_1103_publish.txt) | [配图说明](docs/2611/1103/images/README.md) | [来源入口](docs/2611/1103/sources/README.md) |
+| 2026 / 1104 | [花121万美元，AI挖出948个漏洞？](docs/2611/1104/doc_1104_publish.txt) | [配图说明](docs/2611/1104/images/README.md) | [来源入口](docs/2611/1104/sources/README.md) |
 
 正文采用可直接复制的纯文本，图片单独保存。阅读或发布时不需要依赖 Markdown 插图。
 
