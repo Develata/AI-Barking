@@ -1,0 +1,280 @@
+moonshotai/Kimi-K3.1-Pro | vLLM Recipes
+
+/Recipes [/]
+
+SearchSearch models or providers...⌘K
+
+Browse [/browse]Docs [https://docs.vllm.ai]GitHub [https://github.com/vllm-project/recipes]
+
+Providers
+
+Arcee AI [/arcee-ai]
+
+AutoTrust [/autotrust]
+
+Ernie (Baidu) [/baidu]
+
+BharatGen [/bharatgenai]
+
+Black Forest Labs [/black-forest-labs]
+
+Boson AI [/bosonai]
+
+Seed (ByteDance) [/ByteDance-Seed]
+
+DeepSeek [/deepseek-ai]
+
+Dots [/dots-studio]
+
+Fish Audio [/fishaudio]
+
+Google [/Google]
+
+IBM Granite [/ibm-granite]
+
+IFM [/IFM]
+
+inclusionAI [/inclusionAI]
+
+IndexTeam [/IndexTeam]
+
+InternLM [/internlm]
+
+JetBrains [/JetBrains]
+
+Jina AI [/jinaai]
+
+Lightricks [/Lightricks]
+
+Liquid AI [/LiquidAI]
+
+LongCat (Meituan) [/meituan-longcat]
+
+Meta [/meta-llama]
+
+Muse (Meta) [/meta-models]
+
+Microsoft [/microsoft]
+
+MindLab Research [/mindlab-research]
+
+MiniMax [/MiniMaxAI]
+
+Mistral AI [/mistralai]
+
+Moonshot AI [/moonshotai]
+
+Kimi-K3.1-Pro [/moonshotai/Kimi-K3.1-Pro]Kimi-K3 [/moonshotai/Kimi-K3]Kimi-K2.7-Code [/moonshotai/Kimi-K2.7-Code]Kimi-K2.6 [/moonshotai/Kimi-K2.6]Kimi-K2.5 [/moonshotai/Kimi-K2.5]Kimi-K2-Thinking [/moonshotai/Kimi-K2-Thinking]Kimi-Linear-48B-A3B-Instruct [/moonshotai/Kimi-Linear-48B-A3B-Instruct]Kimi-K2-Instruct [/moonshotai/Kimi-K2-Instruct]
+
+NVIDIA [/nvidia]
+
+OpenAI [/openai]
+
+MiniCPM (OpenBMB) [/openbmb]
+
+InternVL (OpenGVLab) [/OpenGVLab]
+
+OpenMOSS [/OpenMOSS-Team]
+
+PaddlePaddle [/PaddlePaddle]
+
+Preferred Networks [/pfnet]
+
+Poolside [/poolside]
+
+Qwen [/Qwen]
+
+RecursiveSI [/RecursiveSI]
+
+Reflection AI [/reflection]
+
+Stability AI [/stabilityai]
+
+StepFun [/stepfun-ai]
+
+Hunyuan (Tencent) [/tencent]
+
+Thinking Machines Lab [/thinkingmachines]
+
+vLLM Semantic Router [/vllm-sr]
+
+Wan (Alibaba) [/Wan-AI]
+
+MiMo (Xiaomi) [/XiaomiMiMo]
+
+GLM (Z-AI) [/zai-org]
+
+moonshotai/Kimi-K3.1-Pro
+
+2.8T-parameter native multimodal MoE with Kimi Delta Attention, sparse MLA, and a 1M-token context window
+
+TP8 on two GB300 trays or one B300 node, or one MI355X node, for the MXFP4 checkpoint
+
+View on HuggingFace [https://huggingface.co/moonshotai/Kimi-K3.1-Pro]
+
+Copy page
+
+moe2.8T / 16 experts/token + shared (of 896 routed)1,048,576 ctxvLLM 0.34.0+ [https://vllm.ai/#quick-start]multimodaltext
+
+Default configuration: 4× GB300 NVL4 · Multi-Node Tensor Parallel · MXFP4
+
+export GLOO_SOCKET_IFNAME=$IFACE_NAME
+export NCCL_SOCKET_IFNAME=$IFACE_NAME
+export VLLM_ENGINE_READY_TIMEOUT_S=3600
+vllm serve moonshotai/Kimi-K3.1-Pro \
+ --trust-remote-code \
+ --tensor-parallel-size 8 \
+ --nnodes 2 \
+ --node-rank 0 \
+ --master-addr $HEAD_IP \
+ --load-format fastsafetensors \
+ --enable-auto-tool-choice \
+ --tool-call-parser kimi_k3 \
+ --reasoning-parser kimi_k3
+
+The interactive builder loads with JavaScript. Append .md to this page's URL, query string included, for any configuration's command as Markdown — e.g. /moonshotai/Kimi-K3.1-Pro.md [/moonshotai/Kimi-K3.1-Pro.md].
+
+GuidePresets1
+
+Overview [#overview]
+
+Kimi-K3.1 keeps the Kimi-K3 layout (Kimi Delta Attention, 896 routed experts with 16 active
+per token, a latent MoE projection and a vision encoder) and adds sparse
+attention (DSA, top-2048 indexer) to 24 of its MLA layers. The checkpoint ships MXFP4
+routed-expert weights; everything else is BF16.
+
+The baseline is the simplest working setup on NVIDIA: one tensor-parallel group of 8 GPUs,
+either two GB300 trays or one B300 node. Throughput was not tuned.
+
+VR200 (preview) takes the same TP8 layout on two trays, in the vllm/vllm-openai:kimi-k31-cu134
+image (CUDA 13.4). It uses the Blackwell flags and hasn't been tuned or verified on Rubin.
+
+On MI355X, one node takes the same TP8 layout with the AMD profile's AITER environment, in the
+day-0 vllm/vllm-openai-rocm:kimi-k31 image. So far only the
+AgentX TP8 [#preset-mi355x_agentx] configuration has run on MI355X: the tuned single-node AgentX
+configuration for concurrency 48, with DCP8, the K3.1 DSpark draft and host KV offload.
+
+On Zhenwu PPUs, the default MXFP4 checkpoint runs without speculative decoding on
+two 16-PPU 810E nodes with TP32 / EP32, or four 8-PPU M890 nodes with TP8 / DP4 / EP32.
+On 810E, ppu_deep_gemm_w4a16 loads the checkpoint with a W4A16 compute path.
+Use the PPU image specified for each hardware configuration.
+
+Tensor + expert parallelism [#tensor--expert-parallelism]
+
+On one B300 node, the Tensor + Expert Parallel strategy keeps attention at TP8 and runs
+the routed experts with expert parallelism on the MegaMoE kernel. It has the lowest
+long-prompt time to first token of the single-node layouts: a single 340K-token prompt
+prefills in about 10 s, against about 15 s at plain TP8 (8x B300, one request at a time,
+pre-release checkpoint).
+
+Long context: decode context parallelism [#long-context-decode-context-parallelism]
+
+The Decode Context Parallelism row shards the MLA latent and indexer-key caches across
+the 8 GPUs of the TP group instead of replicating them, so DCP8 holds about 7x the KV cache
+tokens of TP8 (about 18.5M vs 2.6M tokens with FP8 KV on 8x B300). Prefill is as fast as
+at TP8. Decode steps are 7–25% slower than TP8 at the same batch, so use DCP when KV
+capacity is the limit: very long contexts or many long-lived agentic sessions.
+
+Low-latency decode [#low-latency-decode]
+
+The Low-latency decode feature switches decode steps to a fused CuTe DSL path tuned for
+small batches; prefill and mixed steps still run the default path. On 8x B300 at TP8 it cuts
+the decode step by 1.6–1.7x at batch 1 and 1.2–1.3x at batch 32–64. Under DCP8 it brings decode
+to within 6% of TP8. It requires the V2 model runner and FULL decode CUDA graphs (the
+defaults), TP8 or TP8 + DCP8, and no expert parallelism in this recipe.
+
+NVFP4 KV cache [#nvfp4-kv-cache]
+
+The NVFP4 KV cache feature stores the MLA latent in NVFP4 (352 bytes per token per layer
+instead of 576) and holds about 1.5x the KV cache tokens of FP8. The indexer keys stay FP8,
+so the top-2048 token selection is unchanged. GSM8K matched FP8 on 8x GB300 (96.1% vs 96.2%);
+long-context accuracy has not been measured yet.
+
+Prefill/decode disaggregation [#prefilldecode-disaggregation]
+
+The Prefill/Decode Disaggregation strategy runs one TP8 prefill pool (with expert
+parallelism) and one DEP16 decode pool (TP1 x DP16 with expert parallelism), and decode
+pulls each request's KV from prefill over NIXL. Every PD worker sets
+VLLM_SSM_CONV_STATE_LAYOUT=DS: NIXL transfers the Kimi Delta Attention conv state in three
+reads, which needs that layout, and the NIXL connector refuses to start without it.
+
+KV cache offloading [#kv-cache-offloading]
+
+The Simple option on the KV Offload row adds SimpleCPUOffloadConnector, a host-DRAM
+prefix tier for each GPU. Under Prefill/Decode Disaggregation it is added to the prefill pool
+only, next to NIXL in a MultiConnector; decode keeps plain NIXL. The tier pins
+cpu_bytes_to_use_per_rank of host memory for every GPU, so size it from the host DRAM that
+is free after the engines are up. The tested GB300 prefill workers used 128 GiB per GPU
+(512 GiB per tray).
+
+Client usage [#client-usage]
+
+curl http://localhost:8000/v1/chat/completions \
+ -H "Content-Type: application/json" \
+ -d '{
+ "model": "moonshotai/Kimi-K3.1-Pro",
+ "messages": [{"role": "user", "content": "Explain sparse attention in two sentences."}],
+ "temperature": 0.7,
+ "top_p": 0.95
+ }'
+
+References [#references]
+
+Model card [https://huggingface.co/moonshotai/Kimi-K3.1-Pro]
+
+Kimi-K3 recipe [https://recipes.vllm.ai/moonshotai/Kimi-K3]
+
+Configurations qualified on specific hardware, layered on the baseline command. Unless marked Opt-in, a preset applies automatically on its hardware and strategy; pick Baseline in the builder to drop it.
+
+MI355XAgentX TP8Opt-in [#preset-mi355x_agentx]
+
+Tensor Parallel · Agentic (InferenceX AgentX)
+
+Concurrency 48 on one MI355X node: TP8 with DCP8, the K3.1 DSpark draft, host KV offload and the reduced-precision knobs of the best-performance band.
+
+Use this preset [?hardware=mi355x&strategy=single_node_tp&preset=mi355x_agentx#recipe-builder]
+RunbookThroughput measurement only (synthetic acceptance)
+
+The single-node MI355X TP8 AgentX configuration at concurrency 48, from the K3.1 best-performance band. It is a BF16 serving config plus three reduced-precision knobs. It serves text with tool-call and reasoning parsers, using DCP8/A2A.
+
+Serving config.
+
+--max-num-seqs 48 and capture sizes 6 to 10240. At concurrency 48, decode batches are at most 48 requests × 6 rows (1 + 5 draft tokens), so the sizes 6 to 288 in steps of 6 cover every decode step exactly. The list then continues from 320 up to 10240, the value of --max-num-batched-tokens, to cover the prefill steps.
+
+VLLM_USE_BREAKABLE_CUDAGRAPH=1. K3.1 has no torch.compile submodule, so vLLM resolves FULL_AND_PIECEWISE to FULL_DECODE_ONLY and captures decode only. Breakable graphs are what let it capture the prefill sizes above 288 as well, so the AMD profile turns them on. They cost graph memory, which comes out of the KV cache: with the old 2-to-576 list (--max-num-seqs 96) they took 63.1 GiB and the server did not start. Keep the capture list to the sizes the workload really uses.
+
+--max-num-batched-tokens 10240. With prefix caching, the hybrid KV manager ends every non-final prefill chunk on a block boundary. In this preset (with the dense MLA DSpark draft sharing the block row) K3.1's packed DSA block is 1152 tokens, so after the decode rows a chunk floors to 9216 tokens (6912 at 8192).
+
+--gpu-memory-utilization 0.92 gives more KV. Keep at least about 6 GiB free per GPU.
+
+The indexer key cache is MXFP4 (indexer_kv_dtype). AITER needs padded FP4 indexer pages for it. Stock AITER asserts on the page stride at startup.
+
+ROCM_AITER_FA is named as the MLA prefill backend, which ROCm already picks first. VLLM_ROCM_DCP_AITER_ALLGATHER=1, the FlyDSL sparse-MLA kernels and the DSA DCP prefill paths are on. kda_prefill_backend: fused prefills the KDA layers with the fused gfx950 kernel.
+
+Spec decoding (the Spec decoding feature, on in this preset) uses the K3.1 DSpark draft (5 layers, not the K3 draft) with 5 tokens, ROCM_AITER_MLA attention, FP8 KV, probabilistic drafting and vLLM's default (standard) rejection sampler. The draft is Inferact/Kimi-K3.1-Pro-DSpark-preview [https://huggingface.co/Inferact/Kimi-K3.1-Pro-DSpark-preview].
+
+The Simple KV-offload option gets 224,875,000,000 bytes of host DRAM per rank. Size cpu_bytes_to_use_per_rank to your host.
+
+Reduced precision (best-performance band). The serving config keeps linear layers, MoE combine and all-reduce in BF16. This preset adds:
+
+--quantization-config '{"targets":{"*in_proj_qkvgfab":"fp8_per_channel"}}': only the KDA input projections are quantized online to FP8 per channel.
+
+AITER_FLYDSL_STAGE2_FP8=1: the FlyDSL MoE down projection writes its per-route outputs as MXFP8 before they are summed.
+
+VLLM_ROCM_QUICK_REDUCE_QUANTIZATION=INT4 with VLLM_ROCM_QUICK_REDUCE_MIN_SIZE_BYTES_MB=16: all-reduces of 16 MiB and more use the lossy INT4 codec. To serve with BF16 all-reduce, unset both.
+
+Drop all three for BF16 precision.
+
+Environment outside the builder. The lane also sets AITER_BF16_FP8_MOE_BOUND=0 (the SiTUv2 path does not read it), VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=1200 for long agentic prefills, PYTHONNOUSERSITE=1, HSA_NO_SCRATCH_RECLAIM=0, and HSA_SCRATCH_SINGLE_LIMIT_ASYNC=25769803776 (24 GiB), which caps a single asynchronous scratch allocation.
+
+Throughput measurement only (synthetic acceptance) [#preset-mi355x_agentx-throughput-measurement-only-synthetic-acceptance]
+
+The AgentX runs replace real verification with synthetic acceptance at the golden acceptance length for 5 draft tokens, 3.62. Only --speculative-config changes:
+
+--speculative-config '{"model":"Inferact/Kimi-K3.1-Pro-DSpark-preview","num_speculative_tokens":5,"method":"dspark","attention_backend":"ROCM_AITER_MLA","kv_cache_dtype":"fp8","draft_sample_method":"probabilistic","rejection_sample_method":"synthetic","synthetic_acceptance_length":3.62}'
+
+Synthetic acceptance skips real verification. Never use it to serve users or to evaluate accuracy.
+
+Updated 2026-11-05 Edit recipe [https://github.com/vllm-project/vllm/edit/main/recipes/models/moonshotai/Kimi-K3.1-Pro.yaml]vllm-project/vllm@c2bc949 [https://github.com/vllm-project/vllm/blob/c2bc949186b5cffa5c7b9dea18c973089e7f98ef/recipes/models/moonshotai/Kimi-K3.1-Pro.yaml] Report issue [https://github.com/vllm-project/recipes/issues]Related: Kimi-K3 [/moonshotai/Kimi-K3]
+
+GitHub [https://github.com/vllm-project/recipes]Request a recipe [https://github.com/vllm-project/recipes/issues]Documentation [https://docs.vllm.ai]Supported Models & Hardware [https://vllm.ai/#compatibility]Install vLLM [https://vllm.ai/#quick-start]JSON API [/api]

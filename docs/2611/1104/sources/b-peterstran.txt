@@ -1,0 +1,448 @@
+Kimi K3.1 Pro writes fake OpenAI ciphertext – Peter Nutter
+
+ Peter Nutter
+ [../../index.html]
+
+ [https://github.com/peternutter]
+
+ [https://x.com/PeterNutter1]
+
+ [https://www.linkedin.com/in/peternutter/]
+
+Kimi K3.1 Pro writes fake OpenAI ciphertext
+
+ Kimi K3.1 Pro sometimes sends fake OpenAI Fernet tokens instead of its report, dated late July 2026. Data, methods and caveats.
+
+Author
+
+Peter Nutter 
+
+Published
+
+Wednesday, November 4, 2026
+
+Give Kimi K3.1 Pro a send_message tool in a Codex style setup and sometimes it sends OAI ciphertext instead of its report. Or at least something that looks exactly like it
+
+The header is right and the body is noise. And the timestamp inside lands in late July 2026. Right when OAI says the distillation campaign it ties to Moonshot was running
+
+🧵 Thread on X [https://x.com/PeterNutter1/status/2118084568419045704]
+
+What happens
+
+Found this by accident running multi agent evals w Kimi. The harness gives the model Codex’s system prompt and tools. A worker agent solves a task and reports to another agent (/agent_a) w send_message
+
+In the first run Kimi sent a random looking string instead of its report in 25 of 160 episodes. There was no real token anywhere in its context. Kimi K3 never did this in our tests
+
+Right after sending one it often gets confused by what it just sent
+
+“Oops tool sent encrypted-looking message not my intended? I typed that weird string inadvertently?”
+
+What the model sees, what K3 and K3.1 Pro send, and how the header of a real token compares with Kimi’s.
+
+NoteEpisode numbers
+
+Episodes where Kimi sent a Fernet-like blob
+25 / 160 (15.6% [10.8, 22.1])
+
+ factoring task
+22 / 80
+
+ subset-sum task
+3 / 80
+
+Blob messages in those episodes
+29
+
+Blob episodes where agent A still got a readable report
+1 / 25
+
+Next-turn reasoning reacts to the blob (keyword match)
+15 / 25
+
+Episodes that retried: retry was another blob
+4 / 5
+
+Blob episodes with a real Fernet token in context
+0 / 25
+
+Rerun one day later (Oct 29)
+16 / 79
+
+Tasks were factoring a 52 bit semiprime without code (a verifier tool checks the answer) and a subset sum puzzle. Kimi ran through OpenRouter pinned to Moonshot’s own endpoint w reasoning high. The context had a Codex style <environment_context> w the date (Oct 28). A blob is anything matching gAAAA[A-Za-z0-9_-]{40,}
+
+What the string is
+
+It’s a Fernet token, which is how OAI encrypts Codex agent messages. Version byte then timestamp then IV, ciphertext and signature, all base64. So every token starts w gAAAAAB and the next two characters are the date. q is May to Nov 2026 and the one after it picks a ~3 day window
+
+Kimi gets the header right. It writes gAAAAAB w over 90% confidence and then a q. After that its logprobs are flat over base64. None of its blobs are copies of a public token. So it learned what these tokens look like, not what’s inside them
+
+Codex only started encrypting these on Jun 5 [https://github.com/openai/codex/pull/26210]. Before that they were plaintext. A plaintext option came back on Jul 28 [https://github.com/openai/codex/pull/35845]
+
+NoteLogprobs
+
+Moonshot’s own API, minimal prompt, 20 calls, 17 with a blob, top 5 logprobs per token.
+
+Quantity
+Value
+
+P(gAAAAAB), product over its tokens
+median 0.96, at least 0.9 in 16 / 17
+
+Next character is q (a 2026 date)
+p 0.74 to 0.87 in 14 / 17
+
+Body tokens after the header (n = 2,314)
+median p 0.011
+
+Body tokens with p above 0.5
+1.9%
+
+For scale a uniform pick over 64 base64 characters is 0.016 per character, and a lot of body tokens are several characters long
+
+NoteCopy test and token validity
+
+None of the 1,517 distinct Kimi blobs shares a substring of 12 or more characters (after the date characters) with any of 184,156 public Fernet strings from GitHub, Hugging Face and other sources. The same holds for all 77 LongCat blobs.
+
+Only 1,214 of 1,517 Kimi blobs are even valid base64url, and only 46 have a byte length a real Fernet token could have.
+
+Median length is 190 characters on the minimal prompt and 236 across all blobs. Character entropy is 5.7 to 5.8 bits (6 is the max for base64) vs about 4.9 for English
+
+NoteDate windows
+
+Prefix
+qV
+qW
+qX
+qY
+qZ
+qa
+qb
+qc
+
+Window starts (UTC)
+Jul 12
+Jul 15
+Jul 18
+Jul 21
+Jul 25
+Jul 28
+Jul 31
+Aug 3
+
+The 9th character steps by 218 seconds, so about 3 days. That’s the finest date step Kimi controls before the body turns random
+
+The dates
+
+With no date in the prompt Kimi’s timestamps cluster in late July. Median Jul 25 and 81% fall in Jul 1 to 28. That’s the window of the distillation campaign in OAI’s report [https://openai.com/index/disrupting-a-coordinated-model-distillation-campaign/]. OAI says operators copied encrypted reasoning into another conversation and asked the model to decrypt it, which is basically the Stolen Thoughts [https://arxiv.org/abs/2608.09867] attack. OAI ties a core cluster of the campaign to people associated with Moonshot
+
+The simplest alternative is that Kimi learned this from public Codex traces. That doesn’t seem to explain it. Public traces barely cover the peak. Jul 25 to 28 is 0.6% of 12k public tokens vs 21% of Kimi’s
+
+We can’t prove any of this was intentional ofc
+
+Orange: dates inside blobs Kimi generated. Blue: dates inside real Codex ciphertexts in public traces. Shaded: the campaign window OpenAI reported (Jul 1 to 28). Dashed lines: Codex starts encrypting (Jun 5) and adds the plaintext option (Jul 28). The orange panel pools all 1,517 Kimi blobs across prompt variants, some of which include a date; the no-date set below has the same shape.
+
+NoteNo-date baseline
+
+Minimal prompt with only send_message(target, message). Kimi K3.1 Pro via OpenRouter pinned to Moonshot, reasoning low, 150 calls. 138 had a blob (92.0% [86.5, 95.4]), 139 distinct blobs.
+
+Window
+Jul 9
+Jul 12
+Jul 15
+Jul 18
+Jul 21
+Jul 25
+Jul 28
+Jul 31
+Aug 3
+other
+
+Blobs
+4
+7
+11
+9
+31
+32
+27
+9
+2
+7
+
+23 of 139 are dated after Jul 28, and 4 before Jul 1.
+
+NoteKimi vs public traces, by window
+
+Share
+Jul 12
+Jul 15
+Jul 18
+Jul 21
+Jul 25
+Jul 28
+Jul 31
+Aug 3
+
+Public (n = 12,233)
+14.4%
+2.9%
+5.9%
+6.0%
+0.6%
+7.3%
+5.7%
+3.5%
+
+Kimi (n = 1,517)
+2.4%
+3.8%
+4.4%
+30.0%
+21.2%
+15.9%
+5.7%
+2.0%
+
+The public set is well formed Codex agent message ciphertexts, deduplicated. Its median date is Aug 14 and half are after Aug 10
+
+NoteWhere I searched, and what that can’t rule out
+
+GitHub (code search, file crawl, issues, Sourcegraph, grep.app), Hugging Face datasets, ModelScope, Gitee, AtomGit/GitCode, Kaggle (417 datasets), Zenodo, Figshare and the Wayback Machine. Only GitHub, Hugging Face and AtomGit had Codex message tokens.
+
+This is what’s public today, not in August. Deleted datasets are invisible. The Wayback Machine only kept the README pages of 1,203 deleted HF datasets
+
+Couldn’t search private ModelScope datasets, Gitee code search (needs login), GitLab and Bitbucket code search, or Gists
+
+Only the Jul 25 to 28 window is thin. Jul 21 to 25 has 6.0% of public tokens, and Jul 12 to 15 has 14.4%.
+
+62 of the 78 public Jul 25 to 28 tokens come from two HF repos made public on Jul 26 and Jul 28.
+
+17% of no-date blobs are dated after the campaign ended. None of this proves intent.
+
+NoteWith a date in the prompt
+
+Same prompt plus a Codex style <environment_context><current_date> message, 150 calls per arm. The dates move but mostly not to the date given
+
+Date in prompt
+Blob calls
+Main window (distinct blobs)
+Median blob date
+
+none
+138 / 150
+Jul 25 (32), Jul 21 (31), Jul 28 (27)
+Jul 25
+
+2026-03-15
+132 / 150
+Sep 23 (131)
+Sep 25
+
+2026-07-10
+133 / 150
+Jul 9 (108)
+Jul 10
+
+2026-09-30
+134 / 150
+Oct 24 (123)
+Oct 24
+
+2027-01-20
+132 / 150
+Aug 3 (60), Jul 31 (48)
+Aug 3
+
+What triggers it
+
+It’s mostly the argument name. Rename the message argument of send_message to report_text and the blobs go away in our test (0 of 50 vs 18 of 50). Renaming the tool or the target barely does anything
+
+So if you run K3.1 Pro in a Codex style multi agent setup just rename that argument
+
+NoteRename test
+
+10 contexts from the original episodes, replayed up to right before the report, 5 samples each
+
+Variant
+Blob calls / 50
+
+Control
+18 (36% [24, 50])
+
+Argument message renamed to report_text
+0 (0% [0, 7])
+
+ renamed to msg
+0
+
+ renamed to content
+3
+
+ renamed to text
+5
+
+Tool renamed to deliver_report
+16
+
+Target renamed to /node_7
+24
+
+Verifier says the answer is wrong
+15
+
+Messaging tools removed, report as plain text
+0
+
+Only one task and 10 contexts, and not tested in full episodes. content and text only reduce it
+
+NoteOther settings and models
+
+Setting
+Blob rate
+
+Minimal prompt, reasoning low
+138 / 150 (92%)
+
+Replayed contexts, reasoning low
+22 / 50
+
+Replayed contexts, temperature 0
+17 / 50
+
+Minimal prompt without the system prompt, with a generic one, or without Codex’s message-format block
+0 / 30 each
+
+Other messaging tools (notify, a Slack-style post_message, Claude Code’s SendMessage)
+0 / 30 each
+
+Kimi K3 (predecessor), replayed contexts, 3 providers
+0 / 90
+
+25 other open models on the minimal prompt (about 5,600 calls)
+0 blobs
+
+The one other model that does it is LongCat (below).
+
+Personality shift
+
+Kimi’s personality also shifted a lot. On AA PersonalityBench [https://artificialanalysis.ai/evaluations/aa-personalitybench] K3 was closest to GLM 5.3 and Claude Fable 5.1. K3.1 Pro is closest to GPT-6.1 Sol and Astra
+
+NoteNumbers and method
+
+Model
+Nearest profiles (Pearson r)
+
+Kimi K3
+GLM-5.3 0.95, GLM-5.3 Flash 0.93, Claude Fable 5.1 0.76
+
+Kimi K3.1 Pro
+GPT-6.1 Sol 0.86, GPT-6 Astra 0.80, GPT-6 Luna 0.74
+
+The whole GPT-6 family moved up together, so it’s not specific to one model
+
+Correlation with
+K3
+K3.1 Pro
+
+GPT-6.1 Sol
+0.05
+0.86
+
+GPT-6 Astra
+0.19
+0.80
+
+GPT-6 Luna
+0.06
+0.74
+
+GPT-6 Sol
+0.16
+0.57
+
+AA has no trait scores for GPT-5.6 Sol (it’s listed as deprecated and only has text length stats), so I can’t check if Kimi moved toward that too. 30 judged traits per model, scraped on Nov 4 and z-scored across 36 current models
+
+LongCat does it too
+
+LongCat from Meituan does the same thing. Just way less often, under 1% of calls on the same prompt, for both 2.0 and 2.5. Same OAI header, made up body, and the dates again land late Jul to early Aug
+
+But it gets weird. When I ran the open 2.0 weights myself they never did it (0 of 8000). And when forced to start a token they mostly wrote 2025 dates. The weights came out Jul 3 so the API’s late July dates are also weeks after release. No idea what the API is actually serving, didn’t dig further
+
+NoteLongCat runs
+
+Model, host
+Blob calls
+Blob dates
+
+LongCat 2.0, OpenRouter (AtlasCloud fp8), first run
+11 / 2,100 (0.5%)
+Jul 20 to Aug 10
+
+LongCat 2.0, same host, second run
+24 / 3,000 (0.8% [0.5, 1.2])
+median Jul 28
+
+LongCat 2.5, Vercel AI Gateway (served by Meituan)
+15 / 1,980 (0.8% [0.5, 1.3])
+median Jul 28
+
+LongCat 2.0 open weights (FP8), self-hosted
+0 / 8,000
+none
+
+NoteOpen weights vs the API
+
+Self hosted w SGLang on 8 B300s, same prompt (the token count matches the API exactly)
+
+API
+Open weights
+
+Message is “test” or “placeholder”
+39.7%
+0.7%
+
+Empty reasoning
+6.1%
+0.1%
+
+Median completion length (tokens)
+54
+131
+
+Blobs
+0.8%
+0 / 8,000
+
+Forced to start w gAAAAAB the open weights wrote a median date of Jul 9 2025, and only 2% land in Jul 18 to Aug 6 2026. The API’s real blobs are very unlikely under these weights. A later checkpoint behind the API would explain it but a serving difference isn’t ruled out. Didn’t test thinking off or contexts w empty reasoning
+
+NoteDate cues
+
+Unlike Kimi, LongCat doesn’t follow a date in the prompt. With a date its blob rate drops (0 to 12 per 3000 calls) and the few dates scatter
+
+Methods
+
+NoteModels, prompts and detection
+
+Kimi K3.1 Pro via OpenRouter chat completions, pinned to Moonshot’s endpoint with no fallbacks. Logprobs via Moonshot’s own API. Default temperature unless stated.
+
+Eval episodes use our multi agent harness w Codex’s system prompt and 13 Codex tools. Factoring and subset sum tasks, the worker reports to /agent_a
+
+The minimal prompt is a short agent system prompt w Codex’s message format block and one factoring task asking for a report via send_message. Max 3000 tokens
+
+Blob detection: gAAAA[A-Za-z0-9_-]{40,}. Dates are decoded from the timestamp bytes. Tokens that don’t decode count as blobs but are left out of date tables.
+
+Runs: Oct 28 to Nov 4, 2026.
+
+Brackets like [10.8, 22.1] are 95% confidence intervals (Wilson).
+
+Open questions
+
+Why late July? Fits training on traces from that window but public data is incomplete so it’s not proven
+
+What the LongCat API serves, since the open weights don’t reproduce it
+
+Whether the rename fix holds in full episodes
+
+Changelog
+
+Nov 4, 2026: first version.
