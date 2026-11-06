@@ -2,6 +2,7 @@
 
 本目录随仓库保存，供回看制作过程。文件中的任务要求、路径、模型安排与“未完成”状态属于当时的工作上下文，不自动代表当前状态。
 
+- [取证任务：1105 期（A Claude Code 把账号邮箱发给网站｜B OpenAI 两份失准报告（文件名骗评分与绕网络限制）｜C Anthropic 标签实验（Claude 按名字分资源）｜D 速览）](2026-11-05-1105-evidence.md)
 - [取证任务：1104 期（A OpenAI 用未发布模型找出948个 Linux 提权漏洞｜B Kimi-K3.1-Pro 按时放出权重【跟进1103】｜C 速览一｜D 速览二）](2026-11-04-1104-evidence.md)
 - [取证任务：1103 期（A 腾讯 Hy4 称“最强开源”与 Kimi-K3.1-Pro 权重到期【跟进1023】｜B Postman 桌面版自动给 Codex 与 Claude Code 装插件｜C 速览一｜D 速览二）](2026-11-03-1103-evidence.md)
 - [取证任务：1102 期（A GPT-6-Astra 直接改 Qwen 权重（Weight-Space Programming）｜B Anthropic 招股书修订版（S-1/A）【跟进1026速览】｜C 速览一｜D 速览二）](2026-11-02-1102-evidence.md)
