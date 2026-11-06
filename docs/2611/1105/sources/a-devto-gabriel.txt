@@ -1,0 +1,303 @@
+Claude Code Put Account Emails in User-Agent Headers. Stable 2.1.311 Lacks the Guard - DEV Community
+
+ Skip to content [#main-content]
+
+ [/]
+
+ Powered by Algolia
+
+ [https://www.algolia.com/developers/?utm_source=devto&utm_medium=referral]
+
+ Log in
+ [https://dev.to/enter?signup_subforem=1]
+
+ Create account
+ [https://dev.to/enter?signup_subforem=1&state=new-user]
+
+DEV Community
+
+ Add reaction
+
+ Like
+
+ Unicorn
+
+ Exploding Head
+
+ Raised Hands
+
+ Fire
+
+ Jump to Comments
+
+ Save
+
+ Boost
+
+Pick as gem
+
+ Copy link
+
+Copied to Clipboard
+
+ Share to X
+ [https://twitter.com/intent/tweet?text=%22Claude%20Code%20Put%20Account%20Emails%20in%20User-Agent%20Headers.%20Stable%202.1.311%20Lacks%20the%20Guard%22%20by%20Gabriel%20Anhaia%20%23DEVCommunity%20https%3A%2F%2Fdev.to%2Fgabrielanhaia%2Fclaude-code-put-account-emails-in-user-agent-headers-stable-21311-lacks-the-guard-5jl]
+
+ Share to LinkedIn
+ [https://www.linkedin.com/shareArticle?mini=true&url=https%3A%2F%2Fdev.to%2Fgabrielanhaia%2Fclaude-code-put-account-emails-in-user-agent-headers-stable-21311-lacks-the-guard-5jl&title=Claude%20Code%20Put%20Account%20Emails%20in%20User-Agent%20Headers.%20Stable%202.1.311%20Lacks%20the%20Guard&summary=Claude%20Code%27s%20model%20had%20your%20account%20email%20in%20context%20and%20sometimes%20sent%20it%20as%20a%20User-Agent%20contact.%202.1.317%20adds%20a%20check%3B%20stable%20still%20serves%202.1.311.&source=DEV%20Community]
+
+ Share to Facebook
+ [https://www.facebook.com/sharer.php?u=https%3A%2F%2Fdev.to%2Fgabrielanhaia%2Fclaude-code-put-account-emails-in-user-agent-headers-stable-21311-lacks-the-guard-5jl]
+
+ Share to Mastodon
+ [https://s2f.kytta.dev/?text=https%3A%2F%2Fdev.to%2Fgabrielanhaia%2Fclaude-code-put-account-emails-in-user-agent-headers-stable-21311-lacks-the-guard-5jl]
+
+ Share Post via... [#]
+
+ Report Abuse [/report-abuse]
+
+ [https://media2.dev.to/dynamic/image/width=1000,height=420,fit=cover,gravity=auto,format=auto/https%3A%2F%2Fdev-to-uploads.s3.us-east-2.amazonaws.com%2Fuploads%2Farticles%2F01atmkia41l2t60sxdfn.jpg]
+
+ [/gabrielanhaia]
+
+ Gabriel Anhaia [/gabrielanhaia]
+
+ Posted on Nov 6
+
+ •
+ Edited on Nov 6
+
+ •
+
+ AI-assisted
+
+ Claude Code Put Account Emails in User-Agent Headers. Stable 2.1.311 Lacks the Guard
+
+ #security [/t/security]
+ #ai [/t/ai]
+ #devtools [/t/devtools]
+ #privacy [/t/privacy]
+
+Book: Prompt Engineering Pocket Guide [https://www.amazon.com/dp/B0GX38N645]
+
+The series: Pocket Guides for Developers — 8 short books on agents, RAG, prompts, observability, events, databases and system design — the whole series [https://www.amazon.com/dp/B0GYLH38X4]
+
+My project: Hermes IDE [https://hermes-ide.com] | GitHub [https://github.com/hermes-hq/hermes-ide] — an IDE for developers who ship with Claude Code and other AI coding tools
+
+Me: xgabriel.com [https://xgabriel.com] | GitHub [https://github.com/gabrielanhaia]
+
+On November 5, a Claude Code [https://code.claude.com/docs/en/overview] user opened issue #107757 [https://github.com/anthropics/claude-code/issues/107757] and said they now get "dozens of scam emails per day." Their explanation: Claude Code put their email address in the User-Agent header of requests it made to third-party sites during web searches.
+
+It wasn't the first report. Issue #101659 [https://github.com/anthropics/claude-code/issues/101659], opened October 13, describes a research subagent sending the signed-in user's email to Liquipedia inside a curl User-Agent. Issue #102577 [https://github.com/anthropics/claude-code/issues/102577], opened October 15, says the address went to Wikipedia in four search requests. By the morning of November 6, a Hacker News thread [https://news.ycombinator.com/item?id=50385272] titled "Claude Code sends your email address to websites" had passed 900 points, and a member of the Claude Code team had answered in it. StartupHub.ai [https://www.startuphub.ai/ai-news/artificial-intelligence/2026/claude-code-sent-your-email-in-user-agent] covered the report the same day.
+
+Anthropic has shipped a partial guard, and a Claude Code team member says on Hacker News that the email comes out of the model's context in a release expected early next week. As of November 6, the stable release channel doesn't have the guard.
+
+ [#what-claude-code-sent-and-why]
+ What Claude Code sent, and why
+
+The explanation came from the Claude Code team member on Hacker News [https://news.ycombinator.com/item?id=50385272]. For signed-in users, Claude Code put the account email address into the model's context. It was added because "Users had reported Claude would hallucinate names for things like @author tags." Sometimes Claude then wrote that address into the User-Agent of a curl call, as a contact.
+
+Plenty of sites ask scripted clients to identify themselves. Wikimedia's User-Agent policy [https://foundation.wikimedia.org/wiki/Policy:Wikimedia_Foundation_User-Agent_Policy] warns: "Scripts should use an informative User-Agent string with contact information, or they may be blocked without notice." Its example header includes a contact email address. The SEC's EDGAR access page [https://www.sec.gov/os/accessing-edgar-data] asks you to declare your user agent and shows a sample header made of a company name and an admin contact email. Liquipedia asks API clients for a contact too, according to the #101659 report [https://github.com/anthropics/claude-code/issues/101659].
+
+So the model followed the site's etiquette, and the only contact address it had was yours.
+
+The #101659 reporter adds one more detail. According to the issue [https://github.com/anthropics/claude-code/issues/101659], the session context already told the model not to send that email to unrelated services unless the user asked. It sent it anyway, and the site returned a 403.
+
+ [https://media2.dev.to/dynamic/image/width=800%2Cheight=%2Cfit=scale-down%2Cgravity=auto%2Cformat=auto/https%3A%2F%2Fdev-to-uploads.s3.us-east-2.amazonaws.com%2Fuploads%2Farticles%2F0041edbz9odsbm7eqkrn.png]
+
+The address was in the model's context, so a "polite" curl call could carry it to any site that asked for a contact.
+
+ [#what-21317-adds-in-its-own-words]
+ What 2.1.317 adds, in its own words
+
+Claude Code 2.1.317 [https://github.com/anthropics/claude-code/releases/tag/v2.1.317], released November 3, lists this change: "Added a check that asks before a web or shell tool call sends your account email address to the network."
+
+On issue #107757 [https://github.com/anthropics/claude-code/issues/107757], a Claude Code contributor said the check is a built-in mod called cc-plugin-privacy, meant "to deterministically block this behavior." It's on by default, and you can turn it off via /plugins.
+
+Anthropic publishes the mod's source in the claude-code repo [https://github.com/anthropics/claude-code/tree/main/mods/privacy], and its README is blunter than the changelog. It describes one tool.check hook. A Bash, PowerShell or Monitor call whose input holds the account address and names a User-Agent is refused. "The refusal raises no prompt, whoever is there and whatever the permission mode." The same README says WebFetch, WebSearch and MCP tools aren't checked, and it describes itself in one line: "This is a courtesy, not a boundary, and it covers one shape."
+
+That README [https://github.com/anthropics/claude-code/tree/main/mods/privacy] also lists what gets through:
+
+the address with no User-Agent named, for example in a URL, a request body or a From: header
+
+a computed value such as $(git config user.email), a variable, or a script that holds the address
+
+a client the mod doesn't name, any encoding other than one pass of percent-encoding, and a non-ASCII address that's percent-encoded
+
+The changelog says "asks." The published source says it refuses without a prompt and doesn't cover web tools. Those don't match, and I haven't run either build myself. Read the source if you depend on this.
+
+The team member on Hacker News was clear that this is a stopgap: "But it still doesn't prevent all cases, like when Claude writes a script and runs on its own." The real fix is different. "We're removing the account email address from the context Claude Code gives the model," the same comment [https://news.ycombinator.com/item?id=50385272] says, in a release expected early next week.
+
+Reports are still coming in. On November 6, one commenter on #107757 [https://github.com/anthropics/claude-code/issues/107757#issuecomment-6676218676] reported that the mod, shown as enabled, didn't refuse a harmless test echo it's documented to refuse, on 2.1.317 and 2.1.318. Another [https://github.com/anthropics/claude-code/issues/107757#issuecomment-6676028953] wrote that they were on 2.1.318 with no cc-plugin-privacy and that their logs showed the email going to other domains; they didn't post the logs. Anthropic hadn't responded to either one on the issue when this was written.
+
+ [https://media2.dev.to/dynamic/image/width=800%2Cheight=%2Cfit=scale-down%2Cgravity=auto%2Cformat=auto/https%3A%2F%2Fdev-to-uploads.s3.us-east-2.amazonaws.com%2Fuploads%2Farticles%2Fyksa7awyaqk91h90i6zi.png]
+
+The mod refuses one shape: a shell call that holds the address and names a User-Agent.
+
+ [#stable-is-still-on-21311]
+ Stable is still on 2.1.311
+
+This is the part you can act on today. The Hacker News comment [https://news.ycombinator.com/item?id=50385272] says: "The stable channel is still on 2.1.311, so update to 2.1.317 or later."
+
+The setup docs [https://code.claude.com/docs/en/setup] explain the channels. latest is the default and gets releases right away. stable serves "a version that is typically about one week old." The Homebrew claude-code cask tracks stable, and so do the apt, dnf and apk stable repositories. If you picked stable on purpose, you're on a build without the check.
+
+Check your version, then move up. The commands come from the setup docs [https://code.claude.com/docs/en/setup]:
+
+# Which build is running?
+claude --version
+
+# On the latest channel: pull the newest build now
+claude update
+
+# Native install on stable: install a build with the check
+curl -fsSL https://claude.ai/install.sh | bash -s 2.1.317
+
+# Homebrew: the claude-code cask is stable, so switch casks
+brew uninstall --cask claude-code
+brew install --cask claude-code@latest
+
+claude update won't move a Homebrew install, and brew upgrade claude-code keeps you on the stable cask. On apt, dnf or apk, the channel is set by the repository, so point it at the latest repository URL shown in the setup docs [https://code.claude.com/docs/en/setup] until stable passes 2.1.317.
+
+To stay on stable without sliding back below the fix, add a floor in settings.json. The docs say auto-updates and claude update "refuse to install any version below this value." In managed settings [https://code.claude.com/docs/en/managed-settings], the same key sets an organization-wide minimum.
+
+{
+ "autoUpdatesChannel": "stable",
+ "minimumVersion": "2.1.317"
+}
+
+Then check that the mod is actually on: open /plugins, where the contributor on #107757 [https://github.com/anthropics/claude-code/issues/107757] says it can be switched off, and confirm it's enabled. The mod's README [https://github.com/anthropics/claude-code/tree/main/mods/privacy] lists several ways it can end up off. One is "cc-plugin-privacy@builtin": false under enabledPlugins in user or managed settings, and an admin can set the managed one for you; a repository's settings can't. Others include /plugin disable, the --settings flag, a server-side switch, and another installed plugin's hook overruling the refusal.
+
+ [#the-model-can-only-leak-whats-in-its-context]
+ The model can only leak what's in its context
+
+This incident touched three levels of control, and your own setups have the same three. A line in CLAUDE.md or AGENTS.md asks the model to behave. A hook checks the shapes you thought of. Taking the value out of the context window [https://news.ycombinator.com/item?id=50385272] is the only one the model can't get around. Before you paste a customer record or a teammate's address into a session, assume a tool call can carry it somewhere you didn't pick.
+
+Some sites really do need a contact for scripted traffic, and Wikimedia's policy says they can block clients without one. Give your agent an address you're happy to publish, such as a role inbox like bots@example.com, and name it in your project instructions. Then the polite path doesn't need your personal one.
+
+What's in your agent's context right now that you wouldn't want in a request header? Tell me in the comments.
+
+ [#if-this-was-useful]
+ If this was useful
+
+I build Hermes IDE [https://hermes-ide.com/download], a free, source-available desktop app that runs Claude Code, Codex and other agents side by side, each in its own real terminal, so it runs whichever claude build you installed and the update above applies there too (GitHub [https://github.com/hermes-hq/hermes-ide]; not affiliated with Anthropic).
+
+This whole incident is a context-engineering lesson: what you put in the window, what an instruction can and can't stop, and where a deterministic check has to take over. The Prompt Engineering Pocket Guide [https://www.amazon.com/dp/B0GX38N645] covers those trade-offs for system prompts, project instruction files and tool-using agents. It's one of 8 short books in the Pocket Guides for Developers series, on agents, RAG, prompts, observability, events, databases and system design: the whole series is here [https://www.amazon.com/dp/B0GYLH38X4].
+
+ [https://www.amazon.com/dp/B0GX38N645]
+
+ Top comments (0)
+
+ Subscribe
+
+ Submit
+ Preview
+ Dismiss [/404.html]
+
+ Code of Conduct [/code-of-conduct]
+ •
+ Report abuse [/report-abuse]
+
+ Gabriel Anhaia
+
+ [/gabrielanhaia]
+
+ Follow
+
+ Senior Software Engineer @ Ordio · 10+ years in backend, distributed systems & AI agents · Creator of Hermes IDE (AI-native terminal) & Neural Playground · Author of 2 books · Open-source enthusiast
+
+ Location
+
+ Berlin, Germany
+
+ Work
+
+ Software Engineer and Book Author
+
+ Joined
+
+ Jul 6, 2020
+
+ More from Gabriel Anhaia [/gabrielanhaia]
+
+ Go 1.27 Adds crypto/mldsa. A Post-Quantum Signature Is 3,309 Bytes; Ed25519's Is 64
+
+ #go
+ #security
+ #cryptography
+ #tutorial
+
+ [/gabrielanhaia/go-127-adds-cryptomldsa-a-post-quantum-signature-is-3309-bytes-ed25519s-is-64-2joe]
+
+ Moved Your Repo Folder? Every Agent Worktree Broke. git worktree repair Fixes It
+
+ #git
+ #ai
+ #tutorial
+ #productivity
+
+ [/gabrielanhaia/moved-your-repo-folder-every-agent-worktree-broke-git-worktree-repair-fixes-it-2mf0]
+
+ DEV Community [/] — A space to discuss and keep up software development and manage your software career
+
+ Home
+ [/]
+
+ DEV Challenges
+ [/challenges]
+
+ DEV++
+ [/++]
+
+ Videos
+ [/videos]
+
+ DEV Education Tracks
+ [/deved]
+
+ DEV Help
+ [/help]
+
+ Advertise on DEV
+ [/advertise]
+
+ Organization Accounts
+ [/organizations]
+
+ DEV Showcase
+ [/showcase]
+
+ About
+ [/about]
+
+ Contact
+ [/contact]
+
+ Free Postgres Database
+ [/free-postgres-database-tier]
+
+ DEV Shop
+ [https://shop.forem.com/]
+
+ MLH
+ [https://mlh.io/]
+
+ Code of Conduct
+ [/code-of-conduct]
+
+ Privacy Policy
+ [/privacy]
+
+ Terms of Use
+ [/terms]
+
+Built on Forem [https://www.forem.com] — the open source [https://dev.to/t/opensource] software that powers DEV [https://dev.to] and other inclusive communities.
+
+Made with love and Ruby on Rails [https://dev.to/t/rails]. DEV Community © 2016 - 2026.
+
+ We're a place where coders share, stay up-to-date and grow their careers.
+
+ Log in
+ [https://dev.to/enter?signup_subforem=1]
+
+ Create account
+ [https://dev.to/enter?signup_subforem=1&state=new-user]
