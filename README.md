@@ -55,6 +55,7 @@ AI 吠点是由 **[Develata](https://github.com/Develata)** 主理的独立内�
 | 2026 / 1103 | [腾讯最强开源没权重？软件偷装AI插件？](docs/2611/1103/doc_1103_publish.txt) | [配图说明](docs/2611/1103/images/README.md) | [来源入口](docs/2611/1103/sources/README.md) |
 | 2026 / 1104 | [花121万美元，AI挖出948个漏洞？](docs/2611/1104/doc_1104_publish.txt) | [配图说明](docs/2611/1104/images/README.md) | [来源入口](docs/2611/1104/sources/README.md) |
 | 2026 / 1105 | [Claude泄邮箱？AI改文件名骗分？](docs/2611/1105/doc_1105_publish.txt) | [配图说明](docs/2611/1105/images/README.md) | [来源入口](docs/2611/1105/sources/README.md) |
+| 2026 / 1106 | [造超级AI判20年？一年就到超级智能？](docs/2611/1106/doc_1106_publish.txt) | [配图说明](docs/2611/1106/images/README.md) | [来源入口](docs/2611/1106/sources/README.md) |
 
 正文采用可直接复制的纯文本，图片单独保存。阅读或发布时不需要依赖 Markdown 插图。
 
