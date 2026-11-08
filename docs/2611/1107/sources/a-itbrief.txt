@@ -1,0 +1,392 @@
+Claude Code can leak secrets in public npm packages
+
+ IT Brief New Zealand - Technology news for CIOs & IT decision-makers
+
+ New Zealand
+
+ [/]
+
+ Powered By
+
+ [https://techday.co.nz]
+
+ Guides
+
+ AI Agents [https://itbrief.co.nz/tag/ai-agents]
+ Artificial Intelligence [https://itbrief.co.nz/tag/artificial-intelligence]
+ Digital Transformation [https://itbrief.co.nz/tag/digital-transformation]
+ Disaster Recovery [https://itbrief.co.nz/tag/disaster-recovery]
+ Hybrid & Remote Work [https://itbrief.co.nz/tag/hybrid-remote-work]
+
+ Data Protection
+ [https://itbrief.co.nz/tag/data-protection]
+
+ Application Security
+ [https://itbrief.co.nz/tag/application-security]
+
+ DevSecOps
+ [https://itbrief.co.nz/tag/devsecops]
+
+ Claude Code can leak secrets in public npm packages
+
+ Thu, 23rd Apr 2026
+
+ SHANNON WILLIAMS
+
+ News Editor
+
+ [/author/shannonw]
+
+Check Point researchers found that Anthropic's Claude Code can cause API keys and other credentials to be included in public npm packages. The issue centres on a local settings file that can be published without any obvious warning.
+
+The researchers examined how Claude Code stores approved shell commands in .claude/settings.local.json within a project directory. If that directory is later used to publish an npm package, the file can be included unless developers explicitly exclude it through .npmignore or package configuration.
+
+The file records commands users have chosen to "allow always" under Claude Code's permission model. According to the findings, those commands can include credentials entered inline at the time of approval, such as tokens, passwords, and bearer headers.
+
+What Was Found
+
+To measure the scale of the problem, the team built a TypeScript service to monitor the npm registry's CouchDB changes feed. For each new or updated package in the scan window, it fetched the tarball and checked for the Claude settings file.
+
+Among about 46,500 monitored packages, 428 contained a .claude/settings.local.json file. Of those, 33 files across 30 packages included credentials, meaning roughly one in thirteen exposed settings files contained sensitive data.
+
+The exposed material included npm authentication tokens, plaintext npm login credentials, GitHub personal access tokens, Telegram bot tokens, production bearer tokens for third-party services, Hugging Face API tokens, and test email and password pairs embedded in commands.
+
+The issue stems from a gap in npm's default publishing flow. Hidden dotfiles do not necessarily stand out during package preparation, and there is no standard exclusion for the .claude directory.
+
+As a result, a file meant to store local permissions can be published to the public registry if a developer does not manually block it. Its name suggests it is local and environment-specific, but unlike .env files, it does not benefit from broad awareness or routine tooling checks.
+
+Why It Matters
+
+Published npm package tarballs are effectively permanent. Even if a version is later deprecated, it is not removed from the registry in a way that guarantees the original contents disappear, and cached copies may remain accessible.
+
+Any credential included in a published tarball should therefore be treated as compromised once the package is released. In practice, developers would need to rotate npm tokens, GitHub tokens, and any other affected credentials.
+
+The findings add to broader concerns about software generated or managed with AI tools, particularly when developers trust automated defaults in security-related workflows. Here, the problem was not that the file was malicious, but that a routine approval process could quietly create a record of sensitive command strings.
+
+Developers using AI coding assistants often approve large numbers of shell commands during routine work. A command that includes an authentication header, a token in an environment variable, or login credentials can therefore be saved permanently if the user selects persistent approval rather than one-time execution.
+
+Simple Fix
+
+The main mitigation is straightforward: exclude the .claude directory from npm packages by adding it to .npmignore. The researchers also advised adding the settings file to .gitignore and checking package contents before release with a dry run.
+
+Developers who rely on the files field in package.json should still verify that the directory is not being included. Reviewing already published versions is also important, particularly for packages released while Claude Code was in active use.
+
+Steve Giguere, Principal AI Security Advocate at Check Point Software, said the issue shows that existing software hygiene practices do not automatically cover new AI-related files.
+
+"Files like .npmignore and .gitignore exist for one main reason: don't ship secrets. What this research highlights is that AI coding assistants are introducing entirely new ways those secrets can be created, stored, and accidentally exposed. Even when these safeguards are generated by AI, the system doesn't yet understand how to protect itself from itself. For organizations, the takeaway is simple: don't assume AI-generated safeguards are correct just because they look right. Any files created for defensive purposes, like ignore rules or security configurations, should have a human in the loop to validate that they actually do what they're intended to do," Giguere said.
+
+ Explore with AI
+
+ ChatGPT
+
+ Key takeaways
+ [https://chatgpt.com/?q=Summarise%20the%20key%20takeaways%20from%20this%20TechDay%20article%3A%20Claude%20Code%20can%20leak%20secrets%20in%20public%20npm%20packages%20https%3A%2F%2Fitbrief.co.nz%2Fstory%2Fclaude-code-can-leak-secrets-in-public-npm-packages]
+
+ Explain why it matters
+ [https://chatgpt.com/?q=Explain%20why%20this%20TechDay%20article%20matters%20for%20me%3A%20Claude%20Code%20can%20leak%20secrets%20in%20public%20npm%20packages%20https%3A%2F%2Fitbrief.co.nz%2Fstory%2Fclaude-code-can-leak-secrets-in-public-npm-packages]
+
+ Create action plan
+ [https://chatgpt.com/?q=Create%20a%20practical%20action%20plan%20for%20me%20from%20this%20TechDay%20article%3A%20Claude%20Code%20can%20leak%20secrets%20in%20public%20npm%20packages%20https%3A%2F%2Fitbrief.co.nz%2Fstory%2Fclaude-code-can-leak-secrets-in-public-npm-packages]
+
+ Future watch
+ [https://chatgpt.com/?q=What%20future%20developments%20should%20I%20watch%20after%20this%20TechDay%20article%3F%20Claude%20Code%20can%20leak%20secrets%20in%20public%20npm%20packages%20https%3A%2F%2Fitbrief.co.nz%2Fstory%2Fclaude-code-can-leak-secrets-in-public-npm-packages]
+
+ Claude
+
+ Key takeaways
+ [https://claude.ai/new?q=Summarise%20the%20key%20takeaways%20from%20this%20TechDay%20article%3A%20Claude%20Code%20can%20leak%20secrets%20in%20public%20npm%20packages%20https%3A%2F%2Fitbrief.co.nz%2Fstory%2Fclaude-code-can-leak-secrets-in-public-npm-packages]
+
+ Explain why it matters
+ [https://claude.ai/new?q=Explain%20why%20this%20TechDay%20article%20matters%20for%20me%3A%20Claude%20Code%20can%20leak%20secrets%20in%20public%20npm%20packages%20https%3A%2F%2Fitbrief.co.nz%2Fstory%2Fclaude-code-can-leak-secrets-in-public-npm-packages]
+
+ Create action plan
+ [https://claude.ai/new?q=Create%20a%20practical%20action%20plan%20for%20me%20from%20this%20TechDay%20article%3A%20Claude%20Code%20can%20leak%20secrets%20in%20public%20npm%20packages%20https%3A%2F%2Fitbrief.co.nz%2Fstory%2Fclaude-code-can-leak-secrets-in-public-npm-packages]
+
+ Future watch
+ [https://claude.ai/new?q=What%20future%20developments%20should%20I%20watch%20after%20this%20TechDay%20article%3F%20Claude%20Code%20can%20leak%20secrets%20in%20public%20npm%20packages%20https%3A%2F%2Fitbrief.co.nz%2Fstory%2Fclaude-code-can-leak-secrets-in-public-npm-packages]
+
+ Perplexity
+
+ Key takeaways
+ [https://www.perplexity.ai/search?q=Summarise%20the%20key%20takeaways%20from%20this%20TechDay%20article%3A%20Claude%20Code%20can%20leak%20secrets%20in%20public%20npm%20packages%20https%3A%2F%2Fitbrief.co.nz%2Fstory%2Fclaude-code-can-leak-secrets-in-public-npm-packages]
+
+ Explain why it matters
+ [https://www.perplexity.ai/search?q=Explain%20why%20this%20TechDay%20article%20matters%20for%20me%3A%20Claude%20Code%20can%20leak%20secrets%20in%20public%20npm%20packages%20https%3A%2F%2Fitbrief.co.nz%2Fstory%2Fclaude-code-can-leak-secrets-in-public-npm-packages]
+
+ Create action plan
+ [https://www.perplexity.ai/search?q=Create%20a%20practical%20action%20plan%20for%20me%20from%20this%20TechDay%20article%3A%20Claude%20Code%20can%20leak%20secrets%20in%20public%20npm%20packages%20https%3A%2F%2Fitbrief.co.nz%2Fstory%2Fclaude-code-can-leak-secrets-in-public-npm-packages]
+
+ Future watch
+ [https://www.perplexity.ai/search?q=What%20future%20developments%20should%20I%20watch%20after%20this%20TechDay%20article%3F%20Claude%20Code%20can%20leak%20secrets%20in%20public%20npm%20packages%20https%3A%2F%2Fitbrief.co.nz%2Fstory%2Fclaude-code-can-leak-secrets-in-public-npm-packages]
+
+ Grok
+
+ Key takeaways
+ [https://grok.com/?q=Summarise%20the%20key%20takeaways%20from%20this%20TechDay%20article%3A%20Claude%20Code%20can%20leak%20secrets%20in%20public%20npm%20packages%20https%3A%2F%2Fitbrief.co.nz%2Fstory%2Fclaude-code-can-leak-secrets-in-public-npm-packages]
+
+ Explain why it matters
+ [https://grok.com/?q=Explain%20why%20this%20TechDay%20article%20matters%20for%20me%3A%20Claude%20Code%20can%20leak%20secrets%20in%20public%20npm%20packages%20https%3A%2F%2Fitbrief.co.nz%2Fstory%2Fclaude-code-can-leak-secrets-in-public-npm-packages]
+
+ Create action plan
+ [https://grok.com/?q=Create%20a%20practical%20action%20plan%20for%20me%20from%20this%20TechDay%20article%3A%20Claude%20Code%20can%20leak%20secrets%20in%20public%20npm%20packages%20https%3A%2F%2Fitbrief.co.nz%2Fstory%2Fclaude-code-can-leak-secrets-in-public-npm-packages]
+
+ Future watch
+ [https://grok.com/?q=What%20future%20developments%20should%20I%20watch%20after%20this%20TechDay%20article%3F%20Claude%20Code%20can%20leak%20secrets%20in%20public%20npm%20packages%20https%3A%2F%2Fitbrief.co.nz%2Fstory%2Fclaude-code-can-leak-secrets-in-public-npm-packages]
+
+ Share
+ [https://www.linkedin.com/feed/?shareActive=true&text=Hundreds%20of%20packages%20could%20have%20exposed%20API%20keys%20and%20logins%20after%20Claude%20Code%20saved%20approved%20commands%20in%20a%20file%20npm%20may%20publish%20by%20default.%20https%3A%2F%2Fitbrief.co.nz%2Fstory%2Fclaude-code-can-leak-secrets-in-public-npm-packages]
+
+ Share
+ [https://x.com/intent/post?text=Hundreds%20of%20packages%20could%20have%20exposed%20API%20keys%20and%20logins%20after%20Claude%20Code%20saved%20approved%20commands%20in%20a%20file%20npm%20may%20publish%20by%20default.%20%40techday_nz&url=https%3A%2F%2Fitbrief.co.nz%2Fstory%2Fclaude-code-can-leak-secrets-in-public-npm-packages]
+
+ Add us as a preferred source on Google
+ [https://www.google.com/preferences/source?q=itbrief.co.nz]
+
+ Related stories
+
+ SHI warns firms to prepare for quantum security risks
+
+ [/story/shi-warns-firms-to-prepare-for-quantum-security-risks]
+
+ AI security incidents expose new criminal tradeoffs
+
+ [/story/ai-security-incidents-expose-new-criminal-tradeoffs]
+
+ Microsoft warns AI is deepening cyber threat links
+
+ [/story/microsoft-warns-ai-is-deepening-cyber-threat-links]
+
+ Secure Code Warrior launches Citizen AI training programme
+
+ [/story/secure-code-warrior-launches-citizen-ai-training-programme]
+
+ Kobalt.io signs security partnerships across North America
+
+ [/story/kobalt-io-signs-security-partnerships-across-north-america]
+
+ Top stories
+
+ Data centre power market set to hit USD $107 billion
+
+ [/story/data-centre-power-market-set-to-hit-usd-107-billion]
+
+ Google Cloud unveils self-learning context tools for AI
+
+ [/story/google-cloud-unveils-self-learning-context-tools-for-ai]
+
+ Brivo launches AI tool for security systems resellers
+
+ [/story/brivo-launches-ai-tool-for-security-systems-resellers]
+
+ Uptiq launches GovernAI for financial institutions
+
+ [/story/uptiq-launches-governai-for-financial-institutions]
+
+ Reco & Cyera rank AI agent risks from sensitive data
+
+ [/story/reco-cyera-rank-ai-agent-risks-from-sensitive-data]
+
+ [https://techday.co.nz]
+
+ 61 specialist sites.
+
+ 8 regions. One network.
+
+ 785,561
+
+Published stories
+
+ 7
+
+ Kiwi sites
+
+Human
+
+POWERED
+
+ 21st
+
+year of business
+
+Get the latest from
+
+IT Brief New Zealand
+
+ Subscribe
+
+ [/subscribe]
+
+Follow us on
+
+LinkedIn
+
+ [https://www.linkedin.com/company/techdaynz]
+
+Follow us on
+
+X
+
+ [https://x.com/techday_nz]
+
+ [https://cfotech.co.nz]
+
+ Kiwi
+
+ FinTech
+
+ Technology news for CFOs & financial decision-makers
+
+ Visit
+
+ [https://cfotech.co.nz]
+
+ Media kit
+ [https://cfotech.co.nz/media-kit]
+
+ [https://channellife.co.nz]
+
+ Kiwi
+
+ Industry
+
+ Industry insider news for technology resellers
+
+ Visit
+
+ [https://channellife.co.nz]
+
+ Media kit
+ [https://channellife.co.nz/media-kit]
+
+ [https://ecommercenews.co.nz]
+
+ Kiwi
+
+ Commerce
+
+ Technology news for digital commerce decision-makers
+
+ Visit
+
+ [https://ecommercenews.co.nz]
+
+ Media kit
+ [https://ecommercenews.co.nz/media-kit]
+
+ [https://futurefive.co.nz]
+
+ Kiwi
+
+ Consumer tech
+
+ Consumer technology news & reviews from the future
+
+ Visit
+
+ [https://futurefive.co.nz]
+
+ Media kit
+ [https://futurefive.co.nz/media-kit]
+
+ [https://itbrief.co.nz]
+
+ Kiwi
+
+ Enterprise
+
+ Technology news for CIOs & IT decision-makers
+
+ Visit
+
+ [https://itbrief.co.nz]
+
+ Media kit
+ [https://itbrief.co.nz/media-kit]
+
+ [https://securitybrief.co.nz]
+
+ Kiwi
+
+ Cybersecurity
+
+ Technology news for CISOs & cybersecurity decision-makers
+
+ Visit
+
+ [https://securitybrief.co.nz]
+
+ Media kit
+ [https://securitybrief.co.nz/media-kit]
+
+ [https://telconews.co.nz]
+
+ Kiwi
+
+ Telecomms
+
+ Telecommunications news for ICT decision-makers
+
+ Visit
+
+ [https://telconews.co.nz]
+
+ Media kit
+ [https://telconews.co.nz/media-kit]
+
+Explore other regions
+
+ Asia
+ [https://techday.asia]
+
+ Australia
+ [https://techday.com.au]
+
+ Canada
+ [https://techdayca.com]
+
+ India
+ [https://techday.in]
+
+ Ireland
+ [https://techday.ie]
+
+ United Kingdom
+ [https://techday.co.uk]
+
+ United States
+ [https://techday.com]
+
+ Brand guidelines
+ [/brand-guidelines]
+
+ Contact us
+ [/contact-us]
+
+ Editorial calendar
+ [https://techday.co.nz/editorial-calendar]
+
+ Editorial standards
+ [/faqs#faq-section-1]
+
+ FAQs
+ [/faqs]
+
+ Media kit
+ [/media-kit]
+
+ Our team
+ [/our-team]
+
+ Our terms
+ [/our-terms]
+
+ YouTube
+
+ [https://www.youtube.com/@techdaynetwork]
+
+ RSS
+
+ [https://itbrief.co.nz/feed]
+
+ © 2026 TechDay, All rights reserved.
+ Hosted on Plan B's Cloud Services [https://www.planb.co.nz/tech-services/cloud-services/?utm_content=techday&utm_source=techday&utm_medium=techday&utm_campaign=techday]. DMARC protection by PowerDMARC [https://powerdmarc.com/?utm_content=techday&utm_source=techday&utm_medium=techday&utm_campaign=techday].

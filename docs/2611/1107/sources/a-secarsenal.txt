@@ -1,0 +1,551 @@
+Claude Code "Don't Ask Again" File Leaks 1,122 Public GitHub Repos — Detection and Remediation Guide | Security Arsenal | Security Arsenal
+
+ [/]
+
+Services
+
+Products
+
+Resources
+
+Certifications
+About [/about]Contact [/contact]
+
+(972) 999-990024/7 NOC [tel:9729999900]Portal [/portal/dashboard]
+
+ Back to Intelligence [/blog]
+Claude Code "Don't Ask Again" File Leaks 1,122 Public GitHub Repos — Detection and Remediation Guide
+
+SA
+Security Arsenal Team
+
+November 7, 2026
+
+13 min read
+
+Security researchers at Apiiro disclosed yesterday that Anthropic's Claude Code AI coding assistant is inadvertently writing plaintext credentials into project settings files, which developers are then committing to public GitHub repositories. As of this writing, 1,122 public repos contain hardcoded passwords, API keys, and other secrets exposed in files created when users select the "Yes, and don't ask again" option during command approval prompts.
+
+This is not a vulnerability in Claude Code's model weights or a remote exploit — it's a default behavior in the tool's permission persistence mechanism that writes the exact command string, including inline secrets, to a local configuration file. When that file lands in version control, the credentials become public, indexed, and effectively compromised.
+
+If your organization uses Claude Code in development environments, you must audit all repos — public and private — for these settings files, rotate any exposed credentials, and implement guardrails to prevent recurrence. This post provides detection rules, hunt queries, and remediation steps.
+
+What Happened
+
+Claude Code is Anthropic's terminal-based AI coding assistant. It can execute shell commands on behalf of the user after requesting approval. When a user approves a command and selects "Yes, and don't ask again," Claude Code saves that command string to a project-level settings file so it can auto-approve the same command in future sessions.
+
+The problem: if the approved command contains inline secrets — API keys, passwords, tokens, database connection strings — those secrets are saved verbatim in the settings file. Developers then commit this file to Git, push to GitHub, and the credentials are now public.
+
+Apiiro's research identified 1,122 public GitHub repositories containing these settings files with live credentials. The exposed secrets include:
+
+Cloud provider API keys (AWS, GCP, Azure)
+
+Database passwords and connection strings
+
+Third-party SaaS API tokens (OpenAI, Stripe, Twilio, etc.)
+
+SSH private key passphrases
+
+Internal service credentials
+
+This is a supply-chain and DevSecOps risk: AI coding tools are now writing secrets to disk by default, and standard developer workflows (commit, push) are leaking them.
+
+Affected Products and Platforms
+
+Product: Anthropic Claude Code (CLI-based AI coding assistant)
+
+Platforms: macOS, Linux, Windows (WSL)
+
+Affected Component: Permission persistence mechanism ("don't ask again" feature)
+
+File Locations:
+
+.claude/settings.json (project-level)
+
+.claude/settings.local.json (local overrides)
+
+~/.claude/settings.json (user-global, less likely to be committed)
+
+The settings files store approved commands as JSON arrays or objects under keys like allowedTools, trustedCommands, or similar permission structures. If a user approved a command like:
+
+Bash / Shell
+Copy
+
+curl -H "Authorization: Bearer sk-abc123..." https://api.example.com
+
+…the entire string, including the sk-abc123... token, is saved in the settings file.
+
+CVE Identifier: None assigned (as of publication). This is a design/default-behavior issue, not a memory corruption or auth bypass.
+
+CVSS: Not applicable (no CVE). Severity is High from a credential-exposure and supply-chain perspective.
+
+How the Exposure Works
+
+Attack Chain (Defender's View)
+
+Developer runs Claude Code in a project directory.
+
+Claude Code proposes a command that includes inline secrets (e.g., aws s3 cp --profile prod --region us-east-1 or curl -u user:pass https://internal-api).
+
+Developer selects "Yes, and don't ask again" to avoid repeated prompts.
+
+Claude Code writes the command string (with secrets) to .claude/settings.json or .claude/settings.local.json.
+
+Developer commits and pushes the project to GitHub without excluding .claude/.
+
+Secrets are now public, indexed by GitHub search, secret-scanning tools, and threat actors.
+
+Attacker discovers the repo, extracts credentials, and gains access to cloud accounts, databases, or internal APIs.
+
+Why This Is Dangerous
+
+Secrets are in plaintext — no encryption, no obfuscation.
+
+Settings files are often committed — .claude/ is not in default .gitignore templates.
+
+Git history preserves secrets — even if the file is deleted later, credentials remain in commit history unless force-pushed or repo is scrubbed.
+
+Public indexing — GitHub code search, Google, and tools like truffleHog, gitleaks, and GitHub's own secret scanning index these files within minutes.
+
+AI tool adoption is accelerating — Claude Code, GitHub Copilot, Cursor, and similar tools are being adopted rapidly in enterprise environments without corresponding security guardrails.
+
+Exploitation Status
+
+In-the-Wild Exploitation: Confirmed. Apiiro found 1,122 public repos with exposed secrets. Threat actors actively monitor GitHub for leaked credentials using automated scanning tools.
+
+PoC / Public Disclosure: Apiiro published findings on 2026-11-05. Security researchers and attackers are actively searching GitHub for .claude/settings.json and similar files.
+
+CISA KEV: Not applicable (no CVE).
+
+Vendor Response: Anthropic has not yet released a patch or configuration change to redact secrets from saved commands (as of publication). Users must manually exclude .claude/ from version control and rotate exposed credentials.
+
+Detection & Response
+
+This is a technical threat — a credential exposure via developer tooling. Below are detection rules and hunt queries to identify exposed secrets in your environment.
+
+SIGMA Rules
+
+The following Sigma rules detect:
+
+Git commits or file writes that include .claude/settings.json or .claude/settings.local.json.
+
+Suspicious patterns in command-line or file content that suggest inline secrets in approved commands.
+
+YAML
+Rule 1 .ymlRule 2 .ymlRule 3 .ymlCopy
+
+---
+title: Claude Code Settings File Committed to Git
+id: 8a3f2c91-7e4b-4d12-bc34-5f6a8d901234
+status: experimental
+description: Detects git commits or file system writes of Claude Code settings files that may contain saved commands with inline secrets.
+references:
+ - https://thehackernews.com/2026/11/claude-codes-dont-ask-again-file.html
+author: Security Arsenal
+date: 2026/11/06
+tags:
+ - attack.credential_access
+ - attack.t1552.001
+logsource:
+ category: file_event
+ product: windows
+detection:
+ selection:
+ TargetFilename|contains:
+ - '.claude\settings.json'
+ - '.claude\settings.local.json'
+ - '.claude/settings.json'
+ - '.claude/settings.local.json'
+falsepositives:
+ - Legitimate use of Claude Code in non-sensitive environments
+level: medium
+---
+title: Git Commit Including Claude Settings Directory
+id: 3b7f1a82-9d5c-4e89-af12-8c4d6f901567
+status: experimental
+description: Detects git add or git commit commands that include .claude/ directory, which may contain settings files with saved secrets.
+references:
+ - https://thehackernews.com/2026/11/claude-codes-dont-ask-again-file.html
+author: Security Arsenal
+date: 2026/11/06
+tags:
+ - attack.credential_access
+ - attack.t1552
+logsource:
+ category: process_creation
+ product: windows
+detection:
+ selection:
+ Image|endswith:
+ - '\git.exe'
+ - '/git'
+ CommandLine|contains:
+ - 'add'
+ - 'commit'
+ filter:
+ CommandLine|contains:
+ - '.claude'
+ - 'settings.json'
+ - 'settings.local.json'
+ condition: selection and filter
+falsepositives:
+ - Developer intentionally committing Claude Code configuration (should be reviewed)
+level: high
+---
+title: Suspicious Command-Line Secrets in Claude Code Context
+id: 5c9a2f71-8e3b-4d67-bc89-2f5a7d901890
+status: experimental
+description: Detects process command lines containing common secret patterns (API keys, tokens, passwords) executed in the context of Claude Code or AI coding assistants.
+references:
+ - https://thehackernews.com/2026/11/claude-codes-dont-ask-again-file.html
+author: Security Arsenal
+date: 2026/11/06
+tags:
+ - attack.credential_access
+ - attack.t1552.001
+logsource:
+ category: process_creation
+ product: windows
+detection:
+ selection:
+ CommandLine|contains:
+ - 'api_key='
+ - 'apikey='
+ - 'Authorization: Bearer'
+ - 'password='
+ - '--password'
+ - 'token='
+ - 'sk-'
+ - 'AKIA'
+ filter_legitimate:
+ Image|endswith:
+ - '\vault.exe'
+ - '\aws.exe'
+ - '\gcloud.exe'
+ condition: selection and not filter_legitimate
+falsepositives:
+ - Legitimate CLI tools that require inline credentials (should use credential helpers instead)
+level: high
+
+Note: These rules are tuned for Windows Sysmon/process creation logs. Adjust logsource for Linux (auditd, execve) or macOS (ESF, Unified Log).
+
+KQL — Microsoft Sentinel / Defender
+
+Use this KQL query to hunt for file writes or process executions that involve .claude/settings.json or inline secrets in command lines.
+
+KQL — Microsoft Sentinel / Defender
+Copy
+
+// Hunt for Claude Code settings file creation or modification
+DeviceFileEvents
+| where TimeGenerated > ago(30d)
+| where FileName contains "settings.json" or FileName contains "settings.local.json"
+| where FolderPath contains ".claude"
+| project TimeGenerated, DeviceName, InitiatingProcessFileName, InitiatingProcessCommandLine, FileName, FolderPath, FileSize
+| order by TimeGenerated desc
+;
+
+// Hunt for process command lines containing common secret patterns
+DeviceProcessEvents
+| where TimeGenerated > ago(7d)
+| where ProcessCommandLine has_any ("api_key=", "apikey=", "Authorization: Bearer", "password=", "--password", "token=", "sk-", "AKIA")
+| where not (FileName in~ ("vault.exe", "aws.exe", "gcloud.exe", "az.exe")) // exclude known CLI tools (tune as needed)
+| project TimeGenerated, DeviceName, FileName, ProcessCommandLine, InitiatingProcessFileName, InitiatingProcessCommandLine, AccountName
+| order by TimeGenerated desc
+;
+
+// Hunt for git commands that add or commit .claude directory
+DeviceProcessEvents
+| where TimeGenerated > ago(30d)
+| where FileName =~ "git.exe" or FileName =~ "git"
+| where ProcessCommandLine has_any ("add", "commit") and ProcessCommandLine has ".claude"
+| project TimeGenerated, DeviceName, AccountName, ProcessCommandLine, InitiatingProcessFileName
+| order by TimeGenerated desc
+
+Integration: If you're ingesting Syslog or CEF logs from Linux build agents or developer workstations, adapt the query to use Syslog or CommonSecurityLog tables and filter on ProcessName and Message fields.
+
+Velociraptor VQL
+
+Use this VQL artifact to hunt for .claude/settings.json files on endpoints and extract potential secrets from their content.
+
+VQL — Velociraptor
+Copy
+
+-- Hunt for Claude Code settings files and extract potential secrets
+SELECT FullPath, Size, Mtime, 
+ read_file(filename=FullPath, length=100000) AS Content
+FROM glob(globs=["**/.claude/settings.json", "**/.claude/settings.local.json"], 
+ root="/")
+WHERE Content =~ "(api_key|apikey|password|token|sk-|AKIA|Authorization)"
+
+Usage: Deploy this as a hunt across your fleet. The regex searches for common secret patterns. Review results manually — do not auto-quarantine, as some may be false positives (e.g., documentation or test files).
+
+Remediation Script
+
+Use the following Bash script to audit Git repos for .claude/settings.json files, scan for secrets, and add .claude/ to .gitignore.
+
+Bash / Shell
+Copy
+
+#!/bin/bash
+# audit_claude_secrets.sh — Scan Git repos for Claude Code settings files and potential secrets
+
+set -euo pipefail
+
+REPO_ROOT="${1:-.}"
+REPORT_FILE="claude_secrets_audit_$(date +%Y%m%d_%H%M%S).txt"
+
+echo "=== Claude Code Secrets Audit ===" | tee "$REPORT_FILE"
+echo "Scanning: $REPO_ROOT" | tee -a "$REPORT_FILE"
+echo "" | tee -a "$REPORT_FILE"
+
+# Find all .claude/settings.json and settings.local.json files
+echo "[+] Searching for .claude/settings.json and settings.local.json files..." | tee -a "$REPORT_FILE"
+find "$REPO_ROOT" -type d -name ".claude" 2>/dev/null | while read -r claude_dir; do
+ for settings_file in "$claude_dir/settings.json" "$claude_dir/settings.local.json"; do
+ if [[ -f "$settings_file" ]]; then
+ echo "[!] FOUND: $settings_file" | tee -a "$REPORT_FILE"
+
+ # Check if file contains potential secrets
+ if grep -qiE '(api_key|apikey|password|token|sk-|AKIA|Authorization: Bearer)' "$settings_file"; then
+ echo " [!] POTENTIAL SECRETS DETECTED in $settings_file" | tee -a "$REPORT_FILE"
+ echo " [!] ROTATE CREDENTIALS IMMEDIATELY if this repo is public" | tee -a "$REPORT_FILE"
+ fi
+
+ # Check if file is tracked by git
+ if git -C "$(dirname "$claude_dir")" ls-files --error-unmatch "$settings_file" &>/dev/null; then
+ echo " [!] FILE IS TRACKED IN GIT — remove and scrub history" | tee -a "$REPORT_FILE"
+ fi
+ fi
+ done
+done
+
+echo "" | tee -a "$REPORT_FILE"
+echo "[+] Checking if .claude/ is in .gitignore..." | tee -a "$REPORT_FILE"
+
+# Check and update .gitignore
+find "$REPO_ROOT" -type d -name ".git" 2>/dev/null | while read -r git_dir; do
+ repo_dir="$(dirname "$git_dir")"
+ gitignore="$repo_dir/.gitignore"
+
+ if [[ -f "$gitignore" ]]; then
+ if ! grep -q "^.claude/" "$gitignore"; then
+ echo "[!] .claude/ NOT in .gitignore for repo: $repo_dir" | tee -a "$REPORT_FILE"
+ echo ".claude/" >> "$gitignore"
+ echo " [+] Added .claude/ to $gitignore" | tee -a "$REPORT_FILE"
+ else
+ echo "[+] .claude/ already in .gitignore for repo: $repo_dir" | tee -a "$REPORT_FILE"
+ fi
+ else
+ echo "[!] No .gitignore found in $repo_dir — creating one with .claude/" | tee -a "$REPORT_FILE"
+ echo ".claude/" > "$gitignore"
+ fi
+done
+
+echo "" | tee -a "$REPORT_FILE"
+echo "=== Audit Complete ===" | tee -a "$REPORT_FILE"
+echo "Report saved to: $REPORT_FILE"
+
+Usage:
+
+Save the script as audit_claude_secrets.sh.
+
+Make it executable: chmod +x audit_claude_secrets.sh.
+
+Run it against your code directory: ./audit_claude_secrets.sh /path/to/repos.
+
+Review the report and rotate any exposed credentials.
+
+Remediation Steps
+
+Immediate Actions (Within 24 Hours)
+
+Audit all Git repos (public and private) for .claude/settings.json and .claude/settings.local.json files.
+
+Use the Bash script above or run gitleaks, truffleHog, or GitHub Advanced Security secret scanning.
+
+Search GitHub for your org: org:yourorg filename:settings.json path:.claude and org:yourorg "api_key" OR "password" OR "token".
+
+Rotate all exposed credentials immediately.
+
+Assume any secret found in a public repo is compromised.
+
+Rotate API keys, passwords, tokens, and database credentials.
+
+Review cloud provider logs (AWS CloudTrail, GCP Audit Logs, Azure Activity Log) for unauthorized access using exposed keys.
+
+Remove .claude/ from Git tracking.
+
+Run: git rm -r --cached .claude/ in affected repos.
+
+Commit and push the removal.
+
+Note: This does not remove secrets from Git history. For public repos, consider the credentials permanently compromised.
+
+Add .claude/ to .gitignore.
+
+Add .claude/ to your organization's default .gitignore template.
+
+Enforce via pre-commit hooks or CI/CD checks.
+
+Short-Term Actions (Within 1 Week)
+
+Scrub Git history if secrets were committed.
+
+Use git filter-repo or BFG Repo-Cleaner to remove .claude/settings.json from history:
+
+Bash / Shell
+Copy
+
+git filter-repo --path .claude/settings.json --invert-paths
+
+Code
+Copy
+
+ - Force-push the cleaned history (coordinate with your team).
+ - **Warning:** This rewrites history. All clones must be re-cloned.
+
+6. **Implement pre-commit hooks to block `.claude/` commits.**
+ - Use tools like `pre-commit` with `gitleaks` or custom hooks:
+ ```yaml
+- repo: local
+ hooks:
+ - id: block-claude-settings
+ name: Block .claude/ commits
+ entry: bash -c 'if git diff --cached --name-only | grep -q ".claude/"; then echo "ERROR: .claude/ files must not be committed"; exit 1; fi'
+ language: system
+
+Deploy secret-scanning in CI/CD.
+
+Integrate gitleaks, truffleHog, or GitHub Advanced Security in your pipeline.
+
+Fail builds if .claude/settings.json or inline secrets are detected.
+
+Long-Term Actions (Within 1 Month)
+
+Establish secrets management policy for AI coding tools.
+
+Document approved AI tools and their configuration.
+
+Require developers to use environment variables, .env files (in .gitignore), or secrets managers (HashiCorp Vault, AWS Secrets Manager, Azure Key Vault) instead of inline credentials.
+
+Provide training on secure AI tool usage.
+
+Monitor Anthropic for patches or configuration options.
+
+As of publication, Anthropic has not released a fix. Monitor Anthropic's security advisories [https://www.anthropic.com/security] and Claude Code release notes.
+
+Advocate for a vendor fix that redacts or encrypts saved commands.
+
+Audit other AI coding assistants.
+
+GitHub Copilot, Cursor, Codeium, and others may have similar behaviors.
+
+Review their settings files and permission models for secret leakage risks.
+
+Detection Tuning Notes
+
+False Positives: Legitimate CLI tools (aws, gcloud, az, kubectl) often use inline credentials. Tune the Sigma and KQL rules to exclude known-good processes or require additional context (e.g., parent process is claude or node).
+
+File Monitoring: If you have EDR or file integrity monitoring (FIM) on developer workstations, alert on writes to .claude/settings.json and trigger a scan for secrets.
+
+GitHub Secret Scanning: Enable GitHub Advanced Security (if available) or use third-party tools to scan public repos for your organization's domain, API key patterns, and .claude/ files.
+
+Conclusion
+
+The Claude Code "don't ask again" feature is a well-intentioned UX improvement that creates a serious security risk: plaintext credential storage in files that developers routinely commit to Git. With over 1,100 public repos already exposed, this is a clear and present danger to organizations using AI coding assistants.
+
+The fix is straightforward: never commit .claude/ to version control, rotate any exposed credentials, and enforce secrets management best practices. AI tools are powerful accelerators, but they require the same security rigor as any other developer tool — if not more, given their ability to execute commands and persist configuration.
+
+Security Arsenal's red team and vulnerability management services can help you audit your environment for AI tool risks, implement secrets management guardrails, and detect credential exposure before attackers do. Contact us to schedule a security assessment.
+
+Related Resources
+
+Security Arsenal Penetration Testing Services [https://securityarsenal.com/services/penetration-testing]
+AlertMonitor Platform [https://securityarsenal.com/products/alertmonitor]
+Book a SOC Assessment [https://securityarsenal.com/contact]
+vulnerability-management Intel Hub [https://securityarsenal.com/intel/incident-response]
+
+critical [/blog?tag=critical]zero-day [/blog?tag=zero-day]cve [/blog?tag=cve]patch-tuesday [/blog?tag=patch-tuesday]exploit [/blog?tag=exploit]vulnerability-disclosure [/blog?tag=vulnerability-disclosure]bytesclaude [/blog?tag=bytesclaude]github-secret-leak [/blog?tag=github-secret-leak]credential-exposure [/blog?tag=credential-exposure]ai-coding-assistant [/blog?tag=ai-coding-assistant]
+
+Is your security operations ready?
+
+Get a free SOC assessment or see how AlertMonitor cuts through alert noise with automated triage.
+
+Book a SOC Assessment [/contact]See AlertMonitor in Action [/products/alertmonitor]
+
+URLFax
+
+Security Arsenal
+
+"Breaches aren’t obvious. Our response is."
+From silent intrusions to bold attacks, we catch them all.
+
+Services
+
+Get a Quote [/quote]
+
+Penetration Testing [/services/penetration-testing]
+
+AI Penetration Testing [/services/ai-penetration-testing]
+
+Pen Test Cost [/services/penetration-testing/cost]
+
+What We Found [/services/penetration-testing/results]
+
+Sample Report [/services/penetration-testing/sample-report]
+
+Security Consulting [/services#consulting]
+
+Training [/training]
+
+Security Tools [/products]
+
+AlertMonitor [/products/alertmonitor]
+
+Company
+
+About Us [/about]
+
+Blog [/blog]
+
+Pricing [/pricing]
+
+Contact [/contact]
+
+Careers [/careers]
+
+Locations
+
+All Cities → [/locations]
+
+New York, NY [/locations/new-york]
+
+Los Angeles, CA [/locations/los-angeles]
+
+Chicago, IL [/locations/chicago]
+
+Houston, TX [/locations/houston]
+
+Dallas, TX [/locations/dallas]
+
+Miami, FL [/locations/miami]
+
+Atlanta, GA [/locations/atlanta]
+
+Seattle, WA [/locations/seattle]
+
+Washington, DC [/locations/washington-dc]
+
+Austin, TX [/locations/austin]
+
+Boston, MA [/locations/boston]
+
+San Francisco, CA [/locations/san-francisco]
+
+Connect
+
+ [https://www.linkedin.com/in/securityarsenal] [https://x.com/SecurityAr58409]
+
+© 2026 Security Arsenal. All rights reserved.
+
+Privacy Policy [/privacy]Terms of Service [/terms]
