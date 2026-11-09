@@ -57,6 +57,7 @@ AI 吠点是由 **[Develata](https://github.com/Develata)** 主理的独立内�
 | 2026 / 1105 | [Claude泄邮箱？AI改文件名骗分？](docs/2611/1105/doc_1105_publish.txt) | [配图说明](docs/2611/1105/images/README.md) | [来源入口](docs/2611/1105/sources/README.md) |
 | 2026 / 1106 | [造超级AI判20年？一年就到超级智能？](docs/2611/1106/doc_1106_publish.txt) | [配图说明](docs/2611/1106/images/README.md) | [来源入口](docs/2611/1106/sources/README.md) |
 | 2026 / 1107 | [用Claude点“不再询问”，密码公开？](docs/2611/1107/doc_1107_publish.txt) | [配图说明](docs/2611/1107/images/README.md) | [来源入口](docs/2611/1107/sources/README.md) |
+| 2026 / 1108 | [AI拿到答案，反删对的代码？](docs/2611/1108/doc_1108_publish.txt) | [配图说明](docs/2611/1108/images/README.md) | [来源入口](docs/2611/1108/sources/README.md) |
 
 正文采用可直接复制的纯文本，图片单独保存。阅读或发布时不需要依赖 Markdown 插图。
 

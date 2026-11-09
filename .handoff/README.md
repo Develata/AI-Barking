@@ -2,6 +2,7 @@
 
 本目录随仓库保存，供回看制作过程。文件中的任务要求、路径、模型安排与“未完成”状态属于当时的工作上下文，不自动代表当前状态。
 
+- [取证任务：1108 期（A MaxxBench 改题后多家模型猜考官｜B 高盛收回 Claude Code｜C 速览）](2026-11-08-1108-evidence.md)
 - [取证任务：1107 期（A Claude Code 把密码写进公开文件（Apiiro）｜B DoubleAI“DeepSeek 自我改造涨7分”｜C 速览）](2026-11-07-1107-evidence.md)
 - [取证任务：1106 期（A 美国议员要禁超级智能（H.R. 10538）｜B METR 报告与 Cotra 的一年内超级智能｜C 速览）](2026-11-06-1106-evidence.md)
 - [取证任务：1105 期（A Claude Code 把账号邮箱发给网站｜B OpenAI 两份失准报告（文件名骗评分与绕网络限制）｜C Anthropic 标签实验（Claude 按名字分资源）｜D 速览）](2026-11-05-1105-evidence.md)
