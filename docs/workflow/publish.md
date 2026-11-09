@@ -33,7 +33,7 @@
 | 存放处 | 内容 |
 |---|---|
 | GitHub（本仓库） | 只入库文字：发布正文、配图说明 `images/README.md`、`images/cards.toml`、`sources/` 中的文本（md、txt、json、jsonl、py、ps1 等）、`sources/offsite.tsv` |
-| OpenList（`openlist.develata.me`） | `images/` 下（含 1029 期起的 `images/publish/`）的全部图片（封面、省流卡、速览聚合图、事件卡、吠点卡、批注截图、备用图），以及 `sources/` 中的 PDF、WPS/DOC 文档、HTML、图片与音视频原件；逐个文件直传，不打压缩包 |
+| OpenList（`openlist.example.com`） | `images/` 下（含 1029 期起的 `images/publish/`）的全部图片（封面、省流卡、速览聚合图、事件卡、吠点卡、批注截图、备用图），以及 `sources/` 中的 PDF、WPS/DOC 文档、HTML、图片与音视频原件；逐个文件直传，不打压缩包 |
 
 - 分界写在根目录 `.gitignore`：`images/` 与 `images/publish/` 下所有 png、jpg、jpeg、webp、gif（`*` 不跨目录，所以 `publish/` 单独列了一组），和 `sources/` 下的 PDF、WPS/DOC 文档（2026-10-16 起）、HTML、图片与音视频。0924–1001 期原先已入库的图片与原件，已于 2026-10-02 全部补传 OpenList（417 个文件逐个核对远端大小一致）、记入各期 `offsite.tsv`，并用 `git filter-repo` 从 Git 历史中移出。
 - 没有图片的克隆里，`barking lint` 把 `offsite.tsv` 列出的图片视为存在；重渲卡片前，先从 OpenList 的同一路径取回 `-raw` 底图。
@@ -47,10 +47,10 @@
 
 | 键 | 含义 |
 |---|---|
-| `OPENLIST_URL` | 站点地址，如 `https://openlist.develata.me` |
+| `OPENLIST_URL` | 站点地址，如 `https://openlist.example.com` |
 | `OPENLIST_USERNAME` | 上传专用用户名 |
 | `OPENLIST_PASSWORD` | 该用户的密码 |
-| `OPENLIST_ROOT` | 归档根目录，相对该用户的基本路径。WebDAV 地址 `https://openlist.develata.me/dav/AI-Barking` 对应的 OpenList 路径是 `/AI-Barking`：用户基本路径为 `/` 时填 `/AI-Barking`；基本路径已限定为 `/AI-Barking` 时填 `/` |
+| `OPENLIST_ROOT` | 归档根目录，相对该用户的基本路径。WebDAV 地址 `https://openlist.example.com/dav/AI-Barking` 对应的 OpenList 路径是 `/AI-Barking`：用户基本路径为 `/` 时填 `/AI-Barking`；基本路径已限定为 `/AI-Barking` 时填 `/` |
 | `BARKING_IDENTITY_HANDLES` | `publish-check` 身份检查用：抓取时登录的 X 账号 handle（不带 `@`，多个用 `;` 分隔）。显示名、头像 ID、数字用户 ID 由工具经 fxtwitter 公开接口解析并缓存在仓库外，改名后自动跟上且保留旧名 |
 | `BARKING_IDENTITY_PATTERNS` | 可选，身份检查的手填补充片段（如其他平台的用户名），`;` 分隔，大小写不敏感，至少 4 个字符。这些字符串只能写在 `.env` 里，不要出现在仓库任何文件中 |
 
