@@ -70,3 +70,7 @@
 说明：`tmp-s1b.png` 为 SEC 页滚动到承销商栏的中间图，未用。
 
 文本存档单文件均小于 1 MB（最大 `b-hn-50415628.json` 约 214 KB）；超过 1 MB 的只有 html/pdf 原件（不入库，如 `b-thestack-news.html` 1.2 MB、`b-youtube-oddlots.html` 1.7 MB），`b-bny-1q26-deck.pdf` 约 227 KB。
+
+## 收尾改动（Claude）
+
+`b-stateofai` 与 `b-awsstack-claude` 的 txt/html 存档中，站点侧栏两条与本期无关的英伟达私生活标题已替换为占位“[站点侧栏无关标题已略]”（按派工单私人个体规则），其余内容未动。
