@@ -9,9 +9,9 @@
 | 文中事实 | 级 | 结果 | 一手来源 | 备注（条件、时区、口径） |
 |---|---|---|---|---|
 | 标题：谷歌有人读你邮件？ | L1/L6 | ⚠️ | 见 A 节 | 问号。指 GitHub 文档与 HN 帖“routes … to human annotators”的说法（L6）；“读”= 人工审核员查看；谷歌帮助页确认关联后“a subset … reviewed by human reviewers”，含邮件与文件的摘要、摘录（L1）。只涉及个人账户且主动关联，正文吠点②写明 |
-| 标题：Claude变笨了？ | L6 | ⚠️ | 见 B 节 | 问号。指 Melaugh 帖“is Opus 5.5 nerfed?”与“the nerf is real”的说法，本号不下结论。标题用 Claude 是读者稿检查后改的（“Opus”普通读者不认识）；说法只针对 Claude 的 Opus-5.5，正文小标题与事实段写明 |
+| 标题：Claude变笨了？ | L6 | ⚠️ | 见 B 节 | 问号。指 Melaugh 帖“is Opus 5.5 nerfed?”与“the nerf is real”的说法，本号不下结论。标题用 Claude 是读者稿检查后改的（“Opus”普通读者不认识）；说法只针对 Claude 的 Opus-5.5，省流写“Claude Opus-5.5” |
 | 省流：Gemini 关联邮箱网盘后部分内容有人审，帮助页1月就写了 | L1 | ✅ | A1、A4 | “有人审”= 人工审核员查看关联应用数据的一部分；“1月”= Wayback 2026-01-14 21:36:56 UTC 快照（北京 01-15 05:36） |
-| 省流：Opus-5.5“变笨”之争，两边测的不是一回事 | L6 | ⚠️ | B1、B2 | Melaugh：可见摘要措辞、high 档首个工具调用前思考 token 中位数；Theo：每条回复平均推理 token、工具调用数 |
+| 省流：Claude Opus-5.5“变笨”之争，两边测的不是一回事 | L6 | ⚠️ | B1、B2 | Melaugh：可见摘要措辞、high 档首个工具调用前思考 token 中位数；Theo：每条回复平均推理 token、工具调用数 |
 | 省流：Gemini-4-Carbon 向付费用户开放，2美元是体验价 | L1 | ✅ | C1、C2 | “付费用户”= 付费 API 开发者、企业与 Ultra 订阅；免费 API 层 “Not available”。原写“全面开放”，反向核验第一轮 SHOULD_FIX 2 指出放大范围，已改 |
 
 ## A 谷歌 Gemini：邮箱网盘有人工审核
@@ -33,13 +33,13 @@
 |---|---|---|---|---|
 | 开发者 Shane Melaugh 让 Gemini 分析自己1400次 Claude Code 编程记录 | L6 | ⚠️ | https://x.com/shanemelaugh/status/2119192075505893695 （`b-melaugh-main.json`；图 13） | 北京 11-08 06:15:38（UTC 11-07 22:15:38）；“I just had Gemini 4 Argon analyze 1,400 Claude Code sessions”。约 59.8 万浏览（14:3x 抓取）。个人开发者，非 Anthropic 员工；原始日志未公开。平台名不写进正文 |
 | 称按 UTC 计11月3日起 Opus-5.5 在 high 档动手前想得少了，中位数从84降到54个 token | L6 | ⚠️ | thread 第 2 条 status 2119192078773260496 及其图（`b-melaugh-2119192078773260496.json`；图 15） | 图标题 ““High” effort now plans less upfront”，副标 “Before vs. after November 3 · effort = high”；“Before Nov 3 84 … After Nov 3 54 … Median thinking tokens before first tool call”。“动手前”= 首个工具调用前；样本前 14,560 回合、后 14,871 回合。图 1 写“Shift observed Nov 3 · ~18:00 UTC”（北京 11-04 约 02:00）、“Daily UTC averages”，作者按 UTC 日期分组，正文写“按 UTC 计11月3日”（反向核验第一轮 SHOULD_FIX 3）。Claude 已直接看图 14、15 核对数字与页脚 |
-| 开发者 Theo 用自己45.8万条回复反驳：变的像是给人看的思考摘要 | L6 | ⚠️ | https://x.com/theo/status/2119238026136330313 （`b-theo-2119238026136330313.json`；图 17、18） | 北京 11-08 09:18:13（UTC 01:18:13）。“Anthropic appears to be rolling out a change to the reasoning summarizer on a per-account basis.”（“appears”= 推断，正文写“像是”）。图注 “458k Opus 5.5 responses”，他自己 6 个账号的 Claude Code 流量；“回复”= responses |
+| Theo 用自己45.8万条回复反驳：变的像是给人看的思考摘要 | L6 | ⚠️ | https://x.com/theo/status/2119238026136330313 （`b-theo-2119238026136330313.json`；图 17、18） | 北京 11-08 09:18:13（UTC 01:18:13）。“Anthropic appears to be rolling out a change to the reasoning summarizer on a per-account basis.”（“appears”= 推断，正文写“像是”）。图注 “458k Opus 5.5 responses”，他自己 6 个账号的 Claude Code 流量；“回复”= responses |
 | 平均推理 token 反而从369升到413 | L6 | ⚠️ | Theo 帖内图（图 18，深色底） | “Reasoning tokens per response (avg)” 369→413；同图工具调用/回复 1.03→1.06、摘要长度中位数 325→440 字符；图注 “not evidence that the model got worse” |
 | 吠点①：Melaugh 图表页脚写着“可见摘要变了，不能证明模型参数变了” | L6 | ⚠️ | thread 第 1 条图（图 14） | 原句 “Visible summaries show a behavior shift, not proof of changed model weights.”；“参数”= weights（读者稿检查称“权重”看不懂）。初稿写“模型本身”，反向核验第二轮 SHOULD_FIX 2 指出权重不变不等于表现不变、不构成矛盾，已改回参数并补下一条 |
-| 吠点①：能力对比只有一个 bug，自注“不是对照测试” | L6 | ⚠️ | thread 第 3 条图（图 16，`b-melaugh-2119192081251906001.json`） | 图题 “One bug. Two effort levels.”，“Same codebase · same day · audio playback bug”，页脚 “Single debugging comparison · Nov 7, 2026”“One case, not a controlled benchmark.” 比较的是同一天 high 与 xhigh 两档，不是 11/3 前后。Claude 直接看图核对 |
+| 吠点①：修 bug 对比只有一例，自注“不是对照测试” | L6 | ⚠️ | thread 第 3 条图（图 16，`b-melaugh-2119192081251906001.json`） | 图题 “One bug. Two effort levels.”，“Same codebase · same day · audio playback bug”，页脚 “Single debugging comparison · Nov 7, 2026”“One case, not a controlled benchmark.” 比较的是同一天 high 与 xhigh 两档，不是 11/3 前后。Claude 直接看图核对 |
 | 吠点①：帖子结尾却说“变笨是真的” | L6 | ⚠️ | thread 第 4 条 status 2119192083361599643（`b-melaugh-2119192083361599643.json`） | “so yeah, you're not imagining things. the nerf is real.” 北京 11-08 06:15:40 |
 | 吠点①：官方文档说，用户看到的思考是另一模型写的摘要 | L1 | ✅ | https://platform.claude.com/docs/en/build-with-claude/thinking （`b-thinking-overview.txt`；Wayback 09-23、10-28、11-02、11-03 快照 `b-wb-thinking-*.txt`；图 19、22） | “what you see is never the raw chain of thought: the text in a thinking block is a summary of Claude’s reasoning”；“Summarization is processed by a different model from the one you target in your requests.” 11-02 与 11-03 21:02 UTC 快照逐字相同，非 11/3 新加。未写是哪个模型、摘要方式会不会变 |
-| 吠点②：Melaugh 和 Theo 测的指标、样本不同，都只给图、没附原始日志 | L6 | ⚠️ | B1、B2 | Melaugh：自己 1,400 个会话、摘要措辞与首个工具调用前思考 token；Theo：自己 6 个账号 45.8 万条回复、平均推理 token。两人都只发图，未公开原始日志 |
+| 吠点②：Melaugh 和 Theo 指标、样本不同，都只给图、没附原始日志 | L6 | ⚠️ | B1、B2 | Melaugh：自己 1,400 个会话、摘要措辞与首个工具调用前思考 token；Theo：自己 6 个账号 45.8 万条回复、平均推理 token。两人都只发图，未公开原始日志 |
 | （已删）吠点②：截至11日下午未见 Anthropic 回应 | L1 | — | 状态页（`b-status-incidents.json`）、API 发布说明、Claude Code CHANGELOG 2.1.316–2.1.322（`b-cc-changelog-2.1.310-322.txt`）、GitHub issue 搜索（`b-gh-issues-search.json`）、HN 两帖 526 条评论 | 查到北京 11-11 15:00 前后。官方 X 时间线未能查（无列表接口）。反向核验第一轮 SHOULD_FIX 8 指出排他判断超出检索范围，正文已删此句。CHANGELOG 无摘要器条目；2.1.316/2.1.317 有子代理 effort 改动，未判断与此有关，正文不写 |
 | 热度：Hacker News 讨论帖816分（未进正文） | L6 | — | HN 50422069（`b-hn-50422069.json`） | 816 分 / 511 评，北京 11-09 15:04 提交 |
 
@@ -54,7 +54,7 @@
 | 吠点①：2美元是体验价，12月1日起输入、输出价都翻倍 | L1 | ✅ | 博文脚注 1（`c-blog.txt`，未截到图：折叠在 More Information）；定价页（图 26）；changelog（`c-api-changelog-rendered.txt`） | 脚注：“After the introductory period expires on November 30, 2026, the price of $4 per 1M input tokens and $20 per 1M output tokens will apply. Applies to the Carbon model intended for public access only.” 定价页：“$2.00 through November 30, 2026. $4.00 starting December 1, 2026.” 1028 时脚注没有到期日（`c-blog-1028.txt`） |
 | （已删）吠点①后半：有中文稿标题写“价格仅 Fable 1/4”，届时是一半——读者稿检查后为省字数删去，记录保留 | L5（夸大实例，只引标题原句） | ⚠️ | https://k.sina.cn/article_5952915705_162d248f906703t0x8.html （`c-zh-sina.txt`），页面标 11.11 06:14 | 自媒体“AI信息Gap”发在新浪看点，标题“刚刚，Gemini 4 Carbon 终于开放！价格仅 Fable 1/4，Pro 会员却没份”；正文写的是“尝鲜价”，也提了到期。初稿写成“新浪新闻”，抽查发现是自媒体，已改“有中文稿”。Fable-5.2 单价 $8/$40（1109 期已核）：体验价 $2/$10 为 1/4，12/1 起 $4/$20 为 1/2 |
 | 吠点②：“六分之一”与谷歌自家论文一致 | L1 | ✅ | DeepMind MKA 技术报告 https://storage.googleapis.com/deepmind-media/papers/mka_tech_paper.pdf （`c-mka-paper.txt` 第 11 页；图 32） | “At provider list prices, this corresponds to a 6.26× higher API cost ($35.28 vs. $5.63 per task)”，表 4 “list-price API cost (with prompt caching)”。论文由 Google MKA 博文链出，Carbon 博文未直接链论文，所以写“一致”不写“出自” |
-| 吠点②：博文链接的 AA 榜单上约为五分之一，AA 是 Fable 最高档对 Carbon high 档，论文未标档位 | L3 | ✅ | https://artificialanalysis.ai/evaluations/mka （`c-aa-mka-board.*`；图 28）；AA 文 `c-aa-mka.txt`（图 34） | 榜单柱图：Fable-5.2 (Max) $31.98、Carbon (High) $6.29，≈5.08 倍；AA 文 “Claude Fable 5.2 averages $31.97 per task, over 5× Gemini 4 Carbon ($6.29)”（同站差 0.01）。AA 按标准价 $4/$20 计（页面载荷），与论文同为挂牌价，差异来源未说明，并列记录。档位：AA 榜 Fable-5.2 为 Max（带 fallback）、Carbon 为 High；论文表 4 未标档位，口径未对齐（反向核验第一轮 SHOULD_FIX 5；正文把 2.2 个百分点明确归于论文得分） |
+| 吠点②：博文链接的 AA 榜单上约为五分之一，AA 是 Fable 最高档对 Carbon high 档，论文未标档位 | L3 | ✅ | https://artificialanalysis.ai/evaluations/mka （`c-aa-mka-board.*`；图 28）；AA 文 `c-aa-mka.txt`（图 34） | 榜单柱图：Fable-5.2 (Max) $31.98、Carbon (High) $6.29，≈5.08 倍；AA 文 “Claude Fable 5.2 averages $31.97 per task, over 5× Gemini 4 Carbon ($6.29)”（同站差 0.01）。AA 按标准价 $4/$20 计（页面载荷），与论文同为挂牌价，差异来源未说明，并列记录。档位：AA 榜 Fable-5.2 为 Max（带 fallback）、Carbon 为 High；论文未标档位（Claude 北京 11-11 17:00 前后对 `c-mka-paper.txt` 全文检索 effort、xhigh、max、(high)、budget 等，只见 “identical harness budgets”，无推理档位设置），口径未对齐（反向核验第一轮 SHOULD_FIX 5；正文把 2.2 个百分点明确归于论文得分） |
 | （已删）吠点②：论文里第一名 Fable-5.2 只高2.2个百分点，差距不显著——反向核验第三轮后为补档位腾字数删去，批注图 19 仍有此句 | L1 | ✅ | MKA 技术报告第 11 页（图 32） | “for a statistically non-significant +2.22 pp Climb-WSR difference”，95% CI [−0.94, +5.49]；前三名 “statistically indistinguishable”。AA 榜：Fable-5.2 (max) 57%、Carbon (high) 54%（取整） |
 
 ## 速览
@@ -147,7 +147,7 @@
 | 6 | SHOULD_FIX | 海外社媒截图来源只写泛称 | 采纳。作者与发帖日期补在图题（“Melaugh 11/8 帖”“Theo 11/8 反驳帖”，北京时间）；页脚放不下，保持“海外社媒原文截图（存档日期）” |
 | 7 | NICE_TO_HAVE | mka 译注②“只高”带评价语气 | 采纳。改“高” |
 
-改后重渲 10、11、12、17、18、19 号与速览、吠点卡，Claude 逐张目视复查。第三轮反向核验短审只看本轮改动。
+改后重渲 10、11、12、17、18、19 号与速览、吠点卡；Claude 第三轮返修后另做一张缩略拼图逐张复查版式（见下）。
 
 ### 第三轮（北京 11-11 约 16:45，codex-reviewer：gpt-6-astra，effort medium，只读）
 
@@ -163,3 +163,10 @@
 | 6 | NEEDS_VERIFICATION | 社媒图与 AA 柱顶数字只核到转录 | 同第二轮第 7 条：Claude 已直接看图 14、15、16、18、28；AA 柱顶 $31.98 与同站文章 $31.97 并列记录 |
 
 省流卡 Carbon 一条因版面改为一行“Carbon 向付费开发者和企业开放”（逐字取自事实段）。改后重渲省流、速览、事件卡与吠点卡，lint 0 个错误。
+
+### 第三轮之后的改动（未经跨模型复核）
+
+第三轮 PASS 后 Claude 又改了：吠点卡②（点名 Melaugh 和 Theo）、Carbon 吠点②（补档位、删 2.2 个百分点）、curl 速览（“至9日”“标”“Claude 报告”）、Theo 批注图换底图 `theo-work-raw.png`；终审前自查再改两处：吠点①“能力对比只有一个 bug”改“修 bug 对比只有一例”（Melaugh 图 2 另有 11/3 前后的“Script & edit crashes +47%”指数，未定义何为崩溃，不能说能力对比只有一例）；省流补回“Claude”。这些改动由 Claude 对照存档自查，未再送 Codex，交付时已告知 Develata。curl 速览里“Claude 报告”是据 OSS Scanner 研究页 “our strongest models” 的推断；“34 份都已打标签”据 VulnCheck 的 19/6/9 三类相加为 34，未逐条复数。
+
+
+终审前复查：北京 11-11 约 17:10 重渲 13 张后，Claude 把 02、03、04、08、09、10、11、14、15、17、18、19 缩成 4×3 拼图逐张看版式（01、05、12 另行打开），未见溢出、压叠或高亮错位；文字一致性由 lint 逐字比对。
