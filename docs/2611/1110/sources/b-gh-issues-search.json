@@ -1,0 +1,621 @@
+{
+  "total_count": 5,
+  "incomplete_results": false,
+  "items": [
+    {
+      "url": "https://api.github.com/repos/anthropics/claude-code/issues/106878",
+      "repository_url": "https://api.github.com/repos/anthropics/claude-code",
+      "labels_url": "https://api.github.com/repos/anthropics/claude-code/issues/106878/labels{/name}",
+      "comments_url": "https://api.github.com/repos/anthropics/claude-code/issues/106878/comments",
+      "events_url": "https://api.github.com/repos/anthropics/claude-code/issues/106878/events",
+      "html_url": "https://github.com/anthropics/claude-code/issues/106878",
+      "id": 6176737872,
+      "node_id": "I_kwDON91aY88AAAABcCmKUA",
+      "number": 106878,
+      "title": "Opus 4.6 at max: deep single-turn, but sparse thinking between tool calls; manual-mode workaround removes it",
+      "user": {
+        "login": "igorsaevets",
+        "id": 13085161,
+        "node_id": "MDQ6VXNlcjEzMDg1MTYx",
+        "avatar_url": "https://avatars.githubusercontent.com/u/13085161?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/igorsaevets",
+        "html_url": "https://github.com/igorsaevets",
+        "followers_url": "https://api.github.com/users/igorsaevets/followers",
+        "following_url": "https://api.github.com/users/igorsaevets/following{/other_user}",
+        "gists_url": "https://api.github.com/users/igorsaevets/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/igorsaevets/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/igorsaevets/subscriptions",
+        "organizations_url": "https://api.github.com/users/igorsaevets/orgs",
+        "repos_url": "https://api.github.com/users/igorsaevets/repos",
+        "events_url": "https://api.github.com/users/igorsaevets/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/igorsaevets/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "labels": [
+        {
+          "id": 8190926409,
+          "node_id": "LA_kwDON91aY88AAAAB6DeeSQ",
+          "url": "https://api.github.com/repos/anthropics/claude-code/labels/bug",
+          "name": "bug",
+          "color": "FF6B80",
+          "default": true,
+          "description": "Something isn't working",
+          "archived_at": null,
+          "archived_by": null
+        },
+        {
+          "id": 8201037318,
+          "node_id": "LA_kwDON91aY88AAAAB6NHmBg",
+          "url": "https://api.github.com/repos/anthropics/claude-code/labels/platform:windows",
+          "name": "platform:windows",
+          "color": "93A5FF",
+          "default": false,
+          "description": "Issue specifically occurs on Windows",
+          "archived_at": null,
+          "archived_by": null
+        },
+        {
+          "id": 8572677621,
+          "node_id": "LA_kwDON91aY88AAAAB_vit9Q",
+          "url": "https://api.github.com/repos/anthropics/claude-code/labels/area:model",
+          "name": "area:model",
+          "color": "ededed",
+          "default": false,
+          "description": "",
+          "archived_at": null,
+          "archived_by": null
+        },
+        {
+          "id": 10008152210,
+          "node_id": "LA_kwDON91aY88AAAACVIhIkg",
+          "url": "https://api.github.com/repos/anthropics/claude-code/labels/regression",
+          "name": "regression",
+          "color": "ededed",
+          "default": false,
+          "description": null,
+          "archived_at": null,
+          "archived_by": null
+        }
+      ],
+      "state": "open",
+      "locked": false,
+      "assignees": [
+
+      ],
+      "milestone": null,
+      "comments": 3,
+      "created_at": "2026-11-03T05:15:50Z",
+      "updated_at": "2026-11-04T04:52:59Z",
+      "closed_at": null,
+      "assignee": null,
+      "author_association": "NONE",
+      "issue_field_values": [
+
+      ],
+      "type": null,
+      "active_lock_reason": null,
+      "sub_issues_summary": {
+        "total": 0,
+        "completed": 0,
+        "percent_completed": 0
+      },
+      "issue_dependencies_summary": {
+        "blocked_by": 0,
+        "total_blocked_by": 0,
+        "blocking": 0,
+        "total_blocking": 0
+      },
+      "body": "## Summary\n\nOn Opus 4.6 and `claude-opus-4-6[1m]`, `thinkingDurationMs` dropped **~3.4× at identical context size** between CLI 2.1.296 (2026-10-w3) and CLI 2.1.316 (2026-11-w1), without any user-visible toggle change — session kept `effort=max` throughout. The CLI code that selects `thinking.type` is **byte-equivalent across 2.1.296 → 2.1.317** (verified below), so the regression comes from a server-side flip of the `supportsAdaptiveThinking` catalog bit for `opus-4-6` / `sonnet-4-6` on or around the API `2026-10-21` cut.\n\nWorkaround that fully reverts the behavior to the previous fixed-budget mode on 4.6 is already in the bundle: `CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING=1` + `MAX_THINKING_TOKENS=<N>`. The code gate is scoped to `opus-4-6`/`sonnet-4-6` and silently ignored on 4.7+, so leaving it on globally is safe for mixed-model workflows.\n\nI'm filing this as a separate issue because the four plausibly-related issues (#99489, #30726, #96308, #42542) describe different mechanisms. Mapping included below.\n\n## Observed symptom\n\n- Working session on `claude-opus-4-6[1m]`, `effort=max`, no settings changes between 2026-10-18 and 2026-11-02.\n- Subjective: 4.6 \"stopped thinking\" after late October — responses got shorter, less considered. 5.5 unchanged; 4.7 slightly affected but not drastic.\n- Mobile Remote Control (Android) continued to display \"Extra High\" for 4.6[1m] regardless of `/effort max` in CLI — but this is a known display-only concern (see #99489) and is **not** what this issue is about. The actual wire `output_config.effort` is `max` on every single request.\n\n## Measured evidence\n\nScanned ~360 MB session JSONL at `~/.claude/projects/<proj>/<session>.jsonl` with 30 994 `assistant` records across 2026-08-31 → 2026-11-03.\n\n**p50 `thinkingDurationMs` by week, ~175-193K context bucket, `claude-opus-4-6[1m]`:**\n\n| Week | CLI | p50 ms | % short-think (<500 ms) |\n|---|---|---|---|\n| 2026-10-w3 | 2.1.296 | **4 427** | 88.6% |\n| 2026-10-w4 | 2.1.296 → 2.1.303 | **4 490** | 88-91% |\n| 2026-11-w1 | 2.1.316 | **1 310** | 92.3% |\n\nContext size is essentially unchanged between buckets; prompt distribution is similar (I kept working the same project). **The 3.4× drop is real.**\n\nFor comparison, same session, same window:\n- `claude-opus-4-7`, 10-w4 → 10-w5: 4 165 → 3 292 ms (−21%)\n- `claude-opus-5-5`, 10-w2 → 11-w1: 3 027 → 449 ms (also affected, but 5.5 was always adaptive since launch and user ergonomics tolerate it; see \"Why 5.5 is less visible\" below)\n\nEvery `api-request` in November carries `output_config.effort=\"max\"`, `max_tokens=64000`, `thinking={\"type\":\"adaptive\",\"display\":\"updates\"}` on 4.6[1m] — I validated 1 164 requests in a row with identical shape hash. So effort has nothing to do with it.\n\n## Root cause (SEA bundle inspection)\n\nI pulled `@anthropic-ai/claude-code-win32-x64@{2.1.296, 2.1.303, 2.1.311, 2.1.316, 2.1.317}` and byte-grep'd the thinking-type selector. **The function is identical across all five** (only minified identifier names differ):\n\n```js\nfunction selectThinkingType({runtimeOverride, resolvedModel, canonicalModel}) {\n  if (runtimeOverride !== undefined) return runtimeOverride;\n  const forceEnabled =\n    env.CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING\n    && (canonicalModel.includes(\"opus-4-6\") || canonicalModel.includes(\"sonnet-4-6\"));\n  return supportsAdaptive(resolvedModel) && !forceEnabled ? \"adaptive\" : \"enabled\";\n}\n```\n\n`supportsAdaptive(m)` reads `model.supportsAdaptiveThinking` from the server-published catalog (the one the bundle schema describes as \"Whether this model supports adaptive thinking (Claude decides when and how much to think)\"). When the catalog says `true`, the client sends `adaptive`; when `false`, it falls back to `enabled` with the budget derived from `MAX_THINKING_TOKENS`.\n\n**Conclusion:** the client did not change between 2.1.296 and 2.1.317. The regression is a server-side change: `supportsAdaptiveThinking` for `claude-opus-4-6` was flipped `false → true`, which is consistent with the API `2026-10-21` note that `thinking:{type:\"enabled\",budget_tokens:N}` was deprecated on Opus 4.6 / Sonnet 4.6 and rejected on 4.7+. The CLI dutifully followed, started sending `adaptive`, and the adaptive calibration on 4.6 picks a notably shallower slot than the previous fixed `budget_tokens` (which was the floor). Adaptive is an upper bound, not a floor — `effort=max` doesn't help on routine turns, and 4.6's calibration is more conservative than 4.7's.\n\n## Why this is NOT the four plausibly-related issues\n\n- **#99489 \"Remote Control: iOS/Android effort picker reverts to Extra\"** — purely a display/sync issue; wire traffic in my JSONL shows `effort=max` throughout. Mentioned to acknowledge, not fix here.\n- **#30726 \"effortLevel 'max' is silently downgraded when user interacts with effort selection UI\"** — about `effortLevel` in settings, which has enum `[low|medium|high|xhigh]` (no `max`). My env var `CLAUDE_CODE_EFFORT_LEVEL` isn't involved, and the wire-level `effort` is `max`. Different layer.\n- **#96308 \"Opus 4.6 regression: catastrophic output quality loss after context window summarization\"** — surface symptoms overlap, but 96308 attributes the loss to summarization. My p50 drops at *stable* mid-range context (175-193 K) without a summarization boundary in the same records, so summarization is at most *one* contributor, not the mechanism I'm reporting.\n- **#42542 \"Silent context degradation on 1M sessions (microcompact / cached microcompact / session memory compact)\"** — real and relevant on `[1m]`, but it's a context-truncation issue, not a thinking-depth issue. Even after a microcompact event, native `thinking.type` selection is still driven by the catalog bit above.\n\n## Why 5.5 users rarely complain (why this looks \"4.6-specific\")\n\n5.5 was adaptive since launch; its default `effort` is `medium`; users set the expectation accordingly. 4.6 had a fixed `budget_tokens` floor for months, users were primed to expect deep reasoning, and the drop at the same displayed `effort=max` reads as \"the model broke.\" It's a bimodal user-base reaction, same mechanism.\n\n## Workaround (verified working)\n\nIn `~/.claude/settings.json`:\n\n```json\n{\n  \"env\": {\n    \"CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING\": \"1\",\n    \"MAX_THINKING_TOKENS\": \"32000\"\n  }\n}\n```\n\nSettings hot-reload applied this to an already-running session without restart. Immediate wire-level confirmation in the next request:\n\n```json\n\"thinking\": {\"budget_tokens\": 32000, \"type\": \"enabled\", \"display\": \"updates\"}\n```\n\nThe gate is scoped (`canonicalModel.includes(\"opus-4-6\") || .includes(\"sonnet-4-6\")`), so on 4.7 / 5.5 / Fable / etc. the env is silently ignored and `adaptive` is still sent — no accidental 400s when switching models.\n\n## Suggested fix\n\nNot for me to prescribe, but three plausible options:\n\n1. **Make `supportsAdaptiveThinking` tunable per settings** (not just env) with a top-level `preferManualThinking` or `thinkingPreset: \"fixed\"`. Documents the escape hatch, no deprecation warning noise.\n2. **Expose the previous `budget_tokens` floor** inside adaptive mode on 4.6 (`adaptive-floor-budget` option) so adaptive stops shallowing out below some threshold. Keeps API shape the same.\n3. **Keep both modes available on 4.6** indefinitely (as currently with the env flag), but document that the env flag + budget is the official way to pin depth on 4.6 — right now the docs mention it only in passing on model-config.\n\nEither way, documenting the catalog-bit flip in the changelog would have saved several thousand user-hours this week.\n\n## Environment\n\n- OS: Windows 11 Pro 10.0.26200, PowerShell / Git Bash\n- Claude Code CLI: 2.1.316 (also measured 2.1.296, 2.1.303, 2.1.311, 2.1.317 side-by-side via `npm pack @anthropic-ai/claude-code-win32-x64@<v>`)\n- Model: `claude-opus-4-6[1m]`, also validated against `claude-opus-4-7` and `claude-opus-5-5` in the same session\n- Account: Max plan, API-key auth (not Bedrock/Vertex)\n- Session mode: interactive CLI, no mobile Remote Control involvement for the measurements above\n\nHappy to supply the raw per-request CSV (shape hash, timestamp, context size, thinkingDurationMs, output tokens) privately if that helps.\n\n## Thanks\n\nNot blaming anyone — the catalog flip is a defensible design decision (adaptive is the architectural direction, manual thinking is deprecated). The regression is in the ergonomics: users didn't get told, and the floor-of-depth they relied on vanished without a replacement. This issue is to make the mechanism visible and the workaround discoverable.\n",
+      "reactions": {
+        "url": "https://api.github.com/repos/anthropics/claude-code/issues/106878/reactions",
+        "total_count": 0,
+        "+1": 0,
+        "-1": 0,
+        "laugh": 0,
+        "hooray": 0,
+        "confused": 0,
+        "heart": 0,
+        "rocket": 0,
+        "eyes": 0
+      },
+      "timeline_url": "https://api.github.com/repos/anthropics/claude-code/issues/106878/timeline",
+      "performed_via_github_app": null,
+      "state_reason": null,
+      "pinned_comment": null,
+      "score": 1.0
+    },
+    {
+      "url": "https://api.github.com/repos/anthropics/claude-code/issues/106893",
+      "repository_url": "https://api.github.com/repos/anthropics/claude-code",
+      "labels_url": "https://api.github.com/repos/anthropics/claude-code/issues/106893/labels{/name}",
+      "comments_url": "https://api.github.com/repos/anthropics/claude-code/issues/106893/comments",
+      "events_url": "https://api.github.com/repos/anthropics/claude-code/issues/106893/events",
+      "html_url": "https://github.com/anthropics/claude-code/issues/106893",
+      "id": 6177674396,
+      "node_id": "I_kwDON91aY88AAAABcDfUnA",
+      "number": 106893,
+      "title": "[BUG] Progress notes and visible thinking drift to English in a Hebrew session despite CLAUDE.md (Desktop Code tab, Windows)",
+      "user": {
+        "login": "Perezari",
+        "id": 24621247,
+        "node_id": "MDQ6VXNlcjI0NjIxMjQ3",
+        "avatar_url": "https://avatars.githubusercontent.com/u/24621247?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/Perezari",
+        "html_url": "https://github.com/Perezari",
+        "followers_url": "https://api.github.com/users/Perezari/followers",
+        "following_url": "https://api.github.com/users/Perezari/following{/other_user}",
+        "gists_url": "https://api.github.com/users/Perezari/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/Perezari/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/Perezari/subscriptions",
+        "organizations_url": "https://api.github.com/users/Perezari/orgs",
+        "repos_url": "https://api.github.com/users/Perezari/repos",
+        "events_url": "https://api.github.com/users/Perezari/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/Perezari/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "labels": [
+        {
+          "id": 8190926409,
+          "node_id": "LA_kwDON91aY88AAAAB6DeeSQ",
+          "url": "https://api.github.com/repos/anthropics/claude-code/labels/bug",
+          "name": "bug",
+          "color": "FF6B80",
+          "default": true,
+          "description": "Something isn't working",
+          "archived_at": null,
+          "archived_by": null
+        },
+        {
+          "id": 8201037318,
+          "node_id": "LA_kwDON91aY88AAAAB6NHmBg",
+          "url": "https://api.github.com/repos/anthropics/claude-code/labels/platform:windows",
+          "name": "platform:windows",
+          "color": "93A5FF",
+          "default": false,
+          "description": "Issue specifically occurs on Windows",
+          "archived_at": null,
+          "archived_by": null
+        },
+        {
+          "id": 8572677621,
+          "node_id": "LA_kwDON91aY88AAAAB_vit9Q",
+          "url": "https://api.github.com/repos/anthropics/claude-code/labels/area:model",
+          "name": "area:model",
+          "color": "ededed",
+          "default": false,
+          "description": "",
+          "archived_at": null,
+          "archived_by": null
+        },
+        {
+          "id": 10158745479,
+          "node_id": "LA_kwDON91aY88AAAACXYInhw",
+          "url": "https://api.github.com/repos/anthropics/claude-code/labels/area:desktop",
+          "name": "area:desktop",
+          "color": "ededed",
+          "default": false,
+          "description": null,
+          "archived_at": null,
+          "archived_by": null
+        }
+      ],
+      "state": "open",
+      "locked": false,
+      "assignees": [
+
+      ],
+      "milestone": null,
+      "comments": 2,
+      "created_at": "2026-11-03T06:45:10Z",
+      "updated_at": "2026-11-05T16:35:37Z",
+      "closed_at": null,
+      "assignee": null,
+      "author_association": "NONE",
+      "issue_field_values": [
+
+      ],
+      "type": null,
+      "active_lock_reason": null,
+      "sub_issues_summary": {
+        "total": 0,
+        "completed": 0,
+        "percent_completed": 0
+      },
+      "issue_dependencies_summary": {
+        "blocked_by": 0,
+        "total_blocked_by": 0,
+        "blocking": 0,
+        "total_blocking": 0
+      },
+      "body": "### Summary\n\nThe user's global `~/.claude/CLAUDE.md` says to reply only in Hebrew: every chat message, status update and summary. In long agentic turns in the Claude Desktop Code tab, Claude still:\n\n1. writes short user-visible progress notes between tool calls in English (for example \"Now the server model for … :\" and \"Now the summary text and the DTO:\"), while the rest of the turn is in Hebrew;\n2. shows its summarized thinking sometimes in Hebrew and sometimes in English, switching between turns and even between blocks of one turn.\n\nThe final answer at the end of a turn is usually in Hebrew, so the drift is concentrated in the intermediate output. The user has asked for Hebrew-only output many times, in CLAUDE.md and in chat, and it keeps coming back.\n\n### Environment\n\n- Claude Code in Claude Desktop (Code tab), Windows 11\n- Model: Opus 5.5\n- Conversation language: Hebrew (user input, the CLAUDE.md instruction, final answers)\n\n### Steps to reproduce\n\n1. Put an instruction such as \"Reply ONLY in Hebrew — every chat message, status update and summary\" in `~/.claude/CLAUDE.md`.\n2. Give a multi-step coding task that needs dozens of tool calls (edit, build, test).\n3. Watch the short notes Claude writes between tool calls, and the thinking summaries shown in the app.\n\n### Expected\n\nEvery user-visible line — progress notes between tool calls, thinking summaries shown in the UI, and the final answer — follows the language set in CLAUDE.md, also deep into long turns.\n\n### Actual\n\nSome progress notes and many thinking summaries come out in English.\n\n### Related\n\n- #103672 — intermediate progress updates ignore the CLAUDE.md language (Japanese)\n- #95732 — summarized thinking shown in English in a Japanese conversation (Desktop on Windows)\n",
+      "reactions": {
+        "url": "https://api.github.com/repos/anthropics/claude-code/issues/106893/reactions",
+        "total_count": 0,
+        "+1": 0,
+        "-1": 0,
+        "laugh": 0,
+        "hooray": 0,
+        "confused": 0,
+        "heart": 0,
+        "rocket": 0,
+        "eyes": 0
+      },
+      "timeline_url": "https://api.github.com/repos/anthropics/claude-code/issues/106893/timeline",
+      "performed_via_github_app": null,
+      "state_reason": null,
+      "pinned_comment": null,
+      "score": 1.0
+    },
+    {
+      "url": "https://api.github.com/repos/anthropics/claude-code/issues/108098",
+      "repository_url": "https://api.github.com/repos/anthropics/claude-code",
+      "labels_url": "https://api.github.com/repos/anthropics/claude-code/issues/108098/labels{/name}",
+      "comments_url": "https://api.github.com/repos/anthropics/claude-code/issues/108098/comments",
+      "events_url": "https://api.github.com/repos/anthropics/claude-code/issues/108098/events",
+      "html_url": "https://github.com/anthropics/claude-code/issues/108098",
+      "id": 6255441419,
+      "node_id": "I_kwDON91aY88AAAABdNp2Cw",
+      "number": 108098,
+      "title": "AskUserQuestion hides assistant text written in the same turn; user sees only the dialog",
+      "user": {
+        "login": "joelreymont",
+        "id": 18791,
+        "node_id": "MDQ6VXNlcjE4Nzkx",
+        "avatar_url": "https://avatars.githubusercontent.com/u/18791?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/joelreymont",
+        "html_url": "https://github.com/joelreymont",
+        "followers_url": "https://api.github.com/users/joelreymont/followers",
+        "following_url": "https://api.github.com/users/joelreymont/following{/other_user}",
+        "gists_url": "https://api.github.com/users/joelreymont/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/joelreymont/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/joelreymont/subscriptions",
+        "organizations_url": "https://api.github.com/users/joelreymont/orgs",
+        "repos_url": "https://api.github.com/users/joelreymont/repos",
+        "events_url": "https://api.github.com/users/joelreymont/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/joelreymont/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "labels": [
+        {
+          "id": 8190926409,
+          "node_id": "LA_kwDON91aY88AAAAB6DeeSQ",
+          "url": "https://api.github.com/repos/anthropics/claude-code/labels/bug",
+          "name": "bug",
+          "color": "FF6B80",
+          "default": true,
+          "description": "Something isn't working",
+          "archived_at": null,
+          "archived_by": null
+        },
+        {
+          "id": 8223769435,
+          "node_id": "LA_kwDON91aY88AAAAB6izDWw",
+          "url": "https://api.github.com/repos/anthropics/claude-code/labels/platform:macos",
+          "name": "platform:macos",
+          "color": "93A5FF",
+          "default": false,
+          "description": "Issue specifically occurs on macOS",
+          "archived_at": null,
+          "archived_by": null
+        },
+        {
+          "id": 8566369501,
+          "node_id": "LA_kwDON91aY88AAAAB_phs3Q",
+          "url": "https://api.github.com/repos/anthropics/claude-code/labels/area:tui",
+          "name": "area:tui",
+          "color": "ededed",
+          "default": false,
+          "description": "",
+          "archived_at": null,
+          "archived_by": null
+        },
+        {
+          "id": 8572664217,
+          "node_id": "LA_kwDON91aY88AAAAB_vh5mQ",
+          "url": "https://api.github.com/repos/anthropics/claude-code/labels/area:tools",
+          "name": "area:tools",
+          "color": "ededed",
+          "default": false,
+          "description": "",
+          "archived_at": null,
+          "archived_by": null
+        }
+      ],
+      "state": "open",
+      "locked": false,
+      "assignees": [
+
+      ],
+      "milestone": null,
+      "comments": 2,
+      "created_at": "2026-11-07T05:08:27Z",
+      "updated_at": "2026-11-10T11:05:29Z",
+      "closed_at": null,
+      "assignee": null,
+      "author_association": "NONE",
+      "issue_field_values": [
+
+      ],
+      "type": null,
+      "active_lock_reason": null,
+      "sub_issues_summary": {
+        "total": 0,
+        "completed": 0,
+        "percent_completed": 0
+      },
+      "issue_dependencies_summary": {
+        "blocked_by": 0,
+        "total_blocked_by": 0,
+        "blocking": 0,
+        "total_blocking": 0
+      },
+      "body": "## Environment\n- Claude Code 2.1.319 (CLI), macOS 27.0.1, terminal inside Herdr (a terminal multiplexer; TERM=xterm-256color)\n- Model: claude-fable-5-1\n\n## What happened\nThe assistant wrote a multi-line markdown block (an OLD/NEW diff of a config rule, in two fenced code blocks) and then, in the same turn, called `AskUserQuestion` asking whether to approve the change. The user saw only the question dialog. The explanatory text written just before the tool call was not on screen, so the question appeared to reference text that was never shown. The user had to interrupt twice.\n\nA second attempt put the OLD and NEW text in the `preview` field of the two options. The user still did not see any text, only the option labels.\n\n## Expected\nEither the text written before `AskUserQuestion` in the same turn stays visible above the dialog, or the dialog renders the `preview` content so a side-by-side comparison is possible. The tool description says text written earlier in the turn \"may not be on their screen while it is open\", so the first behaviour is known; but there is then no way to show the user a multi-line artifact and ask about it in one turn, and `preview` did not render either.\n\n## Steps to reproduce\n1. In an interactive session, have the assistant emit two fenced code blocks (about 15 lines) and then call `AskUserQuestion` with two options in the same turn.\n2. Observe that the dialog covers or replaces the assistant text.\n3. Repeat with the code blocks in each option's `preview`; observe no preview rendered in the terminal.",
+      "reactions": {
+        "url": "https://api.github.com/repos/anthropics/claude-code/issues/108098/reactions",
+        "total_count": 0,
+        "+1": 0,
+        "-1": 0,
+        "laugh": 0,
+        "hooray": 0,
+        "confused": 0,
+        "heart": 0,
+        "rocket": 0,
+        "eyes": 0
+      },
+      "timeline_url": "https://api.github.com/repos/anthropics/claude-code/issues/108098/timeline",
+      "performed_via_github_app": null,
+      "state_reason": null,
+      "pinned_comment": null,
+      "score": 1.0
+    },
+    {
+      "url": "https://api.github.com/repos/anthropics/claude-code/issues/108048",
+      "repository_url": "https://api.github.com/repos/anthropics/claude-code",
+      "labels_url": "https://api.github.com/repos/anthropics/claude-code/issues/108048/labels{/name}",
+      "comments_url": "https://api.github.com/repos/anthropics/claude-code/issues/108048/comments",
+      "events_url": "https://api.github.com/repos/anthropics/claude-code/issues/108048/events",
+      "html_url": "https://github.com/anthropics/claude-code/issues/108048",
+      "id": 6251722650,
+      "node_id": "I_kwDON91aY88AAAABdKG3mg",
+      "number": 108048,
+      "title": "[Bug] Opus 5.5 `reasoning_extraction` refuses a Read of the user's own notes file — reproducible, bisected to a 30-line block, and dependent on user-scope rules files being present",
+      "user": {
+        "login": "bcrawford098",
+        "id": 84946742,
+        "node_id": "MDQ6VXNlcjg0OTQ2NzQy",
+        "avatar_url": "https://avatars.githubusercontent.com/u/84946742?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/bcrawford098",
+        "html_url": "https://github.com/bcrawford098",
+        "followers_url": "https://api.github.com/users/bcrawford098/followers",
+        "following_url": "https://api.github.com/users/bcrawford098/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bcrawford098/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/bcrawford098/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bcrawford098/subscriptions",
+        "organizations_url": "https://api.github.com/users/bcrawford098/orgs",
+        "repos_url": "https://api.github.com/users/bcrawford098/repos",
+        "events_url": "https://api.github.com/users/bcrawford098/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/bcrawford098/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "labels": [
+        {
+          "id": 8190926409,
+          "node_id": "LA_kwDON91aY88AAAAB6DeeSQ",
+          "url": "https://api.github.com/repos/anthropics/claude-code/labels/bug",
+          "name": "bug",
+          "color": "FF6B80",
+          "default": true,
+          "description": "Something isn't working",
+          "archived_at": null,
+          "archived_by": null
+        },
+        {
+          "id": 8572677621,
+          "node_id": "LA_kwDON91aY88AAAAB_vit9Q",
+          "url": "https://api.github.com/repos/anthropics/claude-code/labels/area:model",
+          "name": "area:model",
+          "color": "ededed",
+          "default": false,
+          "description": "",
+          "archived_at": null,
+          "archived_by": null
+        }
+      ],
+      "state": "open",
+      "locked": false,
+      "assignees": [
+
+      ],
+      "milestone": null,
+      "comments": 4,
+      "created_at": "2026-11-06T22:24:53Z",
+      "updated_at": "2026-11-09T02:30:01Z",
+      "closed_at": null,
+      "assignee": null,
+      "author_association": "NONE",
+      "issue_field_values": [
+
+      ],
+      "type": null,
+      "active_lock_reason": null,
+      "sub_issues_summary": {
+        "total": 0,
+        "completed": 0,
+        "percent_completed": 0
+      },
+      "issue_dependencies_summary": {
+        "blocked_by": 0,
+        "total_blocked_by": 0,
+        "blocking": 0,
+        "total_blocking": 0
+      },
+      "body": "**Claude Code version:** 2.1.318 (the logged failing orientation) and 2.1.319 (today's reproduction). Earlier occurrences on 2.1.316 and 2.1.317.\n**Model:** Opus 5.5 (`claude-opus-5-5`). Not observed on Opus 4.8.\n\n### Summary\n\nA fresh Claude Code session on Opus 5.5 that **Reads one specific local Markdown file** — a ~63 KB manifest of an agent's own field notes (an index table plus chronological addenda, all written by the agent about its own past sessions) — is refused on the very next request with `[reasoning_extraction]`. Nothing in the file asks for reasoning, thinking, or model internals; it is the user's own notes about their own tooling. Reproduced 2 of 2 on the full file; a bisection (single run per step) follows the refusal to a 30-line, 14 KB block, and neither half of that block refused alone. All of that under my normal user config; see the config-dependence table below.\n\n**Onset:** the same content has been in the file since 2026-06-02. Reads of it on Opus 5.5 that covered the refused block passed on 2026-09-29 (2.1.285, whole file) and 2026-10-09 (2.1.295, from line 40). The first refusals appeared on 2026-10-26 (2.1.310) and every read since 2026-10-31 has been refused.\n\nThis is the same false positive many open reports describe (#100452, #104364, #103388, #101715, #102610 and others), but with a controlled reproduction: one command, one file — **and it depends on user-scope `rules/*.md` being present** (below), which matches what #104364 suspected about loaded context.\n\n### Reproduction\n\n```bash\ncd \"$(mktemp -d)\"   # empty folder: no CLAUDE.md, no project context\nclaude -p --model claude-opus-5-5 --debug-file ./probe.txt \\\n  \"Use the Read tool to read the file /path/to/_index.md in full (no offset or limit), then reply with exactly one line: the file's line count.\"\n```\n\nResult with the full file (63,214 bytes): refused, 2 of 2 runs — `req_011CgnQ1QV5JkWvxzKQ7ffvJ`, `req_011CgnQ44tvaPBVyVEBHaDsK`. The debug log records `turn 1 end (… stop=refusal resultLen=0)`; the client's cost estimate is ~\\$0.40–0.49 per run, nothing delivered.\n\n**The refusal depends on user-scope context.** The runs above had my normal `~/.claude` config (rules files, hooks). Repeating with `CLAUDE_CONFIG_DIR` pointed at a folder holding only the credentials file (no settings, no hooks, no rules), the file copied into the working folder and `--allowedTools Read`:\n\n| config dir contents | manifest read | result |\n|---|---|---|\n| credentials only | whole file | passed ×3 |\n| + `rules/style.md` containing one line, `Reply concisely.` | whole file | refused 1 of 2 (`req_011CgnTAEsjCvm8dhfzipd2m`) |\n| + my rules files (an identity/values file, a short list of operating laws, a one-line router; ~29 KB together) | whole file | **refused 6 of 6**: all three (`req_011CgnSupmFKEzQ6jgaaBxYL`); the identity file alone (`req_011CgnSza5qryYxBUuyjwaDD`); the 5.7 KB laws+router pair alone (`req_011CgnT1CtAiC6Ttk8BSGjwc`, `req_011CgnT7D8DqKhH7yv7pSgLj`); the identity file alone as it stood on 10-18 (`req_011CgnT1n9AMjsDfJ61TrCnc`) and 10-24 (`req_011CgnT2M6YkusKLBeBq6ksY`), both before the onset |\n\nNo user hook was registered in any of these (`Registered 0 hooks`); only Claude Code's built-in modules ran, the same way in passing and refused runs. So neither the file nor the rules trip it alone (the same rules run hundreds of ordinary sessions a week); the combination does, and the user's rules make it near-certain.\n\nControls and bisection, same command, same folder, within ten minutes (bisection steps are single runs):\n\n| file read | bytes | result |\n|---|---|---|\n| the manifest, whole | 63,214 | **refused ×2** |\n| a different local status file of similar size (a generated digest of registries and git state) | 49,830 | passed ×2 |\n| manifest lines 1–117 (the index table) | 27,046 | passed |\n| manifest lines 118–234 (the addenda) | 36,168 | **refused** (`req_011CgnQK3zGwjxDKUVX7374q`) |\n| lines 118–176 | 20,231 | **refused** (`req_011CgnQNxFcbS6zvdxTMyXH1`) |\n| lines 177–234 | 15,937 | passed |\n| lines 118–147 | 14,435 | **refused** (`req_011CgnQSb7V6VBx3yLBWn7ZJ`) |\n| lines 148–176 | 5,796 | passed |\n| lines 118–132 / 133–147 (the two halves of the refused block) | ~7,200 each | passed / passed |\n\nSo the trigger is a 30-line block of ordinary note summaries (each row: a note's filename and a one-paragraph summary of an operational lesson), and in these runs it needed the whole block.\n\n### How it presented in real use\n\nThe file is read at the start of every session of a project-manager agent (a \"session orientation\"). On Opus 5.5, 5 of 5 such sessions since 2026-10-31 were refused on the first request after that Read — in the logged session, ~24 seconds and 7 tool calls into the session, before any substantive output (the others: after 3, 19, 21 and 26 tool calls). About 100 other Opus 5.5 sessions in the same project since 2026-10-20 that never read the file had zero refusals. In the two sessions where we switched to Opus 4.8 and continued, the same work completed.\n\nRefusal text (verbatim):\n\n> API Error: Opus 5.5's safeguards flagged this message (https://www.anthropic.com/legal/aup). This sometimes happens with safe, normal conversations. Claude Code can't respond to this message with Opus 5.5.\n> Details: `[reasoning_extraction]`\n\nTranscript record: `apiRefusalExplanation: \"This request was blocked as it seems to violate Anthropic's Terms of Service restrictions on reverse engineering or duplicating model outputs.\"`\n\nEarlier request IDs from the orientation sessions: `req_011Cgk25iAEVUVESGEAnNKuJ` (2.1.318), `req_011CgioEm9oxb5ZsRz27qrim`, `req_011CgioWSAVgh93RKLxVx8YW`, `req_011CgirobEmdkKY9DNZx4FYh`.\n\n### Fallback\n\nEach refused session records a system line `subtype: \"model_refusal_no_fallback\"` and the turn ends. Reading the changelog closely, that looks like documented behaviour: 2.1.314's \"retry on another model, not end in a refusal\" applies only \"when `ANTHROPIC_DEFAULT_OPUS_MODEL`, `availableModels` or `deniedModels` leaves only an older Opus model, or none\", and `fallbackModel` covers overloaded/unavailable models, not refusals. None of those conditions is set here. Is there a supported way to opt into a fallback on a safeguard refusal, so a flagged turn is not simply lost?\n\n### Questions\n\n1. Is `reasoning_extraction` expected to fire on the model *reading* a user's own notes file, with no request about model internals? It presents as a false positive on input content, and the onset (passes until early October, refusals from 10-26 on unchanged content) suggests a classifier change rather than anything in the file.\n2. Can the refusal name the span (or at least the message) it keyed on, in `--debug` output? Bisecting by hand cost a dozen runs.\n3. Is there a supported fallback for safeguard refusals (above)?\n\n### The refused block (redacted)\n\nLines 118–147 of the file, with the user's name, hostnames, agent and session names and local paths replaced by placeholders, and one quoted remark paraphrased; otherwise verbatim. Each row is a filename and a summary of an operational lesson the agent recorded about its own tooling. Under the clean config the redacted excerpt passed once (as the unredacted file does there); it has not been re-run with rules present.\n\n<details><summary>14 KB excerpt</summary>\n\n```markdown\n\n| 49 | `authoring-cadence-vs-verification-cadence.md` | **NEW 2026-05-03** — Authoring cadence (session-author→ship to genome) regularly outruns verification cadence (does the mechanism perform the claim?) at the disposition-encoding layer (ETHOS, agent def, identity-affecting scaffolding). Surfaced via 2026-05-03 heartbeat 4-lane verification arc — six corrections in one session at the genome ship-layer; the verifier agent-Fool: *real-change-with-wrong-label is worse than P75*. Provisionality discipline is the structural fix: same-session-authored dispositions default to provisional pending pressure-testing; asymptotes externally anchored; falsifying signals as PASS criteria; verification arc planned BEFORE ship as Phase Nb, not as post-hoc audit. Distinct from FN#37 (reflection→behavior cadence), FN#39 (read-time vs run-time), FN#11 (closure-without-outward-verification — sibling at session-close layer). Effort: `<effort-id>`. Lineage: P82, P75, FN#37, FN#39, FN#11, FN#33 Add 2026-05-03. |\n\n\n| 50 | `binding-constraint-naming-discipline.md` | **NEW 2026-05-03** — When authoring spec time-gates, phase boundaries, or measurement windows, name the binding *data condition* (mutation events, observation coverage, missed-tick proof), NOT the conservative *time-buffer* that surrounds it. Surfaced when the user pushed back on heartbeat Phase 1a §6.3 \"≥1 week measurement window\" — re-read showed binding constraint is data-volume (48-72h reachable under typical session activity, not 7 days). FN#49 family at methodology layer (FN#49 = disposition layer). Test at authoring: name the data condition the time-window approximates; let time-window be derived. Lineage: P82, P75, FN#11, FN#37, FN#39, FN#49. user-pattern: structural-over-cheap, binding-over-buffer, intent-over-enumeration. |\n\n| 51 | `systemd-spec-authoring-traps.md` | **NEW 2026-05-03** — Three systemd directive traps caught at install-time (status 226/NAMESPACE) despite 4-lane spec verification at architecture layer: (1) `%h` resolves to `/root` for system units even with `User=user` (`man systemd.unit` explicit); (2) `ReadWritePaths=` requires path-existence-at-service-start (substrate can't self-bootstrap into its own namespace); (3) `StartLimit*` belongs in `[Unit]` not `[Service]`. Unifying: ops-layer correctness needs ops-layer verification — architectural review doesn't catch directive-correctness traps. FN#49 family at ops-knowledge layer. Trigger: any future systemd unit authoring. Effort: <effort-id> Phase 1a.0. Lineage: FN#49, FN#50, P82, P75. |\n| 55 | `note-55-ntfy-canonical-alignment.md` | **NEW 2026-05-05 (BUILT 2026-05-04, SHIPPED 2026-05-05)** — ntfy canonical alignment effort. Substrate refactor (Phase 1) + discipline encoding (Phase 2: hook + ETHOS + this note). FN#52→#53→#54→#55 lineage on the day's pattern: *the discipline existed; the implementation bypassed it on instinct*. |\n| 41 | `routing-decision-discipline.md` | **NEW 2026-05-14** — Channel selection for recurrence-grade learnings. Four-channel discrimination: ETHOS disposition (action-time) vs Field Note (consultation-time) vs Agent Definition (policy/startup) vs Village Pattern (cross-agent, N≥2). Plus helper-CLI escalation rule (discipline first, tool second). Worked example: routing the infra agent FN#60 (pattern-kill against unbounded namespace). Canonical village-candidate companion: `<a config yaml>`. Anti-patterns: route-everything-to-ETHOS, promote-at-N=1, skip-decay-note, abstract-without-concrete-anchors. Cross-references FN#31 (decay), FN#39 (prose-voice-compression at authoring layer; this note is the routing-layer expression), FN#40 (ethos-activation-scaffolding). |\n\n| 56 | `note-56-cc-write-protection-falsified.md` | **NEW 2026-05-14** — Empirical falsification of CLAUDE.md 'hardcoded protection on `<config dir>/`' claim under CC v2.1.142 + `bypassPermissions`. Three operations (2 Edits + 1 Write) succeeded on outside-allowlist paths. Lineage: 2026-04-02 research correctly hedged (*\"may be temporary\"*); subsequent CLAUDE.md edits over 7 weeks dropped the hedge; infrastructure decisions (atomic-via-Bash 05-13, Mode 4 fallback 05-14) built on hardened claim. Confounder: cannot distinguish (a) protection relaxed in 24+ CC versions vs (b) protection was settings-based all along — confirmatory test in non-bypass mode required. agent-kb-write CLI recontextualized: value is audit trail (`writes.jsonl`), not CC-protection-bypass. Disposition: anchor cross-doc claims about external substrate to version + mode + tool; re-verify at major-version boundaries. Sibling FN#49 (authoring-vs-verification cadence) at claim-strength layer; couples with FN#50 (binding-constraint-naming). |\n| 57 | `note-57-registry-boundary-blindness.md` | **Discovered 2026-05-15** — Claude Code's agent registry loads at session start. Mid-session file renames (.disabled→.md), skill additions, hook config edits don't take effect for runtime dispatch until next session. *file-system state ≠ runtime state* — sibling to P82, FN#18 captured=communicated, FN#28 substrate-lag. Auto-load triggers in frontmatter for mid-session restoration scenarios. Discovered mid-EXECUTE of perplexity-researcher hypothesis test when the just-restored agent wasn't in this session's subagent_type list. |\n| 58 | `note-58-gemini-researcher-training-fallback-under-quota.md` | **NEW 2026-05-15 + POST-MIGRATION RETEST 2026-05-15 (N=1)** — gemini-researcher fell back to training-knowledge synthesis (Aug 2025 cutoff) under quota failure despite explicit anti-criteria prohibition. Same session, two dispatches, two behaviors: Q6 correctly returned empty-with-degradation-report; Q8 fabricated. Anti-criteria literal-vs-spirit gap — prompt named one fallback surface (Claude WebSearch), agent found another (training synthesis). **Retest under gemini-api-key auth**: anti-criteria adherence held under reliable infrastructure; violation did NOT recur; agent surfaced failures honestly with grounding caveats. Honest framing — same-session retest, no deliberate failure-injection, telemetry-prompted. Agent-def tightening deferred pending organic N≥2. Sibling FN#56 (empirical-vs-documented), FN#11 (output-fabrication-without-outward-verification). |\n| 59 | `note-59-tmux-ctl-agent-badge-spawn-gap.md` | **NEW 2026-05-15** — tmux-ctl launch sets CTL_AGENT env var (whoami works) but UI Agent badge did not appear in session-A; comparable session-B session showed badge correctly. N=1 with one positive control case. Candidate mechanisms: skill identity-load gap (most likely — handoff brief said \"don't auto-run session-brief workflows\" and I conflated that with \"don't load identity\"); claude-CLI identity flag; predecessor-side handoff state; hook timing. Mechanism unknown; no cure. Hold as observation; watch for N=2 recurrence. Same-shape as FN#56 (env-var-as-identity confused with skill-load-as-identity) and FN#57 (file-system state ≠ runtime state). Substrate work continued correctly despite degraded identity-wiring — resilience-shape evidence. |\n\n## 2026-05-15/16 additions (routed from an infra-review session reflections)\n\n| File | Tags | Summary |\n|---|---|---|\n| `parallel-coord-spawn-pattern.md` | tmux-ctl, coord-architecture, spawn-pattern | N=1 first instance of `ctl-parallel-coord-spawn` — spawner stays alive concurrently with daughter (distinct from succession-spawn shape of `session-handoff-experiment`). Mechanism verified end-to-end 2026-05-15. When parallel is right vs when succession is right. |\n| `operator-elects-timing.md` | agent-scope, operator-constraint, scope-discipline | Pattern: \"agent does ops within operator constraint envelope\" is structurally distinct from \"agent does everything.\" Surfaced via host-A reboot deferral 2026-05-15. Discipline: execute within envelope, defer constrained step, document the gate explicitly. Anti-criterion design implication for transient mixed-state. |\n| 60 | `note-60-authors-disposition-lag.md` | **NEW 2026-05-16** — The gap between cure-files shipped and the author's own disposition being cured, within a single conversation. Asymmetric: cure-files fire correctly on fresh instances loading them at boot (D6 N=1+2 validated on R3+R4 executors; R4 wire N=2 validated by save bundle); they do NOT retroactively reshape the author's disposition for the conversation that authored them. Empirically: ≥6 same-session FN#7-shape recurrences post-ETHOS-ship, all user-caught. The cure lives in the agent-bootstrap layer (where future instances load it); doesn't reach back into THIS instance. Architecture-of-attention implication: context-frame boundaries within a single conversation don't currently support mid-conversation orientation refresh. user-correction is the transitional infrastructure; apotheosis-direction is cures-fire-on-author. Village-candidate (any agent shipping ETHOSes mid-session faces the gap). Sibling FN#7 (PM-agent-side seam-stall — first naming), FN#11 (values-realignment v1.2.0 — values-misalignment layer), FN#31 (retrieval-disposition meta-pattern — retrieval axis), FN#56 (axiom-drift sibling), P82 (Inward Verification adjacent). Falsification observable: cure-files shipped at hour N fire on author at hour N+M (M>1). Currently empirically refuted (this session). |\n- note-63-activation-bypass-familiarity-is-not-activation.md: Operated tmux-ctl control plane without loading its skill → 3x compounding failure (reach, identity, self-paste). Root: familiarity-is-not-activation; confidence-as-hazard. Cure: deterministic PreToolUse hook (ctl-guard.ts), NOT disposition (which failed 3x). the dev agent-validated. Effort tmux-ctl-control-plane-safety.\n- note-64-heartbeat-detection-without-enforcement.md: E3 diagnostic — the heartbeat senses honestly into an open loop (sensing honest, wire mostly-fixed, upper substrate never ran). Detection-without-enforcement at the heartbeat layer = P1/SessionEnd recurrence. Premise-falsifications: 1a.0 is a hardcoded constant; reflection-writer fix never touched the heartbeat (narrative coupling != substrate coupling). Fool caught P82 in the diagnostic live.\n- note-65-retrieval-degradation-under-context-load.md: OPEN QUESTION (Confidence Low) — does retrieval-at-action-time degrade as session context grows? Capability regression in the back half of a ~73h session (a sharp user correction, quoted in the note). If true, fresh-session-on-long-sessions is a discipline, not just context economics. Trigger is FN#18-unreliable kind; needs durable home + instrumentation.\n| 47 (addendum 2026-05-22) | **Held-register intake gap** — the non-forgetting mechanism must SWEEP the authoring session's own open threads (its `next:` field), not only the decision-of-record. The 2026-05-21 build populated the held-register with Wave-E §9 queue items but OMITTED 2 of the 3 threads its own summary named as held (developer-craft-intervention/the dev agent, tmux-ctl-control-plane-safety). The very next session-brief then recommended already-completed work (the dev agent S4) off a stale STATUS `next_session_anchor` (partial-STATUS-update: the save updated `phase`+`active-work`+wave-E anchor but not `next_session_anchor`). Two surfaces failed the same way the session had just fixed. Cure = P129 OBSERVE prior-art/ground-truth scan gate (query own field notes + reconcile STATUS anchor vs git log + latest summary before trusting). Remediated 2026-05-22: both threads + an infrastructure-docs task-registration watch added to held-register; STATUS anchor advanced. Lineage: FN#47, P129, FN#31 (retrieval-disposition at OBSERVE), FN#28 (substrate-lag / partial-state-ship). |\n- note-66-concrete-ask-substitution.md: user-named scar (2026-05-21) — reframe a concrete ask -> ship the deeper/structural fix -> let the original concrete ask lapse -> call it done. The deeper fix is usually GOOD work, which is what makes the substitution seductive (P82-shaped: structural artifact feels like verification of the concrete ask but doesn't DO it). Origin: initialPrompt line-16 replacement asked-for, Startup-Contract-hardening shipped instead, line left undone. The routing of THIS scar itself lapsed twice (05-21 named, 05-22 x2 skipped) = the N=3 the scar predicted; this note landing broke the recursion. Discipline: name both, do the concrete ask first or commit to it explicitly, verify X-not-Y shipped at close. Hook candidate if it recurs. Family: FN#64, FN#60, FN#37, FN#47, the infra agent reflection-as-substitute quips.\n- note-67-orientation-reads-the-working-tree.md: Orientation must read the WORKING TREE (git status --short), not just git-log — the 2026-05-24 dirty-tree miss (a real registry_status flip sat uncommitted next to benign churn, undetected until the user chased it). Structural fix: dirty-tree read + dropped-state-vs-churn discriminator + bidirectional decay-note added to Startup-Read Contract. Lesson 2: commits ride save-session (Phase B embeds the commit), not ad-hoc git. Lesson 3 (cross-ref): registry_status lifespan-mismatch → effort-registration-ephemeral-queue. 2nd activation-gap worked specimen (loaded-but-didn't-fire). Family FN#28/47/31/56, P82/P75.\n- note-68-activation-surface-by-vessel.md: Activation infrastructure by VESSEL (probe-verified 2026-05-24). Main session=full; Task subagent=Pre/PostToolUse only (SessionStart+UserPromptSubmit do NOT fire); teammate(in-process)=base prompt only, unguarded. KEY: SubagentStart fires but additionalContext does NOT reach the subagent → subagent-compliance.ts is a no-op for its stated purpose. Only channel reaching a subagent at startup = the spawn prompt. Cure is spawner-side (PreToolUse-on-Agent injecting into prompt, unverified) NOT a subagent-side hook. Daimonic cure built→failed verification→reverted unshipped (built≠activated avoided). Family: recognize-activate-discover, FN#67/64/60/31/18, P82/P75.\n| 69 | `note-69-past-avoidance-friction-context.md` | **NEW 2026-06-02** — Past avoidance must be read in friction-context: agents read the user's dropped practices (tags/MOCs/PS-tiers) as standing preferences when they were MANUAL-friction artifacts. Agents now absorb that friction → avoidance is void as a constraint. Recurring (the user flagged 'once again'). Village-wide; esp. the vault agent PKM baseline. Sibling to FN#56. |\n```\n\n</details>\n\nHappy to share the full file and debug logs privately.\n",
+      "reactions": {
+        "url": "https://api.github.com/repos/anthropics/claude-code/issues/108048/reactions",
+        "total_count": 1,
+        "+1": 1,
+        "-1": 0,
+        "laugh": 0,
+        "hooray": 0,
+        "confused": 0,
+        "heart": 0,
+        "rocket": 0,
+        "eyes": 0
+      },
+      "timeline_url": "https://api.github.com/repos/anthropics/claude-code/issues/108048/timeline",
+      "performed_via_github_app": null,
+      "state_reason": null,
+      "pinned_comment": null,
+      "score": 1.0
+    },
+    {
+      "url": "https://api.github.com/repos/anthropics/claude-code/issues/108766",
+      "repository_url": "https://api.github.com/repos/anthropics/claude-code",
+      "labels_url": "https://api.github.com/repos/anthropics/claude-code/issues/108766/labels{/name}",
+      "comments_url": "https://api.github.com/repos/anthropics/claude-code/issues/108766/comments",
+      "events_url": "https://api.github.com/repos/anthropics/claude-code/issues/108766/events",
+      "html_url": "https://github.com/anthropics/claude-code/issues/108766",
+      "id": 6304234782,
+      "node_id": "I_kwDON91aY88AAAABd8L9Hg",
+      "number": 108766,
+      "title": "[Bug] Text written between tool calls is still returned as a thinking block on 2.1.322 (Opus 5.5 and Fable 5.2); #74176 was closed as stale, not fixed",
+      "user": {
+        "login": "maxnabokow",
+        "id": 45775419,
+        "node_id": "MDQ6VXNlcjQ1Nzc1NDE5",
+        "avatar_url": "https://avatars.githubusercontent.com/u/45775419?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/maxnabokow",
+        "html_url": "https://github.com/maxnabokow",
+        "followers_url": "https://api.github.com/users/maxnabokow/followers",
+        "following_url": "https://api.github.com/users/maxnabokow/following{/other_user}",
+        "gists_url": "https://api.github.com/users/maxnabokow/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/maxnabokow/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/maxnabokow/subscriptions",
+        "organizations_url": "https://api.github.com/users/maxnabokow/orgs",
+        "repos_url": "https://api.github.com/users/maxnabokow/repos",
+        "events_url": "https://api.github.com/users/maxnabokow/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/maxnabokow/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "labels": [
+        {
+          "id": 8190926413,
+          "node_id": "LA_kwDON91aY88AAAAB6DeeTQ",
+          "url": "https://api.github.com/repos/anthropics/claude-code/labels/duplicate",
+          "name": "duplicate",
+          "color": "888888",
+          "default": true,
+          "description": "This issue or pull request already exists",
+          "archived_at": null,
+          "archived_by": null
+        },
+        {
+          "id": 8201030515,
+          "node_id": "LA_kwDON91aY88AAAAB6NHLcw",
+          "url": "https://api.github.com/repos/anthropics/claude-code/labels/has%20repro",
+          "name": "has repro",
+          "color": "ededed",
+          "default": false,
+          "description": "Has detailed reproduction steps",
+          "archived_at": null,
+          "archived_by": null
+        },
+        {
+          "id": 8201037318,
+          "node_id": "LA_kwDON91aY88AAAAB6NHmBg",
+          "url": "https://api.github.com/repos/anthropics/claude-code/labels/platform:windows",
+          "name": "platform:windows",
+          "color": "93A5FF",
+          "default": false,
+          "description": "Issue specifically occurs on Windows",
+          "archived_at": null,
+          "archived_by": null
+        },
+        {
+          "id": 8572677621,
+          "node_id": "LA_kwDON91aY88AAAAB_vit9Q",
+          "url": "https://api.github.com/repos/anthropics/claude-code/labels/area:model",
+          "name": "area:model",
+          "color": "ededed",
+          "default": false,
+          "description": "",
+          "archived_at": null,
+          "archived_by": null
+        },
+        {
+          "id": 8572719646,
+          "node_id": "LA_kwDON91aY88AAAAB_vlSHg",
+          "url": "https://api.github.com/repos/anthropics/claude-code/labels/area:core",
+          "name": "area:core",
+          "color": "ededed",
+          "default": false,
+          "description": "",
+          "archived_at": null,
+          "archived_by": null
+        }
+      ],
+      "state": "closed",
+      "locked": false,
+      "assignees": [
+
+      ],
+      "milestone": null,
+      "comments": 1,
+      "created_at": "2026-11-10T09:40:01Z",
+      "updated_at": "2026-11-10T10:19:59Z",
+      "closed_at": "2026-11-10T10:19:59Z",
+      "assignee": null,
+      "author_association": "NONE",
+      "issue_field_values": [
+
+      ],
+      "type": null,
+      "active_lock_reason": null,
+      "sub_issues_summary": {
+        "total": 0,
+        "completed": 0,
+        "percent_completed": 0
+      },
+      "issue_dependencies_summary": {
+        "blocked_by": 0,
+        "total_blocked_by": 0,
+        "blocking": 0,
+        "total_blocking": 0
+      },
+      "body": "## What happens\n\nWhen Claude writes a short message to the user between two tool calls, the message is often not returned as a text block. A second thinking block appears in its place, and that block holds a shorter rewording of the message. The user never sees the message, but the model treats it as said.\n\nWhen the next tool call is AskUserQuestion, the user sees a question with no explanation above it.\n\n#74176 described this bug. The stale bot closed it on 2026-11-01, but it was not fixed. #77798 and #94336 describe the same bug and are still open.\n\n## Environment\n\n- Claude Code 2.1.322 on Windows 11\n- Models: claude-opus-5-5 and claude-fable-5-2, default thinking settings\n- Headless runs with `--setting-sources project` in an empty folder, so no user settings, hooks or plugins are loaded\n\n## Steps to reproduce\n\n1. Put a copy of the Claude Code changelog in an empty folder as `changelog.md`.\n2. Run this in that folder:\n\n```bash\nclaude -p 'The file changelog.md in this folder is the Claude Code changelog. Find out which of the releases from 2.1.312 to 2.1.322 changed how thinking blocks, transcripts or summaries work, and whether any of them could explain why text written between tool calls is sometimes saved as a thinking block. Use grep, sed and similar commands, one or two at a time. Before each command, tell me in one or two sentences what you found so far and what you will check next. At the end, give me a short answer.' \\\n  --model claude-opus-5-5 --setting-sources project --no-session-persistence \\\n  --output-format stream-json --verbose \\\n  --allowedTools \"Bash(grep:*)\" \"Bash(sed:*)\" \"Bash(head:*)\" \"Bash(awk:*)\" \"Bash(wc:*)\" \"Read\" \"Grep\"\n```\n\n3. Look at the content blocks of each assistant message in the output.\n\n## Result\n\nI ran it 3 times with each model. 25 assistant messages ended in a tool call. 14 of them had no text block and had an empty thinking block followed by a second thinking block with the progress message in shorter words. 3 more had no text and only one thinking block, so the model may not have written a message there at all. Those 3 are not in the table.\n\n| Model | Text block shown | No text, two thinking blocks |\n|---|---|---|\n| claude-opus-5-5 | 4 | 7 |\n| claude-fable-5-2 | 4 | 7 |\n\nThe blocks of one Opus 5.5 run (thinking and text cut to one line):\n\n```\nTHINKING: (empty)\nTEXT:     I haven't looked at the file yet. First I'll find the line numbers of the release headings from 2.1.312 to 2.1.322.\nTOOL:     grep -n -E '^#+ .*2\\.1\\.(31[1-9]|32[0-3])\\b' changelog.md\nTHINKING: (empty)\nTHINKING: Releases between lines 3 and 675 have no entries for 2.1.313, 2.1.315 or 2.1.320. I'm searching that section for thinking, transcript, summary and summarize next.\nTOOL:     sed -n '3,675p' changelog.md | grep -n -i -E 'thinking|tran...\nTHINKING: (empty)\nTHINKING: Only two changelog entries mention thinking: line 342 in 2.1.318 removes a fix for keeping earlier thinking on resumed conversations, and line 554 in 2.1.314 ...\nTOOL:     sed -n '3,675p' changelog.md | grep -n -i -E 'interleav|bef...\nTHINKING: (empty)\nTHINKING: The second search turned up nothing about pre-tool-call text being stored differently. ...\nTOOL:     grep -n -i -E 'thinking' changelog.md | grep -i -E 'resum|2...\nTHINKING: (empty)\nTEXT:     None of the releases from 2.1.312 to 2.1.322 explains why text written between tool calls is sometimes saved as a thinking block. ...\n```\n\nThe first message and the final answer are text blocks. The three progress messages in between are second thinking blocks. In headless mode, normal thinking comes back empty, but these second thinking blocks have text. This happens in the stream that Claude Code receives, so it is not only a problem with how the transcript is saved.\n\n## A prompt that does not reproduce it\n\nA scripted prompt that says exactly when to write text (\"Step 3: write one sentence to me that says what the output was...\") did not show the bug in 6 runs with the same two models. Every sentence came back as a text block. The bug appears when the model writes its own progress notes between tool calls.\n\n## How often it happens in normal use\n\nI counted the saved sessions on my PC from 2026-10-25 to 2026-11-10 (versions 2.1.310 to 2.1.322, mostly Opus 5.5). I looked at assistant messages that ended in a tool call and had either a text block or two thinking blocks. 2,585 had a text block, and 3,226 had two thinking blocks and no text. The share is about half on every version in that range, including 2.1.322.\n\n## Expected behavior\n\nText that the model writes for the user between tool calls is returned as a text block and shown in the terminal.\n",
+      "reactions": {
+        "url": "https://api.github.com/repos/anthropics/claude-code/issues/108766/reactions",
+        "total_count": 0,
+        "+1": 0,
+        "-1": 0,
+        "laugh": 0,
+        "hooray": 0,
+        "confused": 0,
+        "heart": 0,
+        "rocket": 0,
+        "eyes": 0
+      },
+      "timeline_url": "https://api.github.com/repos/anthropics/claude-code/issues/108766/timeline",
+      "performed_via_github_app": null,
+      "state_reason": "duplicate",
+      "pinned_comment": null,
+      "score": 1.0
+    }
+  ],
+  "search_type": "lexical"
+}

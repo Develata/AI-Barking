@@ -1,0 +1,269 @@
+How Do You Measure a Model Nerf Suspicion - Unstable-Question Panels, Frozen Prompts, and What the Measurement Cannot Prove
+
+How Do You Measure a Model Nerf Suspicion - Unstable-Question Panels, Frozen Prompts, and What the Measurement Cannot Prove
+
+Anatomy of Livenerf - a 78-question panel drawn from 2,336, daily runs over 30 days, a launch-week baseline for Opus 5.5 and a 99% interval decision rule
+
+ October 1, 2026
+ Dev & Infra [../category/dev.html]
+
+What This Article Covers
+
+The nerf suspicion and Livenerf - what the project tries to measure [#sec-1]
+
+The design at a glance - a 2,336 pool, a 78 panel, 30 days [#sec-2]
+
+Why keep only unstable questions - the logic of the 30 to 70 percent band [#sec-3]
+
+Frozen prompts and an isolated environment - how far determinism is kept [#sec-4]
+
+The decision rule - a 99% interval, 3 points, a control arm [#sec-5]
+
+Does the measurement catch each perceived-decline path [#sec-6]
+
+What the measurement cannot prove [#sec-7]
+
+Where things stand and how to read the result [#sec-8]
+
+What could not be verified [#sec-9]
+
+References [#sec-10]
+
+ Livenerf is an independent project run by an individual developer and is not official Anthropic material. The discussion here carries over only what the repository design documents say, and it does not assert that Anthropic lowered, or did not lower, model performance. Model names and default settings are based on Anthropic's models overview.
+
+The nerf suspicion and Livenerf - what the project tries to measure
+
+A few weeks after a large language model ships, anecdotes that answers have gotten worse tend to appear again and again. Such anecdotes are hard to verify. Few people asked the same question under the same conditions on launch day and a month later, and there is no baseline to separate a model that changed from a user whose expectations changed. Livenerf aims at that gap. The first sentence of the repository describes the project as a long-running benchmark, as deterministic as possible, for detecting whether a frontier model quietly gets worse after launch.
+
+The target is Claude Opus 5.5, which launched on September 22, 2026. Anthropic's models overview lists its API identifier as claude-opus-5-5, its default effort as medium, and its thinking as adaptive and always on. Baseline measurement began on September 24. The project defines itself as independent and states it is not affiliated with Anthropic. Every figure and decision rule discussed here is therefore a third party's design, and until the measurement ends, the subject is the method, not a result.
+
+The angle here is not to reach a verdict but to read the structure of the measurement. Arguments about a suspected decline diverge mostly because the same words point at different things. A change in model weights, a change in default settings, a change in the serving path and a change in product-layer settings all reach users as quality has changed. If it is clear what a given measurement catches and what it misses, then when a result arrives it can be read for what it actually says.
+
+Nature. An individual's independent project, not official Anthropic material. The license is also stated as not yet chosen.
+
+Target. Opus 5.5. According to the official documentation its API identifier is claude-opus-5-5 and its default effort is medium.
+
+Goal. Take a launch-day baseline and judge later change statistically.
+
+Scope of this article. It stays within what the design says and does not speculate about the intent or cause on the provider side.
+
+On measurement methodology, this site has the article on blind spots in LLM evaluation [llm_evaluation_blindspots_2026.html], and the release details of this model are covered in the Claude Opus 5.5 release analysis [claude_opus_5_5_release_2026.html]. This article does not repeat either and concentrates on the narrow topic of decline measurement.
+
+The design at a glance - a 2,336 pool, a 78 panel, 30 days
+
+Collecting the design the repository states gives the table below. The place to look closely is the pair of question counts. The 2,336 is the candidate pool and the 78 is the active panel measured every day. Their relation is unpacked in the next section; here the skeleton of the design comes first.
+
+ItemWhat the repository states
+
+PurposeA long-running, as-deterministic-as-possible benchmark for detecting whether a frontier model quietly gets worse after launch
+
+Target model and baseline startClaude Opus 5.5 (launched 2026-09-22) and 2026-09-24
+
+Question sourcesGPQA Diamond, MMLU-Pro, competition math, AIME 2025-26
+
+Candidate pool to active panel2,336 questions screened with four runs each, leaving the 78 whose pass rate is roughly 30 to 70 percent
+
+Cadence and durationOnce a day for 30 days. Days 1 to 10 are the baseline, followed by two 10-day windows
+
+Primary metricExact-match accuracy. No LLM judge is used for grading
+
+Secondary metrics (in priority order)Output tokens per sample, latency, refusal rate
+
+Statistical methodPaired per-item comparison with clustered standard errors, following Anthropic's framework on adding error bars to evals
+
+Control armOpus 5
+
+Progress (as of September 29)6 of 30 days collected, baseline 6 of 10, none missed
+
+That output length, accuracy and refusal rate are all recorded is true, but it is easy to miss that their weights differ. The repository makes exact-match accuracy primary, and puts output tokens, latency and refusal rate second. Output token count stands first among the secondary metrics on the stated ground that it often shows degradation before accuracy moves.
+
+Pool versus panel. The 2,336 is the candidate count before screening and the 78 is the number measured daily. The two figures are not the size of the same set.
+
+Structure of the period. The first 10 of the 30 days are the baseline, and two 10-day windows after that are compared against it.
+
+Grading method. Grading is by exact match and no judge model is used. The stated reason is that a judge could drift as well.
+
+Preservation of records. Raw results accumulate as Inspect native evaluation logs in append-only form, with prompts, responses, usage, latency, CLI version and harness hash kept alongside.
+
+Why keep only unstable questions - the logic of the 30 to 70 percent band
+
+The condition for entering the active panel is a pass rate in the middle band. The repository's explanation is simple. A question the model always gets right cannot show a drop, and running such a question only spends tokens. The repository states that Opus 5.5 gets about 93 percent right on the first try. For such a model, most questions cannot give a decline signal. Each question was therefore run four times, only those with a pass rate of roughly 30 to 70 percent were kept, and the result is the 78 questions.
+
+An old statistical trap attaches to this screening. A question that lands in the middle band after four runs is likely to include more questions that happened to come out low. The repository writes this phenomenon down as numbers. The initial pass rate of the selected questions was 54.7 percent, and the rate on fresh samples was 62.0 percent. The bad luck at selection time recovered in the next measurement. The design says it reflects this gap in its power calculation by using the fresh rate as the basis. It also treats questions as carrying different amounts of information and weights them so that a question with pass rate p gives p(1-p) of information per sample.
+
+Reason for the middle band. Questions always right or always wrong do not respond to change. The ones that respond are those sometimes right and sometimes wrong.
+
+Correction for selection bias. The repository says the gap between the initial 54.7 percent and the fresh 62.0 percent was reflected in the power calculation.
+
+Information weighting. A question with pass rate p is weighted as giving p(1-p) of information per sample.
+
+Limit of representativeness. The panel is a sample chosen to be sensitive to change, so it does not represent the model's overall accuracy (inferred from the design). The repository states a first-try accuracy of about 93 percent.
+
+Frozen prompts and an isolated environment - how far determinism is kept
+
+The repository concedes the limit of determinism first. In newer models sampling parameters cannot be frozen, so getting the same output from the same input is impossible. The design therefore chooses to freeze everything else that can be frozen. In the repository's wording: freeze the prompts, pin the CLI version, grade by exact match, and keep the raw logs forever. The design measures a statistical shift across thousands of samples rather than sameness of output.
+
+The degree of isolation is fairly strict. The environment used for measurement is described as a short frozen system prompt, no tools, no MCP servers, no settings or hooks, no CLAUDE.md or memory, a single turn, and a fixed empty working directory. These conditions keep the result from being shaken by factors other than the model, and in exchange put much of the real usage environment outside the measurement. Quality as felt in use is the result of passing through tools, memory and long conversations, so this isolation also decides what this measurement does not measure.
+
+What is frozen. Prompts, CLI version, grading method and working directory. Raw logs are only appended to.
+
+What could not be frozen. Sampling parameters. That is why the shift is seen statistically and not as identical output.
+
+Delivery path. The target is Opus 5.5 as served through Claude Code on a subscription, not the model on the raw API.
+
+Pre-registration. The methodology is committed to git before data collection, leaving a public timestamp. It is a device that keeps the criteria from being altered after the fact.
+
+The decision rule - a 99% interval, 3 points, a control arm
+
+To say a decline is confirmed, the repository pins down three conditions that must hold at once. First, the 99 percent interval for the difference from the baseline must exclude zero in both of two consecutive 10-day windows. Second, the size of the effect must be at least 3 points. Third, the control arm must not show a move in the same direction. The control arm is Opus 5. It is a structure with a threefold threshold so that a single spike or a temporary serving fluctuation does not harden into a verdict.
+
+The detection power the design itself states has to be read alongside. At the chosen sample size it predicts being able to detect an accuracy change of roughly 7.5 points per 10-day window. Smaller shifts are not caught inside a window. The repository also records a test with known changes to show the instrument works. Lowering effort to medium cut output tokens by 26 percent and dropped accuracy by 4.2 points (plus or minus 3.9); lowering it to low cut tokens by 62 percent and dropped accuracy by 8.3 points (plus or minus 4.5).
+
+Threefold threshold. The 99 percent interval excludes zero in two consecutive windows, the effect is at least 3 points, and the control arm does not move along with it.
+
+Detection power. The design predicts it can detect a change of about 7.5 points per 10-day window. Anything smaller is not caught.
+
+Test with known changes. Effort medium gave 26 percent fewer tokens and a 4.2-point drop; low gave 62 percent fewer and an 8.3-point drop.
+
+Two-sided testing. The repository tests for change in either direction and states that it assumes no mechanism.
+
+Does the measurement catch each perceived-decline path
+
+The table below lists the paths that can lead to a perceived decline and sorts out whether this measurement design catches each. For the list of paths, only explanations that appear in the repository and the coverage of it, and that can be checked against the design, were chosen. The last column is the reason read from the repository's design sentences, and some of it is inferred from the design, which is marked where it occurs.
+
+Perceived-decline pathCaught by the measurementReason
+
+Change in the model itself (weights, serving precision and the like)PartlyMay appear as changes in accuracy and output tokens, but shifts smaller than about 7.5 points per window fall outside detection
+
+A different default effort setting—Tests showed tokens and accuracy move when effort changes, but the effort setting the harness uses is not in the sources, so whether this path is reflected cannot be known
+
+Safety classifier intervention (answer from another model, refusal)Not caughtTouched samples are rejected and counted, and the questions involved are excluded from analysis
+
+Context accumulated over a long sessionNot caughtThe measurement is a single turn with no memory or working-directory state (inferred from the design)
+
+Product-layer setting or tool changesNot caughtMeasured in a fixed environment with no tools, MCP, settings, hooks or CLAUDE.md
+
+Infrastructure faults or loadPartlyLatency and tokens are recorded but the cause is not separated. The repository states it assumes no mechanism
+
+Rising user expectationsNot caughtFixed questions repeat under the same conditions regardless of user expectation (inferred from the design)
+
+What stands out in the table is how many cells say not caught. That is not because the measurement is poor but because its target is narrowly defined. The question this design tries to answer is whether the ability of the same model to solve the same questions has changed under fixed conditions. The quality a user feels is that result with product settings, long sessions and serving state layered on top, so the two questions overlap but are not the same.
+
+The caught side. Shifts in accuracy and output tokens on the same questions under the same conditions. Changes of about 7.5 points per window or more.
+
+The partly caught side. Things that leave a trace in latency and tokens, such as serving fluctuation. The cause cannot be separated, however.
+
+The not caught side. Safety classifier intervention, long sessions, product-layer settings and changing expectations. The design deliberately excludes them.
+
+How to read. A measurement showing no change is not proof that no decline was perceived; it is grounds to look for the perceived decline outside the model.
+
+What the measurement cannot prove
+
+The repository states its own limits in concrete figures. The most striking is the ability to tell a model swap apart. When the control arm Opus 5 was swapped in for Opus 5.5, it reportedly could not be distinguished at the 99 percent level. The difference was -3.8 points with an error of plus or minus 6.3 points, and tokens were 23 percent fewer. That means this instrument cannot reliably catch a quiet change to another model of the same generation. Disclosing its own limit this plainly is a clue for judging the project's reliability.
+
+There is also a record about the quality of the questions themselves. An audit found 8 questions whose answer keys look wrong and 30 ambiguous ones, but nothing has been removed so far. A pre-registered sensitivity analysis will rerun without them. Taking launch week as the baseline also carries a premise. The repository writes that the quality incidents of 2025 turned out to be infrastructure bugs and not deliberate downgrades, and explains that it therefore tests change in either direction without assuming a mechanism.
+
+Same-family swap. Swapping in Opus 5 could not be distinguished from Opus 5.5 at the 99 percent level (-3.8 plus or minus 6.3 points, tokens -23 percent).
+
+Question quality. There are 8 questions with doubtful answer keys and 30 ambiguous ones, handled by sensitivity analysis without removal.
+
+Limit of the delivery path. The measurement is of Opus 5.5 through subscription Claude Code and may differ from raw API behavior.
+
+Neutrality on mechanism. Whether a change comes from the model or from infrastructure cannot be separated by this measurement alone. Change in both directions is examined with no assumed mechanism.
+
+Out of scope. Reasoning quality or factuality beyond exact-match accuracy, and changes in refusal behavior without an accuracy change, lie outside this design's primary metric.
+
+Where things stand and how to read the result
+
+The progress the repository states is that, as of September 29, 6 of 30 days had been collected and 6 of the 10 baseline days were done. By design, statistical inference starts from day 11, after the baseline ends, and a decision that requires two consecutive windows is possible only after the second 10-day window ends on day 30. Coverage of this design says results come in late October. So at the time of writing neither a result saying a decline exists nor one saying it does not exists, and this article asserts neither.
+
+Coverage of the same topic mentions that a separate tracking tool sees Opus 5.5 at 99.2 percent of its launch-day capability. The design and measurement conditions of that tool cannot be confirmed from this article's sources, so it must not be read as a Livenerf result. Other explanations for perceived decline that coverage offers, such as the default effort setting, the safety classifier path, long-session context and rising expectations, are hypotheses in discussion and not Anthropic statements. What the official models overview confirms is only that the default effort of Opus 5.5 is medium.
+
+What can be said now. The measurement design and its progress. There is no result.
+
+What to look at when results arrive. Whether the 99 percent interval excludes zero through the second window, whether it is 3 points or more, and whether the control arm moved too.
+
+A result of no result. Even if no change is detected, changes below about 7.5 points per window and paths outside the measurement are still not ruled out.
+
+A result of a change. Even if a change is detected, whether the cause is the model or serving cannot be separated by this measurement alone.
+
+Reference material. Facts such as model names and default settings take the official models overview as the standard.
+
+What could not be verified
+
+Measurement results. As of September 29 the project is in the baseline phase and there is not yet data that counts toward a decision.
+
+The effort setting the harness uses. No sentence stating whether it uses the default medium was found, so whether the effort path is reflected cannot be known.
+
+The effect of changes in how thinking is displayed on perceived quality. None of this article's sources addresses it.
+
+The concrete figures and analysis method for latency and refusal rate. Only that the repository records them as secondary metrics appears.
+
+The design and measurement conditions behind the 99.2 percent reported by the separate tracking tool.
+
+Anthropic's position on Opus 5.5 quality. The sources contain no direct quotation.
+
+References
+
+ninjahawk/livenerf [https://github.com/ninjahawk/livenerf] - GitHub repository and README. Primary source for the design, question pool, decision rules and limits.
+
+Claude Opus 5.5 nerfed? Livenerf has the first real data [https://byteiota.com/claude-opus-5-5-nerfed-livenerf-has-the-first-real-data/] - byteiota. Progress and alternative explanations for perceived decline.
+
+Livenerf: Opus 5.5 nerfed? Model drift benchmark [https://saascity.io/blog/livenerf-opus-5-5-nerfed-model-drift-benchmark-2026] - SaaSCity. Summary of the design and of the discussion.
+
+Models overview [https://platform.claude.com/docs/en/about-claude/models/overview] - Anthropic. Identifier, default effort and pricing of Opus 5.5.
+
+Livenerf - GeekNews discussion thread (Korean) [https://news.hada.io/topic?id=34519] - GeekNews. The discussion page where this project was introduced.
+
+Frequently asked questions
+
+What does Livenerf measure?
+
+It is a long-running benchmark meant to detect whether a frontier model quietly gets worse after launch. For Opus 5.5 it records accuracy, output tokens and latency once a day for 30 days using fixed questions and prompts. It states that it is an independent project by an individual and is not affiliated with Anthropic.
+
+How do the 2,336 questions and the 78 questions relate?
+
+The 2,336 are a candidate pool gathered from GPQA Diamond, MMLU-Pro, competition math and AIME 2025-26. Each was run four times and only those with a pass rate of roughly 30 to 70 percent were kept, which gives the 78-question active panel. A question the model always gets right cannot show a drop.
+
+Has a result shown that Opus 5.5 got worse?
+
+No. As of September 29 the repository had 6 of 30 days collected and the 10-day baseline was not finished. The decision is made across two 10-day windows after the baseline, so until results exist there is no basis for saying a decline is present or absent.
+
+Can this measurement confirm every perceived decline?
+
+No. Samples touched by the safety classifier are excluded, and because each question is asked in a single turn with no tools, settings or memory, long sessions and product-level settings are not measured. The repository itself says a swap to a same-family model is hard to distinguish.
+
+Is this data official Anthropic material?
+
+No. It is the measurement design and records of an independent third-party project. Facts such as the model name and default settings are taken from the Anthropic models overview, and the measurement results must not be read as an official position.
+
+Share this post
+
+ Facebook
+ X (Twitter)
+ Threads
+ Copy Link
+
+ Back to List [../blog.html]
+
+Free tools you may find useful
+
+Docker Command Generator 2026 [../docker_builder.html]
+
+Rsync Command Generator 2026 [../rsync_tool.html]
+
+Code Image Generator [../static/code_image.html]
+
+Character Counter [../static/char_counter.html]
+
+See all tools → [../static_index.html]
+
+Related Posts
+
+JavaScript Frameworks AI Cost: 12 Compared, $2.67-$4.97 per Run [javascript_frameworks_ai_cost_comparison.html]
+
+KillSwitch Language: What an LLM-Hostile Benchmark Shows [programming_language_to_confuse_llms.html]
+
+How to Read Open-Source Architecture - What AOSA Teaches About Design Trade-offs and Code Reading 2026 [open_source_architecture_aosa_2026.html]
+
+How to Track AI Agent Mistakes in Production - A Practical LLM Observability Guide 2026 [ai_agent_error_tracking_2026.html]
