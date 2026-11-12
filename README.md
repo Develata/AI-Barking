@@ -60,6 +60,7 @@ AI 吠点是由 **[Develata](https://github.com/Develata)** 主理的独立内�
 | 2026 / 1108 | [AI拿到答案，反删对的代码？](docs/2611/1108/doc_1108_publish.txt) | [配图说明](docs/2611/1108/images/README.md) | [来源入口](docs/2611/1108/sources/README.md) |
 | 2026 / 1109 | [Claude降价反贵一倍？AI没泡沫？](docs/2611/1109/doc_1109_publish.txt) | [配图说明](docs/2611/1109/images/README.md) | [来源入口](docs/2611/1109/sources/README.md) |
 | 2026 / 1110 | [谷歌有人读你邮件？Claude变笨了？](docs/2611/1110/doc_1110_publish.txt) | [配图说明](docs/2611/1110/images/README.md) | [来源入口](docs/2611/1110/sources/README.md) |
+| 2026 / 1111 | [AI找到玛雅遗址？作者自己改口了](docs/2611/1111/doc_1111_publish.txt) | [配图说明](docs/2611/1111/images/README.md) | [来源入口](docs/2611/1111/sources/README.md) |
 
 正文采用可直接复制的纯文本，图片单独保存。阅读或发布时不需要依赖 Markdown 插图。
 
