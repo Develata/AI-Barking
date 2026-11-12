@@ -1,0 +1,102 @@
+Fidelity in AWS Emulator - AWS Emulator
+
+View a markdown version of this page [fidelity.md]
+
+Fidelity in AWS Emulator - AWS Emulator
+
+ [/pdfs/emulator/latest/userguide/emulator-ug.pdf#fidelity]
+
+Documentation [/index.html]AWS Emulator [/emulator/index.html]User Guide [what-is-service.html]
+
+What is fidelity? [#fidelity-terms]How we determine the fidelity score [#fidelity-traces]Reading the fidelity scores [#fidelity-scores]Telling us about a difference [#fidelity-report]
+
+Fidelity in AWS Emulator
+
+ AWS Emulator supports the APIs of AWS services that have an API model in the AWS API models repository on GitHub [https://github.com/aws/api-models-aws]. How closely the emulator matches AWS for those APIs is called fidelity.
+
+ AWS offers a broad and powerful set of capabilities, and both the capabilities and the ways that builders use them keep growing, so we’re continuously assessing and improving fidelity. We base that work on customer feedback and on differences that we discover ourselves. The next section defines the terms that we use to describe fidelity.
+
+Topics
+
+What is fidelity? [#fidelity-terms]
+
+How we determine the fidelity score [#fidelity-traces]
+
+Reading the fidelity scores [#fidelity-scores]
+
+Telling us about a difference [#fidelity-report]
+
+What is fidelity?
+
+Where the emulator implements an operation, it aims for full fidelity: the same results as AWS for valid calls, and the same errors for invalid ones. If it doesn’t implement an operation yet, it returns HTTP 501 with the error code NotImplemented, and a test that calls it fails right away. We measure fidelity with fidelity tests.
+
+A fidelity test is a short program that uses an AWS SDK to run a workflow against an AWS service and assert how AWS behaves: the result, the resulting state, and for invalid calls, the exact error. For example, a fidelity test might try to create an Amazon DynamoDB table with a name that’s too short, and assert that the call is rejected with the error code and message that AWS returns. We build and verify fidelity tests in the US West (Oregon) Region (us-west-2), except for global services, which we verify in the US East (N. Virginia) Region (us-east-1). We publish the fidelity tests in the aws-emulator-evaluation-suite repository on GitHub [https://github.com/aws/aws-emulator-evaluation-suite], including the ones that the emulator doesn’t pass yet.
+
+Each fidelity test has labels that describe what it asserts, such as whether a call succeeds or AWS rejects it. One label says whether the test targets the control plane or the data plane. The control plane is the APIs that create, read or describe, update, delete, and list resources, such as creating an Amazon S3 bucket. The data plane is the primary function of a service, such as getting and putting objects in an S3 bucket. For more information, see Control planes and data planes [https://docs.aws.amazon.com/whitepapers/latest/aws-fault-isolation-boundaries/control-planes-and-data-planes.html] in the 
+ AWS Whitepaper. Today, the emulator matches AWS most closely for control plane APIs. Fidelity for data plane APIs, and support for infrastructure as code tools such as AWS CloudFormation, Terraform, and the AWS CDK, varies by service. For what each label means, see docs/TAXONOMY.md in the aws-emulator-evaluation-suite repository.
+
+A fidelity score is, for each service, the number of fidelity tests that the emulator passes out of the total for that service, such as 40 of 50. We publish fidelity scores with each release of AWS Emulator.
+
+To check whether your own project is expected to work on the emulator, see Checking whether your project works with AWS Emulator [./check-project.html].
+
+How we determine the fidelity score
+
+The emulator passes a fidelity test when its behavior matches AWS for every call in the workflow, including the status code, the resources that it creates, and other side effects. If AWS returns an error, the emulator passes only if it returns the same error.
+
+We publish the fidelity tests in numbered versions. Later versions add tests, and can retire tests that become outdated.
+
+The aws-emulator-evaluation-suite repository on GitHub [https://github.com/aws/aws-emulator-evaluation-suite] holds the following:
+
+The fidelity tests
+
+A manifest file, manifest.jsonl, that lists the services and operations that each fidelity test calls, and its labels
+
+A small Python runner, fidelity_tests_runner, that runs the fidelity tests against AWS Emulator
+
+Reading the fidelity scores
+
+We publish the fidelity scores with each release, on the AWS Emulator releases page on GitHub [https://github.com/aws/aws-emulator/releases]. Each release names the AWS Emulator commit and the version of the fidelity tests that we used. Compare scores only when they use the same version of the fidelity tests.
+
+A score is a snapshot. As the emulator improves and we add fidelity tests, both numbers grow. For example, 40 of 50 can become 45 of 60: the emulator now passes 5 more fidelity tests, and we added 10 new ones.
+
+Fidelity tests that pass don’t regress. The number of failing fidelity tests can still go up in the following situations:
+
+We add fidelity tests. A new fidelity test can find a difference that was already there. It shows up as a new failing test.
+
+We rebuild a fidelity test, or update it, when AWS changes how a service behaves. This can happen within a version of the fidelity tests.
+
+We can also retire a fidelity test that becomes outdated. Then the total goes down.
+
+A fidelity test that the emulator doesn’t pass yet is a known gap that we publish on purpose and track. We keep improving fidelity, so check the scores with each release. To see which gaps affect your project, see Checking whether your project works with AWS Emulator [./check-project.html].
+
+To reproduce the scores, or to check a newer build for the services that you use, you can run the fidelity tests yourself with fidelity_tests_runner, the Python runner in the aws-emulator-evaluation-suite repository. It runs the tests only against an emulator on your machine. For instructions, see the repository’s README file.
+
+Telling us about a difference
+
+If the emulator acts differently from AWS, open an issue in the aws-emulator repository on GitHub [https://github.com/aws/aws-emulator/issues]. Include the following:
+
+Steps to reproduce, including the request that you sent
+
+The response that you got from the emulator
+
+What you expected
+
+If you use the aws-emulator skill, you can also ask your AI coding agent to open the issue on GitHub for you. For more information, see Checking whether your project works with AWS Emulator [./check-project.html].
+
+Document Conventions [/general/latest/gr/docconventions.html]
+
+Command reference
+
+Versions and compatibility
+
+Did this page help you? - Yes
+
+Thanks for letting us know we're doing a good job!
+
+If you've got a moment, please tell us what we did right so we can do more of it.
+
+Did this page help you? - No
+
+Thanks for letting us know this page needs work. We're sorry we let you down.
+
+If you've got a moment, please tell us how we can make the documentation better.

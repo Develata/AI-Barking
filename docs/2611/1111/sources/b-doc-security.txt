@@ -1,0 +1,115 @@
+Security in AWS Emulator - AWS Emulator
+
+View a markdown version of this page [security.md]
+
+Security in AWS Emulator - AWS Emulator
+
+ [/pdfs/emulator/latest/userguide/emulator-ug.pdf#security]
+
+Documentation [/index.html]AWS Emulator [/emulator/index.html]User Guide [what-is-service.html]
+
+Don’t use AWS Emulator to test security [#security-dont-test]Shared responsibility [#security-shared-responsibility]Reporting a security issue [#security-reporting]
+
+Security in AWS Emulator
+
+ AWS Emulator is a tool for building and testing on your own machine. It doesn’t run in the AWS Cloud, so security works differently from security for an AWS service. This topic tells you what not to test, how the emulator helps protect your environment, and what you must do.
+
+Topics
+
+Don’t use AWS Emulator to test security [#security-dont-test]
+
+Shared responsibility [#security-shared-responsibility]
+
+Reporting a security issue [#security-reporting]
+
+Don’t use AWS Emulator to test security
+
+Important
+
+Don’t use AWS Emulator to test whether your application is secure. Passing tests in the emulator don’t show that your permissions are correct or safe.
+
+Don’t use the emulator to test the following:
+
+IAM policies and permissions boundaries
+
+Resource-based policies, such as bucket policies
+
+ AWS KMS key policies
+
+Access across AWS accounts or across AWS Regions
+
+Any other security control
+
+Some services in the emulator evaluate IAM policies for IAM users and roles that you create in the emulator, but not the same way as AWS. The emulator never denies a request signed with its own key. It doesn’t check AWS KMS key policies or Amazon S3 bucket policies. It also doesn’t support calls across accounts or Regions. So a request that AWS denies might succeed in the emulator. A request that AWS allows might fail.
+
+The emulator helps you catch many issues early. Still, test your security settings and your whole app on real AWS before you go to production.
+
+Shared responsibility
+
+We share the work of security with you. We build the emulator to run safely on your machine. You decide where it runs, what data you put in it, and how you test before production.
+
+What we do
+
+We built the emulator to help protect your environment in the following ways:
+
+ By default, it listens only on your own machine. The emulator listens on 127.0.0.1:9297. Some resources that you create, such as databases, get an endpoint of their own on another port of 127.0.0.1. So only your own machine can reach the emulator. The Docker command in this guide also opens its ports only to your own machine.
+
+ It makes its own credentials. When it starts, the emulator makes a new access key ID and secret access key. It writes them to ~/.aws/emulator/<port>/emulator_credentials, a file that only your user can read.
+
+ Its keys work only with that run of the emulator. By default, when the emulator runs as a local process, API requests must be signed with the keys from this run, except operations that AWS serves without a signature. The emulator also accepts keys that you create through its own IAM or STS. It rejects unsigned requests and requests signed with any other keys. Each time the emulator starts, it makes new keys, so keys from an earlier run don’t work.
+
+Note
+
+Some services accept requests that aren’t signed with standard SigV4. The emulator doesn’t handle these requests the same way as AWS. If you use these services, make sure that the emulator is private, as described in What you do [#security-what-you-do].
+
+ It cleans up after itself. When the emulator stops cleanly, it deletes the files that it wrote for its port, including the credentials file. It keeps emulated resources in memory, so they’re gone when it stops.
+
+ It keeps your data local. The emulator doesn’t send your requests, responses, or resource data to AWS. Telemetry never includes what’s in your requests or responses, your code, your credentials, or personal data. For more information, see Telemetry in AWS Emulator [./telemetry.html].
+
+What you do
+
+You must do the following:
+
+ Keep the emulator private. Run it on your own machine, and don’t run it on a machine that other people can sign in to: other users and programs on the same machine can reach the emulator’s ports. Ports for resources with their own endpoint don’t check request signatures, so only the resource’s own sign-in, such as a password, protects them. Don’t open the emulator’s ports to the internet. In Docker, publish them on 127.0.0.1, as shown in Getting started with Docker [./getting-started-docker.html].
+
+ Keep authentication on. If you start the emulator with --auth off, it serves any request, signed or not. The option exists for tools that can’t sign requests and for a simpler local setup. Use it at your own risk, and only on a machine that nobody else can reach.
+
+ Keep real credentials out. Don’t use real AWS credentials with the emulator. Before you run your tests, unset any variables that hold real credentials. For more information, see Pointing your AWS SDK at AWS Emulator [./point-sdk-to-emulator.html].
+
+ Keep real data out. Use only test data. Don’t put real customer data or production data in the emulator.
+
+ Run only code that you trust. When the emulator runs code for you, such as function code, it doesn’t isolate that code from your machine. The code runs with your user’s permissions and can read and change your files. Make sure that the code that you pass to the emulator doesn’t do anything that you don’t intend.
+
+ Make sure your tests reach the emulator. If AWS_ENDPOINT_URL isn’t set, your code calls AWS with whatever credentials it finds. Set the variables in the same script that runs your tests.
+
+ Keep the emulator up to date. We publish security fixes only in the latest release. To get them, upgrade to the latest release. For more information, see Security fixes [./versioning.html#versioning-security].
+
+ Test on real AWS. Before production, test your app and its security settings on real AWS.
+
+Reporting a security issue
+
+If you find a security issue in AWS Emulator, don’t open a public issue on GitHub. Instead, report it to us in one of the following ways:
+
+Submit it to the AWS Vulnerability Disclosure Program on HackerOne [https://hackerone.com/aws_vdp].
+
+Send an email to aws-security@amazon.com [mailto:aws-security@amazon.com].
+
+For more information, see the AWS vulnerability reporting page [https://aws.amazon.com/security/vulnerability-reporting/].
+
+Document Conventions [/general/latest/gr/docconventions.html]
+
+Versions and compatibility
+
+Telemetry
+
+Did this page help you? - Yes
+
+Thanks for letting us know we're doing a good job!
+
+If you've got a moment, please tell us what we did right so we can do more of it.
+
+Did this page help you? - No
+
+Thanks for letting us know this page needs work. We're sorry we let you down.
+
+If you've got a moment, please tell us how we can make the documentation better.

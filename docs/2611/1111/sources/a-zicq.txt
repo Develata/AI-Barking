@@ -1,0 +1,209 @@
+Google调度48个SWE智能体72小时扫描NASA激光雷达，发现未测绘玛雅金字塔 | ZICQ
+
+ 智客 ZICQ
+ [/zh]
+
+ 前沿 [/zh/news]百科 [/zh/wiki]提示词 [/zh/prompts]技能库 [/zh/skills]专题 [/zh/topics]项目 [/zh/projects]信息 [/zh/news-info]模型榜单 [/zh/rankings/models]开源榜单 [/zh/rankings/github]社区 [/zh/community]
+
+ ← [/zh/news-info]
+
+ 紧
+ 中
+ 松
+
+ EN [/articles/n-0460704fe730-Google-Deploys-48-SWE-Agents-to-NASA-Lid.html]
+
+ 登录 / 注册 [/api/auth/github/login]
+
+ 智客信息
+ [/zh/news-info]
+
+ 智能体 [/zh/news?category=%e6%99%ba%e8%83%bd%e4%bd%93]
+
+ #Google [/zh/news?tag=Google]
+
+ #SWE智能体 [/zh/news?tag=SWE%e6%99%ba%e8%83%bd%e4%bd%93]
+
+ #NASA激光雷达 [/zh/news?tag=NASA%e6%bf%80%e5%85%89%e9%9b%b7%e8%be%be]
+
+ #玛雅考古 [/zh/news?tag=%e7%8e%9b%e9%9b%85%e8%80%83%e5%8f%a4]
+
+ #多智能体协作 [/zh/news?tag=%e5%a4%9a%e6%99%ba%e8%83%bd%e4%bd%93%e5%8d%8f%e4%bd%9c]
+
+Google调度48个SWE智能体72小时扫描NASA激光雷达，发现未测绘玛雅金字塔
+
+文 / Mr.Xu 社区投稿
+
+发布时间：2026-11-11
+
+ 中文阅读 (Chinese) [/articles/n-0460704fe730-Google%e8%b0%83%e5%ba%a648%e4%b8%aaSWE%e6%99%ba%e8%83%bd%e4%bd%9372%e5%b0%8f%e6%97%b6%e6%89%ab%e6%8f%8fNASA%e6%bf%80%e5%85%89%e9%9b%b7%e8%be%be-%e5%8f%91%e7%8e%b0%e6%9c%aa%e6%b5%8b%e7%bb%98%e7%8e%9b%e9%9b%85%e9%87%91-zh.html]
+ English Version [/articles/n-0460704fe730-Google-Deploys-48-SWE-Agents-to-NASA-Lid.html]
+
+ 收藏
+
+ 点赞
+ 0
+
+摘要：Google使用48个SWE智能体，在72小时内并行处理NASA机载激光雷达数据，并从未测绘的玛雅遗址中识别出一座金字塔结构。案例展示了多智能体系统在大规模遥感检索、异常几何检测与候选地点筛选中的潜力：智能体可分解搜索任务、调用地图和考古数据源，再对高分辨率地形异常进行交叉验证。不过，现有摘要未披露任务编排方式、误报率、发现坐标及专家复核结果，因此“发现”仍需区分机器候选与经考古学界确认的正式遗址。
+
+ 目录
+
+48 个智能体在 72 小时内扫描激光雷达数据 [#toc-1]
+
+从点云到遗址：候选结构如何产生 [#toc-2]
+
+多智能体调度的工程权衡 [#toc-3]
+
+结果可信度仍取决于验证链 [#toc-4]
+
+开发者如何复现类似流程 [#toc-5]
+
+48 个智能体在 72 小时内扫描激光雷达数据
+
+Google 的一项实验让 48 个 SWE 智能体并行分析 NASA 激光雷达数据，并报告在 72 小时内发现一座此前未被测绘的玛雅金字塔。不同于让单个模型读取全部原始数据，该任务更接近一个可并行扩展的地理搜索系统：智能体负责拆解区域、调用外部数据源、筛选异常点并汇总证据，最终把高价值候选交给专家核验。
+
+这类任务的核心并非文本生成，而是将机器生成内容嵌入可验证的空间工作流。每个候选点都应保留原始点云、栅格影像、坐标、过滤参数、模型判断和交叉验证记录。只有当正射影像、地形高度、遗址轮廓及区域考古数据相互支持时，异常才能升级为考古线索。
+
+从点云到遗址：候选结构如何产生
+
+NASA 机载激光雷达通过机载激光测距生成高密度三维地表数据。与普通卫星光学影像相比，点云可以穿透植被遮挡并直接提供地表高程，因此更容易识别建筑平台、台阶、道路、土台和水坝等微地貌特征。
+
+一个可复现的工程流程通常包括以下环节：
+
+数据分块：将超大点云按地理范围或瓦片切分，并保留点云、影像和地形栅格之间的空间索引。
+
+地表重建：去除植被和噪声，生成数字高程模型、坡度图和可视图。
+
+形态检测：识别规则边界、线性排列、人工平整区域和异常高程结构。
+
+历史数据比对：将候选结构与卫星影像、已知遗址数据库及公开地形产品叠加。
+
+证据审查：输出带坐标和置信度的候选清单，保留中间结果供专家复核。
+
+若模型参与筛选，它最适合承担视觉与空间关系推理，而不应独立充当“发现真伪”的裁决器。线性梯度、规则角点或成组矩形地物也可能来自现代道路、采石场、农田和传感器拼接误差，因此需要可解释的几何规则与人工验证共同约束。
+
+多智能体调度的工程权衡
+
+48 个智能体并行处理任务，主要收益是缩小墙钟时间，而不是线性提升推理质量。若单次区域分析耗时为 (T)，理想情况下 48 路并发可获得约 (T) 的完成时间，但实际结果还受共享文件锁、点云读取带宽、地图 API 配额和调度开销影响。
+
+系统架构可抽象为：
+
+[
+T_{total} \approx \frac{N}{P}T_{task} + T_{merge} + T_{verify}
+]
+
+其中 (N) 是待扫描区域数，(P) 是有效并发度。提高 (P) 并不必然继续缩短总时间：当存储 I/O 饱和或多个智能体重复下载相同数据后，边际收益会快速下降。工程上应把共享点云转换为空间分块缓存，对重复区域做去重，并以任务依赖图限制“先广搜、后深挖”的并发次序。
+
+多智能体系统还会引入额外成本。每个代理都需要上下文空间、工具调用、代码执行和结果汇总；若所有代理都保留完整轨迹，Token 消耗会随代理数显著增长。更稳妥的做法是让区域代理只返回结构化候选和证据指针，由汇总代理读取相关切片，避免把原始点云或重复图像反复放入上下文。
+
+结果可信度仍取决于验证链
+
+“72 小时内发现金字塔”包含两个不同强度的结论：一是算法在数据中找到了值得审查的异常，二是该异常已被确认属于玛雅金字塔。前者可由自动化管线复现，后者仍需要地理坐标、正射影像、地层解释和专家共识。
+
+目前采集信息没有提供完整实验设置，因此无法判断 48 个代理如何分工、使用何种模型、是否采用人工回环、候选点数量、精确率与召回率，也不知道后续是否进行了地面验证。若系统直接在全部异常中选最高分模型输出，误报可能来自点云密度不均、森林砍伐、现代基础设施和坐标配准误差。
+
+独立评估至少应覆盖三项指标：候选发现率，即已知遗址中有多少能被系统检出；误报密度，即每平方千米产生多少无效候选；以及专家节省时间，即从原始点云到形成可审查候选清单所需的实际人时。只有与普通批量处理或单智能体基线相比，才能判断多智能体调度是否真正产生增益。
+
+开发者如何复现类似流程
+
+可落地的系统不必从“48 个聊天代理”起步，而应把智能体限制在可审计的决策节点：
+
+使用区域分块与空间数据库，避免每个代理重复处理相同点云；
+
+为建筑、道路、水坝等类别分别配置几何检测器，而非只依赖视觉语言模型；
+
+强制输出候选坐标、置信度、异常类型和原始数据切片引用；
+
+将模型判断与确定性规则分层，模型负责排序，规则负责剔除常见伪影；
+
+保留每次工具调用、数据版本与提示版本，支持回放审计；
+
+在专家确认前，将输出统一标记为“候选遗址”，避免语义夸大。
+
+这类案例真正值得关注的地方，是 AI 智能体开始承担大规模空间数据筛选和跨源证据编排。但“自动发现”只有在错误率、基线和独立复核均公开后，才具备稳定的科学与工程说服力。
+
+消息来源：Hacker News AI Feed [https://pietromiotti.com/latest/maya-site/?maya] (2026-11-11)
+
+ —— 完 ——
+
+ 主题标签：
+
+ #Google [/zh/news?tag=Google]
+ 关注
+
+ #SWE智能体 [/zh/news?tag=SWE%e6%99%ba%e8%83%bd%e4%bd%93]
+ 关注
+
+ #NASA激光雷达 [/zh/news?tag=NASA%e6%bf%80%e5%85%89%e9%9b%b7%e8%be%be]
+ 关注
+
+ #玛雅考古 [/zh/news?tag=%e7%8e%9b%e9%9b%85%e8%80%83%e5%8f%a4]
+ 关注
+
+ #多智能体协作 [/zh/news?tag=%e5%a4%9a%e6%99%ba%e8%83%bd%e4%bd%93%e5%8d%8f%e4%bd%9c]
+ 关注
+
+ 编辑部与事实核查说明：本篇专刊由智客前沿资讯管线根据官方技术公告、学术论文及开源工程文档整理编译，经算法实体核验与人工编辑审校后发布。若发现技术事实纰漏，欢迎依据勘误方针 [/zh/about#corrections]或一键向编辑部发送勘误反馈 [/cdn-cgi/l/email-protection#9af9f5f4eefbf9eedae0f3f9ebb4f9f5f7a5e9eff8f0fff9eea7bfdfa9bfa2aabfa3aabfdfacbfa3acbfa2adbfdfadbfdbd8bfdbaabfdfafbfa2d8bfa3a2bfdfa2bfdbdcbfdbdcbfdfafbfa2dcbfa2debfdfa3bfdbacbfa2a2bfdfa9bfa2aabfa3abddf5f5fdf6ffbfdfa2bfd8aabfa2a9bfdfafbfd8dbbfdbacaea2bfdfaebfd8a2bfdbdbc9cddfbfdfacbfa3a3bfd8dbbfdfa2bfa2a9bfd8debfdfaebfd8debfa3a9ada8bfdfafbfd8aabfa2dcbfdfacbfa3adbfd8acbfdfacbfa2a3bfdbd8bfdfacbfa2dcbfa2dcd4dbc9dbbfdfacbfd8dcbfa2aabfdfafbfa2afbfa2a3bfdfa3bfa3d8bfd8adbfdfa2bfd8dfbfd8dfbfdfdcbfd8d9bfa2d9bfdfafbfa2dcbfa3abbfdfadbfa2dfbfd8aabfdfacbfa3d9bfdbdbbfdfacbfd8afbfa2d8bfdfadbfd8d8bfa3a2bfdfadbfa2dfbfa3d8bfdfa3bfa3d8bfa2afbfdfa3bfa2adbfa3abbfdfafbfdbdebfa3adbfdfafbfdbabbfa3aebcb9aea9a1bfa8a2d3debfa9dbbcb9aea9a1f4b7aaaeacaaadaaaefcffada9aabfa8a3bcfbf7eaa1f8f5fee3a7bfdfacbfa3acbfa2adbfdfadbfdbd8bfdbaabfdfa3bfa3a9bfd8dfbfdfacbfa2dfbfdbafbfdfdcbfd8d9bfa3dbf2eeeeeae9bfa9dbbfa8dcbfa8dce0f3f9ebb4f9f5f7bfa8dcfbe8eef3f9f6ffe9bfa8dcf4b7aaaeacaaadaaaefcffada9aab7ddf5f5fdf6ffbfdfa2bfd8aabfa2a9bfdfafbfd8dbbfdbacaea2bfdfaebfd8a2bfdbdbc9cddfbfdfacbfa3a3bfd8dbbfdfa2bfa2a9bfd8debfdfaebfd8debfa3a9ada8bfdfafbfd8aabfa2dcbfdfacbfa3adbfd8acbfdfacbfa2a3bfdbd8bfdfacbfa2dcbfa2dcd4dbc9dbbfdfacbfd8dcbfa2aabfdfafbfa2afbfa2a3bfdfa3bfa3d8bfd8adbfdfa2bfd8dfbfd8dfb7bfdfafbfa2dcbfa3abbfdfadbfa2dfbfd8aabfdfacbfa3d9bfdbdbbfdfacbfd8afbfa2d8bfdfadbfd8d8bfa3a2bfdfadbfa2dfbfa3d8bfdfa3bfa3d8bfa2afbfdfa3bfa2adbfa3abb7e0f2b4f2eef7f6bfaadbbfaadbbfdfafbfa2d8bfa3a2bfdfa2bfdbdcbfdbdcbfdfa2bfdbdcbfdbacbfdfacbfa2a9bfa2afbfdfaebfd8a2bfa2dfbfdfafbfa2dcbfa2a8bfdfa2bfa2aabfa2a9bfdfaebfd8dfbfa3debfdfacbfa2debfdbdfbfdfdcbfd8d9bfa3dbbfaadb]。
+
+继续阅读
+
+ 同标签
+ 可审计人机团队接管同步辐射X射线实验，追踪决策来源
+ 智能体
+ [/articles/n-21c1512694bf-%e5%8f%af%e5%ae%a1%e8%ae%a1%e4%ba%ba%e6%9c%ba%e5%9b%a2%e9%98%9f%e6%8e%a5%e7%ae%a1%e5%90%8c%e6%ad%a5%e8%be%90%e5%b0%84X%e5%b0%84%e7%ba%bf%e5%ae%9e%e9%aa%8c-%e8%bf%bd%e8%b8%aa%e5%86%b3%e7%ad%96%e6%9d%a5%e6%ba%90-zh.html]
+
+ 同标签
+ WorkflowArena揭示：最强模型未必是最好的智能体协调者
+ 智能体
+ [/articles/n-fab72020244a-WorkflowArena%e6%8f%ad%e7%a4%ba-%e6%9c%80%e5%bc%ba%e6%a8%a1%e5%9e%8b%e6%9c%aa%e5%bf%85%e6%98%af%e6%9c%80%e5%a5%bd%e7%9a%84%e6%99%ba%e8%83%bd%e4%bd%93%e5%8d%8f%e8%b0%83%e8%80%85-zh.html]
+
+ 同标签
+ 证据门控约束大模型审查权：减少误改也暴露模型差异
+ 智能体
+ [/articles/n-3e09cc91779f-%e8%af%81%e6%8d%ae%e9%97%a8%e6%8e%a7%e7%ba%a6%e6%9d%9f%e5%a4%a7%e6%a8%a1%e5%9e%8b%e5%ae%a1%e6%9f%a5%e6%9d%83-%e5%87%8f%e5%b0%91%e8%af%af%e6%94%b9%e4%b9%9f%e6%9a%b4%e9%9c%b2%e6%a8%a1%e5%9e%8b%e5%b7%ae%e5%bc%82-zh.html]
+
+ 延伸阅读 · 专刊
+
+读完这篇，再看 4 篇相关专刊。
+
+ 可审计人机团队接管同步辐射X射线实验，追踪决策来源智能体2026-11-11
+ →
+ [/articles/n-21c1512694bf-%e5%8f%af%e5%ae%a1%e8%ae%a1%e4%ba%ba%e6%9c%ba%e5%9b%a2%e9%98%9f%e6%8e%a5%e7%ae%a1%e5%90%8c%e6%ad%a5%e8%be%90%e5%b0%84X%e5%b0%84%e7%ba%bf%e5%ae%9e%e9%aa%8c-%e8%bf%bd%e8%b8%aa%e5%86%b3%e7%ad%96%e6%9d%a5%e6%ba%90-zh.html]
+
+ WorkflowArena揭示：最强模型未必是最好的智能体协调者智能体2026-11-11
+ →
+ [/articles/n-fab72020244a-WorkflowArena%e6%8f%ad%e7%a4%ba-%e6%9c%80%e5%bc%ba%e6%a8%a1%e5%9e%8b%e6%9c%aa%e5%bf%85%e6%98%af%e6%9c%80%e5%a5%bd%e7%9a%84%e6%99%ba%e8%83%bd%e4%bd%93%e5%8d%8f%e8%b0%83%e8%80%85-zh.html]
+
+ 证据门控约束大模型审查权：减少误改也暴露模型差异智能体2026-11-05
+ →
+ [/articles/n-3e09cc91779f-%e8%af%81%e6%8d%ae%e9%97%a8%e6%8e%a7%e7%ba%a6%e6%9d%9f%e5%a4%a7%e6%a8%a1%e5%9e%8b%e5%ae%a1%e6%9f%a5%e6%9d%83-%e5%87%8f%e5%b0%91%e8%af%af%e6%94%b9%e4%b9%9f%e6%9a%b4%e9%9c%b2%e6%a8%a1%e5%9e%8b%e5%b7%ae%e5%bc%82-zh.html]
+
+ Challenger监督按需召才：医疗多智能体在推理中精准补位智能体2026-11-05
+ →
+ [/articles/n-43a1f1f178d0-Challenger%e7%9b%91%e7%9d%a3%e6%8c%89%e9%9c%80%e5%8f%ac%e6%89%8d-%e5%8c%bb%e7%96%97%e5%a4%9a%e6%99%ba%e8%83%bd%e4%bd%93%e5%9c%a8%e6%8e%a8%e7%90%86%e4%b8%ad%e7%b2%be%e5%87%86%e8%a1%a5%e4%bd%8d-zh.html]
+
+ 热门文章
+
+ Grok Build共享链接失效：3.5万项目可被枚举并泄露敏感数据行业动态7 阅读
+ [/articles/n-a977dbea5ab5-Grok-Build%e5%85%b1%e4%ba%ab%e9%93%be%e6%8e%a5%e5%a4%b1%e6%95%88-3-5%e4%b8%87%e9%a1%b9%e7%9b%ae%e5%8f%af%e8%a2%ab%e6%9e%9a%e4%b8%be%e5%b9%b6%e6%b3%84%e9%9c%b2%e6%95%8f%e6%84%9f%e6%95%b0%e6%8d%ae-zh.html]
+
+ Third Eye揭示递归自我改进陷阱：即时收益难抵后续退化前沿论文4 阅读
+ [/articles/n-775a8473dd37-Third-Eye%e6%8f%ad%e7%a4%ba%e9%80%92%e5%bd%92%e8%87%aa%e6%88%91%e6%94%b9%e8%bf%9b%e9%99%b7%e9%98%b1-%e5%8d%b3%e6%97%b6%e6%94%b6%e7%9b%8a%e9%9a%be%e6%8a%b5%e5%90%8e%e7%bb%ad%e9%80%80%e5%8c%96-zh.html]
+
+ AWS上线AgentCore网页搜索API：LangGraph并行构建依赖监控代理智能体4 阅读
+ [/articles/n-8a7be27479ef-AWS%e4%b8%8a%e7%ba%bfAgentCore%e7%bd%91%e9%a1%b5%e6%90%9c%e7%b4%a2API-LangGraph%e5%b9%b6%e8%a1%8c%e6%9e%84%e5%bb%ba%e4%be%9d%e8%b5%96%e7%9b%91%e6%8e%a7%e4%bb%a3-zh.html]
+
+社区整体评论区
+
+正在加载实时智能评论与划词标注…
+
+智客百科
+
+百科速览
+
+ ×
+
+ 打开完整词条 →
+ 按 Esc 关闭
+
+© 2026 ZICQ · 保留所有权利。 | 关于我们 [/zh/about] · 隐私政策 [/zh/privacy] · 服务条款 [/zh/terms] · X (@zicqcom) [https://x.com/zicqcom]

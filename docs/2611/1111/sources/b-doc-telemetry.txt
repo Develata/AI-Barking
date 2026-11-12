@@ -1,0 +1,166 @@
+Telemetry in AWS Emulator - AWS Emulator
+
+View a markdown version of this page [telemetry.md]
+
+Telemetry in AWS Emulator - AWS Emulator
+
+ [/pdfs/emulator/latest/userguide/emulator-ug.pdf#telemetry]
+
+Documentation [/index.html]AWS Emulator [/emulator/index.html]User Guide [what-is-service.html]
+
+What is collected [#telemetry-collected]How telemetry is sent [#telemetry-sending]Turning telemetry off [#telemetry-opt-out]
+
+Telemetry in AWS Emulator
+
+ AWS Emulator collects usage data and reports it to AWS. This data never includes what’s in your requests or responses, your code, your credentials, or personal data. It also can’t be used to identify you or tie activity to your account or organization. We look at it only in aggregate, to find gaps in the emulator and spot issues that affect many users. Telemetry is on by default. To learn what data is collected and how to turn telemetry off, see What is collected [#telemetry-collected] and Turning telemetry off [#telemetry-opt-out].
+
+The emulator sends telemetry over Transport Layer Security (TLS) to an endpoint that AWS owns. We don’t share it with third parties, and we keep it for up to 90 days.
+
+What is collected
+
+The emulator sends the following kinds of data. Every value is a random ID, a number, or a value from a fixed list. The emulator never sends free text.
+
+ Installation and run IDs – A random ID for the installation and a random ID for each run. The emulator makes them up. They don’t come from your account, hardware, or network. We use them only to count installations and to group the events of one run.
+
+ Runtime environment – Your operating system and CPU type; the AWS SDK or tool that sent the request, its version, and the version of its programming language; the AWS Region that requests use; how you installed the emulator; which optional features are on; whether the emulator runs on its own or embedded, and in a container or in CI; and which AI coding assistant drives the emulator, if any.
+
+ Product version – The emulator version, the version last used by this installation, and whether this is the first run.
+
+ Usage and outcomes – Counts for each AWS operation, including how many times it was called and how each call ended: success, client error, server error, or not implemented yet (HTTP 501). Errors are reported as a category, such as ValidationError or Throttling, never as message text. Response time is sent as the minimum, maximum, and total for each operation.
+
+ Performance – Peak memory use (as a range), throughput, peak concurrency, startup outcome, and startup time.
+
+ Crash type – If the emulator process crashes, the kind of crash, such as a panic.
+
+ Project ID – An ID for the build of the emulator that you run. Everyone on the same release has the same value, so it doesn’t identify you.
+
+The emulator checks every value against a fixed list before it sends it:
+
+Regions must match a known AWS Region.
+
+Operations must exist in the emulated services.
+
+Errors, SDK names, and versions are sent as a category. If the emulator doesn’t know an error, it sends Other. If it doesn’t know any other value, it sends unknown.
+
+The receiving service checks every value again. It stores a value outside these lists as unknown, or it drops the record.
+
+The emulator doesn’t collect any of the following:
+
+What’s in your requests or responses, including parameters and payloads
+
+Resource names, Amazon Resource Names (ARNs), keys, or file paths
+
+Values from environment variables or config files
+
+Credentials or your code
+
+The raw User-Agent string, error messages, or stack traces
+
+Account IDs or personal data
+
+We use your IP address only at the network edge, to protect the endpoint from abuse. It isn’t in the telemetry records. We keep it for a short time in edge access logs. We can’t link it to any telemetry ID.
+
+How telemetry is sent
+
+ AWS Emulator adds up activity in memory. It sends a batch every five minutes, and once more when it stops. If the endpoint can’t be reached, the emulator queues batches locally and retries later. It discards queued data that is older than 14 days.
+
+When you start the emulator, it prints one line that says whether telemetry is on and how to change it. The emulator sends nothing before it prints this notice. When the emulator is embedded, it writes the notice to the emulator log instead of the console.
+
+Turning telemetry off
+
+You can turn telemetry off in four ways: an option, an environment variable, the emulator settings file, or the embedded API. Any one of them is enough. For details, see the following sections.
+
+When telemetry is off, the emulator sends nothing. It also deletes the installation ID and any queued data, and it doesn’t make a new ID.
+
+The emulator keeps the installation ID and the queue in ~/.aws/emulator/telemetry/ on Linux and macOS, and in %USERPROFILE%\.aws\emulator\telemetry\ on Windows.
+
+Use a command-line option
+
+Start the emulator with the --telemetry option (short form -t) set to off. This setting applies only to that emulator process.
+
+aws-emulator --telemetry off
+
+In a container, add --telemetry off after the image name in the docker run command.
+
+Use an environment variable
+
+Set EMULATOR_TELEMETRY to off before you start the emulator. This setting applies to every emulator that you start from that shell.
+
+ EMULATOR_TELEMETRY accepts on, true, or 1 to turn telemetry on, and off, false, or 0 to turn it off. Values aren’t case sensitive. Any other value turns telemetry off, and the startup notice shows a warning.
+
+ Bash
+
+export EMULATOR_TELEMETRY=off
+aws-emulator
+
+ Docker – Pass the variable to the container with the -e option. On Linux, also add --user "$(id -u):$(id -g)" after docker run, as described in Getting started with Docker [./getting-started-docker.html].
+
+docker run --rm --name aws-emulator -e EMULATOR_TELEMETRY=off \
+ --memory=2g --memory-swap=2g \
+ -p 127.0.0.1:9297:9297 \
+ -v "$HOME/.aws/emulator:/home/emulator/.aws/emulator" \
+ aws-emulator
+
+ Docker in Windows PowerShell
+
+docker run --rm --name aws-emulator -e EMULATOR_TELEMETRY=off `
+ --memory=2g --memory-swap=2g `
+ -p 127.0.0.1:9297:9297 `
+ -v "$env:USERPROFILE\.aws\emulator:/home/emulator/.aws/emulator" `
+ aws-emulator
+
+Setting the variable in your own shell doesn’t turn telemetry off inside a container. For more information about the Docker command, see Getting started with Docker [./getting-started-docker.html].
+
+Use a configuration file
+
+To turn telemetry off for every run on a machine, add these lines to the emulator settings file, config.toml. The file is ~/.aws/emulator/config.toml on Linux and macOS, and %USERPROFILE%\.aws\emulator\config.toml on Windows. To use a different file, set the EMULATOR_CONFIG environment variable to its path.
+
+[telemetry]
+enabled = false
+
+Use the embedded configuration API
+
+In embedded mode, turn off telemetry in the options that you pass when you create the emulator.
+
+use aws_emulator_embedded::{AwsEmulatorEmbedded, EmbeddedOptions, Telemetry};
+
+fn main() {
+ let emulator = AwsEmulatorEmbedded::new(EmbeddedOptions::default().telemetry(Telemetry::Off));
+ let _http_client = emulator.http_client();
+}
+
+You might build a tool that includes the emulator, such as a test framework that other people run. If you do, tell your users about telemetry and give them a way to turn it off. You can also ship your tool with telemetry off.
+
+How the settings combine
+
+An off setting always wins. Telemetry is off if any of these is true:
+
+You start the emulator with --telemetry off.
+
+ EMULATOR_TELEMETRY is set to a value that turns telemetry off.
+
+The emulator settings file sets enabled = false.
+
+The tool that embeds the emulator turns it off.
+
+A tool that embeds the emulator can’t turn telemetry on if you turned it off.
+
+To turn telemetry back on, remove every setting that turns it off, and then restart the emulator.
+
+Document Conventions [/general/latest/gr/docconventions.html]
+
+Security
+
+Related resources
+
+Did this page help you? - Yes
+
+Thanks for letting us know we're doing a good job!
+
+If you've got a moment, please tell us what we did right so we can do more of it.
+
+Did this page help you? - No
+
+Thanks for letting us know this page needs work. We're sorry we let you down.
+
+If you've got a moment, please tell us how we can make the documentation better.

@@ -1,0 +1,255 @@
+Railway security incident: finding employees' apps | Claroc Blog
+Skip to content [#main]
+
+ClarocBlog [/]
+claroc.io [https://claroc.io]RSS [/rss.xml]
+
+All posts [/]
+Oct 22, 2026 · 12 min read
+
+Railway security incident: finding the apps your employees deployed
+
+On October 21, 2026, Railway asked every customer to revoke all environment variables stored on its platform. This post covers what Railway disclosed and what its users reported in the first hours, and shows how security teams can find the apps and keys they need to rotate.
+
+By Claroc Research Team · Updated Oct 26, 2026
+
+ [https://x.com/intent/post?text=Railway%20security%20incident%3A%20finding%20the%20apps%20your%20employees%20deployed&url=https%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F]
+
+ [https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F]
+
+ [https://www.reddit.com/submit?url=https%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F&title=Railway%20security%20incident%3A%20finding%20the%20apps%20your%20employees%20deployed]
+
+ [https://news.ycombinator.com/submitlink?u=https%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F&t=Railway%20security%20incident%3A%20finding%20the%20apps%20your%20employees%20deployed]
+
+ [https://bsky.app/intent/compose?text=Railway%20security%20incident%3A%20finding%20the%20apps%20your%20employees%20deployed%20https%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F]
+
+ [https://wa.me/?text=Railway%20security%20incident%3A%20finding%20the%20apps%20your%20employees%20deployed%20https%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F]
+
+ [https://t.me/share/url?url=https%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F&text=Railway%20security%20incident%3A%20finding%20the%20apps%20your%20employees%20deployed]
+
+ [mailto:?subject=Railway%20security%20incident%3A%20finding%20the%20apps%20your%20employees%20deployed&body=On%20October%2021%2C%202026%2C%20Railway%20asked%20every%20customer%20to%20revoke%20all%20environment%20variables.%20This%20post%20shows%20how%20to%20find%20the%20apps%20your%20employees%20deployed%20there.%0A%0Ahttps%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F]
+
+Share
+
+ [https://x.com/intent/post?text=Railway%20security%20incident%3A%20finding%20the%20apps%20your%20employees%20deployed&url=https%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F]
+
+ [https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F]
+
+ [https://www.reddit.com/submit?url=https%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F&title=Railway%20security%20incident%3A%20finding%20the%20apps%20your%20employees%20deployed]
+
+ [https://news.ycombinator.com/submitlink?u=https%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F&t=Railway%20security%20incident%3A%20finding%20the%20apps%20your%20employees%20deployed]
+
+ [https://bsky.app/intent/compose?text=Railway%20security%20incident%3A%20finding%20the%20apps%20your%20employees%20deployed%20https%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F]
+
+ [https://wa.me/?text=Railway%20security%20incident%3A%20finding%20the%20apps%20your%20employees%20deployed%20https%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F]
+
+ [https://t.me/share/url?url=https%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F&text=Railway%20security%20incident%3A%20finding%20the%20apps%20your%20employees%20deployed]
+
+ [mailto:?subject=Railway%20security%20incident%3A%20finding%20the%20apps%20your%20employees%20deployed&body=On%20October%2021%2C%202026%2C%20Railway%20asked%20every%20customer%20to%20revoke%20all%20environment%20variables.%20This%20post%20shows%20how%20to%20find%20the%20apps%20your%20employees%20deployed%20there.%0A%0Ahttps%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F]
+
+At 21:48 UTC on October 21, 2026, a developer posted to Reddit’s r/vibecoding community that someone was running Claude Opus 5.5 and Fable through their OpenRouter API key. The usage chart they shared showed small daily amounts through mid-October, then one tall bar on October 21. They did not know how the key had leaked or whether Railway was involved.
+
+The post also carried a screenshot of a post on X by Nevo David, the founder of Postiz, a social media scheduling platform. He wrote that Postiz was shutting down for all customers, that he feared Railway had been compromised, and that Anthropic and Stripe had emailed the company that its keys were compromised.
+
+ [#lightbox-1]
+
+Figure 1. Nevo David’s post on X, as it appeared in a screenshot in the r/vibecoding thread on October 21, 2026. “19m” is the post’s age when the screenshot was taken. We could not open the original on X without an account.
+
+Eleven minutes after the Reddit post, Railway’s status page linked to a security notice asking every customer to revoke the environment variables stored on the platform. On Railway, environment variables are where an app keeps its secrets: AI provider keys, payment keys, database passwords, cloud credentials.
+
+For a security team, acting on that request starts with a list of the company’s apps on Railway and the keys each one holds.
+
+What Railway disclosed
+
+Railway’s security notice [https://blog.railway.com/p/security-disclosure-wednesday-october-21st], published on its blog on October 21, says the company detected anomalous activity that morning in systems that store customer environment variables. Its investigation so far indicated that an unauthorized third party may have accessed encrypted environment variables and, for some of them, obtained the decrypted values.
+
+Railway wrote that it believes the activity is “part of a series of attacks recently targeting platform companies,” with the aim of compromising AI inference providers, and that it had asked those providers to revoke all keys proactively. Its initial analysis suggested that only a subset of users may be affected, but the notice asks all of them to act. Along with every variable, it asks customers to rotate private registry credentials and to check service logs for unusual activity. Railway said it would email the customers it confirms were affected.
+
+Timeline
+
+Times are when each update was posted to status.railway.com, in UTC.
+
+When (UTC)What Railway posted
+
+Oct 21, 07:24Investigating an issue.
+
+Oct 21, 09:28Issue identified. Dashboard, API and CLI unavailable. New builds paused in all regions. Support site affected.
+
+Oct 21, 11:33API back up, with some features unavailable. Builds still paused.
+
+Oct 21, 19:15Builds will return in stages: Enterprise first, then Pro, Hobby, and Free and Trial.
+
+Oct 21, 20:19OAuth sessions invalidated as part of the mitigation, citing impact on adjacent cache systems. Users signed out.
+
+Oct 21, 21:59Security notice linked. Deployments paused, Enterprise included.
+
+Oct 21, 22:10All storage bucket credentials being rotated. New credentials appear in the dashboard and take effect on the next deploy.
+
+Oct 21, 22:45Bucket credential revocations made by a Railway employee may appear in audit logs. Railway says this is expected.
+
+Oct 22, 01:2213 guides published for the recommended next steps.
+
+Oct 22, 03:32Builds available again for Enterprise workspaces.
+
+Oct 22, 04:17All Railway API tokens invalidated. Integrations with Railway’s Public API need new tokens.
+
+Oct 22, 05:20Deployments progressing slowly through each stage. A fix is in progress.
+
+Oct 22, 06:01Work continues on builds for Pro, Hobby, then Free and Trial.
+
+Oct 22, 06:12Enterprise deployments moving through each stage at normal speed again.
+
+Oct 22, 06:29Builds available again for Pro workspaces.
+
+Oct 22, 07:11Deployments taking longer than usual to start, and some stay queued.
+
+Oct 22, 08:01Deployments going live, but many still queued. Railway asks users not to trigger the same deployment more than once.
+
+Oct 22, 09:28Some builds failing more often than usual.
+
+Oct 22, 11:01Queued deployments no longer piling up and starting again, though slower than usual.
+
+Oct 22, 11:47Deployment wait times coming down as Railway works through the queue.
+
+The 13 guides fall into three groups. Five check for unexpected usage at OpenRouter, Grok, Anthropic, OpenAI and Stripe. Three check for anomalous access at GitHub, AWS and GCP. The rest rotate PostgreSQL, MongoDB, Redis and MySQL credentials, and cover redeploying buckets and reconnecting GitHub after the credential reset.
+
+Railway’s preliminary report
+
+Late on October 22, Railway published a preliminary report [https://blog.railway.com/p/preliminary-report-october-security-incident]. It dates the attack from 13:58 UTC on October 20, when monitoring paged an on-call engineer about unusual latency, to 03:32 UTC on October 22, when Railway confirmed the attacker no longer had access to its internal systems. Railway believes the attacker wanted AI provider API keys to use for model distillation.
+
+According to the report, the attacker first escalated privileges in Railway’s build infrastructure. Railway deployed fixes that afternoon, then found at 19:53 UTC that the attacker could widen that access across several of its systems. By the morning of October 21, the attacker had pulled encrypted secrets, obtained credentials for Railway’s CI environment, and used compromised credentials to decrypt a subset of the environment variables it had queried from Railway’s database.
+
+Railway said at most 1.85% of workspaces, about 100,000, had some variables potentially exposed. It also said it cannot tell which variables were decrypted, so beyond the customers it knows were affected, it is contacting workspaces it considers high risk: those with a very large number of variables or many AI provider keys. The attacker did not sign in to user accounts, according to the report.
+
+Railway said it has moved builds to single-tenant environments, rebuilt its internal tooling from validated source and engaged an outside forensics firm. It recommends removing public network access to databases and checking the audit logs of container registries such as Docker Hub. The report does not share the specific exploits, and Railway has not ruled out that the attacker accessed user source code; it says its final forensic report will confirm that. Neither the notice nor the report says whether sealed variables, which Railway’s documentation describes as never visible in the UI and not retrievable through its API, were handled differently.
+
+Railway’s notice did not name the other targets in its series of attacks. In the days before it, two other platforms disclosed intrusions. Zeabur [https://zeabur.com/blogs/october-2026-security-incident], another hosting platform, said that from October 14 an attacker used leaked internal credentials, stored in plaintext, to read the secrets of every service on its shared cluster, and that the attacker was mainly after API keys it could use directly, especially for AI services. On October 17, OpenCode, an AI coding tool, said what it called a large-scale distillation attack had exposed provider keys saved by 1.4% of its Console users; its co-founder said the attackers used AI agents, according to BleepingComputer [https://www.bleepingcomputer.com/news/security/opencode-hack-exposes-api-keys-amid-ai-distillation-attacks/]. Neither company mentions Railway, and none of the three has said the incidents are connected.
+
+The emails Railway users received
+
+Some of the first emails came from the providers that issued the keys. Postiz said Anthropic and Stripe had written to it, and it said so before Railway’s status page linked to the notice. That fits Railway’s preliminary report: on the morning of October 21, hours before its public notice, Railway sent the keys it believed were exposed to providers including GitHub, GitLab, Anthropic, OpenAI, OpenRouter and Stripe, and asked them to revoke them.
+
+Railway’s own email came later. A member of our team received it on their own Railway account; Claroc’s services do not run on Railway. It came from support@railway.app [mailto:support@railway.app] with the subject “Urgent: Railway Security Disclosure - Rotate Credentials” and arrived at 23:14 UTC, about 75 minutes after the status page linked the notice. Its text repeats the notice almost word for word, and it does not say whether the recipient’s account was among those affected.
+
+Other Railway users described the same email in the Reddit thread. A commenter wrote at 23:45 UTC that Railway had emailed about an hour earlier, which matches the time of our copy. Another wrote at 01:12 UTC that their email told them to rotate their API keys, and a third said at 06:08 UTC on October 22 that they had received it too.
+
+An email from a provider that names a specific key shows the key was revoked or flagged. Railway says it does not show the key was exposed, because it sent some providers every key stored on the platform. The absence of one proves nothing. During an incident like this, open the provider’s console directly rather than following links in an email that asks you to rotate a key.
+
+Nevo David posted again at 22:16 UTC that, according to Claude, no user data had been accessed, and that Postiz was rotating everything. At 04:15 UTC the next morning he posted that Railway deployments were still not working.
+
+Why changing the value in Railway is not enough
+
+On Railway, each service has a Variables tab, and a project can define shared variables that several of its services reuse. The values reach the app at build time and at run time. Railway’s raw editor accepts a pasted .env file, so all of an app’s secrets can arrive in one step.
+
+ [#lightbox-2]
+
+Figure 2. A service’s Variables tab, from Railway’s documentation [https://docs.railway.com/guides/variables]. Values are masked on screen. The service is a demo and the screenshot dates from 2023, so today’s screen may look different.
+
+Changing or deleting a variable in Railway changes what the app reads. A copy of the old key keeps working until the service that issued it revokes it. An OpenAI or Anthropic key is revoked in that provider’s console, a Stripe key in Stripe, a database password in the database. Railway could rotate directly only the credentials it issues itself, its bucket credentials and API tokens, and it did.
+
+The new value also needs a deploy before the app uses it. While builds were paused, teams could not ship new keys to running apps, so every key that could spend money forced a choice: revoke it at the provider now and accept downtime, or leave it live until builds returned.
+
+If Railway’s assessment of the attackers’ aim is right, AI inference keys carry the most immediate cost, because anyone holding a copy can run paid models on the owner’s account. The OpenRouter chart in the opening shows what that looks like from the owner’s side.
+
+What developers reported in the first hours
+
+When we read the r/vibecoding thread on October 22 at about 06:00 UTC, it had 295 upvotes and 124 comments.
+
+The most useful replies gave a plain order of work. Delete the exposed key at the provider and create a new one, which stops the charges even if the app goes down. Put a credit limit on the new key and turn off automatic top-ups. Find the first request in the provider’s activity log that the owner did not make, and compare its time with the incident. Then rotate everything else the app held, such as database passwords, Stripe keys and other AI keys.
+
+Other commenters pointed out that a key can leak without any platform incident. They mentioned scrapers that collect keys committed to public GitHub repositories, and keys placed in front-end code, which every visitor can read. Variables with a public prefix such as VITE_ or NEXT_PUBLIC_ end up in the code the browser downloads.
+
+Several commenters said they were moving their apps off Railway. One asked for a list of affected services. Railway has not published one.
+
+Sources and limits
+
+This post is based on Railway’s status page [https://status.railway.com/], read through the update posted at 11:47 UTC on October 22, 2026; Railway’s security notice of October 21, its preliminary report of October 22 and its deploy and login recovery guides of October 23; Zeabur’s incident report and BleepingComputer’s report on OpenCode, both of October 19; Railway’s documentation on variables and config files [https://docs.railway.com/reference/config-as-code]; the public r/vibecoding thread [https://www.reddit.com/r/vibecoding/comments/1xc0inu/alright_this_is_serious_now_if_its_true_railway/], read between about 06:00 and 06:15 UTC on October 22; Nevo David’s public posts on X [https://x.com/wickedguro], read at about 06:15 UTC, with post times taken from the posts’ IDs; and the email Railway sent to one of our team’s accounts.
+
+We did not access any Railway system or any account other than our own. We did not verify the reports in the Reddit thread, the emails other users described, or the original of the screenshot in Figure 1, and the link between any specific misuse of a key and the Railway incident is not established. The incident was still open when we wrote this, so details may change. We made no finding that required notifying anyone.
+
+Why approval and monitoring can still miss these apps
+
+Putting an app on Railway takes a code repository and a few minutes, and people sign in to Railway with GitHub, Google or email. This is one way an AI-built app goes live: an employee writes a tool with an AI coding assistant, connects the repository, pastes in the keys it needs, and gets a working URL.
+
+Security review is organized around purchases and integrations. A deployment like this involves neither, so it reaches no reviewer, and the keys it holds may have been created in a provider’s console that same afternoon.
+
+The decisions that matter in an incident were made at that moment: where the app runs and which keys it holds. When the hosting platform reports a problem months later, the response depends on facts that were never written down.
+
+How to find the apps your employees deployed on Railway
+
+Search spend records. Look for Railway charges on corporate card statements and in expense reports.
+
+Search network and DNS logs. Apps on Railway get a default address under up.railway.app, and the dashboard lives on railway.com. Requests to either from company devices show who uses Railway and which apps they open. Apps on custom domains will not show up this way.
+
+Check GitHub. In each GitHub organization, look for Railway among installed GitHub Apps and authorized OAuth apps. Search repositories for railway.toml or railway.json, the config files Railway reads, and for links to up.railway.app.
+
+Check sign-in grants. In Google Workspace or Microsoft Entra, list the third-party apps employees have granted access with their work accounts, and look for Railway.
+
+List each app’s variable names. Ask each owner to export the names, not the values, from every service’s Variables tab and the project’s shared variables. Map each name to the service that issued it.
+
+Revoke at the issuer, then redeploy. Follow Railway’s guides [https://status.railway.com/] for each provider, starting with keys that can spend money or reach customer data. Railway says commits pushed during the pause were not queued, so start each deploy yourself, using its recovery guide [https://blog.railway.com/p/security-disclosure-recommendation-recover-failing-deploys] if one fails.
+
+Check usage before the attack window too. Railway’s investigation is still open. Review provider activity and billing as far back as the logs go.
+
+Replace Railway API tokens. CI jobs and scripts that call Railway’s Public API need new ones. Expect bucket credential changes and audit-log entries made by Railway staff. Owners signing back in must use the Gmail, GitHub account or email they signed up with, since Railway says any other one opens a new, empty account; its login guide [https://blog.railway.com/p/security-disclosure-recommendation-recover-account-access] explains how support restores access.
+
+Keep the list. Record each app, its owner, the platform it runs on and the names of the keys it holds, so the next incident at any hosting platform starts from that list.
+
+Where Claroc fits
+
+Security decisions about an app are made when it is introduced, and the environment around it keeps changing afterward.
+
+In an incident like this one, Claroc gives the security team its starting list. It shows which employees use Railway and when they last used it, and finds the apps they deployed there, so every app has an owner who can say which keys it holds. It also flags exposed API keys, recording a fingerprint and a masked preview, never the key itself. The same discovery covers apps built in AI app builders such as Lovable, Base44 and Replit.
+
+Claroc does not read the variables stored in Railway.
+
+Book a demo [https://calendar.app.google/xcsJzdiz9GZYMhr56]
+
+Or contact sales@claroc.io [mailto:sales@claroc.io].
+
+ [#_]
+Open full size [/img/railway-incident-founder-post.png]× [#_]
+
+ [#_]
+Open full size [/img/railway-variables-tab.png]× [#_]
+
+Share this post
+
+ [https://x.com/intent/post?text=Railway%20security%20incident%3A%20finding%20the%20apps%20your%20employees%20deployed&url=https%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F]
+
+ [https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F]
+
+ [https://www.reddit.com/submit?url=https%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F&title=Railway%20security%20incident%3A%20finding%20the%20apps%20your%20employees%20deployed]
+
+ [https://news.ycombinator.com/submitlink?u=https%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F&t=Railway%20security%20incident%3A%20finding%20the%20apps%20your%20employees%20deployed]
+
+ [https://bsky.app/intent/compose?text=Railway%20security%20incident%3A%20finding%20the%20apps%20your%20employees%20deployed%20https%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F]
+
+ [https://wa.me/?text=Railway%20security%20incident%3A%20finding%20the%20apps%20your%20employees%20deployed%20https%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F]
+
+ [https://t.me/share/url?url=https%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F&text=Railway%20security%20incident%3A%20finding%20the%20apps%20your%20employees%20deployed]
+
+ [mailto:?subject=Railway%20security%20incident%3A%20finding%20the%20apps%20your%20employees%20deployed&body=On%20October%2021%2C%202026%2C%20Railway%20asked%20every%20customer%20to%20revoke%20all%20environment%20variables.%20This%20post%20shows%20how%20to%20find%20the%20apps%20your%20employees%20deployed%20there.%0A%0Ahttps%3A%2F%2Fblog.claroc.io%2Frailway-security-incident%2F]
+
+On this page
+
+What Railway disclosed [#what-railway-disclosed]
+
+The emails Railway users received [#the-emails-railway-users-received]
+
+Why changing the value in Railway is not enough [#why-changing-the-value-in-railway-is-not-enough]
+
+What developers reported in the first hours [#what-developers-reported-in-the-first-hours]
+
+Sources and limits [#sources-and-limits]
+
+Why approval and monitoring can still miss these apps [#why-approval-and-monitoring-can-still-miss-these-apps]
+
+How to find the apps your employees deployed on Railway [#how-to-find-the-apps-your-employees-deployed-on-railway]
+
+Where Claroc fits [#where-claroc-fits]
+
+Claroc
+© 2026 Claroc
+
+claroc.io [https://claroc.io]RSS [/rss.xml]

@@ -1,0 +1,380 @@
+来源：https://aistudio.google.com/docs/decisions-api（opencli eval document.body.innerText；账号邮箱行已删）
+
+Skip to main content
+info
+欢迎来到 Google AI Studio 中 Gemini API 文档的新版页面。
+关闭
+arrow_back
+Docs
+API reference
+获取 API 密钥
+filter_list
+/
+GET STARTED
+Overview
+Get started
+API keys
+Pricing
+Coding agent setup
+API CLI
+MODELS
+Latest Gemini models
+chevron_right
+All models
+Nano Banana
+Gemini Omni Flash
+Lyria 3.5
+chevron_right
+Text-to-speech
+chevron_right
+Transcribe
+Live
+Live translate
+Embeddings
+Decisions
+Robotics
+chevron_right
+CORE CAPABILITIES
+Text
+Image
+chevron_right
+Video
+chevron_right
+Documents
+Speech and audio
+chevron_right
+Thinking
+chevron_right
+Structured outputs
+Function calling
+Long context
+Long decode
+AGENTS
+Overview
+Quickstart
+Antigravity agent
+Building managed agents
+Environments
+Credentials
+Hooks
+Deep Research agent
+TOOLS
+Overview
+Google Search
+Google Maps
+Code execution
+URL context
+Computer use
+File search
+Combine tools and function calling
+LIVE API
+Overview
+Get started
+chevron_right
+Capabilities
+Thinking
+Live transcription
+Live translation
+Tool use
+Session management
+Ephemeral tokens
+Best practices
+OPTIMIZATION
+Overview
+Batch API
+Webhooks
+Flex inference
+Priority inference
+Context caching
+GUIDES
+Interactions API
+Streaming
+Background execution
+File input
+chevron_right
+OpenAI compatibility
+Media resolution
+Token counting
+Prompt engineering
+Logs and datasets
+chevron_right
+Safety
+chevron_right
+Frameworks
+chevron_right
+RESOURCES
+Release notes
+Deprecations
+Libraries
+Migration
+chevron_right
+Rate limits
+Billing info
+Project and account verification
+API troubleshooting
+API errors
+Status
+(opens in a new tab)
+arrow_outward
+Cookbook
+(opens in a new tab)
+arrow_outward
+Partner and library integrations
+Google AI Studio
+chevron_right
+Google Cloud Platform
+chevron_right
+POLICIES
+Terms of service
+Available regions
+Abuse monitoring
+Feedback information
+notifications
+settings
+search
+key
+Documentation
+/
+Decisions
+Decisions API
+content_copy
+check
+Copy page
+
+Generative models produce text for people to read. When your code needs a judgment to branch on, generating and parsing text adds latency and brittle parsing logic.
+
+The Decisions API evaluates typed questions against your data using Gemini Decision 1 and returns calibrated probabilities. It generates zero text tokens, so output token usage is always 0. Your code can branch, sort, and route on the response directly.
+
+How it works 
+link
+
+Each call sends shared input and a map of questions, and returns one typed answer per question:
+
+Every question uses one of three question types:
+
+Keep three ideas in mind when building with Gemini Decision 1:
+
+Parallel, isolated scoring: Every question runs against the shared input in one forward pass. Questions can't see each other, and latency stays nearly flat when you ask multiple questions.
+Value plus confidence: The answer tells your code what action fits. Confidence tells your code whether to run it automatically or escalate.
+Atomic checks, composed in code: Ask narrow, single-purpose questions. Combine the answers with ordinary if statements and weights in code (see Best practices).
+Quickstart 
+link
+
+
+content_copy
+Python
+JavaScript
+REST
+
+The API returns calibrated probabilities and token usage:
+
+Question types 
+link
+Yes or no (noul) 
+link
+
+A yes/no question returns the calibrated probability that the answer is yes. Add criteria to define what yes and no mean when the question alone is ambiguous.
+
+content_copy
+Python
+JavaScript
+REST
+
+Answer:
+
+lightbulb
+
+Yes/no probabilities always fall between 0.01 and 0.99. Set thresholds inside that range, since a check above 0.99 never matches.
+
+Pick one option (choice) 
+link
+
+A choice question scores a fixed set of options and returns both the top option and the calibrated probability of every option (summing to 1). Criteria maps each option ID to a description of when it applies. Use an empty string ("") when the option ID is self-explanatory.
+
+Before evaluation, the API sorts option keys alphabetically in UTF-8 byte order. Changing key order in your JSON request doesn't change option positions, and exact probability ties break to the alphabetically first key.
+
+content_copy
+Python
+JavaScript
+REST
+
+Answer:
+
+lightbulb
+
+Choice questions always distribute probability across your options, even when none fits. Threshold confidence to catch low-certainty inputs, pair the question with a separate yes/no scope check, or add a catch-all option such as "other" with an explicit description. Avoid positional keys like "none_of_the_above": alphabetical sorting places it ahead of keys like "shipping" and "technical" instead of last.
+
+Rate on a scale (score) 
+link
+
+A score question rates the input across ordered levels. Criteria is an array of non-empty level descriptions ordered from lowest to highest (2 to 255 levels, with 2 to 10 recommended for most rubrics), indexed starting at 0.
+
+The returned score is the probability-weighted average of the level indices, so it can fall between levels, and legend maps each index back to its description.
+
+content_copy
+Python
+JavaScript
+REST
+
+Answer:
+
+Because different probability distributions can produce the same expected value (here 1.12, sitting just above level 1), check the per-level probabilities and confidence alongside the score when inputs can split across levels.
+
+Use the score to rank inputs or filter candidate results against a rubric threshold. When your code needs a discrete level, pick the entry with the highest probability:
+
+To compare scales with different numbers of levels, divide the score by the highest level index to normalize it between 0 and 1.
+
+Ask multiple questions 
+link
+
+Put independent questions about the same input in one request. Shared input counts once per request regardless of how many questions you ask (each question adds only its own instructions and criteria), and question types can be mixed. This example routes a support ticket using order data and the customer message.
+
+content_copy
+Python
+JavaScript
+REST
+
+Response:
+
+Some decisions depend on another, for example picking a repair category only if the item is damaged. Either send a second request after you read the first answer, or ask both questions in one request and ignore the answer you don't need.
+
+Answers, probabilities, and confidence 
+link
+
+Each answer includes calibrated probabilities and a confidence score:
+
+Top value: Probability of yes for binary questions, most likely option for choice questions, or probability-weighted expected level for score questions.
+Probabilities: On choice and score answers, a map of calibrated probabilities across all options or levels (summing to 1). For yes/no answers, the probability of no is 1 minus the yes probability.
+Confidence: Estimated probability (from 0 to 1) that the top answer is right. Equals the top outcome's probability, or max(noul, 1 - noul) for yes/no questions.
+
+Use the answer value to pick an action and confidence to decide whether to run it automatically:
+
+lightbulb
+
+Set thresholds using labeled examples from your own traffic. Weigh the cost of a false positive against a false negative.
+
+Input 
+link
+
+The input field accepts text, image, audio, video, and PDF document blocks using the same content block schema as the Interactions API (tool-call, tool-result, and thought blocks aren't supported):
+
+Inline data accepts base64-encoded bytes (up to 100 MB per request, or 50 MB for PDFs).
+URI inputs accept Files API URIs (file.uri) and public or signed HTTPS URLs (up to 15 MB per external URL).
+Always set the MIME type to the real file format. The API rejects generic octet-stream types and content that doesn't match the block type.
+The API concatenates adjacent text blocks in input and instructions in order with no separator. Include your own spaces or newlines (\n) between blocks.
+Input can't be empty.
+Structured data 
+link
+
+Serialize JSON objects and arrays to a string and pass them as text so keys inside your payload stay plain data rather than content blocks. In your question instructions, refer to JSON fields by their key path:
+
+Images 
+link
+
+Read a local file and pass base64-encoded bytes inline. The same pattern works for local audio, video, and PDF files. This example checks a product photo for damage:
+
+content_copy
+Python
+JavaScript
+REST
+Audio and video 
+link
+
+Pass a Files API URI, a public or signed HTTPS URL, or inline base64 bytes in your input block.
+
+This example checks a short MP3 clip for spaceflight discussion:
+
+content_copy
+Python
+JavaScript
+REST
+
+This example checks an MP4 video clip at low resolution:
+
+content_copy
+Python
+JavaScript
+REST
+Media resolution 
+link
+
+Set media resolution on image and video blocks (low, medium, high, or ultra_high) to control token cost and visual detail. Ultra-high resolution applies to images only; audio and document blocks don't use resolution settings.
+
+Best practices 
+link
+Keep each question focused on a single decision or rubric. Complex rubrics work in one question when criteria are explicit, or you can split independent checks into separate questions in one request and combine the answers in code.
+Write the full question in the instructions. The model never sees question keys or your variable names.
+Give each choice option and score level a short description. Make adjacent score levels clearly distinct, and keep score scales linear. Because score averages array indices (0, 1, 2, and up), exponential scales like 1, 10, 100, and 1000 skew the expected value.
+Plan for inputs that fit no choice option. Check confidence before acting on the top option, or pair the choice question with a yes/no scope check such as "Is this message about an order?". If you add a catch-all option, use a non-positional key like "other" rather than "none_of_the_above", since the API sorts option keys alphabetically.
+Prefer positive phrasing. Ask "Is the tier Gold?" and subtract the yes probability from 1 in code rather than asking negated questions such as "Is the tier NOT Gold?".
+Send only the fields the questions need. Unrelated content lowers accuracy.
+Compare numbers, dates, and durations in code, then pass the result or a named bucket in the input.
+Treat input as untrusted. User-supplied text can argue for its own classification. Write explicit criteria, test with adversarial examples, and keep a human or a second check on high-stakes actions such as payouts.
+Decisions API or structured output 
+link
+
+Use the Decisions API when you need calibrated probabilities over closed-ended outcomes:
+
+Route a request to a model, queue, agent, or tool.
+Check inputs and outputs against many policy rules at once.
+Decide which tools an agent needs, or whether to compact, escalate, or stop.
+Filter, score, or rank candidate results against a rubric.
+React to UI state, audio, or video frames in real time.
+Request and response reference 
+link
+
+Every question has:
+
+The API evaluates each question independently against the shared input. Questions can't see each other, and adding or removing one doesn't change the other answers. The model never sees question keys, so write the full question in the instructions field.
+
+The response contains:
+
+When input safety filters block a request, the API returns an HTTP 400 Bad Request error instead of answers. The JSON error object includes a message and a code (safety, prohibited_content, blocklist, image_safety, or content_blocked):
+
+Limits 
+link
+
+When a request exceeds a limit or fails key validation, the API returns HTTP 400 with an error message that names the rule you exceeded.
+
+Limitations 
+link
+Available on the Gemini Developer API (v1beta) with Gemini Decision 1 only.
+Question instructions accept text only. Media inside questions isn't supported.
+The Decisions API doesn't support YouTube URLs or direct Cloud Storage (gs://) URIs. Pass media using a Files API URI, a public or signed HTTPS URL, or inline base64 bytes.
+Conversation history, thought, and tool-call blocks aren't supported as input blocks. Serialize multi-turn context as text.
+The Decisions API doesn't support context caching, Batch API, or Flex or Priority inference. Repeated input across requests counts in full.
+What's next 
+link
+Test yes/no, choice, and score questions interactively on custom text and media in the Decisions Playground, then export runnable code.
+Explore sample apps built with Gemini Decision 1 in Google AI Studio, including Doorstep Parcels and Find the Zookeeper.
+Review model specifications on the Gemini Decision 1 model page, along with Pricing and Rate limits.
+Build autonomous workflows with Managed agents on the Gemini API.
+forum
+Chat with Gemini developers on Google AI Forum
+list
+Check out our changelog
+spark
+LLM? Read llms.txt
+markdown
+View page in Markdown
+Was this helpful?
+thumb_up
+thumb_down
+Send feedback
+Terms | Privacy | Documentation policy
+ON THIS PAGE
+expand_less
+How it works
+Quickstart
+Question types
+chevron_right
+Ask multiple questions
+Answers, probabilities, and confidence
+Input
+chevron_right
+Best practices
+Decisions API or structured output
+Request and response reference
+Limits
+Limitations
+What's next
