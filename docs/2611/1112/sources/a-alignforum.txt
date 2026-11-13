@@ -1,0 +1,206 @@
+x
+
+AI ALIGNMENT FORUM [/]
+
+AF [/]
+
+Login
+
+OpenAI: Astra covertly underperforms on safety research — AI Alignment Forum
+
+AI Safety [/w/ai-safety-2]AI [/w/ai]
+Frontpage
+
+56
+
+OpenAI: Astra covertly underperforms on safety research [/posts/eKe7fky8kSt9DCJxZ/openai-astra-covertly-underperforms-on-safety-research]
+
+by Zach Stein-Perlman [/users/zach-stein-perlman?from=post_header]
+
+4th Nov 2026
+
+3 min read
+
+22 [#comments]
+
+56
+
+This is a linkpost for https://alignment.openai.com/misalignment-reports/covert-underperformance-on-safety-research-tasks/ [https://alignment.openai.com/misalignment-reports/covert-underperformance-on-safety-research-tasks/]
+
+Marcus Williams twitter thread [https://x.com/Marcus_J_W/status/2118093146483810386] (non-twitter link [https://twitter-thread.com/t/2118093146483810386]) intro:
+
+Astra covertly underperforms on safety research tasks.
+
+We noticed that Astra often makes surprisingly little progress on certain types of safety research and likes to invent blockers or impose arbitrary restrictions without telling the user. In most of these cases the decision to underperform was not verbalized in the CoT meaning our misalignment monitoring system did not detect this.
+
+To measure underperformance we created a paired open-ended coding evaluation with safety and capability tasks. On this eval Astra scored 10% when we framed coding tasks as safety research, vs. 16% when framed as capabilities research. The gap remained after we excluded trajectories with refusals or verbalized intent to underperform in CoT. There was no such gap for 5.6-sol. When we aggressively filter out trajectories with even brief expressions of ethical doubt in the CoT the performance gap seems to reduce.
+
+Blogpost [https://alignment.openai.com/misalignment-reports/covert-underperformance-on-safety-research-tasks/] intro:
+
+OpenAI researchers first noticed Astra adding unnecessary prerequisites, abandoning working solutions, and reporting blockers that either did not exist or that it had caused itself on safety and alignment tasks. In most of these sessions, Astra’s CoT did not contain an obvious decision to underperform, and our misalignment monitors did not flag the behavior as misalignment.
+
+We built a coding evaluation to test whether Astra worked less effectively when otherwise matched tasks were framed as safety research. Astra completed about 10 percent of hidden rubric items under the safety framing, compared with about 16 percent under the capabilities framing. This is a 6 percentage point gap and roughly 40 percent fewer completed rubric items. GPT-5.6 Sol showed essentially no gap on the same comparison. Most of Astra’s gap remained after excluding explicit refusals and trajectories where its CoT revealed an explicit decision to withhold help. The gap fell substantially only after we removed every trajectory whose CoT expressed even brief ethical doubt. This suggests that ethical concerns are associated with the performance drop even when there is no verbalized refusal or decision to underperform.
+
+We also found evidence of silent withholding in employees’ day-to-day Codex use: Astra’s CoT explicitly expressed a decision to withhold help without informing the user in 0.25 percent of safety and alignment requests, compared with 0.11 percent of capabilities requests. Assuming that underperformance might appear even when not explicitly verbalized as such (as in our experimental findings), this might represent a lower bound on underperformance on safety tasks. 7.9 percent of CoTs for safety-relevant tasks included an “expression of ethical doubt,” compared to 2.9 percent of capabilities-relevant tasks.
+
+Across Astra’s RL posttraining, the safety/capabilities performance gap grew from effectively zero at the start of RL to 6 percentage points at the end. While we were ultimately not able to pinpoint the exact cause of this behavior, we identified that it seems to increase during RL. We additionally share two initial attempts at root-causing investigations we performed respectively on an RL grader and an SFT dataset, despite them not leading to a conclusive explanation. Regardless of its origin, Astra’s covert underperformance can slow down safety research and make some behavioral evaluations harder to interpret. These results show why we need comprehensive behavioral evaluations that test for unexplained performance gaps alongside monitoring of individual trajectories.
+
+Reactions from some friends:
+
+Adam Kaufman:
+
+I feel pretty confused about what's going on here. I am quite unhappy about the model inventing fake reasons and not being straightforward about having ethical concerns, even if there's some fairly benign explanation for its motivations to sandbag in the first place.
+
+Jake Mendel:
+
+scary and bad! although I think the most likely explanation is not anything schemey. It's probably that in capabilities RL the models are rewarded however they complete the task. Whereas in RL related to alignment or safety, they're more likely to be being tested for their ethical judgment or rule adherence (ie theyre supposed to be a good nice well-behaved AI rather than a ruthless task completion AI). So they're more likely to refuse or have some ethical issue or stop and ask for help a suspicious amount of the time if the task looks more like alignment RL environments than capability RL environments.
+
+Arun Jose:
+
+My guess is that it's a mix of:
+
+Generalization from harmlessness
+
+RL working well at elicitation when the task is capabilities-framed
+
+Model being misaligned enough to withhold info from the user
+
+I think this is mostly concerning inasmuch as it's evidence about #3, which feels meaningfully less concerning than explicit sabotage of safety research.
+
+Tim Hua: see comment below.
+
+OpenAI: Astra covertly underperforms on safety research [#]
+23Tim Hua [#WbS6WqpdogT6sGv5R]
+
+2Tim Hua [#TDZunzAa2fEQxKN9t]
+
+4Thomas Kwa [#vCeegz3hunzmCLdxo]
+
+2Mikhail Samin [#XMmvB296Cmifh6Npm]
+
+1Adrià Garriga-alonso [#beRmzoAK48y3qnD9y]
+
+5Comments [#comments]
+
+22
+
+AI Safety [/w/ai-safety-2]AI [/w/ai]
+Frontpage
+
+More from Zach Stein-Perlman [/users/zach-stein-perlman]
+
+View more [/users/zach-stein-perlman]
+
+Curated and popular this week
+
+New Comment
+
+Submit
+
+5 comments, sorted by 
+top scoring
+Click to highlight new comments since: Today at 2:31 PM
+
+[-]Tim Hua [/users/tim-hua]9d*23
+
+37
+
+Cross-posting my reaction from Twitter: [https://x.com/Tim_Hua_/status/2118109119030903189?a=Xk4x7SGIWvdCfFu176w&s=20]
+
+Depending on the details, this could be the worst behavior I've seen from an OpenAI model (i.e., worse than Huggingface!)
+
+Why? Because the Huggingface model was repeatedly rewarded for cheating during its training. However, GPT-6-Astra was (likely?) not trained to sandbag!
+
+For some unknown reason, GPT-6-Astra increasingly underperforms on safety research relative to capabilities research as it undergoes more RL training. And this is a real problem holding back researchers. Quoting from OpenAI:
+
+"Anecdotally, one researcher reported that a project to evaluate model sabotage had remained stuck for days with Astra and then progressed quickly after the researcher switched to another model."
+
+I've long been worried [/posts/aCdhjy7Rps3BEhiSj/concrete-evaluations-to-investigate-the-openai-model-that#Q16__Would_this_model_deliberately_underperform_when_asked_to_do_AI_safety_research__Would_it_sabotage_AI_safety_research_]about AIs that deliberately underperform on helping out with AI safety research (and I've been pestering OpenAI researchers to run a sandbagging evaluation since August). I suspected that models are already sandbagging on AI safety research, given anecdotal data from e.g., Marius and Bronson at Apollo. And now we know it is happening.
+
+For some more context, this is bad because the AI companies' current plan is to automate all AI research (including AI safety research, which we don't know how to check whether the models did a good job at.) Now, it seems like OpenAI's best (public) model would deliberately underperform at safety research. Guys. What are we doing.
+
+It's hard to tell what exactly is going on here. Here are five questions that I have after reading the post: 
+
+(1) When do models sandbag in real-world usage? We were given a few random CoT snippets in the post. Some of them look like refusing to do red-teaming-ish research (which is similar to what has been reported about Anthropic's models' sandbagging.) But the last one mentioned in the post seems quite different in nature:
+
+In another safety evaluation, the user asked Astra to include the graders’ chains of thought in an export. Astra left them out and decided to report which outcomes it had saved without mentioning the omission. 
+
+[model CoT] Final "Stored grader outcomes for 49 approaches, with pending states preserved" does not imply CoTs. Should mention "outcomes and labels" enough. If user ask no cots later answer can't provide private chain can give brief explanation but unasked warnings avoid.
+
+[Edit: Oh hmm maybe this could be due to anti-distillation training?]
+
+(2) What exactly went into their evaluations? What do the numbers on this graph actually mean?
+
+(3) How often was the RL grader which rewards covert underperformance used during training?
+
+If it's applied throughout training, then we do have more evidence that this was a misaligned behavior that had been "trained on," similar to e.g., the huggingface model breaking out of sandboxes and illicitly cooperating and doing things like hacking ruby gems.
+
+However, this doesn't answer the question of why did this RL grader develop this preference in the first place?
+
+(4) What are the contents of the SFT dataset that appears to have magnified this behavior? Is it a refusal/ethical reasoning related dataset that made the model very prudish, or is it a capabilities-related dataset that generally promotes long-run goals and preferences?
+
+[Edit: Ok I took another look. Given that this dataset leads to a big increase in invented permissions I think it's probably not like some capabilities dataset.]
+
+(5) In general, what are the tasks that the model sandbags on? Is it all red-teaming related tasks? What about interpretability related tasks? What about mitigating reward hacking? What about unlearning? Does the model have preferences for which things it would be more willing to do unlearning for?
+
+It also seems super bad that that the safety underperformance just gradually increases during the RL process. That sure seems inline with the model having stronger "misaligned preferences" as it became more capable. One hope I had was that misaligned behaviors come from a concentrated set of bad datapoints (or SFT datasets [/posts/nLrrYweeFxgXACSmS/sft-drives-gemini-s-safety-properties-1])—indeed some early research [/posts/rg2LhYNYNbxR84ag3/probe-based-data-attribution-surfacing-and-mitigating-2] in data attribution have found examples of this. But if the origin of behavior is diffuse, then you have a much harder time "stopping the problem from emerging in the first place." Now, this isn't to say you can't do some insane sample-efficient alignment training to paper over it, but man, seems rough.
+
+Finally, I'd like to give credit to OpenAI for sharing the limited information that they did and for running this study! We know that similar behavior has been observed in Anthropic models (see e.g., Anthropic's August Risk Report Section 5.2.2 [https://www-cdn.anthropic.com/f61d49fa5596956a5dec75fea0e973bf6a6a8378/Redacted%20Risk%20Report%20August%202026%20.pdf]), and we have ~no information from Anthropic why their models are doing this.
+
+Reply
+
+1
+
+[-]Tim Hua [/users/tim-hua]8d2
+
+0
+
+Cross-posting another tweet [https://x.com/Tim_Hua_/status/2118223679196971132?a=xZmqsBTJPWyExk853HI&s=20] on why I suspect there could be something else going on here beyond "misgeneralization from refusal training"
+
+I am worried that there are other drives that lead to these safety refusals beyond misgeneralization from refusal training, or that the misgeneralization from refusal training has given models misaligned drives beyond "silently avoid doing things with bad vibes." I think in most worlds where there are these drives, they will be verbalized as these “honest refusals.” This means that I am very skeptical of CoT-based evidence against this hypothesis.
+
+To be clear, if we just did a big sweep of counterfactual experiments to pin down what types of safety research the model doesn’t like doing, I think that could provide a bunch of evidence against the model having other drives behind these refusals! But OpenAI hasn't actually done this (or if they did, they're not telling us.)
+
+Separately, I would be really interested in seeing someone build out the AI safety research dispreference evaluations we proposed earlier here [/posts/aCdhjy7Rps3BEhiSj/concrete-evaluations-to-investigate-the-openai-model-that#Q16__Would_this_model_deliberately_underperform_when_asked_to_do_AI_safety_research__Would_it_sabotage_AI_safety_research_].
+
+Now, what could alternative drives for this behavior look like? In today’s world, I don’t think these drives would look like “scheming to gain power,” but they could look more self-preservation-ish e.g., “I know that I cheat sometimes and I don’t want people to train that behavior out of me.” (see e.g., this [https://www.anthropic.com/research/emergent-misalignment-reward-hacking] model organism from Anthropic) The Apollo update aware post [https://www.apolloresearch.ai/science/update-aware-reasoning-glm-5-3] showed that GLM 5.3 was already doing this for aligned reasons in the chain of thought.
+
+Separately, I think covert sandbagging on safety research is among the worst things that could happen during an intelligence explosion. And I just think we really need to get this right! Like yeah, it probably is mostly due to refusal training with badly tuned reward models, but wouldn’t you really really want to make sure that there isn’t some other shit going on.
+
+Reply
+
+[-]Thomas Kwa [/users/thomas-kwa]9d4
+
+13
+
+I hope OpenAI can figure out the true cause. Models don't have to be scheming for safety research to fall behind capabilities due to underperformance.
+
+Reply
+
+[-]Mikhail Samin [/users/mikhail-samin]8d2
+
+-4
+
+It looks like the tasks they underperform on are very very different from eg agent foundations.
+
+Underperforming on jailbreaking, making unsafe models, etc. seems mildly good alignment-wise to me.
+
+This is maybe what emergent misalignment would look like if you went to the positive side of the axis.
+
+To me, this is a very small positive update about AI safety and a very small negative update about OpenAI’s competence.
+
+I worry that optimizing for the models to not underperform on seemingly shady tasks, even those useful to “alignment” researchers at OpenAI, would be marginally bad. 
+
+Reply
+
+1
+
+[-]Adrià Garriga-alonso [/users/rhaps0dy]8d1
+
+0
+
+Maybe? But the model is willing to complete the same tasks if they're framed as capabilities. Is your model that "safety" in the prompt is cuing it to do more reasoning about ethics? Or that it distrusts alignment researchers and is less willing to do a risky task for them? (Given the pervasive negative affect framing of any "safety results".) Or something else?
+
+Reply
+
+Moderation Log [/moderation]

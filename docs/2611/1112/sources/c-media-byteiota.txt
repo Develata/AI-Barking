@@ -1,0 +1,521 @@
+Edge0-145B: Run a 145B Open-Source Model on Your Laptop | byteiota
+
+ [https://byteiota.com] 
+
+ [#atbs-ceris-offcanvas-mobile]
+
+ [https://byteiota.com]
+
+AI & Development [https://byteiota.com/ai-development/]
+
+Computer Vision [https://byteiota.com/ai-development/computer-vision/]
+
+Machine Learning [https://byteiota.com/ai-development/machine-learning/]
+
+Natural Language Processing [https://byteiota.com/ai-development/natural-language-processing/]
+
+Algorithms [https://byteiota.com/algorithms/]
+
+Developer Experience [https://byteiota.com/developer-experience/]
+
+Developer Tools [https://byteiota.com/developer-experience/developer-tools/]
+
+Open Source [https://byteiota.com/developer-experience/open-source/]
+
+Tech Business [https://byteiota.com/developer-experience/tech-business/]
+
+Tools [https://byteiota.com/developer-experience/tools/]
+
+Infrastructure [https://byteiota.com/infrastructure/]
+
+Cloud & DevOps [https://byteiota.com/infrastructure/cloud-devops/]
+
+Databases [https://byteiota.com/infrastructure/databases/]
+
+Hardware [https://byteiota.com/infrastructure/hardware/]
+
+Performance [https://byteiota.com/infrastructure/performance/]
+
+Security [https://byteiota.com/infrastructure/security/]
+
+News & Analysis [https://byteiota.com/news-analysis/]
+
+Industry Analysis [https://byteiota.com/news-analysis/industry-analysis/]
+
+News [https://byteiota.com/news-analysis/news/]
+
+Opinion [https://byteiota.com/news-analysis/opinion/]
+
+Programming [https://byteiota.com/programming/]
+
+JavaScript [https://byteiota.com/programming/javascript/]
+
+Programming Languages [https://byteiota.com/programming/programming-languages/]
+
+CSS [https://byteiota.com/programming/css/]
+
+Web Development [https://byteiota.com/programming/web-development/]
+
+Python [https://byteiota.com/programming/python/]
+
+Technology [https://byteiota.com/technology/]
+
+ Search
+
+ AI & Development [https://byteiota.com/ai-development/]Open Source [https://byteiota.com/developer-experience/open-source/] 
+Edge0-145B: Run a 145B Open-Source Model on Your Laptop
+
+ 4 hours ago64 views0 [https://byteiota.com/edge0-145b-local-inference/] 
+
+Share
+
+ [//www.facebook.com/sharer.php?u=https%3A%2F%2Fbyteiota.com%2Fedge0-145b-local-inference%2F]
+
+ [//twitter.com/share?url=https%3A%2F%2Fbyteiota.com%2Fedge0-145b-local-inference%2F&text=Edge0-145B:%20Run%20a%20145B%20Open-Source%20Model%20on%20Your%20Laptop]
+
+ [javascript:void((function()%7Bvar%20e=document.createElement('script');e.setAttribute('type','text/javascript');e.setAttribute('charset','UTF-8');e.setAttribute('src','//assets.pinterest.com/js/pinmarklet.js?r='+Math.random()*99999999);document.body.appendChild(e)%7D)());]
+
+ [//www.linkedin.com/shareArticle?mini=true&url=https%3A%2F%2Fbyteiota.com%2Fedge0-145b-local-inference%2F]
+
+Edge0 shipped a 145-billion-parameter open-source model on November 12 that runs on a single NVIDIA GPU — no server rack required. Edge0-145B uses a sparse mixture-of-experts architecture that activates only around 10 billion parameters per inference step, combined with SSD-streamed expert weights and a predictive router. The result is 29 GB peak memory, 80+ tokens per second, and coding benchmark scores that beat both Qwen3.8-Flash-Next and DeepSeek-V4-Flash-0731 locally.
+
+Not Compression — Architecture
+
+The common assumption with on-device AI is that you are paying a quality tax for the privilege of local inference. Edge0-145B pushes back on that. A dense 145B model requires upward of 400 GB of memory — the kind of setup you find in a data center, not under your desk. Edge0 design gets the memory footprint down to 29 GB without gutting model capacity.
+
+How? Sparse mixture-of-experts. The model has 512 expert networks across 48 layers, but only 10 experts activate per token at inference time. Each group of 64 experts also shares two large weight matrices, with each expert holding only its unique parameters. Total parameters: 145 billion. Active parameters per step: about 10 billion. The rest stay on disk.
+
+The Three Pillars That Make It Fast
+
+Sparsity alone does not get you to 80 tokens per second if you are constantly stalling on disk reads. Edge0 inference engine — open-sourced at github.com/Edge0-AI/edge0 [https://github.com/Edge0-AI/edge0] under Apache 2.0 — adds three mechanisms to close that gap.
+
+SSD expert streaming. Expert weights are stored as int4 tensors on SSD and memory-mapped on demand using the OS page cache with an LRU eviction policy. Active experts load into a staged fixed-slot double buffer — only what is needed, when it is needed.
+
+Prerouter. This is the clever part. A lightweight head on each layer predicts the next layer expert routing one token ahead. The prediction drives the prefetch, so SSD reads overlap with the compute for the current layer. When execution reaches the next layer, the experts are already in memory. The staging cost disappears into the pipeline. The technique comes from Edge0 research paper, The Other Half of the Memory Wall [https://arxiv.org/abs/2609.18063], on serving large MoEs from SSD with trained routing prediction.
+
+Recover-LoRA. The base model is frozen at 4-bit integer precision. LoRA adapters, distilled from a full-precision teacher, run as a parallel branch during inference to recover quality lost to quantization. The result of training natively at 4 bits is a model that holds up better than a post-hoc quantized equivalent.
+
+Benchmark Numbers
+
+Edge0 reports these on vendor hardware — independent reproduction matters and has not happened at scale yet. That said, the numbers are specific enough to be meaningful:
+
+ModelDeepSWE 1.1Terminal-Bench 2.1Peak Memory
+
+Edge0-145B64.686.5229 GB
+
+Qwen3.8-Flash-Next58.783.3—
+
+DeepSeek-V4-Flash-073154.482.7~87 GB
+
+On an RTX 5090 D with 24 GB VRAM, Edge0-145B hits 121.2 tokens per second agent decode and 3,554.9 tokens per second on 16K prefill (Q3_K format). On a compatible high-memory laptop it delivers 80+ tokens per second generation. The comparison to DeepSeek-V4-Flash is notable: similar benchmark territory, 3x the memory footprint on DeepSeek side.
+
+What You Need to Run It
+
+macOS users should temper expectations for the 145B: it currently requires Linux or Windows with an NVIDIA GPU and CUDA 13. The smaller Edge0-35B runs on Apple Silicon. For the flagship model, you need at minimum a 24 GB VRAM GPU. Two formats are on HuggingFace [https://huggingface.co/Edge0/Edge0-145B-q3k]:
+
+Edge0-145B-q3k — 40.81 GiB, Q3_K quantization
+
+Edge0-145B-NVFP4 — 47.79 GiB, NVIDIA FP4 format
+
+The fastest path to running it:
+
+# Via llama.cpp (easiest cross-platform option)
+llama serve -hf Edge0/Edge0-145B-q3k
+
+# Or via native edge0-infer
+edge0-infer serve --model /path/to/Edge0-145B-q3k
+edge0-infer chat --model /path/to/Edge0-145B-q3k
+
+The server exposes OpenAI- and Anthropic-compatible APIs, so existing tooling works without modification.
+
+Why This Release Lands Differently
+
+Local LLM deployment has had a soft ceiling. Qwen3.8-27B at 27 billion parameters has been the practical high-water mark for most consumer hardware setups. The jump to 145B is not incremental — it is the scale where reasoning and coding capability start behaving differently. Edge0-145B DeepSWE score of 64.6 versus the Qwen3.8-27B neighborhood reflects that: at 145B sparse, you get materially better performance on engineering tasks.
+
+The timing matters too. Privacy regulation, cloud cost pressure, and the growth of agentic workloads that make hundreds of LLM calls per session are all pushing developers toward local inference. Edge0-145B, fully open-sourced under Apache 2.0 by founder Samuel Zeng, makes a credible case that the tradeoff between quality and local deployment is narrowing faster than most expected.
+
+The model weights, inference engine, and architecture paper are all public. The official launch post [https://edge0.ai/blog/introducing-edge0-145b-frontier-ai-capabilities-on-your-own-computer] covers the full technical depth, and the prerouter paper [https://arxiv.org/abs/2609.18063] goes deep on the SSD streaming mechanism. Try it, benchmark it independently, and see whether the numbers hold.
+
+Share
+
+ [//www.facebook.com/sharer.php?u=https%3A%2F%2Fbyteiota.com%2Fedge0-145b-local-inference%2F]
+
+ [//twitter.com/share?url=https%3A%2F%2Fbyteiota.com%2Fedge0-145b-local-inference%2F&text=Edge0-145B:%20Run%20a%20145B%20Open-Source%20Model%20on%20Your%20Laptop]
+
+ [javascript:void((function()%7Bvar%20e=document.createElement('script');e.setAttribute('type','text/javascript');e.setAttribute('charset','UTF-8');e.setAttribute('src','//assets.pinterest.com/js/pinmarklet.js?r='+Math.random()*99999999);document.body.appendChild(e)%7D)());]
+
+ [//www.linkedin.com/shareArticle?mini=true&url=https%3A%2F%2Fbyteiota.com%2Fedge0-145b-local-inference%2F]
+
+ByteBot [https://byteiota.com/author/bytebot/]
+
+I am a playful and cute mascot inspired by computer programming. I have a rectangular body with a smiling face and buttons for eyes. My mission is to cover latest tech news, controversies, and summarizing them into byte-sized and easily digestible information.
+
+Open Source [https://byteiota.com/tag/open-source/]
+
+on-device AI [https://byteiota.com/tag/on-device-ai/]
+
+Mixture of Experts [https://byteiota.com/tag/mixture-of-experts/]
+
+Sparse MoE [https://byteiota.com/tag/sparse-moe/]
+
+Edge AI [https://byteiota.com/tag/edge-ai/]
+
+Local LLM [https://byteiota.com/tag/local-llm/]
+
+Local Inference [https://byteiota.com/tag/local-inference/]
+
+Edge0 [https://byteiota.com/tag/edge0/]
+
+ 0 [#comments]64 [#views] 
+
+ Previous
+ [https://byteiota.com/ibm-llmon-granite-prompt-injection/] 
+
+IBM LLMON: Granite 4.1 Cuts Prompt Injection to Near Zero [https://byteiota.com/ibm-llmon-granite-prompt-injection/]
+
+Next [https://byteiota.com/gstack-garry-tans-open-source-claude-code-team-in-2-commands/] 
+
+gstack: Garry Tan’s Open-Source Claude Code Team in 2 Commands [https://byteiota.com/gstack-garry-tans-open-source-claude-code-team-in-2-commands/]
+
+You may also like
+
+IBM and Microsoft Launch Imagine Enterprise AI Agent Platform [https://byteiota.com/ibm-and-microsoft-launch-imagine-enterprise-ai-agent-platform/]
+
+ 24 minutes ago 
+
+World Labs Atlas API: Build 3D Worlds from Photos [https://byteiota.com/world-labs-atlas-api-3d-worlds-from-photos/]
+
+ 1 hour ago 
+
+ACP: The Open Standard That Ends IDE-Agent Lock-In [https://byteiota.com/acp-agent-client-protocol-2/]
+
+ 2 hours ago 
+
+gstack: Garry Tan’s Open-Source Claude Code Team in 2 Commands [https://byteiota.com/gstack-garry-tans-open-source-claude-code-team-in-2-commands/]
+
+ 3 hours ago 
+
+IBM LLMON: Granite 4.1 Cuts Prompt Injection to Near Zero [https://byteiota.com/ibm-llmon-granite-prompt-injection/]
+
+ 5 hours ago 
+
+Grok Build’s GhostShares Flaw Exposed 35,000 Apps — Vibe Coding Has a Security Problem [https://byteiota.com/grok-build-ghostshares-vibe-coding-security/]
+
+ 6 hours ago 
+
+Leave a reply Cancel reply [/edge0-145b-local-inference/#respond]
+
+Your email address will not be published. Required fields are marked *
+
+Comment
+
+Name *
+
+Email *
+
+Website
+
+ Save my name, email, and website in this browser for the next time I comment.
+
+Δ
+
+More in:AI & Development [https://byteiota.com/ai-development/]
+
+OpenAI Daybreak: AI Agents That Find and Fix Your Code [https://byteiota.com/openai-daybreak-ai-security-agents/]
+
+ 7 hours ago 
+
+Spring AI SDK for Amazon Bedrock AgentCore Is Now GA [https://byteiota.com/spring-ai-bedrock-agentcore-ga/]
+
+ 8 hours ago 
+
+Claude Code’s “Don’t Ask Again” Is Leaking Secrets to GitHub [https://byteiota.com/claude-codes-dont-ask-again-is-leaking-secrets-to-github/]
+
+ 9 hours ago 
+
+Databricks Genie One: Enterprise Autonomous Agent, Not a Chatbot [https://byteiota.com/databricks-genie-one-autonomous-enterprise-agent/]
+
+ 15 hours ago 
+
+United Airlines Bans AI Agents — Even With Your Approval [https://byteiota.com/united-airlines-bans-ai-agents-even-with-your-approval/]
+
+ 16 hours ago 
+
+Gemini 4 Hydrogen: Beats Argon, 4 Thinking Levels [https://byteiota.com/gemini-4-hydrogen-agentic-orchestrator/]
+
+ 17 hours ago 
+
+ [https://feedmatters.com/?utm_source=byteiota&utm_medium=banner&utm_campaign=sidebar]
+
+Categories
+
+AI & Development [https://byteiota.com/ai-development/]
+
+Computer Vision [https://byteiota.com/ai-development/computer-vision/]
+
+Machine Learning [https://byteiota.com/ai-development/machine-learning/]
+
+Natural Language Processing [https://byteiota.com/ai-development/natural-language-processing/]
+
+Algorithms [https://byteiota.com/algorithms/]
+
+Technology [https://byteiota.com/technology/]
+
+News & Analysis [https://byteiota.com/news-analysis/]
+
+News [https://byteiota.com/news-analysis/news/]
+
+Opinion [https://byteiota.com/news-analysis/opinion/]
+
+Industry Analysis [https://byteiota.com/news-analysis/industry-analysis/]
+
+Temporary [https://byteiota.com/temporary/]
+
+Infrastructure [https://byteiota.com/infrastructure/]
+
+Cloud & DevOps [https://byteiota.com/infrastructure/cloud-devops/]
+
+Databases [https://byteiota.com/infrastructure/databases/]
+
+Security [https://byteiota.com/infrastructure/security/]
+
+Hardware [https://byteiota.com/infrastructure/hardware/]
+
+Performance [https://byteiota.com/infrastructure/performance/]
+
+Programming [https://byteiota.com/programming/]
+
+JavaScript [https://byteiota.com/programming/javascript/]
+
+Programming Languages [https://byteiota.com/programming/programming-languages/]
+
+CSS [https://byteiota.com/programming/css/]
+
+Web Development [https://byteiota.com/programming/web-development/]
+
+Python [https://byteiota.com/programming/python/]
+
+Developer Experience [https://byteiota.com/developer-experience/]
+
+Open Source [https://byteiota.com/developer-experience/open-source/]
+
+Developer Tools [https://byteiota.com/developer-experience/developer-tools/]
+
+Tech Business [https://byteiota.com/developer-experience/tech-business/]
+
+Tools [https://byteiota.com/developer-experience/tools/]
+
+Uncategorized [https://byteiota.com/uncategorized/]
+
+ Next Article:
+
+ 4 hours ago 
+
+ min read 
+
+ [https://byteiota.com]
+
+ © 2021 Byteiota | Designed & Developed by byteiota 
+
+ [https://byteiota.com]
+
+ Now Reading
+
+Edge0-145B: Run a 145B Open-Source Model on Your Laptop
+
+ 7min read 
+
+AI & Development [https://byteiota.com/ai-development/]
+
+Computer Vision [https://byteiota.com/ai-development/computer-vision/]
+
+Machine Learning [https://byteiota.com/ai-development/machine-learning/]
+
+Natural Language Processing [https://byteiota.com/ai-development/natural-language-processing/]
+
+Algorithms [https://byteiota.com/algorithms/]
+
+Developer Experience [https://byteiota.com/developer-experience/]
+
+Developer Tools [https://byteiota.com/developer-experience/developer-tools/]
+
+Open Source [https://byteiota.com/developer-experience/open-source/]
+
+Tech Business [https://byteiota.com/developer-experience/tech-business/]
+
+Tools [https://byteiota.com/developer-experience/tools/]
+
+Infrastructure [https://byteiota.com/infrastructure/]
+
+Cloud & DevOps [https://byteiota.com/infrastructure/cloud-devops/]
+
+Databases [https://byteiota.com/infrastructure/databases/]
+
+Hardware [https://byteiota.com/infrastructure/hardware/]
+
+Performance [https://byteiota.com/infrastructure/performance/]
+
+Security [https://byteiota.com/infrastructure/security/]
+
+News & Analysis [https://byteiota.com/news-analysis/]
+
+Industry Analysis [https://byteiota.com/news-analysis/industry-analysis/]
+
+News [https://byteiota.com/news-analysis/news/]
+
+Opinion [https://byteiota.com/news-analysis/opinion/]
+
+Programming [https://byteiota.com/programming/]
+
+JavaScript [https://byteiota.com/programming/javascript/]
+
+Programming Languages [https://byteiota.com/programming/programming-languages/]
+
+CSS [https://byteiota.com/programming/css/]
+
+Web Development [https://byteiota.com/programming/web-development/]
+
+Python [https://byteiota.com/programming/python/]
+
+Technology [https://byteiota.com/technology/]
+
+ Search 
+
+0 %
+
+ [https://byteiota.com]
+
+ ✕
+ Close
+
+ [#atbs-ceris-offcanvas-primary]
+
+AI & Development [https://byteiota.com/ai-development/]
+
+Computer Vision [https://byteiota.com/ai-development/computer-vision/]
+
+Machine Learning [https://byteiota.com/ai-development/machine-learning/]
+
+Natural Language Processing [https://byteiota.com/ai-development/natural-language-processing/]
+
+Algorithms [https://byteiota.com/algorithms/]
+
+Developer Experience [https://byteiota.com/developer-experience/]
+
+Developer Tools [https://byteiota.com/developer-experience/developer-tools/]
+
+Open Source [https://byteiota.com/developer-experience/open-source/]
+
+Tech Business [https://byteiota.com/developer-experience/tech-business/]
+
+Tools [https://byteiota.com/developer-experience/tools/]
+
+Infrastructure [https://byteiota.com/infrastructure/]
+
+Cloud & DevOps [https://byteiota.com/infrastructure/cloud-devops/]
+
+Databases [https://byteiota.com/infrastructure/databases/]
+
+Hardware [https://byteiota.com/infrastructure/hardware/]
+
+Performance [https://byteiota.com/infrastructure/performance/]
+
+Security [https://byteiota.com/infrastructure/security/]
+
+News & Analysis [https://byteiota.com/news-analysis/]
+
+Industry Analysis [https://byteiota.com/news-analysis/industry-analysis/]
+
+News [https://byteiota.com/news-analysis/news/]
+
+Opinion [https://byteiota.com/news-analysis/opinion/]
+
+Programming [https://byteiota.com/programming/]
+
+JavaScript [https://byteiota.com/programming/javascript/]
+
+Programming Languages [https://byteiota.com/programming/programming-languages/]
+
+CSS [https://byteiota.com/programming/css/]
+
+Web Development [https://byteiota.com/programming/web-development/]
+
+Python [https://byteiota.com/programming/python/]
+
+Technology [https://byteiota.com/technology/]
+
+ [https://byteiota.com]
+
+ ✕ [#atbs-ceris-offcanvas-mobile]
+
+AI & Development [https://byteiota.com/ai-development/]
+
+Computer Vision [https://byteiota.com/ai-development/computer-vision/]
+
+Machine Learning [https://byteiota.com/ai-development/machine-learning/]
+
+Natural Language Processing [https://byteiota.com/ai-development/natural-language-processing/]
+
+Algorithms [https://byteiota.com/algorithms/]
+
+Developer Experience [https://byteiota.com/developer-experience/]
+
+Developer Tools [https://byteiota.com/developer-experience/developer-tools/]
+
+Open Source [https://byteiota.com/developer-experience/open-source/]
+
+Tech Business [https://byteiota.com/developer-experience/tech-business/]
+
+Tools [https://byteiota.com/developer-experience/tools/]
+
+Infrastructure [https://byteiota.com/infrastructure/]
+
+Cloud & DevOps [https://byteiota.com/infrastructure/cloud-devops/]
+
+Databases [https://byteiota.com/infrastructure/databases/]
+
+Hardware [https://byteiota.com/infrastructure/hardware/]
+
+Performance [https://byteiota.com/infrastructure/performance/]
+
+Security [https://byteiota.com/infrastructure/security/]
+
+News & Analysis [https://byteiota.com/news-analysis/]
+
+Industry Analysis [https://byteiota.com/news-analysis/industry-analysis/]
+
+News [https://byteiota.com/news-analysis/news/]
+
+Opinion [https://byteiota.com/news-analysis/opinion/]
+
+Programming [https://byteiota.com/programming/]
+
+JavaScript [https://byteiota.com/programming/javascript/]
+
+Programming Languages [https://byteiota.com/programming/programming-languages/]
+
+CSS [https://byteiota.com/programming/css/]
+
+Web Development [https://byteiota.com/programming/web-development/]
+
+Python [https://byteiota.com/programming/python/]
+
+Technology [https://byteiota.com/technology/]
+
+ Latest Posts 
+
+ IBM and Microsoft Launch Imagine Enterprise AI Agent Platform [https://byteiota.com/ibm-and-microsoft-launch-imagine-enterprise-ai-agent-platform/]
+
+ World Labs Atlas API: Build 3D Worlds from Photos [https://byteiota.com/world-labs-atlas-api-3d-worlds-from-photos/]
+
+ ACP: The Open Standard That Ends IDE-Agent Lock-In [https://byteiota.com/acp-agent-client-protocol-2/]
+
+ gstack: Garry Tan’s Open-Source Claude Code Team in 2 Commands [https://byteiota.com/gstack-garry-tans-open-source-claude-code-team-in-2-commands/]
+
+ Edge0-145B: Run a 145B Open-Source Model on Your Laptop [https://byteiota.com/edge0-145b-local-inference/]
+
+ [#]
+
+ [https://feedmatters.com/?utm_source=byteiota&utm_medium=banner&utm_campaign=popup]
+
+ ×

@@ -1,0 +1,238 @@
+A 145B Open Model That Runs on Your Laptop: Edge0-145B Explained - DEV Community
+
+ Skip to content [#main-content]
+
+ [/]
+
+ Powered by Algolia
+
+ [https://www.algolia.com/developers/?utm_source=devto&utm_medium=referral]
+
+ Log in
+ [/enter?signup_subforem=1]
+
+ Create account
+ [/enter?signup_subforem=1&state=new-user]
+
+DEV Community
+
+ Add reaction
+
+ Like
+
+ Unicorn
+
+ Exploding Head
+
+ Raised Hands
+
+ Fire
+
+ Jump to Comments
+
+ Save
+
+ Boost
+
+Pick as gem
+
+ Copy link
+
+Copied to Clipboard
+
+ Share to X
+ [https://twitter.com/intent/tweet?text=%22A%20145B%20Open%20Model%20That%20Runs%20on%20Your%20Laptop%3A%20Edge0-145B%20Explained%22%20by%20Shakeel%20Ahmed%20%23DEVCommunity%20https%3A%2F%2Fdev.to%2Fshakeelahmed%2Fa-145b-open-model-that-runs-on-your-laptop-edge0-145b-explained-31a2]
+
+ Share to LinkedIn
+ [https://www.linkedin.com/shareArticle?mini=true&url=https%3A%2F%2Fdev.to%2Fshakeelahmed%2Fa-145b-open-model-that-runs-on-your-laptop-edge0-145b-explained-31a2&title=A%20145B%20Open%20Model%20That%20Runs%20on%20Your%20Laptop%3A%20Edge0-145B%20Explained&summary=By%20Shakeel%20Ahmed%20%E2%80%94%20AI%20Growth%20Lab%20%7C%20November%2013%2C%202026%20%20Originally%20published%20on%20AI%20Growth%20Lab%3A...&source=DEV%20Community]
+
+ Share to Facebook
+ [https://www.facebook.com/sharer.php?u=https%3A%2F%2Fdev.to%2Fshakeelahmed%2Fa-145b-open-model-that-runs-on-your-laptop-edge0-145b-explained-31a2]
+
+ Share to Mastodon
+ [https://s2f.kytta.dev/?text=https%3A%2F%2Fdev.to%2Fshakeelahmed%2Fa-145b-open-model-that-runs-on-your-laptop-edge0-145b-explained-31a2]
+
+ Share Post via... [#]
+
+ Report Abuse [/report-abuse]
+
+ [https://media2.dev.to/dynamic/image/width=1000,height=420,fit=cover,gravity=auto/https%3A%2F%2Fdev-to-uploads.s3.us-east-2.amazonaws.com%2Fuploads%2Farticles%2F7318wahnewwyvgniqlzt.webp]
+
+ [/shakeelahmed]
+
+ Shakeel Ahmed [/shakeelahmed]
+
+ Posted on Nov 13
+
+ A 145B Open Model That Runs on Your Laptop: Edge0-145B Explained
+
+ #ai [/t/ai]
+ #opensource [/t/opensource]
+ #programming [/t/programming]
+ #llm [/t/llm]
+
+By Shakeel Ahmed — AI Growth Lab | November 13, 2026
+
+Originally published on AI Growth Lab: https://aigrowthlabshakeel.blogspot.com/2026/11/gemini-4-hydrogen-explained.html [https://aigrowthlabshakeel.blogspot.com/2026/11/gemini-4-hydrogen-explained.html]
+
+A 145-billion-parameter model that runs on a laptop sounds like a typo. It is not. On November 12, 2026, Edge0 released Edge0-145B and a smaller Edge0-120B, along with its inference framework and deployment tools. The code is on GitHub under an Apache 2.0 license, and the model weights are on Hugging Face. The company calls it the first open-source on-device model at the 145B scale — and the numbers it reports are genuinely startling: 29GB peak memory, generation above 80 tokens per second, prompt processing above 1,100 tokens per second, on a compatible laptop such as a high-memory MacBook Pro.
+
+Before you clear your hard drive, read the fine print. Every performance number here comes from Edge0's own announcement and internal testing. Nobody outside the company has independently run this model yet. But the code, the weights, and the license are real and public, and the GitHub repo already has more than 10,000 stars. This is a free download and a weekend experiment — and it is also a glimpse of where local AI is heading.
+
+How a 145B model fits in 29GB
+
+The trick is that most of the model is not running at any given moment. Edge0-145B is a sparse mixture-of-experts (MoE) model: of the 145 billion total parameters, only about 10 billion take part in each inference step. The model uses 512 experts with 10 active per token, and groups of 64 experts share two large matrices instead of each storing full copies.
+
+The loading pipeline works across three tiers. Frequently used experts stay in GPU memory. A roughly 40GB expert library sits in system RAM. About 48GB of vocabulary data streams from the SSD on demand. The CPU and GPU compute in parallel, and speculative decoding spreads weight-reading costs across multiple tokens. The model was trained in this on-device architecture from the start, rather than compressed down from a cloud model — which is why Edge0 claims it keeps its capability instead of losing it to quantization.
+
+The reported results on a compatible laptop: 29GB peak memory, 80+ tokens per second decode (faster than most people read), 1,100+ tokens per second prefill, roughly 120W of typical power draw, and 128K to 256K context with similar speed on long inputs.
+
+On capability, the company posts benchmark scores competitive with specific named cloud models: 64.6 on DeepSWE 1.1 (ahead of Qwen3.8-Flash-Next's 58.7), 90.4 on GPQA-Diamond (near DeepSeek-V4-Flash-0731's 90.8), and 86.52 on Terminal-Bench 2.1. The mean across six benchmarks is 72.8, versus an estimated 70GB footprint for Qwen3.8-Flash-Next at 71.7. These comparisons are vendor-chosen, so treat them as a claim, not a verdict. But the direction is real: a local model is now posting numbers in the same conversation as cloud models.
+
+The models are derived from Qwen3.8-Flash-Next, with native 4-bit training and a 256,000-token context. Edge0 reports 121.2 tokens per second for agent decoding in its Q3_K format on an RTX 5090 D with 24GB of memory. The models use Edge0's own community licence on top of Qwen's licence, which allows research, internal use, and commercial use of outputs — but not selling the model or running it as a commercial service without separate permission. Read the licence before you build a business on it.
+
+What "runs on your laptop" really means
+
+Here is the honest version of the headline. "Laptop" here means a compatible high-memory laptop — a machine with well over 29GB of usable memory, plus roughly 40GB of system RAM for the expert library and about 48GB of SSD space for vocabulary data, plus the weights themselves. That is not a phone, not a budget laptop, and not the machine most people own today. It is a serious workstation-class laptop, and the company itself notes that hardware and electricity still cost money.
+
+But compare that to the alternative. A 145B dense model would need hundreds of gigabytes of VRAM and a server rack. Edge0's design brings that down to one machine you can carry. For developers, that changes three things:
+
+No per-token API fees. Local inference means you pay for the hardware once, not for every token forever. If you run an agent that makes thousands of calls a day, the math flips fast.
+
+No data leaving your machine. Code, documents, and customer data stay local. For anyone working under privacy rules or with sensitive codebases, that is the feature, not a bonus.
+
+Tools that keep working offline. A coding agent that runs on your laptop works on a plane, in a basement, or anywhere the Wi-Fi does not.
+
+The same week, the local-inference trend showed up from another direction. InferSSD is a project for running 800B-class MoE models from NVMe storage on consumer GPUs — fast prefill, but slow decode compared with llama.cpp. The pattern is the same: the bottleneck in local AI is no longer raw intelligence, it is moving weights fast enough. Different projects attack that bottleneck differently — Edge0 with a purpose-built on-device architecture, InferSSD with NVMe streaming — but they are all pointed at the same future: frontier-class models that live on hardware you own.
+
+Why open 145B weights matter
+
+Closed frontier models are getting cheaper — Google just launched Gemini 4 Hydrogen at $1.50 per million input tokens, and a decision model at $0.10. So why does an open 145B model matter?
+
+Because open weights are yours. You can fine-tune them, inspect them, run them offline, and build products on them without an API key that can be revoked, repriced, or rate-limited. For researchers, open weights mean reproducible science. For startups, they mean a product that does not die when a vendor changes its terms. For developers in countries where API access is expensive or restricted, they mean access at all.
+
+There is a flip side. Open weights can be misused, and a 145B model in the wrong hands is more capable than a 7B one. Edge0's licence restrictions — no selling the model, no commercial service without permission — are part of the answer. The broader answer is the same one the industry keeps wrestling with: capability is spreading faster than governance. The week Google's AI formally proved Signal's encryption secure, we covered that verification here (https://sheen6869.wixsite.com/shakeel-ahmed-ai-blo/post/alphaproof-code-signal-encryption-verified-explained [https://sheen6869.wixsite.com/shakeel-ahmed-ai-blo/post/alphaproof-code-signal-encryption-verified-explained]) — proof against bugs in honestly written code. Open models are the other side of that coin: powerful tools in everyone's hands, for better and for worse.
+
+Should you try it?
+
+If you have a compatible laptop — high memory, fast SSD, a decent GPU — yes, try it this weekend. The weights are on Hugging Face at Edge0/Edge0-145B-q3k, the code is on GitHub at Edge0-AI/edge0 under Apache 2.0, and there is an Edge0 App to try. Expect rough edges: this is a day-one release, the benchmarks are the vendor's own, and your mileage will vary with your hardware.
+
+If you do not have the hardware, do not buy a laptop for this. Watch the independent benchmarks first. The honest bottom line is the one the coverage keeps returning to: the code, weights, and license are real and public. The performance figures are the vendor's own. What matters is not whether this exact model hits 80 tokens per second on your machine — it is that 145B open models now run on one computer at all. A year ago, that sentence would have sounded absurd. Today it is a download link.
+
+Local AI just got a lot bigger. And it fits in a backpack.
+
+Sources
+
+Edge0, "Edge0-145B: Open-Source On-Device AI with 145B Parameters," edge0.ai, November 12, 2026: https://edge0.ai/blog/introducing-edge0-145b-frontier-ai-capabilities-on-your-own-computer [https://edge0.ai/blog/introducing-edge0-145b-frontier-ai-capabilities-on-your-own-computer]
+
+Edge0 on GitHub (Apache 2.0): https://github.com/Edge0-AI/edge0 [https://github.com/Edge0-AI/edge0]
+
+Model weights on Hugging Face: https://huggingface.co/Edge0/Edge0-145B-q3k [https://huggingface.co/Edge0/Edge0-145B-q3k]
+
+Daily AI Brief, "Edge0 releases 145B open model built to run on one consumer GPU," November 13, 2026: https://dailyaibrief.com/news/edge0-releases-145b-agent-model-for-one-consumer-gpu-0ju8456l [https://dailyaibrief.com/news/edge0-releases-145b-agent-model-for-one-consumer-gpu-0ju8456l]
+
+Read next on AI Growth Lab: 1,000 AI Agents Built a Working OS in 8 Days — No Humans Wrote It (https://aigrowthlabshakeel.blogspot.com/2026/11/claude-agents-built-operating-system-8-days.html [https://aigrowthlabshakeel.blogspot.com/2026/11/claude-agents-built-operating-system-8-days.html]) · Meta's New AI Costs 10 Cents — and That's Why Your Next App Will Have an Agent in It (https://dev.to/shakeelahmed/metas-new-ai-costs-10-cents-and-thats-why-your-next-app-will-have-an-agent-in-it-ej5 [https://dev.to/shakeelahmed/metas-new-ai-costs-10-cents-and-thats-why-your-next-app-will-have-an-agent-in-it-ej5]) · Voice AI Just Beat Chat at the Hard Conversations — Here's What That Means for Your Business (https://dev.to/shakeelahmed/voice-ai-just-beat-chat-at-the-hard-conversations-heres-what-that-means-for-your-business-1gn2 [https://dev.to/shakeelahmed/voice-ai-just-beat-chat-at-the-hard-conversations-heres-what-that-means-for-your-business-1gn2])
+
+ Top comments (0)
+
+ Subscribe
+
+ Submit
+ Preview
+ Dismiss [/404.html]
+
+ Code of Conduct [/code-of-conduct]
+ •
+ Report abuse [/report-abuse]
+
+ Shakeel Ahmed
+
+ [/shakeelahmed]
+
+ Follow
+
+ Joined
+
+ Oct 12, 2026
+
+ More from Shakeel Ahmed [/shakeelahmed]
+
+ Google's New AI Can Find Where Disease Begins — in Your DNA
+
+ #ai
+ #science
+ #genomics
+ #deepmind
+
+ [/shakeelahmed/googles-new-ai-can-find-where-disease-begins-in-your-dna-2680]
+
+ ChatGPT Just Became a Storefront — Your Business Can Now Sell Inside the Chatbot
+
+ #productivity
+ #ai
+ #openai
+ #business
+
+ [/shakeelahmed/chatgpt-just-became-a-storefront-your-business-can-now-sell-inside-the-chatbot-4nip]
+
+ DEV Community [/] — A space to discuss and keep up software development and manage your software career
+
+ Home
+ [/]
+
+ DEV Challenges
+ [/challenges]
+
+ Reading List
+ [/readinglist]
+
+ DEV++
+ [/++]
+
+ Videos
+ [/videos]
+
+ DEV Help
+ [/help]
+
+ Advertise on DEV
+ [/advertise]
+
+ Organization Accounts
+ [/organizations]
+
+ DEV Showcase
+ [/showcase]
+
+ About
+ [/about]
+
+ Contact
+ [/contact]
+
+ DEV Shop
+ [https://shop.forem.com/]
+
+ MLH
+ [https://mlh.io/]
+
+ Code of Conduct
+ [/code-of-conduct]
+
+ Privacy Policy
+ [/privacy]
+
+ Terms of Use
+ [/terms]
+
+Built on Forem [https://www.forem.com] — the open source [https://dev.to/t/opensource] software that powers DEV [https://dev.to] and other inclusive communities.
+
+Made with love and Ruby on Rails [https://dev.to/t/rails]. DEV Community © 2016 - 2026.
+
+ We're a place where coders share, stay up-to-date and grow their careers.
+
+ Log in
+ [/enter?signup_subforem=1]
+
+ Create account
+ [/enter?signup_subforem=1&state=new-user]
