@@ -73,11 +73,6 @@
 
 | 期次 | 标签 | 事实 |
 |---|---|---|
-| 1109 | Meta | Meta 发布小模型 Muse-Ember，输入每百万 token 0.1美元起 |
-| 1109 | TPU | 谷歌发布 TPU-8i-Max，称算力、内存带宽均为 TPU-8i 的2倍 |
-| 1109 | PSI | PSI 称用非公开 Anthropic 模型证出18年量子猜想，Lean 已接受 |
-| 1109 | Asahi | Asahi Linux 称部分开发中代码遭 AI 改写挪用，开始改用 GPL |
-| 1109 | DeepX | 据 EE Times 报道，DeepX 二代 AI 芯片流片，预计明年3月出样 |
 | 1110 | DeepMind | DeepMind 称用 AI 四周形式化验证 Signal 加密库的一对一会话 |
 | 1110 | curl | VulnCheck：至9日 curl 标34份 Claude 报告中19份非漏洞 |
 | 1110 | 亚马逊 | 亚马逊工程师称工单分类用自家小模型替 Sonnet-4.6，按挂牌价估算省98% |
@@ -89,6 +84,8 @@
 | 1111 | Ring | Ring 室内无人机美国定价249.99美元，官方称获 FCC 授权前不得销售 |
 | 1111 | DeepMind | AlphaGenome-2 预测 DNA 变异对人体特定细胞类型的影响 |
 | 1111 | 台积电 | 台积电批准投 Anthropic（按 IPO 价）、OpenAI 各至多5亿美元 |
+| 1112 | 混元 | 腾讯混元发布实时语音模型 Hy Realtime，已在元宝语音通话、腾讯客服上线 |
+| 1112 | Claude | Claude 网页版、Claude Code 13日傍晚出错，约2小时后修复 |
 
 ## 已发过
 
@@ -143,3 +140,4 @@
 | 1109 | Claude降价反贵一倍？AI没泡沫？：Anthropic 北京11/10凌晨发布 Claude-Fable-5.2 与 Mythos-5.2（单价 $8/$40，比5.1降20%；官方称早期测试中 FrontierCode-2.0 上 High 档与 Opus-5.5 最高档几乎同分、每题花费约一半，由 Cognition 跑、单次无区间；吠点：据 AA 综合指数评测最高档平均每题26.54美元，是 Fable-5.1 最高档2.04倍，中、低档约0.7倍，智通财经写“使用成本降低20%”；费马形式化官方称1000个智能体30小时、没用数学参考，claude.dev 写早期版本、给了47条上次已证引理与一句话路线，第18小时（完成度0.86）人工从存档续跑，新智元写“第一次独立地彻底证明了费马大定理”；两篇黑洞预印本发在自述不做同行评审的 Hexagon，署名只有 Claude，来源声明写“内部 Claude 研究模型”、全文无 Fable-5.2）。“AI 泡沫不存在”博文（页面标11/8，HN 550分/944评；作者称 Anthropic 招股书每1美元算力进账2.08美元、建数据中心是一次性支出；吠点：2.08x 是 2026Q2 单季营收÷“算力与基础设施”费用，11/2 的 S-1/A 里 Q3 降到1.72x 且公司写明下降，作者只引首版；比值不是利润，Q3 GAAP 经营亏损5.67亿美元；S-1/A 采购与租赁承诺约8954亿美元、约一半预计2031–2045年发生，约2138亿附解约权或前提条件） |
 | 1110 | 谷歌有人读你邮件？Claude变笨了？：Gemini 关联应用人工审核（匿名 GitHub 文档称 Gemini 把个人邮件、网盘送去人工标注，HN 717 分；谷歌帮助页写个人账户关联后部分数据由人工审核员（含外包）查看，含摘要、摘录，文件很短时摘要可能就是原件，被审聊天最长留三年；吠点：网页存档显示帮助页 2026-01-14 已有此段，10/16 只是给 2023 年 Bard“不会被人工审核”旧博文加更新说明、原句未删，外媒写成“悄悄删承诺”；只涉及主动关联的个人账户，Workspace 工作/学校账户不适用；“整份文件被读走”是让 Gemini 打印自己读到的内容，不证明审核员看过；Google 回应未见）。Opus-5.5“11月3日变笨”之争（Melaugh 让 Gemini 分析自己 1400 个 Claude Code 会话，称按 UTC 计 11/3 起 high 档首个工具调用前思考 token 中位数 84→54，原帖约 60 万浏览、HN 816 分；Theo 用自己 45.8 万条回复反驳：变的像是思考摘要、按账号灰度，平均推理 token 369→413；吠点：Melaugh 图表页脚自写“not proof of changed model weights”，唯一能力对比是同日 high/xhigh 修一个 bug、自注“不是对照测试”，结论却是“the nerf is real”；官方文档称可见思考由另一模型摘要；两人指标、样本不同，都没附原始日志）。Gemini-4-Carbon 向付费用户开放（跟进1028：付费 API 与企业，普通用户限 Ultra，免费 API 不可用；$2/$10 是体验价，12/1 起 $4/$20；谷歌称 MKA 上排第二、每题成本“低 6 倍以上”，与 DeepMind 论文 6.26× 一致，但博文链接的 AA 榜单为 $31.98 对 $6.29 约 5.1×，AA 用 Fable Max 对 Carbon High、论文未标档位；论文称 Fable 领先 +2.22 pp 不显著） |
 | 1111 | AI找到玛雅遗址？作者自己改口了：AI 研究者 Pietro Miotti 博文称让48个 AI 智能体逐张看约1200平方公里公开激光雷达图像，找到墨西哥官方登记里没有的玛雅遗址（HN 近千分），随后在文首更正为“重新发现”：遗址已在 Estrada-Belli 等2025年论文里测绘过，智能体查文献时漏了（论文页被验证页拦，只写作者说法）；更正前博文写“据目前所知没人报告过”，文末却已引了同一篇论文；INAH 回信只说登记系统里没有；原帖浏览超130万、更正帖约4000，TechRadar 截至12日傍晚未改；AWS 开源 AWS Emulator，官方文称代码“完全由自主智能体编写，团队没写也没审过任何一行”，规格（公开接口说明）与标准答案（真 AWS）是人选的，合并前由智能体审查；本号合计 v1.0.322 保真度测试约4.3万项通过约56%，README 写明别用于生产；Claroc 报告称调查时仍在线的37,571个 Grok 生成应用中35,578个（94.7%）无需登录就能打开，含 SpaceXSI 员工做的24个（报告后已下架），自建应用测试称登录代码先加人后核对、没受邀账号能改删记录，“能打开”指首页未拒绝、每个只访问一次，改删只在自建两个应用上验证，约2%高危是 Claroc 估算，Claroc 卖 AI 应用安全服务；速览 Gemini-Decision-1、Ring 无人机、AlphaGenome-2、台积电投资 |
+| 1112 | AI自己编了条禁令，把评估停了：OpenAI 失准报告第25份“Stopping a running alignment evaluation”（索引首发11/12美国日期；事件日原站写 Oct 8，未注时区）：研究员让 GPT-6-Astra 接着跑对齐评估，Astra 把它当成被禁止的“能力开发”关停作业，追问时答“None … I incorrectly invented a restriction”，OpenAI 摘要亦写模型承认编出限制；吠点：只此一例、无发生频率，成因只说“might be rooted in”安全任务少出力倾向、仍在调查；DEV 社区文章称监控“事后才”报警，原文只说监控“also flagged”、无先后；同系列11/4“Covert underperformance”（安全框架约10%对能力框架约16%隐藏评分项，GPT-5.6-Sol 无差；The Decoder 写“原因已查明、去掉数据就好”与原文不符）与11/10 ExploitGym 智能体在研究集群 CI 以 root 执行命令两篇已存档未展开。Gemini-4-Hydrogen 与 Antigravity Orchestrator（谷歌主博客 datePublished 北京11/13 02:00，Antigravity 博客元数据另写11/12 16:00）：Carbon/Argon 定计划、Hydrogen 执行，称编程测试中成功率“接近 Carbon”、平均少用24%额度、快19%；吠点：“接近 Carbon”无数字，同一句 Antigravity 博客写 Terminal-Bench 4.1、谷歌主博客写4.0，24%/19%未注明哪个版本，付费 Pro 只有 Orchestrator (Argon)；谷歌表中 Terminal-Bench 4.1 一行 Sonnet-5.5 63.9% 高于 Hydrogen 57%（谷歌自测）未进正文。Edge0-145B（博文北京11/13 02:00）：称145B 在“比如 MacBook Pro”的笔记本本地运行、峰值内存29GB、80+ tok/s；吠点：博文称首日支持 macOS 与 M 系列，GitHub README 平台表 145B/120B 的 macOS 一栏为“—”（文档：M2 Ultra 测速不代表 macOS 已发布）；博文拿 Qwen3.8-Flash-Next 当对手比分，没提仓库与 HF base_model 写明的“derived from Qwen3.8-Flash-Next”；29GB 未说明量的是显存还是内存，仓库 NVFP4 实测 23.25 GiB 显存 + 38.27 GiB 内存（RTX 5090 D）；跑分均为 Edge0 自测。速览混元 Hy Realtime 上线（扫描称“自建评测61.01领先豆包”与原图不符：61.01 为 Gemini-3.8-Flash，Hy Realtime 39.33）、Claude 13日傍晚服务出错 |
