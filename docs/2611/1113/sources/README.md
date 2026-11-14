@@ -7,7 +7,7 @@
 ## 主帖
 
 1. 哥德尔笔记：[《卫报》Alex Bellos 稿](https://www.theguardian.com/science/2026/nov/13/kurt-godel-notebooks-ai-helps-unlock-hidden-discoveries-man-who-transformed-maths)（北京 11-14 00:38）、[HN 50486748](https://news.ycombinator.com/item?id=50486748)（403 分 / 101 评）、[维也纳大学演讲预告 PDF](https://vcs.univie.ac.at/WK_Vorlesung_26.pdf) 与 [Uni Wien 直播](https://www.youtube.com/watch?v=L7I57U4GSv8)（10-19 CEST）、AITP 2026 幻灯片（`a-aitp-slides.txt`）、ERC CORDIS GODELIANA 787758 与 HERITAGE 101198605、[新智元稿（36氪转载）](https://www.36kr.com/p/4069178330764161)
-   - 所有数字只有《卫报》一处（L4，von Plato 口述）。von Plato 10-19 维也纳演讲是更早的一手，但数字只见于 YouTube 机器字幕（500/1,084 页、55 条错、5–8 条在做、14 个主题），没人听过音频，正文不用；字幕的 55+5~8 能补上《卫报》400+200+50=650 与 663 之间的约 13 条差额。
+   - 正文数字据《卫报》（L4，转述 von Plato）。von Plato 10-19 维也纳演讲是更早的一手，但数字只见于 YouTube 机器字幕（500/1,084 页、55 条错、5–8 条在做、14 个主题），没人听过音频，正文不用；字幕的 55+5~8 能补上《卫报》400+200+50=650 与 663 之间的约 13 条差额。
    - ERC 资助额不一：《卫报》“€2.5m (£2.1m)”，CORDIS GODELIANA €2,132,993（2018–2024）、HERITAGE €2,294,070（2025–2031）；页数口径不一：《卫报》1,009、赫尔辛基项目页约 1,200、AITP 摘要约 1,700；正文采用《卫报》1009页并署名，资助额未进正文。
    - 据《卫报》，提供给 Claude 的材料包括 von Plato 的转写稿（反向核验第一轮：“Claude 没读速记”是推断，已撤）；AITP 幻灯片把机器读速记列为未决挑战（未提 Claude）。Hamkins 本人 Bluesky 帖反而写 “with AI translating the mysterious Gabelsberger script”（图 12），正文不写。
    - 未找到：Anthropic 官方文章（员工社媒帖无搜索接口、未完成检索）、赫尔辛基大学新闻稿、论文或预印本、公开的 Coq 文件（arXiv、GitHub 检索 0 条）。Der Standard 全文被订阅墙挡住。
