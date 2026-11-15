@@ -1,0 +1,183 @@
+Lovable Apps Data Exposure: What's Fixed and What Isn't
+
+ Skip to content [#main]
+
+ [https://www.privacyaffairs.com/]
+
+ Menu 
+
+Best VPN [/best-vpn/]
+
+News [https://www.privacyaffairs.com/news/]
+
+Tools & Research [https://www.privacyaffairs.com/tools-and-research/]
+
+Guides [https://www.privacyaffairs.com/guides/]
+
+Experts [https://www.privacyaffairs.com/authors/]
+
+About [https://www.privacyaffairs.com/about/]
+
+ Search
+
+ X
+
+Home [https://www.privacyaffairs.com/]
+
+News [https://www.privacyaffairs.com/news/]
+
+Lovable Apps Data Exposure
+
+Lovable Apps Exposed Passports and Private Chats. The Fixes So Far Don’t Close Existing Leaks
+
+By Laura Bede [https://www.privacyaffairs.com/authors/laura/] . 14 November 2026
+
+ Journalist
+
+Miklos Zoltan [https://www.privacyaffairs.com/authors/miklos/]
+
+Fact-Checked this
+
+Thousands of apps built with the AI app builder Lovable left personal data readable by anyone, without a login. Two weeks after the findings went public, the platform fixes cover new tables and new publishes, not the data already sitting open.
+
+The research comes from Crissy Field, a Hamburg security firm, working with the German business daily Handelsblatt, which first reported it on 2 November. Crissy Field’s English report [https://www.crissyfield.de/research/lovable-en/], with updated figures, reached Hacker News on 14 November and passed 100 points within an hour.
+
+Among the open data: more than 1,000 records with passport numbers, expiry dates and nationalities, and over 200,000 chat messages from a German lifestyle forum. Nobody broke into Lovable. The apps’ databases simply answered anyone who asked.
+
+What the Researchers Found
+
+Crissy Field took 159,041 Lovable projects from the Common Crawl web archive, covering December 2025 to September 2026. Of those, 34,545 stored their data with Supabase, the database service Lovable apps most often use.
+
+On 24,664 of those sites, the page sent database records as soon as it loaded, with no login. That can be harmless, since a menu or event list is meant to be public. But with further read-only requests using the same public key, the researchers found tables holding email addresses on 7,403 sites, 30% of the ones they checked.
+
+The worst cases they describe:
+
+a German lifestyle forum with more than 80,000 profiles (full name, email, date of birth, gender) and over 200,000 chat messages
+
+event organisers and restaurants with tens of thousands of ticket and food orders, including phone numbers, postal addresses, payment information and ticket codes
+
+a property manager’s AI-written summaries of internal emails about tenants and owners
+
+a service provider with more than 1,000 identity-document records
+
+tens of thousands of contracts and invoices, photo albums, internal WhatsApp messages, and in one case 280,000 emails sent to a company’s customers
+
+Crissy Field is careful about its own numbers. The 30% is not a leak rate, because an email address can be a public contact or test data, and the Common Crawl sample doesn’t represent every Lovable app. It downloaded only parts of each dataset, doesn’t name the apps, and couldn’t tell whether anyone had misused the data. Handelsblatt reported [https://www.handelsblatt.com/technik/ki/lovable-hat-die-beliebte-ki-coding-plattform-ein-sicherheitsproblem/100264923.html] that it received the first tips in mid-August and that the data had been reachable for at least a year.
+
+Why It Keeps Happening
+
+Lovable writes the app, but the person who asked for it decides who may read what. Supabase lets a web page talk to the database directly, with a key that sits in the page’s code where anyone can see it. What keeps strangers out is a set of database rules called Row Level Security. Supabase’s own guidance [https://supabase.com/docs/guides/database/postgres/row-level-security] is to switch it on for every table the app exposes. Where it’s off, or the rules are too loose, the public key opens the table.
+
+This isn’t new. A researcher reported the same pattern in Lovable apps in 2025, and it became CVE-2025-48757 [https://www.cve.org/CVERecord?id=CVE-2025-48757]. Lovable disputed it, on the grounds that each customer is responsible for protecting their app’s data. In September 2026, UpGuard counted [https://www.upguard.com/blog/everything-everywhere-systemic-data-exposure-in-supabase-apps] 16,326 Supabase databases with readable tables across the web, built with all kinds of tools.
+
+Lovable’s answer has stayed close to that line. It told Handelsblatt this is a known configuration problem across the industry. Its security documentation [https://docs.lovable.dev/features/security] says the same: “You are responsible for ensuring that your app meets the security requirements appropriate for its use case.” Yet the platform’s pitch is that you don’t need to know how to code. Lovable says it delivers 1.2 million new projects a week, and its builders are exactly the people who’ve never heard of Row Level Security.
+
+What Lovable and Supabase Have Changed
+
+Two changes, and neither reaches data that is already exposed.
+
+Supabase stopped making new tables reachable through its public API automatically. The change reached all existing projects on 30 October, days before the report. A new table now needs an explicit grant before the page can query it. But the changelog [https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically] is clear that existing tables “keep their current grants and stay reachable.” An app that was leaking on 29 October still leaks unless someone fixes it.
+
+Lovable added a step on 12 November, according to its changelog [https://docs.lovable.dev/changelog]. When someone publishes a project on Lovable’s built-in backend with unresolved critical security findings, Lovable now asks them to review the findings first. They can still choose “publish anyway”. Only Enterprise workspaces can block publishing outright. The free Quick scan runs when the publish window opens, so an app nobody touches again isn’t checked again.
+
+Lovable’s changelog lists no other change up to 14 November that would close tables already open.
+
+Is Your Data in One of These Apps?
+
+You probably can’t tell from the outside. Crissy Field doesn’t name the apps, and with a paid plan an app can run on any domain. Apps on Lovable’s own hosting run at an address ending in lovable.app [https://docs.lovable.dev/features/publish].
+
+What helps:
+
+Think about small new services. A ticket shop for a local event, a restaurant’s order page, a booking form, a community forum or a waiting list launched in the past two years is the kind of app the report describes.
+
+Ask the operator. Under the GDPR, any business that holds your data in the EU must tell you what it holds when you ask (Article 15). You can also ask what it uses to build and host the service.
+
+If you shared an ID document, treat it as exposed until the operator says otherwise. A passport number can’t be changed like a password, so watch for messages that quote your ID details back at you, and ask your bank or mobile provider whether they offer an extra check on new accounts.
+
+Expect convincing phishing. Leaked order data lets a scammer write “your ticket for Saturday” with the right name and address. Check any request for payment or login through the official site, not the link in the message.
+
+If You Built an App With Lovable
+
+Run the Deep scan in Lovable’s Security view; it’s free, and it isn’t automatic. Then open Supabase’s Security Advisor and fix every table it flags, starting with any that hold personal data. Check that Row Level Security is on and that no rule lets the public key read other people’s rows. Never put Supabase’s secret (service role) key in the app’s front end.
+
+If personal data was exposed, the law treats it as your breach, not Lovable’s. Under the GDPR [https://eur-lex.europa.eu/eli/reg/2016/679/oj], you have 72 hours from when you become aware of a breach to report it to your data protection authority (Article 33), unless it’s unlikely to put people at risk. If the risk is high, as with ID documents or payment details, you must also tell the people affected (Article 34). Crissy Field’s advice for anything that handles customer data is a professional review before it goes live, and again after big changes.
+
+Our Mission
+
+We believe security online security matters and its our mission to make it a safer place.
+
+ [https://www.privacyaffairs.com/authors/laura/] 
+
+Journalist
+
+At PrivacyAffairs, Laura writes the site's news, reporting on privacy, cybersecurity and technology.
+
+Laura specializes in in-depth reports and interviews on culture, community life, traditions, education, tourism, and social issues across the region. Laura also regularly covers technology and innovation, spotlighting local breakthroughs such as solar-powered cars built by students at the Technical University of Cluj-Napoca, pioneering VR therapy in intensive care at the Csíkszereda hospital, competitive robotics teams (including the Fabton Lego team from Csíkszereda preparing for international events), carbon-footprint tracking apps developed in Cluj, and the use of drones in mountain rescue.
+
+Through her work, she connects traditional Transylvanian life with emerging technologies, showing how digital tools, renewable energy, robotics, and immersive tech are being adopted by communities, hospitals, schools, and young innovators in the region.
+
+Laura Bede [https://www.privacyaffairs.com/authors/laura/]
+
+Connect with the author:
+
+ [https://www.linkedin.com/in/laura-bede-888203303/]
+
+Our Mission
+
+We believe security online security matters and its our mission to make it a safer place.
+
+ [#]
+
+Reviews
+
+Reviews [https://www.privacyaffairs.com/reviews/]
+
+Editorial
+
+How to Use a VPN: A Beginner’s Guide [https://www.privacyaffairs.com/beginners-guide-to-vpn/]
+
+How to Use the Internet Privately – Ultimate Guide [https://www.privacyaffairs.com/browse-internet-privately/]
+
+About
+
+About Us [https://www.privacyaffairs.com/about/]
+
+Terms & Conditions [https://www.privacyaffairs.com/terms-conditions/]
+
+Privacy Policy [https://www.privacyaffairs.com/privacy-policy/]
+
+Cookie Policy [https://www.privacyaffairs.com/cookie-policy/]
+
+How We Make Money [https://www.privacyaffairs.com/how-we-make-money/]
+
+Editorial Policy [https://www.privacyaffairs.com/editorial-policy/]
+
+Contact [https://www.privacyaffairs.com/contact/]
+
+PrivacyAffairs
+
+[email protected] [/cdn-cgi/l/email-protection#ee8d81809a8f8d9aae9e9c87988f8d978f88888f879c9dc08d8183]
+
+Ferdinand 22-26 Street, 3rd Floor
+
+Cluj-Napoca, 400110
+
+Romania
+
+--
+
+X [https://twitter.com/Privacy_Affairs]
+
+ English
+ العربية
+ Türkçe
+ Français
+ Deutsch
+ Русский
+ 中文 (中国)
+
+© PrivacyAffairs.com – 2026. All rights reserved.
+
+PrivacyAffairs
+
+X [https://twitter.com/Privacy_Affairs]

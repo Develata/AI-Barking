@@ -1,0 +1,230 @@
+# 经 opencli browser extract 取得（https://www.lilox.io/datenluecke-lovable-ki-websites-sicherheit/）
+Ein IT-Sicherheitsexperte hat über 140.000 deutschsprachige Websites geprüft, die mit dem KI-Builder Lovable gebaut wurden. Bei rund 15 Prozent konnte er Daten einsehen, darunter E-Mail-Adressen und Ausweisdaten. Ursache ist meist eine fehlende Zugriffsregel in der Datenbank. Wer eine solche App betreibt, ist datenschutzrechtlich verantwortlich und sollte sie jetzt prüfen.
+
+# Was ist bei Lovable passiert?
+
+Auf Zehntausenden Lovable-Seiten waren Nutzerdaten über einen öffentlich sichtbaren Schlüssel abrufbar. Das berichtet das Handelsblatt am 2. November 2026 auf Basis einer Analyse von Thomas Jansen, Gründer des Sicherheitsunternehmens Crissyfield. Die Lücke bestand laut dem Bericht seit mindestens einem Jahr.
+
+Jansen hat nach eigenen Angaben mehr als 140.000 deutschsprachige Lovable-Websites untersucht und bei etwa 15 Prozent davon Daten einsehen können. Betroffen sind demnach über 20.000 Lovable-Nutzer. Unter den Funden war eine Seite für US-Visa-Anträge mit Namen, Geburtsdaten und Passnummern, zeitweise sogar mit Fotos von Ausweisen. Bei einer Radio-Website lagen Profile registrierter Nutzer mit Namen und mit E-Mail-Adressen offen. Für die gesamte Analyse brauchte Jansen dank KI-Unterstützung nach eigener Aussage etwa fünf Stunden.
+
+Die Größe des Problems erklärt sich aus der Reichweite der Plattform. Lovable meldet laut Handelsblatt mehr als 50 Millionen umgesetzte Projekte und 1,2 Millionen neue pro Woche. Das schwedische Unternehmen wurde im August 2026 in einer Finanzierungsrunde mit 13,3 Milliarden US-Dollar bewertet. Viele Nutzer bauen dort Formulare, Kundenportale und interne Tools, ohne selbst zu programmieren.
+
+## Warum liegen Daten offen, obwohl niemand hackt?
+
+Die Daten liegen offen, weil die App sie selbst jedem Besucher ausliefert. Lovable-Apps speichern ihre Daten meist bei Supabase, einem Anbieter für Datenbanken und Backend. Der Browser greift dabei mit einem öffentlichen Schlüssel auf die Datenbank zu, dem sogenannten Anon-Key. Der steht bewusst im Quellcode jeder Seite.
+
+Das ist so gewollt und an sich sicher. Der öffentliche Schlüssel soll nur das freigeben, was ohnehin jeder sehen darf, etwa Texte oder Produktbilder. Was er darüber hinaus lesen darf, regelt eine zweite Schicht, die Row Level Security (RLS). Das sind Regeln je Tabelle und Zeile, zum Beispiel „jeder Nutzer sieht nur seinen eigenen Eintrag“. Fehlen diese Regeln oder sind sie zu offen formuliert, liefert die Datenbank dem öffentlichen Schlüssel alles aus.
+
+Der Ethical Hacker und IT-Rechtsexperte Dirk Koch hat Jansens Vorgehen technisch und rechtlich geprüft. Er kommt zum Schluss, dass Jansen nur den Zugang genutzt hat, den die Seiten selbst jedem Besucher anbieten. Das macht die Lücke so heikel. Es braucht kein Spezialwissen, nur einen Browser und etwas Neugier. Mit KI-Werkzeugen lässt sich die Suche zudem in großem Maßstab automatisieren.
+
+Wer ohne Programmierkenntnisse baut, sieht dieses Problem selten. Die App funktioniert, Formulare speichern, Logins klappen. Dass ein Fremder dieselben Daten auch ohne Login abrufen kann, zeigt sich im normalen Gebrauch nie.
+
+## Betrifft das nur Lovable?
+
+Nein, das Muster tritt überall dort auf, wo Apps mit Supabase im Hintergrund schnell gebaut werden. Lovables Sicherheitschef Igor Andriushchenko spricht gegenüber dem Handelsblatt von einem bekannten, branchenweiten Konfigurationsproblem. Mehrere unabhängige Analysen stützen diese Einschätzung.
+
+Das Sicherheitsunternehmen UpGuard hat im Herbst 2026 rund 300.000 Domains mit Hinweisen auf Supabase untersucht. Bei 16.326 Datenbanken waren Tabellen von außen lesbar. Über die Hälfte dieser Fälle enthielt laut UpGuard Hinweise auf personenbezogene Daten. Der Bericht beschreibt auch einen technischen Grund. Im Tabellen-Editor ist RLS voreingestellt, bei Tabellen, die per SQL oder automatisiert angelegt werden, etwa durch KI-Werkzeuge, jedoch nicht.
+
+Der Anbieter Symbiotic Security hat im Juni 2026 1.072 Apps auf Supabase-Basis gescannt und bei 98 Prozent mindestens einen Befund gemeldet, bei 16 Prozent einen kritischen. Die Zahl stammt aus der eigenen Studie eines Sicherheitsanbieters und ist entsprechend einzuordnen.
+
+Auch unabhängig von Supabase ist KI-generierter Code oft unsicher. Der GenAI Code Security Report von Veracode aus dem Juli 2025 testete über 100 Sprachmodelle mit 80 Programmieraufgaben. In 45 Prozent der Fälle enthielt der erzeugte Code eine Schwachstelle aus den OWASP Top 10. Code, der funktioniert, ist deshalb noch nicht geprüft.
+
+Wie viel Druck dabei entsteht, zeigte im Oktober 2026 eine kritische Lücke in PHP. Der Digitalverband Bitkom erwartete am 21. Oktober, dass KI die Suche nach verwundbaren Systemen um ein Vielfaches beschleunigt.
+
+## Was haben Lovable und Supabase seither geändert?
+
+Beide Anbieter haben die Standards verschärft, doch die Verantwortung liegt weiter beim Betreiber der App. Die Lücke selbst ist seit Frühjahr 2025 bekannt. Der Sicherheitsforscher Matt Palmer meldete sie im März 2025 an Lovable. Im Mai 2025 wurde sie als CVE-2025-48757 veröffentlicht. Ein Folge-Scan fand damals 303 ungeschützte Schnittstellen in 170 Projekten. Lovable bestreitet die CVE und verweist auf die Verantwortung der Kunden für ihre Daten.
+
+Lovable führte im April 2025 mit Lovable 2.0 einen Security Scan ein. Laut der Analyse von Superblocks prüfte er zunächst nur, ob Zugriffsregeln existieren, nicht ob sie wirken. Heute laufen bei jeder Veröffentlichung automatische Prüfungen, ein tiefer Scan lässt sich manuell starten. In der eigenen Dokumentation hält Lovable fest, dass der Scan keine Sicherheitsgarantie ist und bei sensiblen Daten eine zusätzliche professionelle Prüfung empfohlen wird. Für November 2026 kündigt das Unternehmen laut Handelsblatt ein verbessertes Sicherheitserlebnis für nichttechnische Nutzer an.
+
+Supabase hat die Voreinstellung geändert. Seit dem 30. Mai 2026 sind neue Tabellen in neuen Projekten nicht mehr automatisch über die öffentliche Schnittstelle erreichbar. Seit dem 30. Oktober 2026 gilt das für alle bestehenden Projekte. Das hilft bei neuen Tabellen. Bereits freigegebene Tabellen mit zu offenen Regeln bleiben davon unberührt.
+
+Das Handelsblatt zitiert Lovables Sicherheitschef mit dem Satz „Sicherheit ist eine geteilte Verantwortung“. Für Unternehmen heißt das konkret, dass sie sich nicht auf den Builder verlassen können. Nach eigenen Angaben hatte Lovable die Betreiber in drei vom Handelsblatt gemeldeten Fällen gewarnt, gehandelt haben diese nicht.
+
+## Welche Pflichten haben Sie, wenn Daten offen lagen?
+
+Lagen personenbezogene Daten offen, kann das eine meldepflichtige Datenschutzverletzung sein. Verantwortlich ist der Betreiber der App, nicht der Builder. Die folgende Übersicht ersetzt keine Rechtsberatung, zeigt aber die Eckpunkte.
+
+Regelung
+
+Was gilt
+
+DSGVO Art. 32
+
+Angemessene technische Schutzmaßnahmen und deren regelmäßige Überprüfung
+
+DSGVO Art. 33
+
+Meldung an die Aufsichtsbehörde unverzüglich und möglichst binnen 72 Stunden nach Bekanntwerden, außer es besteht voraussichtlich kein Risiko
+
+DSGVO Art. 34
+
+Information der Betroffenen bei voraussichtlich hohem Risiko
+
+DSGVO Art. 83
+
+Verstöße gegen Art. 32 bis 34 können mit bis zu 10 Millionen Euro oder 2 Prozent des weltweiten Jahresumsatzes geahndet werden, je nachdem, welcher Betrag höher ist
+
+Schweiz, DSG Art. 24
+
+Meldung an den EDÖB so rasch als möglich, wenn voraussichtlich ein hohes Risiko besteht
+
+Ob ein Risiko besteht, hängt von der Art der Daten ab. Eine offene Liste mit Newsletter-Adressen wiegt anders als Passnummern oder Gesundheitsangaben. Dokumentieren Sie den Fund in jedem Fall, schließen Sie die Lücke sofort und holen Sie bei Unsicherheit Ihren Datenschutzbeauftragten dazu.
+
+## Wie prüfen Sie Ihre eigene App?
+
+Eine erste Prüfung schaffen Sie mit den Bordmitteln von Supabase und Lovable in kurzer Zeit. Sie ersetzt keinen Penetrationstest, deckt aber die häufigsten Fehler auf.
+
+1.  **Bestand erheben.** Listen Sie alle Lovable- oder andere KI-gebaute Apps auf, die Daten speichern. Dazu zählen auch Kontaktformulare, Wartelisten und interne Tools aus Abteilungen.
+2.  **Security Advisor öffnen.** Im Supabase-Dashboard zeigt der Security Advisor unter anderem Tabellen ohne aktive Zugriffsregeln und Regeln, die nicht greifen.
+3.  **Regeln lesen.** Prüfen Sie je Tabelle, wer lesen und schreiben darf. Eine Regel, die der Rolle „anon“ ohne Bedingung Lesezugriff gibt, öffnet die Zeilen für alle Besucher.
+4.  **Deep Scan in Lovable starten.** Lassen Sie vor jeder Veröffentlichung den manuellen Scan laufen und beheben Sie kritische Funde, bevor die Seite live geht.
+5.  **Geheime Schlüssel prüfen.** Der geheime Service-Schlüssel von Supabase darf nie im Code stehen, der im Browser ankommt.
+6.  **Fachleute einbeziehen.** Sobald Ausweis-, Zahlungs- oder Gesundheitsdaten im Spiel sind, gehört eine Prüfung durch Sicherheitsfachleute vor den Start.
+
+## Wann passt ein KI-Builder und wann nicht?
+
+Ein KI-Builder passt gut für Prototypen und Seiten ohne sensible Daten. Er passt schlecht, sobald Kunden sich anmelden oder persönliche Angaben hinterlassen und niemand im Team die Datenbank versteht. KI beschleunigt das Bauen deutlich. Über die Sicherheit entscheidet, wer das Ergebnis vor dem Start prüft.
+
+Vorhaben
+
+KI-Builder allein
+
+Was es zusätzlich braucht
+
+Klickbarer Prototyp für interne Abstimmung
+
+Gut geeignet
+
+Keine echten Kundendaten verwenden
+
+Landingpage ohne Formular
+
+Gut geeignet
+
+Impressum, Datenschutz, Ladezeit prüfen
+
+Landingpage mit Kontaktformular
+
+Mit Vorsicht
+
+Zugriffsregeln prüfen, Daten nur so lange speichern wie nötig
+
+Kundenportal mit Login
+
+Nicht ohne Prüfung
+
+Fachliche Prüfung der Datenbankregeln vor dem Start
+
+Ausweis-, Zahlungs- oder Gesundheitsdaten
+
+Nicht geeignet ohne Expertise
+
+Sicherheitsprüfung, Auftragsverarbeitungsvertrag, Dokumentation
+
+Für Unternehmen im Mittelstand ist das eine Budgetfrage, die sich gut rechnen lässt. Eine Prüfung vor dem Start kostet einen Bruchteil dessen, was eine Datenpanne an Meldeaufwand, Vertrauensverlust und möglichen Bußgeldern auslöst. Wer heute schon Builder-Apps im Einsatz hat, beginnt am besten mit den Anwendungen, die Kundendaten speichern.
+
+## Häufige Fragen
+
+### Ist Lovable jetzt unsicher?
+
+Lovable selbst ist nicht gehackt worden. Die Lücke entsteht in einzelnen Apps, deren Datenbankregeln fehlen oder zu offen sind. Weil Lovable sich an Menschen ohne Programmierkenntnisse richtet, bleiben solche Fehler oft unbemerkt. Mit geprüften Regeln lässt sich eine Lovable-App sicher betreiben.
+
+### Was ist Row Level Security?
+
+Row Level Security ist eine Funktion der Datenbank, die je Tabelle und Zeile festlegt, wer Daten lesen oder ändern darf. Ein Beispiel ist die Regel, dass angemeldete Nutzer nur ihre eigenen Einträge sehen. Ohne solche Regeln kann der öffentliche Schlüssel einer App alle Einträge abrufen.
+
+### Ist der Anon-Key ein Passwort, das geschützt werden muss?
+
+Nein, der Anon-Key ist bewusst öffentlich und steht im Code jeder Seite. Er ist nur sicher, wenn die Zugriffsregeln der Datenbank stimmen. Geheim bleiben muss dagegen der Service-Schlüssel von Supabase, der alle Regeln umgeht und nie im Browser landen darf.
+
+### Ist das Abrufen der offenen Daten illegal?
+
+Nach Einschätzung des IT-Rechtsexperten Dirk Koch im Handelsblatt war Jansens Vorgehen nicht illegal, weil er keinen Schutz umging. Das ist eine Einzelmeinung zum deutschen Recht. Für Betreiber ändert das nichts. Sie bleiben für den Schutz der Daten verantwortlich und müssen eine Datenschutzverletzung gegebenenfalls melden.
+
+### Hat die Supabase-Änderung das Problem gelöst?
+
+Nur teilweise. Seit dem 30. Oktober 2026 werden neue Tabellen in allen Supabase-Projekten nicht mehr automatisch über die öffentliche Schnittstelle freigegeben. Tabellen, die schon freigegeben sind und zu offene Regeln haben, bleiben erreichbar, bis der Betreiber sie korrigiert.
+
+### Muss ich eine offene Datenbank den Behörden melden?
+
+Wenn personenbezogene Daten offen lagen und daraus ein Risiko für die Betroffenen entsteht, verlangt die DSGVO eine Meldung möglichst binnen 72 Stunden. In der Schweiz gilt die Meldung an den EDÖB bei voraussichtlich hohem Risiko. Prüfen Sie den Einzelfall mit Ihrem Datenschutzbeauftragten.
+
+### Betrifft das auch andere KI-Builder?
+
+Ja, das Muster betrifft alle Werkzeuge, die Apps mit Supabase oder ähnlichen Backends erzeugen. Die Analyse von UpGuard fand über 16.000 Supabase-Datenbanken mit lesbaren Tabellen, gebaut mit verschiedenen Werkzeugen. Entscheidend ist die Konfiguration der Datenbank, nicht der Name des Builders.
+
+## Quellen
+
+1.  Handelsblatt, „Experten finden Datenlücke bei beliebter KI-Coding-Plattform“, Lina Knees, 02.11.2026
+2.  UpGuard, Everything Everywhere: Systemic Data Exposure in Supabase Apps, 2026: [upguard.com](https://www.upguard.com/blog/everything-everywhere-systemic-data-exposure-in-supabase-apps)
+3.  Supabase Changelog, Tables not exposed to Data and GraphQL API automatically, 2026: [supabase.com](https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically)
+4.  Superblocks, Lovable Vulnerabilities (CVE-2025-48757), 2025: [superblocks.com](https://superblocks.com/blog/lovable-vulnerabilities)
+5.  Lovable, Lovable 2.0, April 2025: [lovable.dev](https://lovable.dev/blog/lovable-2-0)
+
+Weitere 8 Quellen anzeigen
+
+6.  Lovable Docs, Security: [docs.lovable.dev](https://docs.lovable.dev/features/security)
+7.  Symbiotic Security, Scan von 1.072 Apps, Juni 2026: [symbioticsec.ai](https://www.symbioticsec.ai/blog/we-scanned-1-072-vibe-coded-apps-98-had-security-flaws)
+8.  Veracode, GenAI Code Security Report, Juli 2025: [veracode.com](https://www.veracode.com/press-release/ai-generated-code-poses-major-security-risks-in-nearly-half-of-all-development-tasks-veracode-research-reveals/)
+9.  Bitkom zur PHP-Sicherheitslücke, 21.10.2026: [bitkom.org](https://www.bitkom.org/Presse/Presseinformation/Bitkom-zu-kritischer-Internet-Sicherheitsluecke)
+10.  Lovable-Bewertung, AI Magazine, 2026: [aimagazine.com](https://aimagazine.com/news/lovable-europes-vibe-coding-platform-crosses-us-600m-arr)
+11.  DSGVO Art. 32, 33, 34, 83: [dsgvo-gesetz.de](https://dsgvo-gesetz.de/art-33-dsgvo/)
+12.  EDÖB, Leitfaden zur Meldung von Datensicherheitsverletzungen nach Art. 24 DSG: [edoeb.admin.ch](https://www.edoeb.admin.ch)
+13.  Supabase Docs, Row Level Security und Database Linter: [supabase.com/docs](https://supabase.com/docs/guides/database/postgres/row-level-security)
+
+![Nadine Fraiss](/_astro/2026-07-Nadine_Portrait-2.B6ecLXik_Z1DfuuP.webp)
+
+Über die Autorin bzw. den Autor
+
+## Nadine Fraiss
+
+Geschäftsführende Gesellschafterin · CEO & Founder
+
+Nadine ist das strategische Herz von Lilox und Gründerin. In über 15 Jahren Digital Marketing war sie als Digital Officer und Head of Marketing bei der Hypo Tirol Bank, beim Startup Bots&People und beim Scale-up One Hiring. Sie verantwortete den E-Commerce Shop von Hartlauer und war als führende Expertin für digitalen Vertrieb bei Egger aktiv.
+
+[LinkedIn](https://www.linkedin.com/in/nadine-fraiss/)[E-Mail](mailto:nadine.fraiss@lilox.io)
+
+## Ihre Website soll schnell entstehen und trotzdem sicher sein?
+
+Wir bauen B2B-Websites mit KI-Unterstützung und prüfen Formulare, Datenflüsse und Zugriffe, bevor etwas live geht. Im Erstgespräch schauen wir gemeinsam, was Ihr Projekt braucht.
+
+[Erstgespräch vereinbaren](https://calendly.com/nadinefraiss/lilox-erstgesprach?utm_source=lilox.io&utm_medium=website&utm_content=%2Fdatenluecke-lovable-ki-websites-sicherheit%2F)
+
+Weiterlesen
+
+## Ähnliche Beiträge
+
+[
+
+![Visual: KI-Crawler prüft die KI-Readiness einer Website](/_astro/ki-readiness-crawler-visual.CgJrlwVk_1kY2QB.webp)
+
+Tools & Technologie
+
+### Technische KI-Readiness: Was eure Website erfüllen muss, damit KI-Systeme sie lesen können
+
+06\. Juli 2026
+
+Die besten Inhalte nützen nichts, wenn KI-Crawler sie nicht lesen. Technische KI-Readiness: robots.txt, JavaScript, Schema & Co. – mit konkreten Prüfschritten.
+
+
+](/technische-ki-readiness-website/)[
+
+![Abstrakte Grafik: links verstreute kleine Kacheln, die sich nach rechts zu wenigen großen, klaren Kacheln ordnen.](/_astro/infografik-zylo-200-saas-tools.BTEGOk54_Z1UOaQm.webp)
+
+Tools & Technologie
+
+### Tool-Auswahl im B2B: Warum weniger oft mehr ist
+
+07\. Juli 2026
+
+Zu viele Tools schaffen Silos statt Fokus. So stellt ihr eure B2B-Tool-Landschaft schlank auf – mit klaren Auswahlkriterien statt Tool-Masse.
+
+
+](/tool-auswahl-b2b/)
+
+Passend dazu aus unserem Angebot: [Website, die Anfragen bringt](/website/)
+
+[Alle Beiträge](/magazin/)
+
+Stand: November 2026
