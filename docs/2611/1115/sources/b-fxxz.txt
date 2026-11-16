@@ -1,0 +1,304 @@
+uBlock Origin曝UXSS漏洞 AI辅助发现已修复
+
+ 飞
+ 飞翔科技频道
+ [/]
+
+ 首页 [/]
+
+ 资讯▾ [/news/]
+
+ 全部资讯 [/news/]
+ 人工智能 [/category/ai/]
+ 互联网 [/category/internet/]
+ 硬件 [/category/hardware/]
+ 软件 [/category/software/]
+ 汽车科技 [/category/auto/]
+ 科学探索 [/category/science/]
+ 网络安全 [/category/security/]
+ 创投 [/category/venture/]
+ 游戏 [/category/game/]
+ 数码评测 [/category/review/]
+
+ 行情 [/coin/]
+ 快讯 [/flash/]
+ 交易所 [/exchange/]
+ 公链 [/chain/]
+ 钱包 [/wallet/]
+ 排行榜 [/rank/]
+
+ AUD
+ SGD
+ $ USD
+ ¥ CNY
+ HK$ HKD
+ NT$ TWD
+ € EUR
+ ¥ JPY
+ ₩ KRW
+ £ GBP
+
+ 首页 [/]›
+ 网络安全 [/category/security/]›
+ 正文
+
+uBlock Origin曝UXSS漏洞 AI辅助发现已修复
+
+ 网络安全 [/category/security/]
+ 2026-11-16 02:04
+ 16 阅读
+ 来源： Hacker News 精选 [https://iter.ca/post/ubo-uxss/]
+
+uBlock Origin曝UXSS漏洞，已修复。该漏洞主要影响Firefox MV2版本及uBO Lite，恶意网站可诱导扩展添加可信过滤器从而执行任意JS代码。此次发现过程中，AI模型承担了初步排查与验证工作。
+
+近期，uBlock Origin 浏览器扩展被曝存在通用跨站脚本攻击（UXSS）漏洞。该漏洞主要影响 Firefox 上的 MV2 版本，但类似的机制也波及到基于 MV3 架构的 uBO Lite。恶意网站可利用此漏洞欺骗扩展程序添加任意“可信过滤器”。由于可信过滤器具备在页面中注入 JavaScript 代码的能力，攻击者可在特定网站环境中执行任意 JS 代码。目前，该安全问题已得到修复，用户可查阅 GitHub 相关公告获取更多技术细节。
+
+此次漏洞的发现过程中，GPT-5.6 Sol 模型承担了主要的初步排查工作。研究人员推测可能存在通过过滤器注入实现的 UXSS 风险，并借助该模型进行验证，随后人工确认了问题的真实性。文章中的文字描述由人类作者撰写，而大部分代码实现则由 Claude 辅助完成。
+
+漏洞原理与利用流程
+
+uBlock Origin 提供了一项右键选择元素的功能，允许用户在浏览页面时直接创建规则以屏蔽特定元素。这一功能依赖于一个内部 iframe 组件，其 URL 格式通常为 moz-extension://[UUID]/web_accessible_resources/epicker-ui.html。
+
+攻击者的利用链条主要包含以下四个步骤：
+
+获取元素选择器所需的扩展内部 UUID；
+
+创建一个透明度为 0 的隐形 iframe 来嵌入选择器界面；
+
+通过消息通信驱动选择器生成特定的过滤器规则；
+
+诱导用户点击隐形 iframe 覆盖层下的“创建”按钮，从而完成攻击。
+
+泄露扩展 UUID
+
+在 Firefox 环境下，攻击的首要目标是获取扩展内部的唯一标识符（UUID）。默认配置下，uBlock Origin 加载了一条来自 uAssets 的规则：Lootdest.*##+js(no-fetch-if,adsbygoogle,war:googlesyndication_adsbygoogle.js)。该规则旨在拦截对 Google 广告脚本的网络请求，并通过 fetch hook 向 moz-extension://<extension UUID>/web_accessible_resources/googlesyndication_adsbygoogle.js 发送 XHR 请求，返回一个具有正确 API 但不执行任何操作的虚拟脚本。
+
+攻击者可以通过劫持 XMLHttpRequest 原型来捕获这一过程。当受害者访问攻击者控制的网站时，攻击者可以触发上述过滤规则，并从 XHR 请求的 URL 中提取出扩展的 UUID。代码如下：
+
+const origOpen = XMLHttpRequest.prototype.open;
+XMLHttpRequest.prototype.open = function(m, url, ...a) {
+ const e = .exec(url);
+ if (e) {
+ e[0] // <- 此处包含扩展 UUID
+ }
+ return origOpen.call(this, m, url, ...a);
+};
+
+值得注意的是，泄露扩展 UUID 的途径并非只有这一种，其他机制也可能导致信息暴露。
+
+构造隐形 Iframe
+
+获取 UUID 后，攻击者可以在页面中创建一个 iframe 元素，并将其 src 属性设置为 moz-extension://${origin}/web_accessible_resources/epicker-ui.html。为了隐藏这一操作，通常会将该 iframe 的不透明度设置为 0，使其对用户不可见。
+
+消息通信与过滤器注入
+
+接下来，攻击者需要与嵌入的元素选择器进行交互。通过创建 MessageChannel，攻击者可以使用 iframe.contentWindow.postMessage 向选择器发送指令。例如，发送 {what: 'epickerStart'} 启动选择器，随后发送包含过滤器定义的消息以及结果详情，以启用“创建”按钮并设置选项。
+
+正常情况下，元素选择器会限制用户输入的过滤器类型，禁止添加脚本类过滤器。然而，攻击者利用了一个逻辑缺陷：在第二条消息中设置的 opt 字段通常用于指定网络请求匹配类型（如 image），攻击者可将其篡改为类似 "image\ngoogle.com##+js(trusted-rpnt, script, ...)" 的字符串。这种构造方式能够绕过限制，注入任意的“可信脚本过滤器”。
+
+核心问题在于，元素选择器未对来源消息进行严格校验，接受了来自外部页面的指令。一种可能的修复方案是引入秘密令牌，确保只有来自受信任内容脚本的消息才能被处理。
+
+诱导用户点击
+
+尽管存在安全限制，但如果恶意网站能在嵌入式选择器上方叠加透明元素，或利用不透明度为 0 的 iframe 完全隐藏界面，只要诱使用户在页面上进行一次点击，即可触发过滤器的创建。
+
+由元素选择器生成的过滤器会被标记为“可信”，这意味着它们可以直接执行 JavaScript 代码。虽然用户后续修改自定义过滤器会触发重新编译并清除信任状态，但在实际攻击场景中，攻击者往往能立即打开受害者的网页，在信任状态清除前完成恶意代码的执行。
+
+ # GPT-5.6 Sol [/tag/gpt-5-6-sol/]
+ # uBlock Origin [/tag/ublock-origin/]
+ # UXSS [/tag/uxss/]
+ # Firebase [/tag/firebase/]
+ # MV2 [/tag/mv2/]
+
+ 👍
+ 有用
+ 0
+
+觉得有帮助就点个赞吧
+
+ 上一篇
+ 东风日产NX7开启预售，纯电续航320km [/article/22513.html]
+
+ 下一篇
+ 质量效应》作曲家回忆盲听选拔经历 [/article/22505.html]
+
+评论 0
+
+ 0/500
+ 发表评论
+
+ 评论需审核后展示，请文明发言 
+
+💬
+
+还没有评论，来说两句
+
+相关阅读
+
+ [/article/22668-making-a-typo-when-trying-to-access-ai-could-land-you-on-a-malware-site.html]
+
+攻击者注册186个拼写错误域名冒充27个AI品牌 [/article/22668-making-a-typo-when-trying-to-access-ai-could-land-you-on-a-malware-site.html]
+
+ 网络安全 [/category/security/]
+ 2026-11-16 15:18
+ 1 阅读 
+
+ [/article/22639-your-enterprise-ai-access-can-be-sold-for-pennies-beware-llm-mixers.html]
+
+Google报告：黑市低价转售被盗AI访问权 [/article/22639-your-enterprise-ai-access-can-be-sold-for-pennies-beware-llm-mixers.html]
+
+ 网络安全 [/category/security/]
+ 2026-11-16 14:00
+ 8 阅读 
+
+ [/article/22629-ai-finds-zero-day-flaws-for-just-4-now-even-mediocre-hackers-can-cash-in.html]
+
+AI挖掘零日漏洞成本降至4美元，安全攻防门槛骤降 [/article/22629-ai-finds-zero-day-flaws-for-just-4-now-even-mediocre-hackers-can-cash-in.html]
+
+ 网络安全 [/category/security/]
+ 2026-11-16 13:14
+ 8 阅读 
+
+ [/article/22626-every-organization-has-to-invest-in-getting-this-right-proofpoint-ceo-warns-the-.html]
+
+Proofpoint CEO：AI代理时代催生新一代网络威胁 [/article/22626-every-organization-has-to-invest-in-getting-this-right-proofpoint-ceo-warns-the-.html]
+
+ 网络安全 [/category/security/]
+ 2026-11-16 13:05
+ 7 阅读 
+
+ [/article/22577-28-zero-day-findings-in-under-two-days-is-robotics-security-keeping-pace.html]
+
+VicOne用AI两天发现28个机器人零日漏洞 [/article/22577-28-zero-day-findings-in-under-two-days-is-robotics-security-keeping-pace.html]
+
+ 网络安全 [/category/security/]
+ 2026-11-16 10:00
+ 13 阅读 
+
+ [/article/22554-facebook-italy-fines-meta-805-million-over-android-gallery-access.html]
+
+意大利对Meta罚款8.05亿欧元 因违规访问用户图库 [/article/22554-facebook-italy-fines-meta-805-million-over-android-gallery-access.html]
+
+ 网络安全 [/category/security/]
+ 2026-11-16 08:56
+ 14 阅读 
+
+7×24 快讯
+
+ 全部 → [/flash/]
+
+11-16 16:00
+
+哈佛公司持有 3.04 万股 Bitcoin ETF 股票
+
+ BTC [/coin/btc.html]
+
+11-16 15:58
+
+股票价格预测：人工智能关键话题遇到了技术突破
+
+11-16 15:50
+
+随着分析师重新设定目标，搜索问题开始反弹。
+
+11-16 15:46
+
+最高法院拒绝监管的美联储账户上诉
+
+11-16 15:43
+
+Bitcoin 从周末的低点反弹，但每周的损失不断积累
+
+ BTC [/coin/btc.html]
+
+11-16 15:42
+
+股价预测：发射进展与受损趋势发生冲突
+
+11-16 15:41
+
+Nvidia 面临来自亚洲更严格的出口管制的收入风险
+
+11-16 15:36
+
+BTC 可能会在荒野中漫游一段时间，Bitwise 首席信息官马特·霍根警告
+
+ BTC [/coin/btc.html]
+
+热门币种
+
+ 行情 → [/coin/]
+
+ 1
+
+ 比特币
+ [/coin/btc.html]
+
+ $64,463.01
+ -0.37%
+
+ 2
+
+ 以太坊
+ [/coin/eth.html]
+
+ $1,822.18
+ +0.67%
+
+ 3
+
+ 泰达币
+ [/coin/usdt.html]
+
+ $0.9994
+ -0.02%
+
+ 4
+
+ 币安币
+ [/coin/bnb.html]
+
+ $587.11
+ -0.58%
+
+ 5
+
+ 美元币
+ [/coin/usdc.html]
+
+ $1.00
+ +0.03%
+
+ 6
+
+ 瑞波币
+ [/coin/xrp.html]
+
+ $0.9527
+ -0.39%
+
+ 7
+
+ 索拉纳
+ [/coin/sol.html]
+
+ $70.80
+ -0.48%
+
+ 8
+
+ 波场币
+ [/coin/trx.html]
+
+ $0.3056
+ +0.46%
+
+飞翔科技频道 · tech.fxxz.com
+
+行情数据来自 OKX、币安、Gate.io 与 CoinGecko，仅供参考，不构成投资建议。
+
+ 科技资讯 [/news/]
+ 币圈行情 [/coin/]
+ 7×24快讯 [/flash/]
+ RSS [/rss.xml]
+ 网站地图 [/sitemap.xml]

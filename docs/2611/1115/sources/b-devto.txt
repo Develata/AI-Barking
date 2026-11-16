@@ -1,0 +1,253 @@
+1 postMessage, every site: uBlock Origin's picker XSS - DEV Community
+
+ Skip to content [#main-content]
+
+ [/]
+
+ Powered by Algolia
+
+ [https://www.algolia.com/developers/?utm_source=devto&utm_medium=referral]
+
+ Log in
+ [/enter?signup_subforem=1]
+
+ Create account
+ [/enter?signup_subforem=1&state=new-user]
+
+DEV Community
+
+ Add reaction
+
+ Like
+
+ Unicorn
+
+ Exploding Head
+
+ Raised Hands
+
+ Fire
+
+ Jump to Comments
+
+ Save
+
+ Boost
+
+Pick as gem
+
+ Copy link
+
+Copied to Clipboard
+
+ Share to X
+ [https://twitter.com/intent/tweet?text=%221%20postMessage%2C%20every%20site%3A%20uBlock%20Origin%27s%20picker%20XSS%22%20by%20frank%20chu%20%23DEVCommunity%20https%3A%2F%2Fdev.to%2Ffrankchu%2F1-postmessage-every-site-ublock-origins-picker-xss-53f6]
+
+ Share to LinkedIn
+ [https://www.linkedin.com/shareArticle?mini=true&url=https%3A%2F%2Fdev.to%2Ffrankchu%2F1-postmessage-every-site-ublock-origins-picker-xss-53f6&title=1%20postMessage%2C%20every%20site%3A%20uBlock%20Origin%27s%20picker%20XSS&summary=One%20postMessage%20drove%20uBlock%20Origin%27s%20element%20picker%20into%20installing%20a%20trusted%20scriptlet%20filter%20%E2%80%94%20I%20traced%20the%20chain%20in%20the%20source%20and%20the%203-commit%20fix.&source=DEV%20Community]
+
+ Share to Facebook
+ [https://www.facebook.com/sharer.php?u=https%3A%2F%2Fdev.to%2Ffrankchu%2F1-postmessage-every-site-ublock-origins-picker-xss-53f6]
+
+ Share to Mastodon
+ [https://s2f.kytta.dev/?text=https%3A%2F%2Fdev.to%2Ffrankchu%2F1-postmessage-every-site-ublock-origins-picker-xss-53f6]
+
+ Share Post via... [#]
+
+ Report Abuse [/report-abuse]
+
+ [https://media2.dev.to/dynamic/image/width=1000,height=420,fit=cover,gravity=auto,format=auto/https%3A%2F%2Fraw.githubusercontent.com%2Ffrankchu91%2FWhatTechPost%2Fmain%2Fpublished%2F2026-11-16-ublock-picker-uxss%2Fcover.png]
+
+ [/frankchu]
+
+ frank chu [/frankchu]
+
+ Posted on Nov 16
+
+ 1 postMessage, every site: uBlock Origin's picker XSS
+
+ #programming [/t/programming]
+ #security [/t/security]
+ #browsers [/t/browsers]
+ #discuss [/t/discuss]
+
+ [#1-postmessage-every-site-ublock-origins-picker-xss]
+ 1 postMessage, every site: uBlock Origin's picker XSS
+
+One postMessage with a stolen extension UUID was enough to drive uBlock Origin's element picker from any website — and the picker would then install a trusted scriptlet filter that runs JavaScript on any site the attacker chose. I traced the whole chain in the source, and the fix is three commits totalling 19 lines.
+
+ [#the-chain-as-reported]
+ The chain, as reported
+
+The bug was reported by email on November 1, 2026, by a researcher going by "syvb", and disclosed publicly on November 15 in a writeup by the same author. The writeup credits GPT-5.6 Sol with most of the hard work of finding it — the researcher suspected a filter-injection UXSS was possible, asked the model to look, and verified what it proposed. The advisory is GHSA-cmqw-9r2w-6wv2, rated high, with no CVE assigned.
+
+The attack has four steps, and I verified each one against the code at the parent of the fix:
+
+1. Learn the extension's random UUID. On Firefox, uBlock Origin's internal UUID is random per install, and you need it to build the picker URL. The leak comes from uBO's own filter list: a lootdest.*##+js(no-fetch-if, adsbygoogle, war:googlesyndication_adsbygoogle.js) rule replaces ad-server JavaScript fetches with a dummy script by making an XHR to moz-extension://<UUID>/web_accessible_resources/googlesyndication_adsbygoogle.js from inside the fetch hook. A malicious page hooks XMLHttpRequest.prototype.open, triggers fetch('/adsbygoogle.js'), and reads the UUID out of the intercepted URL. The writeup notes this is only one of several leak paths.
+
+2. Iframe the picker. The element picker lives at moz-extension://<UUID>/web_accessible_resources/epicker-ui.html — a web-accessible resource, so any page can embed it in an invisible iframe.
+
+3. Drive it with postMessage. This is the core defect. Here is the pre-fix message listener in src/js/epicker-ui.js, verbatim from the parent of the fix commit:
+
+globalThis.addEventListener('message', ev => {
+ const msg = ev.data || {};
+ if ( msg.what !== 'epickerStart' ) { return; }
+ if ( Array.isArray(ev.ports) === false ) { return; }
+ if ( ev.ports.length === 0 ) { return; }
+ pickerContentPort = ev.ports[0];
+ ...
+ startPicker();
+ pickerContentPort.postMessage({ what: 'start' });
+}, { once: true });
+
+No origin check. No secret. Any page that could guess the URL could send { what: 'epickerStart' } with a MessageChannel port and the picker would talk to it. The picker then accepts showDialog and resultsetDetails messages over that port. The resultsetDetails handler does this:
+
+case 'resultsetDetails': {
+ resultsetOpt = msg.opt;
+
+msg.opt is attacker-controlled, stored raw, and later appended to the filter being created:
+
+if ( resultsetOpt !== undefined ) {
+ opts.push(resultsetOpt);
+}
+if ( opts.length ) {
+ filter += '$' + opts.join(',');
+}
+
+So opt set to "image\ngoogle.com##+js(trusted-rpnt, script, ...)" turns one network filter into two lines — the second a trusted scriptlet filter for an arbitrary domain. The picker normally refuses scriptlet filters; the newline smuggles one past that restriction. Filters added by the element picker are treated as trusted, so the injected scriptlet runs JavaScript in the context of any site.
+
+4. Get the click. The attacker still needs the user to press the picker's Create button once. The writeup's author didn't implement this part, but the options are the usual ones: overlay page content on the invisible iframe, or set its opacity to 0 and let any click on the page land on it. One click, and the trusted filter is installed. Editing custom filters later would trigger a recompile and clear the trust — but the attacker can open the victim page immediately, so that barely matters.
+
+ [#the-fix-a-password-then-a-parser]
+ The fix: a password, then a parser
+
+Raymond Hill fixed it in three commits across three releases, and the commit messages read like a checklist of the chain above:
+
+1.75.2, November 2 — bf69cf7, "Avoid use of potentially tainted XHR methods in scriptlets". This closes the UUID leak path: scriptlets no longer use XHR methods a page can hook to learn the extension UUID.
+
+1.75.4, November 3 — 9859477, "Launch element picker only with a verified secret token". The background page generates self.crypto.randomUUID() once per session and hands it only to the real content script over extension messaging. The content script passes it in the epickerStart postMessage, and the picker UI now verifies it before accepting the port:
+
+const epickerPassword = await vAPI.messaging.send('elementPicker', {
+ what: 'elementPickerPassword'
+});
+if ( msg.password !== epickerPassword ) { return; }
+
+An attacker page can't learn the password — it never crosses a web page boundary — so step 3 dies even if the UUID leaks again.
+
+1.76.0, November 8 — b1f7d27, "Validate about to be created filter in element picker", plus 150df12, "Prevent war:-related filters for the time being". Even with a valid session, the filter the picker is about to create is now run through the static filter parser (parseRawFilter) and rejected if it isn't a well-formed network or cosmetic filter. The newline injection fails at this layer even if the password check is ever bypassed.
+
+The numbers that stayed with me: the vulnerable listener was 12 lines, the password fix is 19 lines across 3 files, and the whole window — report on November 1 to the defense-in-depth fix on November 8 — was 7 days. The MV3 build, uBO Lite, had a similar but less severe variant of the same issue.
+
+ [#what-i-take-from-this]
+ What I take from this
+
+The bug is not really "the picker trusted postMessage". It's that a privileged UI was reachable from the web at all: a web-accessible HTML page that accepts commands over postMessage('*') is a web page with extension privileges, and the only thing separating it from every site on the internet was a random UUID that the extension itself leaked through a scriptlet. The fix's shape is the lesson — Hill didn't just add the password. He fixed the leak (1.75.2), added the authentication (1.75.4), and then validated the output anyway (1.76.0), because each layer assumed the previous one would hold, and the previous one hadn't.
+
+If you run uBlock Origin on Firefox, check you're on 1.76.0 or later. If you build extensions, the audit question is one sentence: is there any web-accessible page of yours that acts on postMessage without a secret only your content script can know? If the answer is yes, you have this bug — you just haven't been emailed about it yet.
+
+Sources: Universal XSS in uBlock Origin from website-driven element picker [https://iter.ca/post/ubo-uxss/] (November 15, 2026); GHSA-cmqw-9r2w-6wv2 [https://github.com/gorhill/uBlock/security/advisories/GHSA-cmqw-9r2w-6wv2] (high, published November 15, 2026); fix commits bf69cf7 [https://github.com/gorhill/uBlock/commit/bf69cf7405d7d9e7e4bd1143726988a482629b18], 9859477 [https://github.com/gorhill/uBlock/commit/9859477ebc647352282ddd71b5013ce4764493ed], b1f7d27 [https://github.com/gorhill/uBlock/commit/b1f7d27c876658a8e148240a401288f462bca788] and summary cbb22a5 [https://github.com/gorhill/uBlock/commit/cbb22a5eeeb32e6aea48edd72f63e04fc03163c3] in gorhill/uBlock. All code quoted above was read from the repository at the parent of each fix commit.
+
+ Top comments (0)
+
+ Subscribe
+
+ Submit
+ Preview
+ Dismiss [/404.html]
+
+ Code of Conduct [/code-of-conduct]
+ •
+ Report abuse [/report-abuse]
+
+ frank chu
+
+ [/frankchu]
+
+ Follow
+
+ Work
+
+ Meta
+
+ Joined
+
+ Jul 21, 2026
+
+ More from frank chu [/frankchu]
+
+ 5 seconds to panic a server: Linux's 11-year-old TCP race
+
+ #programming
+ #linux
+ #networking
+ #discuss
+
+ [/frankchu/5-seconds-to-panic-a-server-linuxs-11-year-old-tcp-race-39mi]
+
+ 7,546,996 lines of Lean: I counted DeepMind's Signal proof
+
+ #programming
+ #security
+ #lean
+ #discuss
+
+ [/frankchu/7546996-lines-of-lean-i-counted-deepminds-signal-proof-31oo]
+
+ DEV Community [/] — A space to discuss and keep up software development and manage your software career
+
+ Home
+ [/]
+
+ DEV Challenges
+ [/challenges]
+
+ DEV++
+ [/++]
+
+ Videos
+ [/videos]
+
+ DEV Help
+ [/help]
+
+ Advertise on DEV
+ [/advertise]
+
+ Organization Accounts
+ [/organizations]
+
+ DEV Showcase
+ [/showcase]
+
+ About
+ [/about]
+
+ Contact
+ [/contact]
+
+ DEV Shop
+ [https://shop.forem.com/]
+
+ MLH
+ [https://mlh.io/]
+
+ Code of Conduct
+ [/code-of-conduct]
+
+ Privacy Policy
+ [/privacy]
+
+ Terms of Use
+ [/terms]
+
+Built on Forem [https://www.forem.com] — the open source [https://dev.to/t/opensource] software that powers DEV [https://dev.to] and other inclusive communities.
+
+Made with love and Ruby on Rails [https://dev.to/t/rails]. DEV Community © 2016 - 2026.
+
+ We're a place where coders share, stay up-to-date and grow their careers.
+
+ Log in
+ [/enter?signup_subforem=1]
+
+ Create account
+ [/enter?signup_subforem=1&state=new-user]
