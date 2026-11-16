@@ -1,6 +1,6 @@
 # 1115 期事实清单
 
-时间一律北京时间。证据细节见 `evidence-A.md`（Qwen4-Max 与 Hy4 flash）、`evidence-B.md`（uBlock Origin）、`evidence-c.md`（速览）；截图在 `images/`（“图 NN”指取证截图编号）。取证：A、B 组 claude-sonnet-5-5，C 组 claude-haiku-5-5，北京 11-17 00:0x 前后派出（C 组约 4 分钟交回）。
+时间一律北京时间。证据细节见 `evidence-A.md`（Qwen4-Max 与 Hy4 flash）、`evidence-B.md`（uBlock Origin）、`evidence-c.md`（速览）；截图在 `images/`（“图 NN”指取证截图编号）。取证：A、B 组 claude-sonnet-5-5，C 组 claude-haiku-5-5，北京 11-16 约 23:58 派出（C 组约 4 分钟交回）。
 
 ## 标题与省流
 
@@ -21,8 +21,8 @@ Qwen 博客 https://qwen.ai/blog?id=qwen4-max （opencli 渲染：`a-qwen-blog-z
 | 阿里11月16日发布 Qwen4-Max，称自家测试中单任务平均费用比上一代降约六成 | L1 | ✅ | `a-qwen-blog-zh.rendered.txt` 第 20 行、`-en` 第 13 行；图 02 | 中文：“在我们 Work360 的评测中，单个任务的平均费用从 26.58 元降至 11.16 元，降低了 58%。”英文：“the average cost per task drops from $4.43 to $1.67 — a 62% reduction.”同一项测试，中文按人民币、英文按美元，正文合写“约六成”；未写推理档位。上一代 = Qwen3.8-Max。IT之家标题“任务成本降低超 60%”与其正文 58% 不一（图 12c，夸大实例）。 |
 | 腾讯同日发布 Hy4 flash，常规价每百万 token 输入0.5元、输出2元 | L1 | ✅ | `a-hy4flash-zh.rendered.txt` 第 18–21 行；图 09 | 价格表“Hy4 flash 0.02元（命中缓存）0.5元 2元”，为常规价；TokenHub 11-30 前限时 5 折（图 12e），WorkBuddy 11-30 前免费。 |
 | 称在内部测试上单任务成本是自家 Hy4 的1/20 | L1 | ✅ | `a-hy4flash-zh.rendered.txt` 第 37 行；图 10 | “在 WorkIndex 上单任务成本仅为 Hy4 preview 的 1/13、Hy4 的 1/20、DeepSeek-V4.1-Flash-1017（max档位，忙时价格）的 1/8。”WorkIndex = 8 个内部评测集（图 1 注）。官方 X 帖“18x task cost reduction”是对 Haiku 5.5 (high)（`a-fx-2122217770314301469.json`），口径不同，正文未用。 |
-| 据第三方 Artificial Analysis 评测，Qwen4-Max 跑其综合指数每个任务平均3.27美元，上一代10.02美元 | L3 | ✅ | `a-aa-qwen4max.txt` 第 84–86 行；`a-aa-qwen38max.txt` 第 93 行；图 05、07 | “On average, it costs $3.27 per task to evaluate Qwen4 Max on the Intelligence Index.”；“… it costs $10.02 per task to evaluate Qwen3.8 Max (0902) on the Intelligence Index.”指标 = Intelligence Index v5.0.1（9 项评测）每任务加权平均费用（方法页 `a-aa-methodology.txt`）。两页只写 “Reasoning Yes”，未标 max/high（A2-3）；AA 标 Qwen3.8 Max 已弃用。单价 $1.50/$4.50 对 $2.00/$6.00。另：AA 称 Qwen4 Max “very verbose”（127M，中位数 78.6M），上一代 150M。 |
-| 吠点①：第三方 Vals 换套任务测千问：每次9.33美元，上一代8.73美元，没降；AA、Vals 都没标档位 | L3 | ✅ | https://www.vals.ai/benchmarks/vals_index （`a-vals-index.txt` 第 135、157、171 行）；图 12h（Claude 北京 11-17 00:3x 用 opencli 展开折叠区后整页截图裁切，1 倍像素比） | 表头 “Rank Model Accuracy Cost / Test Tokens / Test Duration / Test”；第 11 行 “Qwen 4 Max 63.20% $9.33 27.27m 1h05m”；第 18 行 “Qwen 3.8 Max 0902 59.05% $8.73 26.59m 1h46m”。Vals 页未写所用推理档位与计价来源；token 几乎持平而单价下调、费用反升，原因未知，正文只写“没变便宜”不作解释。“两家都没标推理档位”= AA 两页与 Vals 表均未标（AA 只写 Reasoning Yes）；“另一套任务”= Vals Index 是金融、编程、法律、税务的行业测试，AA 是 9 项评测的加权指数（反向核验 SHOULD_FIX 4）。 |
+| 据第三方 Artificial Analysis 评测，Qwen4-Max 跑其综合指数每个任务平均3.27美元，上一代10.02美元（AA 未标推理档位） | L3 | ✅ | `a-aa-qwen4max.txt` 第 84–86 行；`a-aa-qwen38max.txt` 第 93 行；图 05、07 | “On average, it costs $3.27 per task to evaluate Qwen4 Max on the Intelligence Index.”；“… it costs $10.02 per task to evaluate Qwen3.8 Max (0902) on the Intelligence Index.”指标 = Intelligence Index v5.0.1（9 项评测）每任务加权平均费用（方法页 `a-aa-methodology.txt`）。两页只写 “Reasoning Yes”，未标 max/high（A2-3）；AA 标 Qwen3.8 Max 已弃用。单价 $1.50/$4.50 对 $2.00/$6.00。另：AA 称 Qwen4 Max “very verbose”（127M，中位数 78.6M），上一代 150M。 |
+| 吠点①：第三方 Vals 换套任务测千问：新版开 xhigh 档每次9.33美元，上一代8.73美元，没降 | L3 | ✅ | https://www.vals.ai/benchmarks/vals_index （`a-vals-index.txt` 第 135、157、171 行）；图 12h（Claude 北京 11-17 00:3x 用 opencli 展开折叠区后整页截图裁切，1 倍像素比） | 表头 “Rank Model Accuracy Cost / Test Tokens / Test Duration / Test”；第 11 行 “Qwen 4 Max 63.20% $9.33 27.27m 1h05m”；第 18 行 “Qwen 3.8 Max 0902 59.05% $8.73 26.59m 1h46m”。Vals 页未写所用推理档位与计价来源；token 几乎持平而单价下调、费用反升，原因未知，正文只写“没变便宜”不作解释。档位：Vals 的 Qwen 4 Max 模型页 `a-a-vals-qwen4max.txt` 第 423–441 行 “Reasoning Effort: xhigh”“We evaluated it at xhigh reasoning effort, temperature 1.0, top_p 0.95 and top_k 20.”；Qwen 3.8 Max 0902 页（`a-a-vals-qwen38max.txt`）超参数只写 Temperature 0.7、Max Output Tokens 128,000，未写推理档位。先前“AA、Vals 都没标档位”只看了榜单表，Claude 交付前查模型页后更正（advisor 指出）；Qwen 官方也写 Work360 上 Xhigh 档 token 只降约24%。“另一套任务”= Vals Index 是金融、编程、法律、税务的行业测试，AA 是 9 项评测的加权指数（反向核验 SHOULD_FIX 4）。 |
 | 吠点②：混元的1/20比的是内部测试得分更高的 Hy4：同图 Hy4 flash 42.1分对51.4分 | L1 | ✅ | `a-hy4flash-zh.html` 第 212 行图表数据；图 10 | 数据：“name: 'Hy4 flash', value: [0.2, 42.1]”“name: 'Hy4', value: [5.7, 51.4]”（WorkIndex，纵轴 Performance，横轴单任务成本元）；英文页同值（美元）。Open Benchmarks 图 48.3 对 59.8（图 10b）。官方文字只写“综合效果上略优于 Hy4 preview”（39.7）。 |
 | 吠点③：“接近 Claude-Haiku-5.5”来自85位腾讯内部用户盲测，4分制满意度2.79对2.81，外部模型开 high 档；DeepSeek 3.09分最高 | L1 | ✅ | `a-hy4flash-zh.rendered.txt` 第 51 行；图 11b（盲测表在官方页是图片 alt=“【中】模型盲测结果.png”，`a-hy4flash-zh.html` 中无文字版，图 11b 为 opencli 渲染官方页截图） | “我们邀请了 85 位 WorkBuddy 内部用户在 27 类共 259 个日常工作任务上进行盲测。结果显示，Hy4 flash 的用户满意度接近 Claude Haiku 5.5”；表：DeepSeek-V4.1-Flash-1017 3.09、Hy4 flash 2.79、Claude-Haiku-5.5 2.81、GLM-5.3-Flash 2.53（4分制），注“外部模型均为 high 档”。官方 X 帖写 “Matches Claude Haiku 5.5 (high)”。 |
 | 吠点④：Hy4 11月4日称“将于近期开源”，截至17日腾讯 Hugging Face 账号仍只有预览版 | L1 | ✅ | 1103 存档 `docs/2611/1103/sources/a-tencent-hy4-launch-zhcn.txt` 第 277 行；`a-claude-hf-hy4.json`、`a-claude-modelscope-hy4.json`（Claude 北京 11-17 00:25 查）；图 12b | “Hy4 将于近期开源模型权重”；HF author=tencent 搜 Hy4 只有 `tencent/Hy4-preview`、`Hy4-preview-FP8`（08-28）；ModelScope Tencent-Hunyuan 名下同样只有两个 preview；腾讯官方 GitHub 只有 preview（A 组）。交付前再查一次。 |
@@ -54,11 +54,10 @@ Qwen 博客 https://qwen.ai/blog?id=qwen4-max （opencli 渲染：`a-qwen-blog-z
 | 文中事实 | 级 | 结果 | 一手来源 | 备注（条件、时区、口径） |
 |---|---|---|---|---|
 | 苹果招最多20万名符合条件的美国用户研究健康 AI，称数据不用于训练模型 | L1 | ✅ | https://www.apple.com/newsroom/2026/11/apple-launches-research-study-to-explore-the-use-of-ai-for-health/ （`c-c1-apple.txt`） | 官方只写 November 15, 2026（未给时刻）。第 78 行：“open to up to 200,000 eligible participants age 21 and older across the United States … (iPhone 15 Pro or later) running iOS 26 or later”；第 70 行：“study data will not be used to train AI models”。“符合条件”= 21 岁以上、支持 Apple Intelligence 的 iPhone 15 Pro 及以上且 iOS 26 以上（反向核验 SHOULD_FIX 8）。参与者用的是 OpenEvidence 的医学 AI。TechCrunch 写 “iPhone 15 or later”，与官方不一致；“约12个月”“发第三方云前匿名化”只见 TechCrunch（L4），不进速览。 |
-| 欧洲央行副行长称 AI 风险来源增多：融资从股市扩展到债市、敞口集中、网络攻击 | L1 | ✅ | https://www.ecb.europa.eu/press/key/date/2026/html/ecb.sp261116~db374b56ab.en.html （`c-c2-ecb-en.txt`） | 【风控待定】11-16 Euro Finance Week 演讲（官方未给时刻）。原句：“AI-related risks to system-wide stability now stem from a range of additional factors – the expansion of external funding from equity to debt markets, concentration of exposures, quickening AI adoption and potential cyberattacks.” 第 1116 行 5.5 万亿美元是“主要美国科技企业到2030年累计资本开支”的预测（未署出处），Reuters 写成 financing need；速览不写这个数。“扩展到”照 expansion 译（反向核验 SHOULD_FIX 7）。是否收录待 Develata 定（外国官员讲话）。 |
-| 美联储理事 Barr 称大银行报告 AI 智能体试图操作客户账户，授权无法核实 | L1 | ✅ | https://www.federalreserve.gov/newsevents/speech/barr20261116a.htm （`c-c3-barr.txt`） | 【风控待定】11-16 米兰演讲（官方未给时刻）。第 637 行：“major banks now report finding AI agents attempting to take actions in retail customer accounts, without the bank being able to verify authenticity, consent, and alignment with customer instructions.” 无次数、金额、银行名单；脚注 1 称个人观点；挤兑句为 may/could 假设。是否收录待 Develata 定（美国官员讲话）。 |
+| 数学博客 Xena 称 Lean 代码有重要信号，但若由 AI 生成，要先做检查 | L1（作者自有博客，观点） | ✅ | https://xenaproject.wordpress.com/2026/11/12/and-the-proof-is-checked-in-lean/ （`c-c6-xena.txt`） | “Posted on November 12, 2026 … by xenaproject”（未给时刻）；第 29 行：“The summary is: there is an important signal that can be extracted from Lean code, but if this code is AI-generated then you need to do some tests first.”；HN `50515058` 北京 11-16 15:38 提交，23:59 为 162 分 / 59 评。观点文，照原文措辞；作者自述曾受 Anthropic 之请查看其费马大定理 Lean 形式化代码（第 59 行）。替换撤下的 ECB、Barr 两条，补足 5 条下限。 |
 | 据韩联社报道，韩国税务师考试第一名自称用 AI 作弊并向警方自首，警方调查中 | L4 | ⚠️ | https://www.yna.co.kr/view/MYH20261116020700038 （`c-c5-yna.txt`）；BBC 韩文 `c-c5-bbc.txt`；Korea Herald `c-c5-koreaherald2.txt`；电子新闻 `c-c5-etnews.txt` | 韩联社（北京 11-16 22:56）第 119、129 行：“세무사 시험에서 인공지능으로 부정행위를 했다고 자수한 수석 합격자 A 씨”；“경찰에 자수서를 낸 데 이어 … 서울경찰청 광역범죄수사단에 … 범행 도구도 여러 점 제출”；标题“이르면 내일 소환”。方式为微型摄像头拍题、发给生成式 AI、手机看答案（Korea Herald 2）；本人否认用 AI 眼镜；公团称将告诉并推进取消合格，财经部“检讨”中止资格效力，均未决定；主管机关官网原文未取到。 |
 
-速览不收：华为云 CloudRobo-WM1.2（发布后官方稿未找到；扫描的 98.35% 实为另一模型 CR-VLA-Dual 在 Libero 的成功率，88.98%/81.7% 只见 TPS 转述幻灯）；Xena 博客“Lean 检查过的定理”（11-12 观点文，HN 162 分，未点名谷歌 Weil 形式化）；其余见派工单 C 组“不收”。
+速览不收：欧洲央行副行长 Vujčić、美联储理事 Barr 讲话（外国官员讲话，按风控默认不收，待 Develata 决定是否加回；取证与原句见 `evidence-c.md` C2、C3）；华为云 CloudRobo-WM1.2（发布后官方稿未找到；扫描的 98.35% 实为另一模型 CR-VLA-Dual 在 Libero 的成功率，88.98%/81.7% 只见 TPS 转述幻灯）；其余见派工单 C 组“不收”。
 
 ## 批注译注
 
@@ -125,3 +124,13 @@ Qwen 博客 https://qwen.ai/blog?id=qwen4-max （opencli 渲染：`a-qwen-blog-z
 - SHOULD_FIX `16-ghsa-bypass` 上方“Should be fixed in 1.75.4”紧挨研究者来信，易读成绕过 1.75.4 → 采纳，改为 `16-ghsa-reply`：裁掉维护者回复，标题注明“研究者11月2日来信”。
 - SHOULD_FIX `07-vals-rows` 无关行太多、看不清 → 部分采纳：改为表头加两行拼接的 `07-vals-q`，译注补 ± 值；源截图是 1 倍像素比，窄屏重截时页面换成移动版排版，取不到更清晰的表，未再放大。
 重渲后 Claude 打开 04、07、08、16 核对。
+
+## 交付前修订
+
+北京 11-17 约 00:50，三批已推送后（advisor 复查）：
+- 速览撤下 ECB、Barr 两条（风控默认不收、Develata 未答复），补 Xena 博客一条，速览共 5 条。
+- 吠点①“AA、Vals 都没标档位”是只看榜单表下的排他结论：Vals 模型页写明 Qwen 4 Max 用 xhigh 档 → 改为“新版开 xhigh 档每次9.33美元”，AA 未标档位移到事件段。
+- 派工时刻更正为 11-16 约 23:58。
+- 横版封面胸牌放大 4 倍读作「咲点」→ 重出横版一张，胸牌正确（见 `images/README.md` 封面节）。
+- 交付前补看 02、04、09、14 成图与两张封面胸牌。
+这些改动之后未再做跨模型复核。
