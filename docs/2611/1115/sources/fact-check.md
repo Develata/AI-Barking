@@ -54,10 +54,12 @@ Qwen 博客 https://qwen.ai/blog?id=qwen4-max （opencli 渲染：`a-qwen-blog-z
 | 文中事实 | 级 | 结果 | 一手来源 | 备注（条件、时区、口径） |
 |---|---|---|---|---|
 | 苹果招最多20万名符合条件的美国用户研究健康 AI，称数据不用于训练模型 | L1 | ✅ | https://www.apple.com/newsroom/2026/11/apple-launches-research-study-to-explore-the-use-of-ai-for-health/ （`c-c1-apple.txt`） | 官方只写 November 15, 2026（未给时刻）。第 78 行：“open to up to 200,000 eligible participants age 21 and older across the United States … (iPhone 15 Pro or later) running iOS 26 or later”；第 70 行：“study data will not be used to train AI models”。“符合条件”= 21 岁以上、支持 Apple Intelligence 的 iPhone 15 Pro 及以上且 iOS 26 以上（反向核验 SHOULD_FIX 8）。参与者用的是 OpenEvidence 的医学 AI。TechCrunch 写 “iPhone 15 or later”，与官方不一致；“约12个月”“发第三方云前匿名化”只见 TechCrunch（L4），不进速览。 |
-| 数学博客 Xena 称 Lean 代码有重要信号，但若由 AI 生成，要先做检查 | L1（作者自有博客，观点） | ✅ | https://xenaproject.wordpress.com/2026/11/12/and-the-proof-is-checked-in-lean/ （`c-c6-xena.txt`） | “Posted on November 12, 2026 … by xenaproject”（未给时刻）；第 29 行：“The summary is: there is an important signal that can be extracted from Lean code, but if this code is AI-generated then you need to do some tests first.”；HN `50515058` 北京 11-16 15:38 提交，23:59 为 162 分 / 59 评。观点文，照原文措辞；作者自述曾受 Anthropic 之请查看其费马大定理 Lean 形式化代码（第 59 行）。替换撤下的 ECB、Barr 两条，补足 5 条下限。 |
+| 欧洲央行副行长称 AI 风险来源增多：融资从股市扩展到债市、敞口集中、网络攻击 | L1 | ✅ | https://www.ecb.europa.eu/press/key/date/2026/html/ecb.sp261116~db374b56ab.en.html （`c-c2-ecb-en.txt`） | 11-16 Euro Finance Week 演讲（官方未给时刻）。原句：“AI-related risks to system-wide stability now stem from a range of additional factors – the expansion of external funding from equity to debt markets, concentration of exposures, quickening AI adoption and potential cyberattacks.” 第 1116 行 5.5 万亿美元是“主要美国科技企业到2030年累计资本开支”的预测（未署出处），Reuters 写成 financing need；速览不写这个数。“扩展到”照 expansion 译（反向核验 SHOULD_FIX 7）。外国官员讲话，Develata 11-17 决定收录。 |
+| 美联储理事 Barr 称大银行报告 AI 智能体试图操作客户账户，授权无法核实 | L1 | ✅ | https://www.federalreserve.gov/newsevents/speech/barr20261116a.htm （`c-c3-barr.txt`） | 11-16 米兰演讲（官方未给时刻）。第 637 行：“major banks now report finding AI agents attempting to take actions in retail customer accounts, without the bank being able to verify authenticity, consent, and alignment with customer instructions.” 无次数、金额、银行名单；脚注 1 称个人观点；挤兑句为 may/could 假设。“授权无法核实”对应 consent 与 alignment with customer instructions 无法核实。外国官员讲话，Develata 11-17 决定收录。 |
+| 数学博客 Xena 称 Lean 代码有重要信号，但若由 AI 生成，要先做检查 | L1（作者自有博客，观点） | ✅ | https://xenaproject.wordpress.com/2026/11/12/and-the-proof-is-checked-in-lean/ （`c-c6-xena.txt`） | “Posted on November 12, 2026 … by xenaproject”（未给时刻）；第 29 行：“The summary is: there is an important signal that can be extracted from Lean code, but if this code is AI-generated then you need to do some tests first.”；HN `50515058` 北京 11-16 15:38 提交，23:59 为 162 分 / 59 评。观点文，照原文措辞；作者自述曾受 Anthropic 之请查看其费马大定理 Lean 形式化代码（第 59 行）。撤下 ECB、Barr 时补入，两条加回后保留。 |
 | 据韩联社报道，韩国税务师考试第一名自称用 AI 作弊并向警方自首，警方调查中 | L4 | ⚠️ | https://www.yna.co.kr/view/MYH20261116020700038 （`c-c5-yna.txt`）；BBC 韩文 `c-c5-bbc.txt`；Korea Herald `c-c5-koreaherald2.txt`；电子新闻 `c-c5-etnews.txt` | 韩联社（北京 11-16 22:56）第 119、129 行：“세무사 시험에서 인공지능으로 부정행위를 했다고 자수한 수석 합격자 A 씨”；“경찰에 자수서를 낸 데 이어 … 서울경찰청 광역범죄수사단에 … 범행 도구도 여러 점 제출”；标题“이르면 내일 소환”。方式为微型摄像头拍题、发给生成式 AI、手机看答案（Korea Herald 2）；本人否认用 AI 眼镜；公团称将告诉并推进取消合格，财经部“检讨”中止资格效力，均未决定；主管机关官网原文未取到。 |
 
-速览不收：欧洲央行副行长 Vujčić、美联储理事 Barr 讲话（外国官员讲话，按风控默认不收，待 Develata 决定是否加回；取证与原句见 `evidence-c.md` C2、C3）；华为云 CloudRobo-WM1.2（发布后官方稿未找到；扫描的 98.35% 实为另一模型 CR-VLA-Dual 在 Libero 的成功率，88.98%/81.7% 只见 TPS 转述幻灯）；其余见派工单 C 组“不收”。
+速览不收：华为云 CloudRobo-WM1.2（发布后官方稿未找到；扫描的 98.35% 实为另一模型 CR-VLA-Dual 在 Libero 的成功率，88.98%/81.7% 只见 TPS 转述幻灯）；其余见派工单 C 组“不收”。
 
 ## 批注译注
 
@@ -134,3 +136,5 @@ Qwen 博客 https://qwen.ai/blog?id=qwen4-max （opencli 渲染：`a-qwen-blog-z
 - 横版封面胸牌放大 4 倍读作「咲点」→ 重出横版一张，胸牌正确（见 `images/README.md` 封面节）。
 - 交付前补看 02、04、09、14 成图与两张封面胸牌。
 这些改动之后未再做跨模型复核。
+
+北京 11-17 01:48，Develata 决定欧洲央行、美联储 Barr 两条都加回速览；Xena 一条保留，速览共 7 条。加回的两条措辞与第一轮反向核验后一致，未再做跨模型复核。

@@ -22,10 +22,10 @@
 ## 速览
 
 - [Apple 健康 AI 研究](https://www.apple.com/newsroom/2026/11/apple-launches-research-study-to-explore-the-use-of-ai-for-health/)（官方日期 11-15）。TechCrunch 把机型写成“iPhone 15 or later”，官方是 15 Pro 及以上；“约 12 个月”只见 TechCrunch。
-- 未收（风控默认，待 Develata 决定是否加回）：[欧洲央行副行长 Vujčić 演讲](https://www.ecb.europa.eu/press/key/date/2026/html/ecb.sp261116~db374b56ab.en.html)（11-16）。5.5 万亿美元是“到 2030 年累计资本开支预测”，Reuters 写成 financing need；速览不写这个数。
-- 未收（同上）：[美联储理事 Barr 演讲](https://www.federalreserve.gov/newsevents/speech/barr20261116a.htm)（11-16，脚注称个人观点）。
+- [欧洲央行副行长 Vujčić 演讲](https://www.ecb.europa.eu/press/key/date/2026/html/ecb.sp261116~db374b56ab.en.html)（11-16）。5.5 万亿美元是“到 2030 年累计资本开支预测”，Reuters 写成 financing need；速览不写这个数。
+- [美联储理事 Barr 演讲](https://www.federalreserve.gov/newsevents/speech/barr20261116a.htm)（11-16，脚注称个人观点）。
 - [韩联社：税务师考试第一名自首](https://www.yna.co.kr/view/MYH20261116020700038)（北京 11-16 22:56）。中文媒体“AI 智能眼镜作弊”是早期指控，本人自述为微型摄像头 + 生成式 AI + 手机；主管机关原文未取到。当事人姓名不入正文与卡片。
-- [Xena 博客：怎么理解“Lean 检查过”](https://xenaproject.wordpress.com/2026/11/12/and-the-proof-is-checked-in-lean/)（11-12，HN 北京 11-16 15:38 提交、162 分），撤下 ECB、Barr 后补入。
+- [Xena 博客：怎么理解“Lean 检查过”](https://xenaproject.wordpress.com/2026/11/12/and-the-proof-is-checked-in-lean/)（11-12，HN 北京 11-16 15:38 提交、162 分），撤下 ECB、Barr 时补入；两条外国官员讲话经 Develata 11-17 决定加回，Xena 保留。
 - 未收：华为云 CloudRobo-WM1.2（发布后官方稿未找到；扫描的 98.35% 实为 CR-VLA-Dual）；IMF 总裁“超 1 万亿循环融资”（底稿不明）；美国与盟友 AI 供应链合作（未读到宣言原文、涉外国政府）；黄仁勋复任传闻（FT 匿名信源，风控）；Project Zero（1114 已收）。
 
 ## 备注
