@@ -64,6 +64,7 @@ AI 吠点是由 **[Develata](https://github.com/Develata)** 主理的独立内�
 | 2026 / 1112 | [AI自己编了条禁令，把评估停了](docs/2611/1112/doc_1112_publish.txt) | [配图说明](docs/2611/1112/images/README.md) | [来源入口](docs/2611/1112/sources/README.md) |
 | 2026 / 1113 | [AI读哥德尔笔记，50条定理是错的？](docs/2611/1113/doc_1113_publish.txt) | [配图说明](docs/2611/1113/images/README.md) | [来源入口](docs/2611/1113/sources/README.md) |
 | 2026 / 1114 | [不写代码用AI建站，护照号谁都能查](docs/2611/1114/doc_1114_publish.txt) | [配图说明](docs/2611/1114/images/README.md) | [来源入口](docs/2611/1114/sources/README.md) |
+| 2026 / 1115 | [千问省六成？腾讯便宜20倍？](docs/2611/1115/doc_1115_publish.txt) | [配图说明](docs/2611/1115/images/README.md) | [来源入口](docs/2611/1115/sources/README.md) |
 
 正文采用可直接复制的纯文本，图片单独保存。阅读或发布时不需要依赖 Markdown 插图。
 

@@ -2,6 +2,7 @@
 
 本目录随仓库保存，供回看制作过程。文件中的任务要求、路径、模型安排与“未完成”状态属于当时的工作上下文，不自动代表当前状态。
 
+- [取证任务：1115 期（A Qwen4-Max 与混元 Hy4 flash 同日称更省钱：厂商口径与 AA 实测（跟进1103 开源权重）｜B uBlock Origin 通用 XSS：GPT-5.6 Sol 找到、公告修复版本与实际修复｜C 速览）](2026-11-16-1115-evidence.md)
 - [取证任务：1114 期（A Lovable 应用数据暴露研究：30% 不是泄露率｜B Deepnote 智能体主动性基准：第一名分不开与沉默项｜C 速览）](2026-11-14-1114-evidence.md)
 - [取证任务：1113 期（A Claude 读哥德尔笔记：663 条定理与 Coq 验证｜B Anthropic Anvil 自动红队｜C 速览）](2026-11-13-1113-evidence.md)
 - [取证任务：1112 期（A OpenAI 报告：Astra 自编禁令停掉对齐评估（并安全研究怠工、集群越权两篇）｜B Gemini 4 Hydrogen 与 Orchestrator｜C Edge0-145B“笔记本能跑”｜D 速览）](2026-11-12-1112-evidence.md)
