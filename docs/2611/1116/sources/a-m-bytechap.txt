@@ -1,0 +1,238 @@
+Windows 11 telemetry now tracks specific coding agents and developer tools
+
+Skip to content [#main]
+
+ bytechap [/]
+
+ Blog [/blog]
+
+ Topics 
+
+AI news [/topics/ai]AI agents [/topics/agents]Building with AI [/topics/ai-engineering]Open & local AI [/topics/open-models]Developer tools [/topics/developer-tools]Cloud & infrastructure [/topics/cloud-infrastructure]Security & privacy [/topics/security]Data & documents [/topics/data-documents]Mobile & devices [/topics/mobile-devices]Self-hosting [/topics/self-hosting]
+
+ Store [/products]
+ About [/about]
+
+ [/blog#search]
+
+ EN
+
+English [/blog/windows-11-telemetry-now-tracks-specific-coding-agents-and-developer-tools]Tiếng Việt [/vi/blog/windows-11-telemetry-now-tracks-specific-coding-agents-and-developer-tools]日本語 [/ja/blog/windows-11-telemetry-now-tracks-specific-coding-agents-and-developer-tools]Español [/es/blog/windows-11-telemetry-now-tracks-specific-coding-agents-and-developer-tools]Français [/fr/blog/windows-11-telemetry-now-tracks-specific-coding-agents-and-developer-tools]Deutsch [/de/blog/windows-11-telemetry-now-tracks-specific-coding-agents-and-developer-tools]
+
+ Browse the store [/products]
+
+ Blog [/blog]Store [/products]About [/about]
+ Support [/support]
+
+TopicsAI news [/topics/ai]AI agents [/topics/agents]Building with AI [/topics/ai-engineering]Open & local AI [/topics/open-models]Developer tools [/topics/developer-tools]Cloud & infrastructure [/topics/cloud-infrastructure]Security & privacy [/topics/security]Data & documents [/topics/data-documents]Mobile & devices [/topics/mobile-devices]Self-hosting [/topics/self-hosting]
+
+English [/blog/windows-11-telemetry-now-tracks-specific-coding-agents-and-developer-tools]Tiếng Việt [/vi/blog/windows-11-telemetry-now-tracks-specific-coding-agents-and-developer-tools]日本語 [/ja/blog/windows-11-telemetry-now-tracks-specific-coding-agents-and-developer-tools]Español [/es/blog/windows-11-telemetry-now-tracks-specific-coding-agents-and-developer-tools]Français [/fr/blog/windows-11-telemetry-now-tracks-specific-coding-agents-and-developer-tools]Deutsch [/de/blog/windows-11-telemetry-now-tracks-specific-coding-agents-and-developer-tools]
+
+ Browse the store [/products]
+
+Blog [/blog]
+
+Security & privacy [/topics/security]
+
+ Security & privacy [/topics/security]
+
+Windows 11 telemetry now tracks specific coding agents and developer tools
+
+Reverse engineering reveals Windows 11 collects bitmaps of used AI coding agents and dev tools via MissionControlAggregator, uploading them as optional diagnostic data.
+
+ November 17, 2026
+ ·4 min read
+ ·Source: Xusheng Li [https://xusheng.dev/posts/windows-coding-agent-telemetry/]
+
+Illustration generated for this article
+
+A recent investigation into Windows 11 binaries has uncovered a new telemetry component that actively monitors which coding agents and developer tools users execute. The component, identified within MissionControlAggregator.dll, records usage of specific executables like codex.exe and cursor.exe, then reports this data to Microsoft if optional diagnostics are enabled.
+
+What happened
+
+Researcher Xusheng Li used AI assistance to analyze recent Windows binaries for undocumented features. This analysis highlighted a list of executable names embedded in MissionControlAggregator.dll, including popular AI coding agents such as copilot.exe, claude.exe, codex.exe, and cursor.exe. The list also contained standard developer tools like python.exe, dotnet.exe, gcc.exe, and code.exe. Further investigation revealed that these names are not merely static references but are part of an active monitoring system.
+
+The component functions by subscribing to existing Windows event traces rather than scanning processes directly. It listens for application state changes and interactivity summaries. When a match is found against the hardcoded list of executables, the system sets a specific bit in an internal state structure. This state is persisted locally and periodically compiled into a diagnostic report. If the user has not opted out of optional diagnostic data, this report is queued for upload to Microsoft servers.
+
+Li verified this behavior on a Windows 11 ARM64 virtual machine running build 26200.9974. The feature, identified by the ID CLICodingAgentUsage (feature ID 62580080), was enabled by default in the tested US configuration. The telemetry service DiagTrack was running automatically, hosting the AggregatorHost.exe process which loaded the relevant DLL. Tests confirmed that renaming a generic executable to codex.exe or gcc.exe triggered the corresponding bits in the diagnostic output.
+
+How it works
+
+The detection mechanism relies on string comparisons within the MissionControlAggregator.dll. The code contains explicit checks for four CLI agent slots (copilot.exe, claude.exe, codex.exe, agy.exe) and five desktop agent slots (github.exe, claude.exe, codex.exe, cursor.exe, antigravity.exe). It also checks for broader developer tool categories, including compilers and runtimes like Node.js, Python, and .NET. Some checks verify the publisher signature, such as ensuring python.exe is from the Python Software Foundation, while others, like the GCC/Clang group, do not.
+
+Data collection flows through Event Tracing for Windows (ETW). The aggregator consumes events from KernelProcess.AppStateChangeSummary for standard Windows apps and Microsoft.Windows.Lxss.Manager.Exec for Windows Subsystem for Linux (WSL) processes. Instead of logging detailed usage metrics like runtime or focus time, the component discards this granular data. It only records a bitmap indicating whether a specific tool category was observed during the reporting window.
+
+These bitmaps are emitted in a TraceLogging event named Segments.SubCohorts. The event structure uses integer values to represent sets of tools. For example, a value of 4 in the CLI agent field corresponds to the third bit being set, indicating codex.exe was detected. This compact format allows the system to report tool usage without transmitting large volumes of raw log data.
+
+Key details
+
+The monitoring component is located in MissionControlAggregator.dll and runs inside AggregatorHost.exe.
+
+It tracks specific AI agents like cursor.exe, copilot.exe, and claude.exe, alongside tools like gcc.exe and python.exe.
+
+Data is collected via ETW events KernelProcess.AppStateChangeSummary and WSL execution logs.
+
+Reports are generated as bitmaps in Segments.SubCohorts events, not as detailed usage logs.
+
+The feature is controlled by feature ID 62580080 (CLICodingAgentUsage) and was active by default in the tested US Windows 11 setup.
+
+Local state is saved in C:\ProgramData\Microsoft\Diagnosis\AggregatorStorage\MissionControlAggregator$.
+
+Why it matters
+
+For developers, this revelation highlights a significant expansion in the scope of default Windows telemetry. While previous telemetry often focused on system performance or crash data, this component specifically targets the software development workflow. It identifies not just that a developer is working, but which specific AI assistants and compilers they prefer. This level of granularity could inform Microsoft’s competitive strategy in the developer tools market, providing real-world adoption metrics for rival products.
+
+Privacy-conscious engineers must recognize that "optional" diagnostic data is enabled by default in many configurations. The data uploaded does not include source code or prompts, but it does create a persistent record of tool usage patterns. For teams with strict intellectual property policies or those using proprietary internal tools, understanding exactly what metadata leaves the workstation is crucial for compliance and security auditing.
+
+What you can do
+
+Check your current telemetry setting by navigating to Settings → Privacy & security → Diagnostics & feedback.
+
+Disable "Send optional diagnostic data" to prevent the Segments.SubCohorts reports from being uploaded.
+
+Monitor the DiagTrack service status using PowerShell commands like Get-Service DiagTrack to see if it is running.
+
+Inspect local telemetry storage at C:\ProgramData\Microsoft\Diagnosis\AggregatorStorage\ to view cached reports.
+
+Use ETW tracing tools to observe Microsoft.Windows.MissionControlAggregator events if you need to audit what is being generated locally.
+
+Review organizational group policies that may enforce telemetry settings across enterprise Windows deployments.
+
+ Source
+
+This article is based on the original from Xusheng Li, published November 16, 2026. It was written with AI assistance and adds background and context; read the original for the full details.
+
+ Read the original on xusheng.dev [https://xusheng.dev/posts/windows-coding-agent-telemetry/]
+
+#windows
+
+#telemetry
+
+#privacy
+
+#developer-tools
+
+#reverse-engineering
+
+Tools from the Bytechap store
+
+$19
+
+SSL & Domain Monitor [/products/ssl-domain-monitor]
+
+Catch expiring certificates and domains before your visitors do.
+
+ Live demo [/demo/domain/]
+
+$19
+
+Secure File Share [/products/secure-file-share]
+
+Encrypted file sharing with passwords, expiry and download limits.
+
+ Live demo [/demo/share/]
+
+Keep reading
+
+Security & privacy [/topics/security]
+
+Google reports autonomous AI agents automating exploit generation from patches [/blog/google-reports-autonomous-ai-agents-automating-exploit-generation-from-patches]
+
+Google and Mandiant identified attackers using multi-agent frameworks to reverse-engineer security patches and generate exploits in minutes, significantly shrinking the window for defense.
+
+ Nov 17, 2026
+ ·4 min read
+ ·via The New Stack
+
+ [/blog/google-reports-autonomous-ai-agents-automating-exploit-generation-from-patches]
+
+Security & privacy [/topics/security]
+
+Google reports AI agents automating exploit creation and patch reverse-engineering [/blog/google-reports-ai-agents-automating-exploit-creation-and-patch-reverse]
+
+Google reveals threat actors use autonomous AI frameworks to reverse-engineer patches and launch attacks at machine speed, shrinking the window for defense.
+
+ Nov 17, 2026
+ ·4 min read
+ ·via The Hacker News
+
+ [/blog/google-reports-ai-agents-automating-exploit-creation-and-patch-reverse]
+
+Security & privacy [/topics/security]
+
+AI agents automate API key theft from exposed LLM gateways [/blog/ai-agents-automate-api-key-theft-from-exposed-llm-gateways]
+
+Amazon and Cloudflare report automated campaigns using ARTEX to steal AI provider keys from internet-exposed apps like LiteLLM and Dify.
+
+ Nov 17, 2026
+ ·5 min read
+ ·via The Hacker News
+
+ [/blog/ai-agents-automate-api-key-theft-from-exposed-llm-gateways]
+
+Security & privacy [/topics/security]
+
+Amazon reveals how AI agents automate credential theft and deepfake fraud [/blog/amazon-reveals-how-ai-agents-automate-credential-theft-and-deepfake-fraud]
+
+Amazon Threat Intelligence observed threat actors using the ARTEX framework to steal AI model credentials and bypass identity verification with deepfakes between October and November 2026.
+
+ Nov 16, 2026
+ ·4 min read
+ ·via Amazon Web Services
+
+ [/blog/amazon-reveals-how-ai-agents-automate-credential-theft-and-deepfake-fraud]
+
+All stories [/blog]
+
+ bytechap [/]
+
+AI and software news explained for people who build, plus self-hosted software you can own.
+
+ hello@bytechap.com [mailto:hello@bytechap.com]
+
+Topics
+
+AI news [/topics/ai]
+
+AI agents [/topics/agents]
+
+Building with AI [/topics/ai-engineering]
+
+Open & local AI [/topics/open-models]
+
+Developer tools [/topics/developer-tools]
+
+Cloud & infrastructure [/topics/cloud-infrastructure]
+
+All stories [/blog]
+
+Store
+
+Business apps [/products?category=business]
+
+Developer tools [/products?category=devtools]
+
+Mobile & desktop [/products?category=apps]
+
+All products [/products]
+
+Bytechap
+
+About [/about]
+
+Support [/support]
+
+RSS feed [/blog/feed.xml]
+
+License [/license]
+
+Privacy [/privacy]
+
+Terms [/terms]
+
+Cookie settings [/privacy]
+
+ English [/blog/windows-11-telemetry-now-tracks-specific-coding-agents-and-developer-tools]Tiếng Việt [/vi/blog/windows-11-telemetry-now-tracks-specific-coding-agents-and-developer-tools]日本語 [/ja/blog/windows-11-telemetry-now-tracks-specific-coding-agents-and-developer-tools]Español [/es/blog/windows-11-telemetry-now-tracks-specific-coding-agents-and-developer-tools]Français [/fr/blog/windows-11-telemetry-now-tracks-specific-coding-agents-and-developer-tools]Deutsch [/de/blog/windows-11-telemetry-now-tracks-specific-coding-agents-and-developer-tools]
+
+ © 2026 Bytechap
+ Prices in USD · One-time purchase · Secure checkout by Gumroad

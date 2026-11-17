@@ -1,0 +1,267 @@
+Windows 11 Collects Data on Coding Agents and Developer Tools You Use | LavX News
+
+Skip to content [#main-content]
+
+LavX
+News [/]
+
+Open Source [/category/open-source]
+Open Source Security [/category/open-source-security]Open Source Apps [/category/open-source-apps]Open Source Infrastructure [/category/open-source-infra]Open Source AI [/category/open-source-ai]Open Source Dev Tools [/category/open-source-devtools]
+
+Trends [/category/trends]
+Regulation [/category/regulation]Business [/category/business]Startups [/category/startups]
+
+Hardware [/category/hardware]
+Chips [/category/chips]Laptops [/category/laptops]Smartphones [/category/smartphones]
+
+Cloud [/category/cloud]
+DevOps [/category/devops]Serverless [/category/serverless]Infrastructure [/category/infrastructure]
+
+Security [/category/security]
+Vulnerabilities [/category/vulnerabilities]Privacy [/category/privacy]Cybersecurity [/category/cybersecurity]
+
+Dev [/category/dev]
+Python [/category/python]Rust [/category/rust]Mobile [/category/mobile]Backend [/category/backend]Frontend [/category/frontend]
+
+AI [/category/ai]
+Robotics [/category/robotics]LLMs [/category/llms]Machine Learning [/category/machine-learning]
+
+BookmarksSign In
+
+English
+Sign In
+
+#Privacy
+
+Windows 11 Collects Data on Coding Agents and Developer Tools You Use
+
+Nov 17, 2026, 12:48 AM UTC•
+
+Lukas Brandt [/author/lukas-brandt]
+•4 min read
+
+Share this article
+
+Save
+
+Advertisement
+
+Advertise on LavX NewsSee options [/advertise]
+
+Xusheng Li found that Windows 11's MissionControlAggregator records which coding agents and developer tools run on a PC and queues a usage bitmap for upload when optional diagnostic data is enabled. In the U.S. setup tested, optional diagnostic data was enabled.
+
+Xusheng Li reported Nov. 16, 2026, that a Windows 11 system component records which coding agents and developer tools run on a PC and queues a usage bitmap for upload when optional diagnostic data is enabled.
+
+The component is MissionControlAggregator.dll. DiagTrack, the Connected User Experiences and Telemetry service, starts AggregatorHost.exe, and that process loads the DLL. MissionControlAggregator does not scan running processes. It subscribes to Windows events that already carry application identities, then matches those identities against built-in lists.
+
+Xusheng Li found the lists while asking an AI assistant to scan recent Windows binaries for undocumented features. The assistant returned executable names that included coding agents and familiar developer tools. The names sat inside MissionControlAggregator.dll. Following references led from string comparisons to a running component that records matches, saves them locally and reports them through Windows Diagnostics.
+
+Four CLI agent slots check copilot.exe, claude.exe, codex.exe and agy.exe, with extensionless equivalents on the WSL route. Five desktop agent slots check github.exe, claude.exe, codex.exe, cursor.exe and antigravity.exe. A feature named CLICodingAgentUsage, feature ID 62580080, guards the agent checks. The list extends beyond AI agents. The same component checks node.exe, python.exe, dotnet.exe, gcc.exe, clang.exe, gdb.exe, javac.exe, devenv.exe and code.exe, among others. Those checks feed 12 broader developer-tool categories.
+
+Some slots also verify the publisher. The Node.js slot expects Node.js Foundation. The Python slot expects Python Software Foundation. The .NET and Visual Studio slots expect Microsoft Corporation. The compiler and debugger group that contains GCC and Clang has no publisher check in this path.
+
+For Windows programs, the aggregator consumes KernelProcess.AppStateChangeSummary and Win32kTraceLogging.AppInteractivitySummary. These events provide application identities that handlers parse and pass to the matchers. For WSL, the aggregator consumes Microsoft.Windows.Lxss.Manager.Exec and ExecCritical and uses the imageName field. A native Windows codex.exe can reach the CLI-agent checks through the app-state summary route, so collection covers Windows executables as well as programs launched inside WSL.
+
+A successful match sets a slot in aggregator state. Later, ReportCohorts<12,4,5> converts those slots into bitsets and emits a self-describing TraceLogging event named Segments.SubCohorts. The numbers correspond to 12 broader tool categories, four CLI agents and five desktop agents. The report stores a bitmap of which agents were observed during the reporting window. Executable names do not appear in the report. The source events also include runtime, time in focus, interaction counters and resource usage, but the component discards those details. Timestamps in the report describe the collection window, not how long each agent ran.
+
+The aggregator saves state on disk at:
+
+C:\ProgramData\Microsoft\Diagnosis\AggregatorStorage\MissionControlAggregator
+
+To test the finding, Xusheng Li copied cmd.exe to a file named codex.exe and ran it in an interactive Windows session. The name caused the component to record Codex in CLI slot 2. A separate run without an additional ETW trace also set that slot. A separate test with a copy named gcc.exe set developer-tool slot 3. In the upload queue, that report showed SubCohorts: [8], or 1 << 3, the compiler and debugger category shared by GCC and Clang.
+
+The report is treated as optional diagnostic data. In the U.S. setup Xusheng Li tested, optional diagnostic data was enabled by default and labeled Include Optional. After completing setup with those defaults, AllowTelemetry was 3, which confirms that optional diagnostic data was enabled. Xusheng Li found the agent event in DiagTrack's upload queue with isRequired set to false. That means Windows queues the coding-agent usage report for upload to Microsoft unless the user declined optional diagnostic data during setup or turned it off through Settings.
+
+The Diagtrack-Listener session on the test VM subscribed to both ends of the path. It subscribed to KernelProcess with MatchAnyKeyword=0x400000000002, which includes the summary keyword 0x400000000000, and to Microsoft.Windows.MissionControlAggregator with MatchAnyKeyword=0xe00000000000, which includes the report keyword 0x800000000000. Both subscriptions used level 255. Those subscriptions show where the report can go. The upload queue check shows that Windows queued it.
+
+Xusheng Li checked a clean installation of Windows 11 Home ARM64 from the latest official ISO with the region set to the United States. The public ISO's baseline VM had the coding-agent feature disabled by image default. That result does not support a claim that the feature is active on every Windows installation. On the test VM, Windows 11 build 26200.9974 with MissionControlAggregator.dll version 10.0.26100.9818, the feature and DiagTrack were active before testing. DiagTrack ran with startup type Automatic.
+
+Xusheng Li found no prompt text or source code in the report. The report still records which agents and developer tools a person uses, and that has privacy implications.
+
+Users can decline optional diagnostics during setup. Users can turn off Send optional diagnostic data under Settings, Privacy & security, Diagnostics & feedback. Microsoft's diagnostics and privacy guide explains the change.
+
+Xusheng Li published the full investigation, including PowerShell queries and ETW captures, at xusheng.dev [https://xusheng.dev/posts/windows-coding-agent-telemetry/].
+
+Source:Windows 11 Is Collecting Data on Which Coding Agents and Developer Tools You Use [https://xusheng.dev/posts/windows-coding-agent-telemetry], Xusheng Li, Nov 16, 2026
+
+#Windows 11 [/tag/windows-11]#Telemetry [/tag/telemetry]#privacy [/tag/privacy]#Coding Agents [/tag/coding-agents]#Developer Tools [/tag/developer-tools]
+
+Advertisement
+
+Advertise on LavX NewsSee options [/advertise]
+
+Previous ArticleApple expands Apple Intelligence beta testing in China to iPads and Macs
+ [/article/apple-expands-apple-intelligence-beta-testing-in-china-to-ipads-and-macs]
+Next ArticleMichael Bacarella Recalls Dennis Moran's Role in the 2000 DDoS Attacks
+ [/article/michael-bacarella-recalls-dennis-moran-s-role-in-the-2000-ddos-attacks]
+
+You might also like
+
+Apple lets Mac users limit broad app access to chosen folders
+
+Starting in macOS 27.3, some apps that request Full Disk Access or System & App Protection Override can receive access only to the folders or apps you select. Apple's change gives Mac users a way to keep system protections in place for the rest of their data.
+
+ [/article/apple-lets-mac-users-limit-broad-app-access-to-chosen-folders]
+
+macOS 27.3 splits device-control permission, redesigns Full Disk Access consent
+
+Apple's macOS 27.3 beta splits the unified Device Control and Data Access permission into Accessibility and System and App Protection Override categories, redesigns Full Disk Access consent, and adds per-request permission plus a menu bar indicator. Existing grants remain in effect.
+
+ [/article/macos-27-3-splits-device-control-permission-redesigns-full-disk-access-consent]
+
+NYC taxi data release shows limits of hashing small ID sets
+
+In 2014, New York City released taxi trip and fare logs with license and medallion numbers hashed by MD5. The privacy risk came from the small set of possible IDs, which made a known hash function reversible by brute force.
+
+ [/article/nyc-taxi-data-release-shows-limits-of-hashing-small-id-sets]
+
+Comments
+
+Please log in or register to join the discussion
+
+Log InRegister
+
+Loading comments...
+
+ Back to Home [/]
+
+Editor's Choice
+
+Chips
+
+ Judge Allows DRAM Supply Conspiracy Suit Against Samsung, SK Hynix, Micron to Proceed
+
+A federal judge in California denied the three memory makers' motion to dismiss a class action claiming they conspired to restrict conventional DRAM supply whil…
+
+ [/article/judge-allows-dram-supply-conspiracy-suit-against-samsung-sk-hynix-micron-to-proceed]
+
+Popular news
+View all [/category/popular]
+
+Hardware
+
+ OpenAI Explores Nvidia Alternatives for AI Inference, Tests Cerebras and Groq Hardware
+
+ [/article/openai-explores-nvidia-alternatives-for-ai-inference-tests-cerebras-and-groq-hardware]
+
+Dev
+
+ Beyond Package Management: How Nix Revolutionized One Developer's Digital Chaos
+
+ [/article/beyond-package-management-how-nix-revolutionized-one-developer-s-digital-chaos]
+
+AI
+
+ The Quiet Rebellion: Top Smartphones That Resist the AI Onslaught
+
+ [/article/the-quiet-rebellion-top-smartphones-that-resist-the-ai-onslaught]
+
+Trends
+
+ Denmark Ends Open Source Office Pilot in Silence
+
+ [/article/denmark-ends-open-source-office-pilot-in-silence]
+
+Dev
+
+ OpenBSD Developers Reject uutils Coreutils Port Over Licensing and Compatibility Concerns
+
+ [/article/openbsd-developers-reject-uutils-coreutils-port-over-licensing-and-compatibility-concerns]
+
+Advertisement
+
+Advertise on LavX NewsSee options [/advertise]
+
+Latest
+View all [/latest]
+
+10:50
+
+ China's Shenyang institute 3D-prints a 16.4-foot load-bearing aircraft structure in segments
+
+ [/article/china-s-shenyang-institute-3d-prints-a-16-4-foot-load-bearing-aircraft-structure-in-segments]10:17
+
+ Numa raises $45 million to help car dealerships cut paperwork
+
+ [/article/numa-raises-45-million-to-help-car-dealerships-cut-paperwork]10:10
+
+ Mem to shut down in January, with notes read-only from December
+
+ [/article/mem-to-shut-down-in-january-with-notes-read-only-from-december]09:47
+
+ N-able patches 17 N-central flaws as attackers exploit earlier bugs to deploy crypto miners
+
+ [/article/n-able-patches-17-n-central-flaws-as-attackers-exploit-earlier-bugs-to-deploy-crypto-miners]09:08
+
+ Redict, the copyleft Redis fork, is deprecated after Redict 7.3.6
+
+ [/article/redict-the-copyleft-redis-fork-is-deprecated-after-redict-7-3-6]08:46
+
+ Meta tests Direct, a standalone messaging app for Instagram inboxes
+
+ [/article/meta-tests-direct-a-standalone-messaging-app-for-instagram-inboxes]
+
+Popular Tags
+View all [/tag/ai]
+
+#AI4505 [/tag/ai]#Open Source1764 [/tag/open-source]#Security1624 [/tag/security]#Apple1458 [/tag/apple]#privacy1185 [/tag/privacy]#Cybersecurity1133 [/tag/cybersecurity]#Microsoft1057 [/tag/microsoft]#Hardware994 [/tag/hardware]#Infrastructure841 [/tag/infrastructure]#Remote Code Execution827 [/tag/remote-code-execution]#API816 [/tag/api]#AI_Agents811 [/tag/ai-agents]#regulation804 [/tag/regulation]#Linux794 [/tag/linux]#Windows784 [/tag/windows]#OpenAI751 [/tag/openai]#Gaming704 [/tag/gaming]#Developer Tools673 [/tag/developer-tools]#Cloud668 [/tag/cloud]#Performance652 [/tag/performance]
+
+Quick Links
+
+GuidesTutorials & how-to articles [/guides]GlossaryTech terms explained [/glossary]
+
+Subscribe to our Newsletter
+
+Get the latest tech news delivered to your inbox.
+Subscribe
+
+LavX
+News [/]
+Your trusted source for the latest tech news, AI developments, cybersecurity insights, and programming tutorials. We bring you the future, today.
+
+ [https://www.linkedin.com/company/lavx-managed-systems] [https://github.com/lavx] [https://www.facebook.com/profile.php?id=61571712924312] [https://mastodon.social/@lvxnews] [https://bsky.app/profile/lavxnews.bsky.social] [https://www.instagram.com/lavxnews]
+
+Discover
+
+Latest [/latest]
+
+Popular [/category/popular]
+
+Trends [/category/trends]
+
+Tech Glossary [/glossary]
+
+Tech Guides [/guides]
+
+Support
+
+About Us [/about]
+
+Contact Support [/about#contact]
+
+Editorial policy [/editorial-policy]
+
+Privacy Policy [/privacy]
+
+Cookie Settings
+
+Terms of Service [/terms]
+
+Copyright removal [/takedown]
+
+Advertise [/advertise]
+
+Sitemap [/sitemap.xml]
+
+LLM Feed [/llms.txt]
+
+Subscribe to our Newsletter
+
+Get the latest tech news delivered to your inbox.
+Subscribe
+
+© 2026 LavX News. All rights reserved.Site made by LavX Managed Systems [https://lavx.hu]
+
+English
+
+ [/api/rss]

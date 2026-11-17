@@ -1,0 +1,383 @@
+Win11收集AI代理数据 - 隐私风险 | 飞翔科技频道
+
+ 飞
+ 飞翔科技频道
+ [/]
+
+ 首页 [/]
+
+ 资讯▾ [/news/]
+
+ 全部资讯 [/news/]
+ 人工智能 [/category/ai/]
+ 互联网 [/category/internet/]
+ 硬件 [/category/hardware/]
+ 软件 [/category/software/]
+ 汽车科技 [/category/auto/]
+ 科学探索 [/category/science/]
+ 网络安全 [/category/security/]
+ 创投 [/category/venture/]
+ 游戏 [/category/game/]
+ 数码评测 [/category/review/]
+
+ 行情 [/coin/]
+ 快讯 [/flash/]
+ 交易所 [/exchange/]
+ 公链 [/chain/]
+ 钱包 [/wallet/]
+ 排行榜 [/rank/]
+
+ AUD
+ SGD
+ $ USD
+ ¥ CNY
+ HK$ HKD
+ NT$ TWD
+ € EUR
+ ¥ JPY
+ ₩ KRW
+ £ GBP
+
+ 首页 [/]›
+ 软件 [/category/software/]›
+ 正文
+
+逆向发现 Win11 默认收集 AI 编码代理数据
+
+ 软件 [/category/software/]
+ 2026-11-16 22:58
+ 11 阅读
+ 来源： Hacker News 精选 [https://xusheng.dev/posts/windows-coding-agent-telemetry/]
+
+逆向工程发现 Win11 默认收集 AI 编码代理数据。MissionControlAggregator.dll 记录 Copilot、Claude 等工具使用情况，除非用户主动退出可选诊断，否则信息将上传至微软。
+
+逆向工程揭示 Windows 11 正在收集编码代理与开发工具数据
+
+通过对 Windows 11 中的 MissionControlAggregator.dll 进行逆向工程，发现该组件在诊断 ETW 报告中记录了用户使用的编码代理（Coding Agents）和开发工具。这一功能默认启用，除非用户主动选择退出“可选”诊断数据，否则相关使用信息将被上传至 Microsoft。
+
+嵌入的二进制文件名称列表
+
+在 Binary Ninja 中打开 DLL 后，可以清晰地看到嵌入在 Windows 组件中的可执行文件名。这些名称被用于特定的比较逻辑：
+
+CLI Agent 插槽：检查 copilot.exe, claude.exe, codex.exe 和 agy.exe。在 WSL 路径上，没有扩展的等效项。
+
+桌面代理机位：检查 github.exe, claude.exe, codex.exe, cursor.exe 和 antigravity.exe。
+
+编译器生成的 C++ 名称较为复杂，但核心逻辑是通过可执行名称匹配器实现的。例如，一个相关的匹配器函数名为 std::_Func_impl_no_alloc<<lambda_340dfe7e962ab225b6ac33bc664bd54f>, bool, std::basic_string_view<wchar_t, std::char_traits<wchar_t>> const&, Microsoft::Diagnostics::MissionControlAggregator::Utils::Type>::_Do_call。保护新代理检查的功能有一个直接的名字：CLICodingAgentUsage，其功能 ID 为 62580080。
+
+除了 AI 代理，该组件还检查广泛的开发者工具，包括 node.exe, python.exe, dotnet.exe, gcc.exe, clang.exe, gdb.exe, javac.exe, devenv.exe, code.exe 等。部分检查还会验证发布者身份：Node.js 槽期望 Node.js Foundation，Python 期望 Python Software Foundation，而 .NET 和 Visual Studio 槽期望 Microsoft Corporation。GCC 和 Clang 所在的编译器/调试器组在此路径中没有额外的发布者检查。
+
+数据来源与处理机制
+
+Aggregator::OnLoad 显示该组件订阅了现有的 Windows 事件，而非直接扫描进程。具体来源如下：
+
+Windows 程序：使用 KernelProcess.AppStateChangeSummary 和 Win32kTraceLogging.AppInteractivitySummary。这些提供应用程序身份，其处理器分析并传递给匹配器。
+
+WSL：使用 XQZAQ.Windows.Lxss.Manager.Exec 和 ExecCritical，利用 imageName 字段。
+
+这意味着普通的 Windows codex.exe 可以通过应用状态总结路径到达 CLI 代理检查，不仅限于 WSL 内部运行的 Linux 程序。流程结构如下：
+
+Aggregator::OnLoad
+├─ WSL Exec / ExecCritical
+│ └─ ProcessWslExecEvent → CLI agent matchers
+├─ KernelProcess.AppStateChangeSummary
+│ └─ ProcessAppStateChangeSummaryEvent → CLI agent matchers
+└─ Win32kTraceLogging.AppInteractivitySummary
+ └─ ProcessAppInteractivitySummaryEvent → desktop agent matchers
+
+Aggregator::OnRelativeTimerExpire
+└─ MissionControlAggregatorLogging::ReportCohorts<12,4,5>
+ └─ Segments.SubCohorts ETW report
+
+Aggregator::OnUnload / intermediate timer
+└─ PersistentState::SaveToDisk
+
+成功的匹配会在聚合器状态中设置一个插槽。ReportCohorts<12,4,5> 将这些位点转化为位集，并发出一个名为 Segments.SubCohorts 的报告。数字对应于 12 个更广泛的工具类别、4 个 CLI 代理和 5 个桌面代理。
+
+ETW (Windows Event Tracing) 是报告的机制。组件不记录每个报告中的可执行文件名称，而是为每个类别赋予一个位。设置的 Codex 位意味着在报告窗口中观察到了匹配的工具。虽然源事件包含运行时间、焦点时间等信息，但该组件似乎忽略这些细节，仅记录观察到的代理位图。
+
+实际运行环境验证
+
+在 Parallels Windows 11 ARM64 虚拟机（版本 26200.9974）中进行了测试。其 MissionControlAggregator.dll 版本为 10.0.26100.9818，且 CLICodingAgentUsage 已作为服务实验启用，无需手动开启。
+
+连接用户体验和远程测量服务 DiagTrack 以自动启动类型运行。它启动了一个单独的 AggregatorHost.exe 进程来加载 DLL。以下 PowerShell 命令展示了服务及其子进程关系：
+
+PS> Get-Service DiagTrack | Format-Table Name,Status,StartType -AutoSize
+
+Name Status StartType
+---- ------ ---------
+DiagTrack Running Automatic
+
+PS> Get-Process AggregatorHost | Format-Table ProcessName,Id -AutoSize
+
+ProcessName Id
+----------- --
+AggregatorHost 1500
+
+PS> Get-CimInstance Win32_Service -Filter "Name='DiagTrack'" |
+ Format-List Name,State,StartMode,ProcessId
+
+Name : DiagTrack
+State : Running
+StartMode : Auto
+ProcessId : 10148
+
+PS> Get-CimInstance Win32_Process -Filter "Name='AggregatorHost.exe'" |
+ Format-List ProcessId,ParentProcessId
+
+ProcessId : 1500
+ParentProcessId : 10148
+
+PS> tasklist /m MissionControlAggregator.dll
+
+Image Name PID Modules
+========================= ======== ============================================
+AggregatorHost.exe 1500 MissionControlAggregator.dll
+
+进程 ID 证实了关联：DiagTrack 运行在进程 10148 中，它是 AggregatorHost.exe（PID 1500）的父进程，后者加载了 MissionControlAggregator.dll。
+
+行为测试与数据上传
+
+为了验证检测机制，将 cmd.exe 复制并重命名为 codex.exe。仅凭名称即可使其被认定为“手册”代理。
+
+从 KernelProcess 提供程序捕获的 AppStateChangeSummary 显示 LaunchCount=1。聚合器保存的状态在 CLI slot 2（Codex slot）中包含值 2。状态持久化存储在：
+
+C:\ProgramData\Microsoft\Diagnosis\AggregatorStorage\MissionControlAggregator$
+
+通过调整保存的报告窗口启动时间，立即捕获了 Segments.SubCohorts 事件：
+
+Provider: Microsoft.Windows.MissionControlAggregator
+Time: 2026-11-16T12:34:29.125116Z
+Version: 0.1.5
+
+CliAgentSubCohorts: 4
+DesktopAgentSubCohorts: 0
+FlushedFromSave: true
+
+值 4 对应 1 << 2，即编码 CLI 位。单独测试开发者工具路径时，重命名为 gcc.exe 的副本设置了开发者工具插槽 3。在允许选择性诊断数据的情况下，DiagTrack 的上传队列中发现了相应的 Segments.SubCohorts 事件，值为 [8] (1 << 3)，代表 GCC/Clang 共享的编译器/调试器类别。
+
+ETW 事件本身并不确定数据是否离开机器，关键在于谁在监听。虚拟机在路径两端订阅了 Diagtrack-Listener 会话：
+
+Get-EtwTraceProvider -SessionName Diagtrack-Listener `
+ -Guid '{2839ff94-8f12-4e1b-82e3-af7af77a450f}'
+
+Get-EtwTraceProvider -SessionName Diagtrack-Listener `
+ -Guid '{00de11a2-ec06-58e5-1a2b-21bb21dbee4b}'
+
+第一个订阅针对 KernelProcess，第二个针对 MissionControlAggregator。检查 DiagTrack 的 EventStore.db 并解压 AsimovEvents 表中的 JSON 批次，揭示了关键条件：药物使用报告被视为可选的诊断数据。
+
+当可选诊断数据被允许时（在美国设置中默认启用），Windows 会将编码代理使用报告排队上传到 Microsoft。验证数据如下：
+
+{
+ "name": "Microsoft.Windows.MissionControlAggregator.Segments.SubCohorts",
+ "ext": {
+ "privacy": { "isRequired": false }
+ },
+ "data": {
+ "Version": "0.1.5",
+ "CliAgentSubCohorts": [4],
+ "DesktopAgentSubCohorts": [0],
+ "FlushedFromSave": true
+ }
+}
+
+使用最新的官方 ISO 和美国区域设置，在完成初始设置前，AllowTelemetry 为 3，确认可选诊断数据已启用。如果用户未在安装过程中拒绝或在“设置 → 隐私与安全 → 诊断与反馈”中关闭“发送可选诊断数据”，编码代理的使用数据将持续上传。
+
+ # Claude [/tag/claude/]
+ # Windows 11 [/tag/windows-11/]
+ # Copilot [/tag/copilot/]
+ # MissionControlAggregator [/tag/missioncontrolaggregator/]
+ # ETW [/tag/etw/]
+
+ 👍
+ 有用
+ 0
+
+觉得有帮助就点个赞吧
+
+ 上一篇
+ 战锤40K桌面搭建指南：Secretlab联名家具与游戏折扣 [/article/22851.html]
+
+ 下一篇
+ GTA6官方发布截图 展示莱昂尼达动态天气系统 [/article/22856.html]
+
+评论 0
+
+ 0/500
+ 发表评论
+
+ 评论需审核后展示，请文明发言 
+
+💬
+
+还没有评论，来说两句
+
+相关阅读
+
+ [/article/22953-does-the-end-of-vsphere-8-support-mean-the-end-of-your-vmware-estate.html]
+
+VMware vSphere 8支持2027年结束，客户面临升级或迁移抉择 [/article/22953-does-the-end-of-vsphere-8-support-mean-the-end-of-your-vmware-estate.html]
+
+ 软件 [/category/software/]
+ 2026-11-17 09:56
+ 5 阅读 
+
+ [/article/22928-windows-11-insider-adds-fido2-passkey-deletion.html]
+
+Win11预览版推新构建：支持FIDO2密钥管理与远程锁定 [/article/22928-windows-11-insider-adds-fido2-passkey-deletion.html]
+
+ 软件 [/category/software/]
+ 2026-11-17 07:08
+ 9 阅读 
+
+ [/article/22888-6-chrome-settings-tweaks-every-power-user-needs-to-know.html]
+
+Chrome六项关键设置优化指南：提升安全与隐私 [/article/22888-6-chrome-settings-tweaks-every-power-user-needs-to-know.html]
+
+ 软件 [/category/software/]
+ 2026-11-17 01:05
+ 12 阅读 
+
+ [/article/22860-a-new-aws-emulator-has-been-built-entirely-by-ai-agents-to-bring-its-cloud-strai.html]
+
+AWS发布全AI编写代码的本地模拟器 [/article/22860-a-new-aws-emulator-has-been-built-entirely-by-ai-agents-to-bring-its-cloud-strai.html]
+
+ 软件 [/category/software/]
+ 2026-11-16 23:35
+ 14 阅读 
+
+ [/article/22839-three-small-failures-combined-to-take-down-microsoft-365.html]
+
+微软发布PIR：三因素叠加致M365中断 [/article/22839-three-small-failures-combined-to-take-down-microsoft-365.html]
+
+ 软件 [/category/software/]
+ 2026-11-16 21:56
+ 16 阅读 
+
+ [/article/22824-apple-reveals-new-mac-security-controls-as-ai-agents-raise-privacy-risks.html]
+
+Apple调整Mac安全机制以应对AI代理隐私风险 [/article/22824-apple-reveals-new-mac-security-controls-as-ai-agents-raise-privacy-risks.html]
+
+ 软件 [/category/software/]
+ 2026-11-16 21:01
+ 11 阅读 
+
+7×24 快讯
+
+ 全部 → [/flash/]
+
+11-17 11:18
+
+BlackRock snaps Bitcoin ETF 在极端恐惧的背景下。
+
+ BTC [/coin/btc.html]
+
+11-17 11:14
+
+Bitcoin 实现损失指标击败了 6 月份的高点，开放的利息眼睛是 2 年来的最低点
+
+ BTC [/coin/btc.html]
+
+11-17 11:12
+
+OpenAI 拒绝加利福尼亚的人工智能测试诉讼
+
+11-17 11:11
+
+智能网购买了 55 个 BTC，低于其 81,234 英的平均成本基础
+
+ BTC [/coin/btc.html]
+
+11-17 11:10
+
+阿里巴巴 (BABA) 股价预测：超卖反弹将在 11 月 19 日进行 Test 利测试
+
+11-17 11:09
+
+Kaiko：Binance 占 Anthropic 上市前永续合约未平仓量的 84%，OpenAI 占比 44%
+
+11-17 11:07
+
+Microsoft to pay dividends in December; Here’s how much 100 MSFT shares will earn
+
+11-17 11:06
+
+在 JavaScript 供应链攻击到达 178 个网站时被盗了 7,000 美元的加密货币
+
+热门币种
+
+ 行情 → [/coin/]
+
+ 1
+
+ 比特币
+ [/coin/btc.html]
+
+ $64,408.65
+ -0.45%
+
+ 2
+
+ 以太坊
+ [/coin/eth.html]
+
+ $1,805.31
+ -0.33%
+
+ 3
+
+ 泰达币
+ [/coin/usdt.html]
+
+ $0.9990
+ -0.02%
+
+ 4
+
+ 币安币
+ [/coin/bnb.html]
+
+ $590.74
+ -0.16%
+
+ 5
+
+ 美元币
+ [/coin/usdc.html]
+
+ $1.00
+ +0.03%
+
+ 6
+
+ 瑞波币
+ [/coin/xrp.html]
+
+ $0.9640
+ +0.76%
+
+ 7
+
+ 索拉纳
+ [/coin/sol.html]
+
+ $72.87
+ +1.82%
+
+ 8
+
+ 波场币
+ [/coin/trx.html]
+
+ $0.3058
+ +0.43%
+
+飞翔科技频道 · tech.fxxz.com
+
+行情数据来自 OKX、币安、Gate.io 与 CoinGecko，仅供参考，不构成投资建议。
+
+ 科技资讯 [/news/]
+ 币圈行情 [/coin/]
+ 7×24快讯 [/flash/]
+ RSS [/rss.xml]
+ 网站地图 [/sitemap.xml]

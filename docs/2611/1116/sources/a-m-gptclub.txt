@@ -1,0 +1,226 @@
+Windows 11 在记录你用什么编程 agent：一条可验证的遥测链 ｜ ChatGPT Pro 俱乐部
+
+跳到正文 [#gc-content]
+
+ ChatGPT Pro 俱乐部 [https://www.gptclub.ai/] 
+
+首页 [https://www.gptclub.ai/]
+
+Claude Max 拼车 [https://www.gptclub.ai/claude-max-share/]
+
+Claude Code拼车 [https://www.gptclub.ai/claude-code%e6%8b%bc%e8%bd%a6/]
+
+Discord社区 [https://discord.gg/WTsmC7xjRt]
+
+🛍️ 购买套餐 [https://dashboard.gptclub.ai]
+
+ 自营中转站 [https://newapi.gptclubapi.xyz/]
+
+ 搜索文章
+
+首页 [https://www.gptclub.ai/]
+
+Claude Max 拼车 [https://www.gptclub.ai/claude-max-share/]
+
+Claude Code拼车 [https://www.gptclub.ai/claude-code%e6%8b%bc%e8%bd%a6/]
+
+Discord社区 [https://discord.gg/WTsmC7xjRt]
+
+🛍️ 购买套餐 [https://dashboard.gptclub.ai]
+
+ 自营中转站 [https://newapi.gptclubapi.xyz/]
+
+博客 [https://www.gptclub.ai/%e5%8d%9a%e5%ae%a2/]
+
+Windows 11 在记录你用什么编程 agent：一条可验证的遥测链
+
+2026年11月17日·14 阅读·约 11 分钟读完
+
+Windows 11 在记录你用什么编程 agent。
+
+具体来说：系统里有一个叫 MissionControlAggregator.dll 的组件，里面硬编码了一组可执行文件名——codex.exe、claude.exe、copilot.exe、cursor.exe、agy.exe、antigravity.exe，以及 node.exe、python.exe、gcc.exe、clang.exe、javac.exe、code.exe 这些开发者工具。它订阅系统的进程事件，匹配到就把对应的「位」置上，然后定期把这些位打包成一份报告，在开启「可选诊断数据」的情况下上传到微软。
+
+作者做了一件很扎实的事：不只是反编译看到字符串，而是在自己的 Windows 11 ARM64 虚拟机上真的跑通了整条链路——把 cmd.exe 复制成 codex.exe，观察状态被置位、报告被生成、最后在 DiagTrack 的上传队列里找到了那条事件。
+
+HN 上 344 分、208 条评论，但讨论很快滑向了「我要不要换 Linux」。所以这篇不跟风，把这条链路拆开讲清楚：它到底收集了什么、没收集什么、为什么这个发现值得认真对待、以及「Windows 本来就有遥测」这个辩解为什么只说对了一半。
+
+一句话结论
+
+收集的是「用了哪一类工具」，不是内容。作者明确写了：报告里没有提示词文本，也没有源代码；时间戳只描述采集窗口，不代表各工具用了多久。
+
+但「用了哪个 agent」本身就是高价值信号。作者的判断很克制：这件事「已经具有显著的隐私含义」——因为它在企业里能区分「谁在用公司批准的 Copilot」和「谁在自己跑 Claude Code」。
+
+检测方式很廉价，也很粗暴。它不看进程做了什么，只比较可执行文件名。作者把 cmd.exe 改名成 codex.exe 就被识别成 Codex 了——这说明它连二进制签名都不验证。
+
+上传与否取决于「可选诊断数据」。而这个开关在作者测试的干净安装里默认就是开着的（AllowTelemetry = 3，界面标注「Include Optional」）。
+
+但要说清：并非每台机器都在跑这个功能。作者自己也写明，官方 ISO 的基线虚拟机里这个功能是镜像默认关闭的，所以证据不支持「每台 Windows 都开着」的说法。他测试的 VM 上功能和服务是预先激活的。
+
+1）这条链路是怎么走通的
+
+作者从 MissionControlAggregator.dll 里的字符串出发，跟出了一条完整的流水线。拆开看是这样：
+
+阶段机制细节
+
+① 订阅事件不主动扫描进程，而是订阅 Windows 已有事件普通程序走 KernelProcess.AppStateChangeSummary 和 Win32kTraceLogging.AppInteractivitySummary；WSL 走 Microsoft.Windows.Lxss.Manager.Exec
+
+② 名称匹配把事件里的应用标识送进一组「可执行名匹配器」4 个 CLI agent 槽（copilot / claude / codex / agy）＋ 5 个桌面 agent 槽（github / claude / codex / cursor / antigravity）
+
+③ 置位与落盘匹配成功就在聚合器状态里置一个位，并持久化到磁盘路径：C:\ProgramData\Microsoft\Diagnosis\AggregatorStorage\MissionControlAggregator$
+
+④ 生成报告定时器到点，把置位转成位图，发出 ETW 事件事件名 Segments.SubCohorts，参数 ReportCohorts<12,4,5>——12 个工具类别、4 个 CLI agent、5 个桌面 agent
+
+⑤ 上传判定按诊断数据等级决定是否入上传队列被标记为可选诊断数据（privacy.isRequired = false）
+
+整理自原文「Where does the DLL get this information?」与「Following the report toward Microsoft」两节。
+
+这个设计有个值得注意的地方：它只记「见过」，不记「用了多久」。源事件里其实带着运行时长、聚焦时间、交互计数、资源占用，但作者追下来发现这个组件把这些细节全部丢掉，只留一个位图。
+
+从隐私角度这是「克制」，从产品角度这是「精确的统计口径」——它想知道的是「这个用户是不是编程 agent 用户、用的是哪一家」，不需要知道你到底用了多久。
+
+2）作者怎么把它验到实处的
+
+这篇比一般「反编译发现字符串」的文章强的地方，是它每一环都验了。四步：
+
+确认功能在跑：VM 是 build 26200.9974，DLL 版本 10.0.26100.9818，CLICodingAgentUsage（feature ID 62580080）已经作为服务实验启用，而他并没有手动开过。DiagTrack 服务状态 Running、启动类型 Automatic，它启动子进程 AggregatorHost.exe，DLL 就加载在那个子进程里。
+
+伪造一个 agent：把 cmd.exe 复制成 codex.exe 跑起来。抓 AppStateChangeSummary 事件，再看聚合器落盘状态——CLI 槽 2（Codex 槽）的值变成了 2。
+
+捕获报告：把保存的报告窗口起点往前挪 25 小时、重启 DiagTrack，抓到了 Segments.SubCohorts 事件：CliAgentSubCohorts: 4。4 就是 1 << 2，正是 Codex 那一位。
+
+验上传：把 cmd.exe 改名成 gcc.exe，走开发者工具路径，置上槽 3。然后在 DiagTrack 的 EventStore.db 里解压 AsimovEvents 表的 JSON 批次，找到了那条准备上传的事件，SubCohorts: [8]（1 << 3，编译器/调试器类别）。
+
+这条链路里最该被记住的细节：名字匹配就是全部判据。它没验证数字签名，没检查文件哈希，改个文件名就进去了。作者顺便测了开发者工具那条路径，其中部分槽额外验证了发布者——Node.js 槽期待 Node.js Foundation，Python 槽期待 Python Software Foundation，.NET 和 Visual Studio 槽期待 Microsoft Corporation；但 GCC/Clang 那组没有额外签名校验。
+
+所以这套检测的准确度是「尽力而为」级别的。它能识别真用户，也会被改名骗过，还可能因为 PATH 里的包装脚本、容器、远程开发而漏报。把它当成精确的行业统计会得出偏斜的结论——HN 上也有人说破了这一点：这个数据只来自开着遥测的 Windows 用户，本身就是一份有偏样本。
+
+3）「Windows 本来就在收集遥测」——这话只说对一半
+
+HN 上最常见的反驳是：「Windows 一直在收集遥测，为什么这次这么大反应？Android、iOS、ChromeOS 都在收集。」
+
+这话没错，但漏掉了这次的新东西：以前记录的是「应用崩溃了没」「系统卡不卡」，现在记录的是「你在用哪个 AI 编程工具」。
+
+这两件事的性质不同。前者是系统健康，后者是工作方式画像。一个企业如果拿到这份数据，能回答一个很敏感的问题：哪些员工在用公司没批准的工具。这不是微软的意图推测，而是这个数据本身的能力。
+
+另一个值得记的评论，是有人替微软说话：「Windows 披露了这件事，也提供了必需／可选诊断数据的开关，还内置了浏览事件的 app。可选诊断数据的披露就写在这个控件旁边，明确说会跟踪网站和应用活动，而且关掉不影响系统功能或安全。」
+
+「你可以关」和「默认帮你开着」是两件事。
+
+这个说法在「有没有给开关」这一层是成立的。但作者自己的测试补充了一个更要紧的细节：开关默认是开的，而且上传发生在「可选」这一档。一个人没做过任何隐私设置调整的干净安装，AllowTelemetry 就是 3。「你可以关」和「默认帮你开着」是两件事。
+
+还有一条也值得记，来自 HN：「文章说数据是一直被记录的，只有当你的诊断共享关闭时才不上传。这感觉不像是对微软数据隐私开关的诚实解读。而且一旦你『决定』重新开启共享（比如更新后误开），之前采集的这些数据有没有可能一起上传？」
+
+这个问题作者没有回答，但它命中了要害：本地持久化的那份状态是长期存在的（路径在 ProgramData 下），关掉上传不等于删掉记录。
+
+4）另一面：微软确实需要这份数据
+
+HN 上有一条来自反方向的评论，我认为必须放进来，否则这篇会失衡：
+
+「Windows 在给 AI agent 做沙箱这件事上一直很慢——他们一个月前（10 月 7 日）才发布 MXC，而 Claude Code 到现在还不支持它。所以我们有一堆人在 Windows 上跑没有沙箱的 agent，或者改用 WSL。这一切说明：是的，我希望他们有一些不侵入的遥测来知道该优先做什么，因为平台急需这类功能。」
+
+这个视角很现实。如果微软不知道有多少人在 Windows 上跑编程 agent，就很难判断该不该优先做 agent 沙箱。从产品决策角度，这份数据是有正当用途的。
+
+问题不在「要不要知道」，而在三件事的组合：默认开启、只记不删、以及记录的是可以推断工作方式的行为。任何一件单独都不严重，三件叠在一起才值得讨论。
+
+5）你该做什么
+
+作者给了明确的操作路径，值得照做：
+
+装系统时就拒掉：安装过程中可以选择拒绝可选诊断数据。
+
+装完之后关：设置 → 隐私和安全性 → 诊断和反馈，把「发送可选诊断数据」关掉。
+
+查当前状态：注册表里 AllowTelemetry 的值——3 表示包含可选诊断。如果你从没动过，很可能就是 3。
+
+如果你在企业环境里管一批 Windows 开发机，这件事值得提上议程：「员工用了哪些编程 agent」这一项，已经不是纯技术遥测，而是需要和员工说明的东西。
+
+6）适合谁 / 怎么看
+
+如果你是 Windows 上的开发者：先去查一下 AllowTelemetry。如果是 3 而你并不想分享这些，改成关掉即可——按作者的验证，关掉不影响系统功能。这不是「必须换系统」级别的发现，但值得你花两分钟确认一次默认值。
+
+如果你在做企业 IT 或合规：把这条写进设备基线检查。真正的风险不是「微软知道了」，而是这份画像可以被用来做工具合规判定——而它的准确度只是文件名级别的，误报和漏报都会有。
+
+如果你只是关心 AI 工具生态：这件事说明了一个趋势——编程 agent 已经成为操作系统厂商要统计的「品类」了。Windows 专门为它开了 4 个 CLI 槽 + 5 个桌面槽，还给了一个 feature ID。这本身是「编程 agent 已经进入主流基础设施视野」的一个侧证。
+
+小结
+
+这个发现的技术含量在于验证的完整度：从 DLL 字符串到事件订阅、到落盘状态、到 ETW 报告、再到上传队列，每一环都有可复现的证据。而且作者把边界说得很清楚——没收集提示词、没收集源码、不记录使用时长，官方 ISO 的基线镜像里这个功能是关的。
+
+该警惕的是另外三件事叠加：判据只有文件名（改名就能骗过，精度有限）、默认开启（干净安装 AllowTelemetry 就是 3）、本地状态长期保留（关上传不等于删记录）。而它记录的恰好是能推断「你用哪家 AI 工具」的信息。
+
+所以最平衡的判断是：微软需要这份数据做产品决策，这说得通；但「默认帮你开着收集工作方式数据」这件事，用户至少要知情。两分钟查一次设置，就够了。
+
+想同时用上 Claude Code、Codex、Cursor 这些编程 agent 背后的模型、又不想按原价一家家订阅？可以看看俱乐部的 Claude Max / ChatGPT Pro 拼车方案 [https://www.gptclub.ai/]。
+
+参考来源
+
+原文：Windows 11 Is Collecting Data on Which Coding Agents and Developer Tools You Use（2026-11-16；含 DLL 中硬编码的可执行名清单、4 CLI + 5 桌面 agent 槽、CLICodingAgentUsage feature ID 62580080、事件订阅路径、ReportCohorts<12,4,5>、cmd.exe 改名 codex.exe 的实测、Segments.SubCohorts 事件、DiagTrack EventStore.db 上传队列验证、AllowTelemetry=3 默认值、关闭设置路径） [https://xusheng.dev/posts/windows-coding-agent-telemetry/]
+
+Hacker News 讨论（344 分，208 条评论；含「其他 OS 也在收集」的反驳、微软披露与开关的辩护、「记录一直在做、重开后会不会补传」的质疑、Windows 缺 agent 沙箱（MXC 10-07 发布）的辩护、样本有偏的观察） [https://news.ycombinator.com/item?id=50524736]
+
+微软官方：Windows 诊断数据与隐私说明（可选诊断数据的范围与开关方式） [https://support.microsoft.com/en-us/windows/privacy/diagnostics-feedback-and-privacy-in-windows]
+
+ #Windows 11 [https://www.gptclub.ai/tag/windows-11/]
+ #编程 agent [https://www.gptclub.ai/tag/%e7%bc%96%e7%a8%8b-agent/]
+ #逆向工程 [https://www.gptclub.ai/tag/%e9%80%86%e5%90%91%e5%b7%a5%e7%a8%8b/]
+ #遥测 [https://www.gptclub.ai/tag/%e9%81%a5%e6%b5%8b/]
+ #隐私 [https://www.gptclub.ai/tag/privacy/]
+
+ 上一篇Qwen4-Max 发布：2.4T 参数，62% 成本下降，但排在第 38 [https://www.gptclub.ai/qwen4-max/]
+
+相关文章
+
+ [https://www.gptclub.ai/qwen4-max/]
+
+Qwen4-Max 发布：2.4T 参数，62% 成本下降，但排在第 38 [https://www.gptclub.ai/qwen4-max/]
+
+2026年11月17日·13 阅读
+
+ [https://www.gptclub.ai/ai-generated-code-open-source/]
+
+所有 AI 生成的代码都该开源？1,125 分讨论里的那个断点 [https://www.gptclub.ai/ai-generated-code-open-source/]
+
+2026年11月16日·24 阅读
+
+ [https://www.gptclub.ai/nvidia-circular-financing/]
+
+WSJ 揭英伟达循环融资：为了消化晶圆，出钱让客户买自己的芯片 [https://www.gptclub.ai/nvidia-circular-financing/]
+
+2026年11月16日·28 阅读
+
+发表评论 取消回复 [/windows-agent-telemetry/#respond]
+
+邮箱不会公开，带 * 的是必填项。
+
+评论 * 
+
+显示名称 * 
+
+邮箱 * 
+
+网站 
+
+ 在此浏览器中保存我的显示名称、邮箱地址和网站地址，以便下次评论时使用。
+
+ 搜索文章
+
+☁️ 标签云
+
+Claude Code [https://www.gptclub.ai/tag/claude-code/]claude [https://www.gptclub.ai/tag/claude/]claude max [https://www.gptclub.ai/tag/claude-max/]Anthropic [https://www.gptclub.ai/tag/anthropic/]OpenAI [https://www.gptclub.ai/tag/openai/]chatgpt [https://www.gptclub.ai/tag/chatgpt/]AI 编程 [https://www.gptclub.ai/tag/ai-coding/]AI安全 [https://www.gptclub.ai/tag/ai-security/]行业观察 [https://www.gptclub.ai/tag/%e8%a1%8c%e4%b8%9a%e8%a7%82%e5%af%9f/]codex [https://www.gptclub.ai/tag/codex/]
+
+目录
+
+ ChatGPT Pro 俱乐部 [https://www.gptclub.ai/] 
+© 2026 羊森智能科技有限公司 YANGSEN INTELLIGENCE LIMITED 保留所有权利。
+
+首页 [https://www.gptclub.ai/]
+
+Claude Max 拼车 [https://www.gptclub.ai/claude-max-share/]
+
+Claude Code拼车 [https://www.gptclub.ai/claude-code%e6%8b%bc%e8%bd%a6/]
+
+Discord社区 [https://discord.gg/WTsmC7xjRt]
+
+🛍️ 购买套餐 [https://dashboard.gptclub.ai]
+
+Powered by WordPress [https://wordpress.org/]

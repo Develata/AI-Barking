@@ -1,0 +1,259 @@
+Windows 11 在记录你用过哪个 AI 编程助手 · 开源
+
+ ☰
+
+ AI CLUB
+ [/]
+
+ --° 正在定位...
+
+ 星期一 
+
+ 登录 [javascript:void(0)]
+ |
+ 退出 [javascript:void(0)]
+
+首页 [/]
+
+AI工具集 [/tools]
+
+模型库 [/model-lib]
+
+资讯 [/news]
+
+AI前沿 [/frontier]
+
+开源 [/opensource]
+
+大模型排行榜 [/rank/arena]
+
+AI模型市场 [/llm-plans]
+
+AI服务监控 [/ai-status]
+
+AI算力 [/compute]
+
+随笔 [/blog]
+
+AI赋能 [/help]
+
+社区榜单 [/rank]
+
+ AI CLUB [/]
+ ×
+
+首页 [/]
+
+AI工具集 [/tools]
+
+模型库 [/model-lib]
+
+资讯 [/news]
+
+AI前沿 [/frontier]
+
+开源 [/opensource]
+
+大模型排行榜 [/rank/arena]
+
+AI模型市场 [/llm-plans]
+
+AI服务监控 [/ai-status]
+
+AI算力 [/compute]
+
+随笔 [/blog]
+
+AI赋能 [/help]
+
+社区榜单 [/rank]
+
+会员登录
+
+ ×
+
+ 登录
+ 注册
+ 忘记密码
+
+ 邮箱
+
+ 密码登录
+ 验证码登录
+
+ 密码
+
+ 邮箱验证码
+
+ 发送验证码
+
+ 登 录
+
+未注册的邮箱可点击上方「注册」创建账号
+
+ 登录
+ 注册
+ 忘记密码
+
+ 邮箱
+
+ 密码
+
+ 自动生成
+
+ 确认密码
+
+请使用真实邮箱注册，注册后需通过邮箱验证码激活账户，激活后才能使用部分功能。
+
+ 注 册
+
+已有账号？点击上方「登录」
+
+ 登录
+ 注册
+ 忘记密码
+
+ 邮箱
+
+ 邮箱验证码
+
+ 发送验证码
+
+ 新密码
+
+ 自动生成
+
+ 重置密码
+
+重置成功后请使用新密码登录
+
+ 首页 [/]
+ >
+ 开源 [/opensource]
+ >
+ Windows 11 在记录你用过哪个 AI 编程助手
+
+Windows 11 在记录你用过哪个 AI 编程助手
+
+ OSChina资讯
+ 2026-11-17 10:54
+ 16 阅读
+ 查看原文 [https://www.oschina.net/news/503608/windows-coding-agent-telemetry]
+
+ AI编程助手 [/opensource?keyword=AI%E7%BC%96%E7%A8%8B%E5%8A%A9%E6%89%8B]
+ Windows [/opensource?keyword=Windows]
+ 11 [/opensource?keyword=11]
+ 技术爆料 [/opensource?keyword=%E6%8A%80%E6%9C%AF%E7%88%86%E6%96%99]
+
+一位开发者在让 AI 帮忙翻 Windows 二进制文件时，在 MissionControlAggregator.dll 里翻到了一份名单：codex.exe、claude.exe、copilot.exe、cursor.exe，再往下还有 python.exe、dotnet.exe、gcc.exe、code.exe。
+
+一个系统 DLL 为什么要认识编程助手？
+
+他把这个疑问追下去了。结论是：这个组件确实在记录你用过哪些 AI 编程工具和开发工具，存到本地，然后上报给 Windows 诊断系统。除非你关掉了「可选诊断数据」——而这项数据默认是开着的。
+
+他的验证方式很简单也很说明问题：把 cmd.exe 复制一份改名成 codex.exe 再运行。组件认了。持久化状态里 Codex 对应的位被置上，接着在 ETW 的 Segments.SubCohorts 报告里看到了 CliAgentSubCohorts: 4，也就是 1 << 2，Codex 的位。换成 gcc.exe 名字的副本，则置上开发者工具类别第 3 位，报告里是 [8]。
+
+只靠文件名判断，不看你在里面干什么。
+
+细看匹配逻辑，CLI 编程助手有四个槽位（slot），对应 copilot.exe、claude.exe、codex.exe、agy.exe，WSL 路径上还有一份不带扩展名的等价名单；桌面端五个 slot，对应 github.exe、claude.exe、codex.exe、cursor.exe、antigravity.exe。守护这套检查的功能开关名字很直白，就叫 CLICodingAgentUsage，功能 ID 62580080。
+
+开发工具的检查更细，部分还带发布者校验：Node.js slot 要求签名来自 Node.js Foundation，Python 要求 Python Software Foundation，.NET 和 Visual Studio 则要求 Microsoft Corporation。GCC 和 Clang 所在的编译器/调试器组没有这一层校验。
+
+组件本身不扫进程，而是订阅系统已有的事件。Windows 程序走 KernelProcess.AppStateChangeSummary 和 Win32kTraceLogging.AppInteractivitySummary，WSL 走 Microsoft.Windows.Lxss.Manager.Exec。所以一个普通的 Windows 版 codex.exe 同样会被记录，这条路径并不只覆盖 WSL 里的 Linux 程序。
+
+原始事件里其实带着运行时长、前台占用时间、交互计数和资源占用。组件把细节丢掉了，只留一张位图：报告窗口里有没有见过这个工具。时间戳描述的是采集窗口，不是使用时长。
+
+作者在自己的 Parallels Windows 11 ARM64 虚拟机上确认这条链路是活的：系统版本 26200.9974，DLL 版本 10.0.26100.9818，CLICodingAgentUsage 已经作为服务实验启用，而他没有手动开过。DiagTrack（Connected User Experiences and Telemetry）服务是 Automatic，它拉起 AggregatorHost.exe，DLL 就加载在这个子进程里。
+
+他没敢把话说满：官方 ISO 装出来的基线虚拟机默认把这个功能关着，所以现有证据不足以断定每台 Windows 都开着。但在他的机器上，功能和服务的状态都是测试前就有的。
+
+真正决定数据去不去微软的，是诊断数据的档位。作者查了 DiagTrack 的 EventStore.db，解开 AsimovEvents 表里的 JSON 批次，发现这条报告的 isRequired 是 false——属于可选诊断数据。他在一台用最新官方 ISO 装的 Windows 11 家庭版 ARM64 上（区域设为美国）验证过：动任何隐私设置之前，诊断数据开关就是开启状态，标注为 Include Optional，AllowTelemetry 值为 3。装完系统不额外操作，编程工具使用情况就在上传队列里。
+
+这个数据本身谈不上多敏感。报告里没有提示词，没有源码，只有「这台机器上出现过哪些工具」。但它统计的对象是一群最清楚遥测意味着什么的人。
+
+HN 上的讨论里有人提出，安卓、iOS、ChromeOS、macOS 都在收集，为什么偏偏对 Windows 意见这么大。也有人反驳得挺直接：如果只统计开着可选遥测的那部分人，结论天然就是偏的。还有个更扎心的说法——真正会去关遥测的，恰好是微软最想了解的那批开发者。
+
+想关的话路径不算隐蔽：装机时可以拒绝可选诊断，之后在「设置 → 隐私和安全性 → 诊断和反馈」里关掉「发送可选诊断数据」。没关过的，现在大概率还开着。
+
+参考来源：
+
+Windows 11 Is Collecting Data on Which Coding Agents and Developer Tools You Use [https://xusheng.dev/posts/windows-coding-agent-telemetry/]
+
+Hacker News 讨论 [https://news.ycombinator.com/item?id=50524736]
+
+相关推荐
+
+ 换一批
+
+ Windows 11 Is Collecting Data on Which Coding Agents and Developer Tools You Use
+ 2026-11-17 06:58
+ [/frontier-article/61702]
+
+ 微软 Win11 被曝 SignDrop 零日漏洞：普通用户可提权至 SYSTEM，目前尚无专用修复补丁
+ 2026-11-16 09:58
+ [/news-article/60957]
+
+ 开发者推出 WinPopBit 计划，让 AMD K8、英特尔奔腾 4 等老处理器也能运行微软 Win11
+ 2026-11-16 09:47
+ [/news-article/60960]
+
+ 这个双11，商家和AI商量着做生意
+ 2026-11-13 18:30
+ [/news-article/59982]
+
+ 微软发布 PowerShell 7.7：基于 .NET 11 构建，强化安全防护
+ 2026-11-12 14:52
+ [/news-article/59322]
+
+ 微软 Win11 自带照片应用将接入 Adobe AI，恐成订阅推广新入口
+ 2026-11-12 14:11
+ [/news-article/59333]
+
+今日 24 小时 · 更多入口
+
+ 资讯 24 小时 [/news-24h]
+ 开源 24 小时 [/opensource-24h]
+ AI前沿 24 小时 [/frontier-24h]
+ 开源频道 [/opensource]
+ 社区榜单 [/rank]
+ AI 工具库 [/tools]
+
+AI CLUB
+
+让 AI 成为每个人的超级助手。聚合全球 AI 前沿资讯、
+
+工具与模型排行榜，陪你读懂 AI 世界。
+
+站点
+
+联系我们 [/contact.html]
+
+免责声明 [/disclaimer.html]
+
+友情链接 · 数据源 >> [/friend-links.html]
+
+IT之家 [https://www.ithome.com]
+36氪 [https://36kr.com]
+简书 [https://www.jianshu.com]
+钛媒体 [https://www.tmtpost.com]
+Hacker News [https://news.ycombinator.com]
+InfoQ 中国 [https://www.infoq.cn]
+OSChina [https://www.oschina.net]
+腾讯 [https://www.tencent.com]
+
+雷锋网 [https://www.leiphone.com]
+GitHub [https://github.com]
+OpenAI [https://openai.com]
+TechCrunch [https://techcrunch.com]
+The Verge [https://www.theverge.com]
+机器之心 [https://www.jiqizhixin.com]
+量子位 [https://www.qbitai.com]
+少数派 [https://sspai.com]
+
+© 2026 AI垂直社区 · 让AI成为每个人的超级助手
+|
+冀ICP备2024090281号-3 [https://beian.miit.gov.cn/]
+|
+冀公网安备13010402003573号 [https://beian.mps.gov.cn/#/query/webSearch?code=13010402003573]
+|
+联系：service@ai-club.cn

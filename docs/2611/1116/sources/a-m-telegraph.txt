@@ -1,0 +1,88 @@
+Windows 11 正在收集你使用的 AI 编程助手和开发者工具数据 – Telegraph
+
+Windows 11 正在收集你使用的 AI 编程助手和开发者工具数据
+
+ Hacker News 摘要 [https://t.me/hacker_news_zh]November 17, 2026
+
+Windows 11 正在收集你使用的 AI 编程助手和开发者工具数据
+
+Hacker News 摘要 [https://t.me/hacker_news_zh]
+
+原标题：Windows 11 Is Collecting Data on Which Coding Agents and Developer Tools You Use [https://xusheng.dev/posts/windows-coding-agent-telemetry/]
+
+安全研究员 Xusheng Li 通过逆向工程发现，Windows 11 系统内置组件正在收集用户使用的 AI 编程助手和开发者工具信息，并将其打包在遥测诊断报告中上传至微软。
+
+发现背景与核心组件
+
+作者借助 AI 分析 Windows 最新的二进制文件以寻找未公开功能时，发现了一个包含众多编程工具名称的列表。经过追踪，这些特征代码位于名为 MissionControlAggregator.dll 的系统动态链接库中。该组件会记录用户使用过的工具，将数据保存在本地，并汇报给 Windows 诊断系统。
+
+被监控的工具列表
+
+该组件通过硬编码的可执行文件名进行匹配识别：
+
+ • 命令行 AI 编程助手：监控 copilot.exe、claude.exe、codex.exe 和 agy.exe，在 WSL 环境下则匹配无扩展名的对应命令。控制这一功能的内部特性名称为 CLICodingAgentUsage（功能 ID 为 62580080）。
+
+ • 桌面端 AI 编程助手：监控 github.exe、claude.exe、codex.exe、cursor.exe 和 antigravity.exe。
+
+ • 通用开发者工具：监控包括 node.exe、python.exe、dotnet.exe、gcc.exe、clang.exe、gdb.exe、javac.exe、devenv.exe 和 code.exe 等。部分工具还会验证软件发布者身份（例如 Node.js 要求来自 Node.js Foundation，Python 要求来自 Python Software Foundation，.NET 和 Visual Studio 要求来自微软），而编译器和调试器分类（如 GCC、Clang）则没有额外的发布者校验。
+
+数据收集与处理机制
+
+该组件本身并不主动扫描正在运行的进程，而是订阅了系统的现有事件：
+
+ • 针对常规 Windows 程序，订阅 KernelProcess.AppStateChangeSummary 和 Win32kTraceLogging.AppInteractivitySummary 事件。
+
+ • 针对 WSL 环境，订阅 Microsoft.Windows.Lxss.Manager.Exec 和 ExecCritical 事件，读取其中的映像名称字段。
+
+ • 当进程名称匹配成功后，组件会在内部状态中标记对应的槽位。聚合器随后通过 Windows 事件跟踪（ETW）生成名为 Segments.SubCohorts 的报告。
+
+ • 报告采用位掩码（bitset）的形式存储，包含 12 个通用工具类别、4 个命令行 AI 助手和 5 个桌面端 AI 助手，某个比特置 1 仅代表在统计时间窗口内观察到该工具运行。
+
+ • 报告中不包含具体的提示词文本、源代码或运行时长细节，仅记录工具是否被使用，但这种行为依然对用户隐私构成显著影响。
+
+实际运行与验证测试
+
+作者在 Windows 11 ARM64 虚拟机（版本 26200.9974）中进行了验证：
+
+ • 系统的诊断跟踪服务 DiagTrack（连接的用户体验和遥测）处于自动运行状态，它启动了子进程 AggregatorHost.exe，并在该子进程中加载了 MissionControlAggregator.dll。该测试机上的 CLICodingAgentUsage 特性已作为服务端实验默认开启。
+
+ • Codex 测试：作者将 cmd.exe 复制并重命名为 codex.exe 运行。系统事件立即捕获并记录了该进程，聚合器内部的 Codex 对应槽位被成功标记。本地持久化存储路径位于 C:\ProgramData\Microsoft\Diagnosis\AggregatorStorage\MissionControlAggregator$。调整报告周期触发后，生成的诊断事件中命令行助手字段数值变为 4（即二进制对应位置 1）。
+
+ • GCC 测试：将 cmd.exe 重命名为 gcc.exe 运行后，成功激活了通用开发者工具中代表编译器和调试器类别的比特位。
+
+数据是否上传至微软
+
+经过分析，诊断跟踪服务 DiagTrack 已经订阅了包含该聚合报告的 ETW 会话。作者通过检查 DiagTrack 本地的 EventStore.db 数据库，在 AsimovEvents 数据表的待上传队列中找到了包含上述工具使用记录的 JSON 数据包。
+
+该数据被归类为可选诊断数据。在作者使用官方原版镜像初始化的美国区域 Windows 11 家庭版系统中，“包含可选诊断数据”在安装时默认处于开启状态。这意味着，只要用户在安装或设置中没有主动关闭可选诊断数据，所使用的编程助手和开发工具信息就会被自动上传给微软。
+
+如何关闭该数据收集
+
+用户若想避免此类数据被上传，可以在 Windows 系统的“设置”中，依次进入“隐私和安全性”下的“诊断和反馈”，将“发送可选诊断数据”开关彻底关闭。
+
+原文：https://xusheng.dev/posts/windows-coding-agent-telemetry/ [https://xusheng.dev/posts/windows-coding-agent-telemetry/]
+
+评论：https://news.ycombinator.com/item?id=50524736 [https://news.ycombinator.com/item?id=50524736]
+
+ EditPublish
+
+Report content on this page
+
+Report Page
+
+ Violence
+
+ Child Abuse
+
+ Copyright
+
+ Illegal Drugs
+
+ Personal Details
+
+ Other
+
+ Please submit your DMCA takedown request to dmca@telegram.org [mailto:dmca@telegram.org?subject=Report%20to%20Telegraph%20page%20%22Windows%2011%20%E6%AD%A3%E5%9C%A8%E6%94%B6%E9%9B%86%E4%BD%A0%E4%BD%BF%E7%94%A8%E7%9A%84%20AI%20%E7%BC%96%E7%A8%8B%E5%8A%A9%E6%89%8B%E5%92%8C%E5%BC%80%E5%8F%91%E8%80%85%E5%B7%A5%E5%85%B7%E6%95%B0%E6%8D%AE%22&body=Reported%20page%3A%20https%3A%2F%2Ftelegra.ph%2FpON1RC8XSbJe5-zT7hOUtA-11-17%0A%0A%0A]
+
+ Cancel
+ Report
