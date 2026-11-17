@@ -96,7 +96,12 @@ pub const COVER_WIDE_OUT: &str = "00-cover-wide.png";
 /// Mascot on the template covers, relative to the repo root.
 const AVATAR: &str = "common_images/profile_picture.png";
 /// 速览 entries per issue, main-post entries included (EDITORIAL.md 速览).
-pub const ROUNDUP_MIN: usize = 5;
+/// The floor rose from 5 to 7 on 2026-11-17 (Develata): issues dated on or
+/// after [`ROUNDUP_MIN_RAISED_FROM`] need [`ROUNDUP_MIN`]; earlier ones keep
+/// [`ROUNDUP_MIN_OLD`] (EDITORIAL.md 纠错: no rewrites).
+pub const ROUNDUP_MIN: usize = 7;
+pub const ROUNDUP_MIN_OLD: usize = 5;
+pub const ROUNDUP_MIN_RAISED_FROM: u32 = 2611_1116;
 pub const ROUNDUP_MAX: usize = 10;
 /// Character caps (every scalar counts) that keep ten entries legible at
 /// 36 px on one card: a main-post title stays on one line, others on two.
@@ -143,6 +148,11 @@ pub struct Spec {
     /// Spec parsed straight from text keeps the old layout.
     #[serde(skip)]
     pub publish: bool,
+    /// Minimum 速览 entries for this issue: [`load_spec`] sets it from the
+    /// issue's date ([`roundup_min_for`]). A Spec parsed straight from text
+    /// (0) keeps the old floor.
+    #[serde(skip)]
+    pub roundup_min: usize,
 }
 
 /// An 事件卡 (from 2026-10-29): one main post's fact paragraphs, so a reader
@@ -327,9 +337,14 @@ impl Spec {
             return errs;
         }
         let n = self.roundup.len();
-        if !(ROUNDUP_MIN..=ROUNDUP_MAX).contains(&n) {
+        let min = if self.roundup_min == 0 {
+            ROUNDUP_MIN_OLD
+        } else {
+            self.roundup_min
+        };
+        if !(min..=ROUNDUP_MAX).contains(&n) {
             errs.push(format!(
-                "速览共 {n} 条，应为 {ROUNDUP_MIN}–{ROUNDUP_MAX} 条（主帖条目也算）"
+                "速览共 {n} 条，应为 {min}–{ROUNDUP_MAX} 条（主帖条目也算）"
             ));
         }
         // Main-post entries come first, in the main post's order.
@@ -847,6 +862,16 @@ pub(crate) fn publish_era(key: Option<u32>) -> bool {
     key.is_none_or(|k| k >= PUBLISH_FROM)
 }
 
+/// Minimum 速览 entries for an issue (by [`issue_key`]). Unrecognised paths
+/// get the current rule.
+pub(crate) fn roundup_min_for(key: Option<u32>) -> usize {
+    if key.is_none_or(|k| k >= ROUNDUP_MIN_RAISED_FROM) {
+        ROUNDUP_MIN
+    } else {
+        ROUNDUP_MIN_OLD
+    }
+}
+
 /// `Ok(None)` when the issue has no `images/cards.toml`. The layout (flat
 /// `images/` or `images/publish/`) follows from the issue's date.
 pub fn load_spec(images: &Path) -> Result<Option<Spec>, String> {
@@ -861,7 +886,9 @@ pub fn load_spec(images: &Path) -> Result<Option<Spec>, String> {
     let issue = images
         .parent()
         .map(|p| p.canonicalize().unwrap_or_else(|_| p.to_path_buf()));
-    spec.publish = publish_era(issue.as_deref().and_then(issue_key));
+    let key = issue.as_deref().and_then(issue_key);
+    spec.publish = publish_era(key);
+    spec.roundup_min = roundup_min_for(key);
     Ok(Some(spec))
 }
 
@@ -2795,6 +2822,18 @@ mod tests {
             ));
         }
         toml::from_str(&s).unwrap()
+    }
+
+    #[test]
+    fn roundup_floor_follows_the_issue_date() {
+        assert_eq!(roundup_min_for(Some(2611_1115)), ROUNDUP_MIN_OLD);
+        assert_eq!(roundup_min_for(Some(ROUNDUP_MIN_RAISED_FROM)), ROUNDUP_MIN);
+        assert_eq!(roundup_min_for(None), ROUNDUP_MIN);
+        let six = [("x", "t", false); 6];
+        let mut spec = roundup("", &six);
+        assert!(spec.structure_errors().is_empty());
+        spec.roundup_min = roundup_min_for(Some(ROUNDUP_MIN_RAISED_FROM));
+        assert_eq!(spec.structure_errors().len(), 1);
     }
 
     #[test]
