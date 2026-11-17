@@ -1228,7 +1228,7 @@ mod tests {
         // Without a 速览 group the two roundup sentences disappear whole.
         let plain = render(&ctx(vec![group('A', "甲"), group('B', "乙")])).unwrap();
         assert!(plain.contains("深色底页面也可以截，但在日志里注明。\n"));
-        assert!(plain.contains("三节。\n"));
+        assert!(plain.contains("没有就写“无”。\n"));
         assert!(plain.contains("本文件分两组（A/B）"));
         let single = render(&ctx(vec![group('A', "甲")])).unwrap();
         assert!(single.contains("（`a-`）"));

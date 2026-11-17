@@ -41,6 +41,15 @@ const BARK_FROM: u32 = 2610_1027;
 /// Issues from this date also carry one 事件卡 `images/00-event-N.png` per
 /// main post, ahead of its 吠点卡 (EDITORIAL.md 省流卡与批注截图, 2026-10-29).
 const EVENT_FROM: u32 = 2610_1028;
+/// Issues from this date carry at most `BARK_MAX` 吠点 per main post and get a
+/// warning for verification footnotes inside a 吠点 (EDITORIAL.md 正文结构,
+/// decided 2026-11-18; trial from 1117).
+const BARK_CAP_FROM: u32 = 2611_1117;
+const BARK_MAX: usize = 3;
+/// Words that usually mark a note on our own checking (“截至17日未见回应”)
+/// rather than a 吠点 a reader can use. Only a warning: a specific gap may
+/// still need one of them.
+const BARK_FOOTNOTES: [&str; 6] = ["截至", "未见", "没找到", "未找到", "没证实", "未证实"];
 /// Names with one canonical spelling. Another casing in a title is only a
 /// warning: Develata may choose one on purpose (1021 used `claude`).
 const BRANDS: [&str; 13] = [
@@ -58,8 +67,9 @@ const BRANDS: [&str; 13] = [
     "OpenAI",
     "Qwen",
 ];
-/// Wire-copy words that make a title read like a press summary; the question
-/// mark already carries the doubt.
+/// Wire-copy words that make a title read like a press summary. A claim we
+/// correct goes into the title together with the correction, and a claimant
+/// is named plainly (“X称”), not hedged (EDITORIAL.md 标题).
 const TITLE_WIRE: [&str; 3] = ["被曝", "被指", "疑似"];
 /// Admonishing pivots and maxim closers (“A 不等于 B”“仍需外部检验”). Summed
 /// over 0924–1024: 1022 has 10, 1007 and 1021 have 5, 1014 has 3, every other
@@ -100,7 +110,7 @@ const UNITS: [char; 14] = [
     '月', '日', '年', '美', '元', '倍', '万', '亿', '个', '条', '次', '天', '分', '秒',
 ];
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Level {
     Info,
     Warn,
@@ -180,6 +190,7 @@ pub fn lint_issue(dir: &Path) -> Vec<Finding> {
         style: key.is_none_or(|k| k >= STYLE_FROM),
         bark: key.is_none_or(|k| k >= BARK_FROM),
         event: key.is_none_or(|k| k >= EVENT_FROM),
+        bark_cap: key.is_none_or(|k| k >= BARK_CAP_FROM),
         publish: card::publish_era(key),
     };
 
@@ -309,6 +320,9 @@ fn lint_publish(sink: &mut Sink, raw: &str, fact_check: Option<&str>, era: Era, 
     }
 
     lint_structure(sink, &lines, new_format, kind);
+    if era.bark_cap {
+        lint_bark_points(sink, &lines);
+    }
 
     let fc_compact: Option<String> =
         fact_check.map(|fc| fc.chars().filter(|c| !c.is_whitespace()).collect());
@@ -615,6 +629,8 @@ struct Era {
     bark: bool,
     /// 1028 on: an 事件卡 per main post.
     event: bool,
+    /// 1117 on: at most `BARK_MAX` 吠点 per main post.
+    bark_cap: bool,
     /// 1029 on: the upload set lives in `images/publish/`, numbered in order.
     publish: bool,
 }
@@ -628,7 +644,9 @@ fn lint_style(sink: &mut Sink, title: &str, text: &str) {
     for w in TITLE_WIRE.iter().filter(|w| title.contains(*w)) {
         sink.warn(
             Some(1),
-            format!("标题含「{w}」，像新闻摘要：钩子写具体事实，存疑交给问号（EDITORIAL.md 标题）"),
+            format!(
+                "标题含「{w}」，像新闻摘要：钩子写具体事实；要纠正的说法连同纠正一起写进标题（EDITORIAL.md 标题）"
+            ),
         );
     }
     let hits = hedge_hits(text);
@@ -642,6 +660,64 @@ fn lint_style(sink: &mut Sink, title: &str, text: &str) {
                 list.join("、")
             ),
         );
+    }
+}
+
+/// EDITORIAL.md 正文结构“吠点” (1117 on): each “吠点：” section holds at most
+/// `BARK_MAX` points; a point carrying a footnote word gets a warning.
+/// Points are read as `bark_sections` reads them, on lines with all
+/// whitespace removed (so “吠点 ：” is a header too): inline after “吠点：”,
+/// then the ①② lines that follow, blank lines skipped.
+fn lint_bark_points(sink: &mut Sink, lines: &[&str]) {
+    let compact: Vec<String> = lines
+        .iter()
+        .map(|l| l.chars().filter(|c| !c.is_whitespace()).collect())
+        .collect();
+    let mut i = 0;
+    let mut section = 0;
+    while i < compact.len() {
+        let Some(rest) = compact[i].strip_prefix("吠点：") else {
+            i += 1;
+            continue;
+        };
+        section += 1;
+        let head = i;
+        let mut points: Vec<(usize, &str)> = Vec::new();
+        if !rest.is_empty() {
+            points.push((i, card::strip_circled(rest).unwrap_or(rest)));
+        }
+        i += 1;
+        while i < compact.len() {
+            let l = compact[i].as_str();
+            if l.is_empty() {
+                i += 1;
+                continue;
+            }
+            let Some(p) = card::strip_circled(l) else {
+                break;
+            };
+            points.push((i, p));
+            i += 1;
+        }
+        if points.len() > BARK_MAX {
+            sink.error(
+                Some(head + 1),
+                format!(
+                    "第 {section} 段吠点有 {} 条，每个主帖至多 {BARK_MAX} 条（EDITORIAL.md 正文结构）",
+                    points.len()
+                ),
+            );
+        }
+        for (n, p) in &points {
+            for w in BARK_FOOTNOTES.iter().filter(|w| p.contains(*w)) {
+                sink.warn(
+                    Some(n + 1),
+                    format!(
+                        "吠点含「{w}」，像核验注脚：核验过程只记 fact-check.md；若是具体缺口，写明缺的是什么（EDITORIAL.md 正文结构）"
+                    ),
+                );
+            }
+        }
     }
 }
 
@@ -1409,6 +1485,34 @@ mod tests {
         out.iter().any(|f| f.level == Level::Error)
     }
 
+    fn bark_point_findings(text: &str) -> Vec<(Level, Option<usize>)> {
+        let mut out = Vec::new();
+        let lines: Vec<&str> = text.lines().collect();
+        lint_bark_points(
+            &mut Sink {
+                path: Path::new("t"),
+                out: &mut out,
+            },
+            &lines,
+        );
+        out.iter().map(|f| (f.level, f.line)).collect()
+    }
+
+    #[test]
+    fn bark_sections_hold_at_most_three_points_and_footnotes_warn() {
+        let ok = "一、甲\n吠点：\n①说法甲，原文只到乙。\n②丙。\n\n③丁。\n二、乙\n吠点：①戊。";
+        assert!(bark_point_findings(ok).is_empty());
+        let four = "吠点：\n①甲。\n②乙。\n③丙。\n④丁。\nAI 吠点：聊 AI 沸点，轻松识破吠点。";
+        assert_eq!(bark_point_findings(four), [(Level::Error, Some(1))]);
+        let spaced = "吠点 ：\n①甲。\n②乙。\n③丙。\n④丁。";
+        assert_eq!(bark_point_findings(spaced), [(Level::Error, Some(1))]);
+        let footnote = "吠点：\n①甲。\n②截至17日未见回应。";
+        assert_eq!(
+            bark_point_findings(footnote),
+            [(Level::Warn, Some(3)), (Level::Warn, Some(3))]
+        );
+    }
+
     fn structure_errs(text: &str, new_format: bool) -> bool {
         structure_errs_as(text, new_format, Kind::Main)
     }
@@ -1674,6 +1778,7 @@ mod tests {
         style: true,
         bark: true,
         event: true,
+        bark_cap: true,
         publish: true,
     };
 

@@ -45,6 +45,18 @@ pub struct Axis {
 pub struct Value {
     pub name: String,
     pub hint: String,
+    /// Issue key (`YYMMMMDD`, e.g. `26111117`) from which the value is
+    /// retired: no longer drawn, and an error on that issue's line or any
+    /// later one. Earlier issues that recorded it stay valid.
+    #[serde(default)]
+    pub retired_from: Option<u32>,
+}
+
+impl Value {
+    /// Whether an issue with this key may use the value.
+    fn active_at(&self, key: u32) -> bool {
+        self.retired_from.is_none_or(|r| key < r)
+    }
 }
 
 /// One recorded or drawn cover: axis key → value name.
@@ -64,7 +76,8 @@ impl Deck {
     }
 
     /// Invariant relied on by `draw`: after excluding at most `avoid_last`
-    /// values, every axis still offers two, so A and B can differ.
+    /// values, every axis still offers two values that are not retired, so A
+    /// and B can differ.
     fn validate(&self) -> Result<(), String> {
         if self.axis.is_empty() {
             return Err("没有 [[axis]]".into());
@@ -83,20 +96,20 @@ impl Deck {
                     return Err(format!("轴「{}」的取值「{}」重复", a.key, v.name));
                 }
             }
-            if a.values.len() < a.avoid_last + 2 {
+            let live = a.values.iter().filter(|v| v.retired_from.is_none()).count();
+            if live < a.avoid_last + 2 {
                 return Err(format!(
-                    "轴「{}」只有 {} 个取值，至少要比 avoid_last（{}）多 2 个",
-                    a.key,
-                    a.values.len(),
-                    a.avoid_last
+                    "轴「{}」只有 {live} 个未停用的取值，至少要比 avoid_last（{}）多 2 个",
+                    a.key, a.avoid_last
                 ));
             }
         }
         Ok(())
     }
 
-    /// Unknown or missing axes, and values the deck does not list.
-    pub fn entry_errors(&self, e: &Entry) -> Vec<String> {
+    /// Unknown or missing axes, values the deck does not list, and values
+    /// retired by the issue with key `key`.
+    pub fn entry_errors(&self, e: &Entry, key: u32) -> Vec<String> {
         let mut out = Vec::new();
         for k in e.keys() {
             if !self.axis.iter().any(|a| &a.key == k) {
@@ -104,11 +117,17 @@ impl Deck {
             }
         }
         for a in &self.axis {
-            match e.get(&a.key) {
-                None => out.push(format!("缺少轴「{}」", a.key)),
-                Some(v) if !a.values.iter().any(|x| &x.name == v) => {
-                    out.push(format!("「{}」没有取值「{v}」（见 {DECK}）", a.key));
-                }
+            let Some(v) = e.get(&a.key) else {
+                out.push(format!("缺少轴「{}」", a.key));
+                continue;
+            };
+            match a.values.iter().find(|x| &x.name == v) {
+                None => out.push(format!("「{}」没有取值「{v}」（见 {DECK}）", a.key)),
+                Some(x) if !x.active_at(key) => out.push(format!(
+                    "「{}」的取值「{v}」已停用（{} 期起，见 {DECK}）",
+                    a.key,
+                    x.retired_from.map_or(0, |r| r % 10_000)
+                )),
                 Some(_) => {}
             }
         }
@@ -217,7 +236,11 @@ pub fn ledger_errors(root: &Path, key: u32, md: &str) -> Vec<(Option<usize>, Str
             return out;
         }
     };
-    out.extend(deck.entry_errors(entry).into_iter().map(|m| (Some(*n), m)));
+    out.extend(
+        deck.entry_errors(entry, key)
+            .into_iter()
+            .map(|m| (Some(*n), m)),
+    );
     match history(root, key) {
         Ok(h) => {
             let banned = deck.banned(&h);
@@ -259,9 +282,11 @@ impl Rng {
     }
 }
 
-/// Two entries drawn from the values `banned` leaves. B avoids A's value on
-/// every axis that still has another one, so the two candidates are two
-/// directions, not two takes of one.
+/// Two entries drawn from the values that are not retired and that `banned`
+/// leaves. Retired values are never drawn, whatever the issue: they only stay
+/// valid on old issues' recorded lines. B avoids A's value on every axis that
+/// still has another one, so the two candidates are two directions, not two
+/// takes of one.
 fn draw(deck: &Deck, banned: &Banned, seed: u64) -> (Entry, Entry) {
     let mut rng = Rng(seed);
     let (mut a, mut b) = (Entry::new(), Entry::new());
@@ -269,6 +294,7 @@ fn draw(deck: &Deck, banned: &Banned, seed: u64) -> (Entry, Entry) {
         let allowed: Vec<&str> = axis
             .values
             .iter()
+            .filter(|v| v.retired_from.is_none())
             .map(|v| v.name.as_str())
             .filter(|v| !banned.get(&axis.key).is_some_and(|m| m.contains_key(*v)))
             .collect();
@@ -428,8 +454,14 @@ values = [{ name = "浅", hint = "" }, { name = "深", hint = "" }, { name = "�
     #[test]
     fn entry_errors_name_missing_and_unknown() {
         let d = deck();
-        assert!(d.entry_errors(&entry("画风=甲；底色=浅")).is_empty());
-        assert_eq!(d.entry_errors(&entry("画风=戊；颜色=浅")).len(), 3);
+        assert!(
+            d.entry_errors(&entry("画风=甲；底色=浅"), 2611_1117)
+                .is_empty()
+        );
+        assert_eq!(
+            d.entry_errors(&entry("画风=戊；颜色=浅"), 2611_1117).len(),
+            3
+        );
     }
 
     #[test]
@@ -470,6 +502,51 @@ values = [{ name = "浅", hint = "" }, { name = "深", hint = "" }, { name = "�
         let d = deck();
         let banned = d.banned(&[]);
         assert_eq!(draw(&d, &banned, 7), draw(&d, &banned, 7));
+    }
+
+    fn retiring_deck() -> Deck {
+        let raw = r#"
+[[axis]]
+key = "看板娘"
+avoid_last = 1
+values = [
+  { name = "探头", hint = "" }, { name = "小人", hint = "" }, { name = "角标", hint = "" },
+  { name = "大特写", hint = "", retired_from = 26111117 },
+]
+"#;
+        let d: Deck = toml::from_str(raw).unwrap();
+        d.validate().unwrap();
+        d
+    }
+
+    #[test]
+    fn retired_values_stay_valid_before_and_fail_from_their_issue() {
+        let d = retiring_deck();
+        assert!(
+            d.entry_errors(&entry("看板娘=大特写"), 2611_1116)
+                .is_empty()
+        );
+        let errs = d.entry_errors(&entry("看板娘=大特写"), 2611_1117);
+        assert_eq!(errs.len(), 1);
+        assert!(errs[0].contains("停用") && errs[0].contains("1117"));
+        assert!(d.entry_errors(&entry("看板娘=角标"), 2611_1117).is_empty());
+    }
+
+    #[test]
+    fn retired_values_are_never_drawn_and_dont_count_toward_the_minimum() {
+        let d = retiring_deck();
+        // 1116 recorded the retired value; it still bans nothing live.
+        let banned = d.banned(&[("1116".to_string(), entry("看板娘=大特写"))]);
+        // Drawing never depends on the issue, so an old issue gets no retired value either.
+        for seed in 0..500 {
+            let (a, b) = draw(&d, &banned, seed);
+            assert_ne!(a["看板娘"], "大特写");
+            assert_ne!(b["看板娘"], "大特写");
+            assert_ne!(a["看板娘"], b["看板娘"]);
+        }
+        let raw = "[[axis]]\nkey = \"x\"\navoid_last = 1\nvalues = [{ name = \"a\", hint = \"\" }, { name = \"b\", hint = \"\" }, { name = \"c\", hint = \"\", retired_from = 26111117 }]\n";
+        let thin: Deck = toml::from_str(raw).unwrap();
+        assert!(thin.validate().is_err());
     }
 
     #[test]
