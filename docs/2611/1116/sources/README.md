@@ -24,7 +24,8 @@
 - [Hugging Face × OpenRouter](https://huggingface.co/blog/openrouter)（11-16）。语言模型自带密钥失效，图像、视频、音频不变。
 - [Databricks AI Index](https://www.databricks.com/blog/introducing-databricks-ai-index-state-enterprise-ai-tokenomics)（11-16）。编码任务来自 Databricks 私有代码库；成本按标价估算；未写档位。
 - [Mem 关停公告](https://get.mem.ai/blog/mem-is-shutting-down)（11-16）。
-- 未收：[加州总检察长起诉 OpenAI](https://oag.ca.gov/news/press-releases/it%E2%80%99s-golden-state-not-wild-west-attorney-general-bonta-sues-openai-over)（已存档新闻稿与诉状；涉美国州政府，按风控默认不收，交 Develata 定；跟进 1014 的 8 州诉讼，派工单误写 6 州，C 组已纠正）；英伟达 Vera Rubin“每瓦10倍”、TensorWave 457MW、万拓 One2N（只见 WorkBuddy 扫描，C 组与 Claude 搜索均未找到一手来源）；OpenAI Daybreak 进北约机构、FBI ARTEX（风控）；OpenAI 儿童安全分类器（题材敏感）。
+- [加州总检察长起诉 OpenAI](https://oag.ca.gov/news/press-releases/it%E2%80%99s-golden-state-not-wild-west-attorney-general-bonta-sues-openai-over)（11-16；涉美国州政府，按风控默认未收，Develata 终审时决定加回；跟进 1014 的 8 州诉讼，派工单误写 6 州，C 组已纠正）。
+- 未收：英伟达 Vera Rubin“每瓦10倍”、TensorWave 457MW、万拓 One2N（只见 WorkBuddy 扫描，C 组与 Claude 搜索均未找到一手来源）；OpenAI Daybreak 进北约机构、FBI ARTEX（风控）；OpenAI 儿童安全分类器（题材敏感）。
 
 ## 备注
 

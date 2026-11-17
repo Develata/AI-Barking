@@ -30,7 +30,7 @@
 | 顺序 | 文件 | 对应正文 | 图注与来源 |
 |---|---|---|---|
 | 1 | publish/01-tldr.png | 省流 | 两条事实，逐字取自正文事实段（不放吠点） |
-| 2 | publish/02-roundup.png | 今日速览 | 两条主帖小标题＋AMD 完成收购 World Labs、Hugging Face 改走 OpenRouter、Databricks 自测成本差、Mem 关停 |
+| 2 | publish/02-roundup.png | 今日速览 | 两条主帖小标题＋加州总检察长起诉 OpenAI（终审时加回）、AMD 完成收购 World Labs、Hugging Face 改走 OpenRouter、Databricks 自测成本差、Mem 关停 |
 | 3 | publish/03-event-1.png | 第一条事实段 | 事件卡（Win11），逐字取自正文事实段；公众号不插 |
 | 4 | publish/04-bark-1.png | 第一条吠点 | 吠点卡（Win11），逐字取自正文吠点段；公众号不插 |
 | 5 | publish/05-win-vm.png | 第一条事实段、吠点① | 研究者博文标题、“请 AI 帮我翻查系统文件”句与“测试机上功能已作为服务端实验开启”段（现行版两段拼接，浅色重渲），批注；来源 xusheng.dev 原文截图（2026-11-17，两段拼接） |
