@@ -67,6 +67,8 @@
 
 卡片清单：至少一张事实批注图，每条吠点尽量配一张依据截图；取证截图照常按本组编号区间放在 `images/`（不放 `images/publish/`）。正式配图（`images/publish/` 里按上传顺序编号的那一套，含本主帖的事件卡、吠点卡）由 Claude 按正文渲染和编排，不占本组编号；批注底图将由 Claude 从取证截图裁出为 `images/<名>-raw.png`。
 
+对读者：本组交卷时附“对读者”一节（见“验收”）。Claude 起草本主帖的“对你”句只用这一节里已核实的事实（2026-11-18 起，`EDITORIAL.md`“正文结构”）。
+
 候选配图（{GROUP} 组 {RANGE}）：（待填）
 <!-- skeleton:roundup -->
 # {GROUP} 组：{TOPIC}
