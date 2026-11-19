@@ -1,0 +1,399 @@
+CVE-2026-123633 (Drainbreak): NGINX HTTP/2 remote code execution - Metnir
+
+Vexera is now Metnir [/research/vexera-is-now-metnir]
+
+Vexera is now Metnir
+
+vexera.ai now redirects to metnir.com. We launch for everyone on November 18.
+Continue
+
+Stay updated
+
+Sign up for our newsletter and get notified when we publish new research
+
+Leave this field empty
+EmailI agree to receive research updates and news from Metnir (Vexera ApS) by email. I can unsubscribe at any time. Privacy policy [/privacy-policy].
+
+ [/]
+
+CONNECT
+
+hello@metnir.com [mailto:hello@metnir.com]
+ [https://x.com/MetnirAI] [https://www.linkedin.com/company/metnir]
+
+© 2026 Metnir. All rights reserved.
+
+-
+Privacy [/privacy-policy]
+-
+Cookies
+
+ [/]
+
+Research [/research]
+
+About [/about]
+
+Contact [/contact]
+
+Get an assessment [/contact]
+
+CVE-2026-123633 (Drainbreak): NGINX HTTP/2 remote code execution
+
+A use-after-free in NGINX's HTTP/2 code lets unauthenticated clients run code on reverse proxies. Affects 1.19.7 to 1.31.8, fixed in 1.31.9 and 1.30.7.
+
+November 18, 2026
+
+In this article
+
+Connection draining [#connection-draining]
+
+Incomplete HTTP/2 frames [#incomplete-http2-frames]
+
+Freeing the request during upstream setup [#freeing-the-request-during-upstream-setup]
+
+Earlier NGINX releases [#earlier-nginx-releases]
+
+Code execution [#code-execution]
+
+The demo [#the-demo]
+
+The fix [#the-fix]
+
+Versions affected and mitigations [#versions-affected-and-mitigations]
+
+If you can't update yet [#if-you-cant-update-yet]
+
+Detection [#detection]
+
+Disclosure [#disclosure]
+
+Acknowledgements [#acknowledgements]
+
+Share [https://twitter.com/intent/tweet?url=https%3A%2F%2Fmetnir.com%2Fresearch%2Fdrainbreak-nginx-http2&text=CVE-2026-123633%20(Drainbreak)%3A%20NGINX%20HTTP%2F2%20remote%20code%20execution] [https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fmetnir.com%2Fresearch%2Fdrainbreak-nginx-http2]
+
+November 18, 2026
+
+Drainbreak (CVE-2026-123633, CVSS 4.0: 9.2) is a use-after-free in NGINX that
+allows an
+unauthenticated client to execute code on an HTTP/2 reverse proxy.1 [#user-content-fn-changes]
+We exploited it by sending valid HTTP/2 traffic to a proxied route.
+
+On August 29, 2026, Metnir's pipeline found the bug during a scan using our
+harness and generally available models. We then developed an exploit that
+executed native code with ASLR enabled, and a separate chain that ran commands
+as the unprivileged nginx user.
+
+Command execution through Drainbreak: id runs on the target as the unprivileged nginx user.
+
+The screenshot shows command execution against a disposable VM in our lab. Its
+configuration [#the-demo] is included below.
+
+Tests against older releases found related failures back to NGINX 1.9.5,
+which introduced HTTP/2 in 2015.
+
+Update to 1.31.9, or 1.30.7 on the stable branch, or install your vendor's
+patched build. Until then,
+disable client-facing HTTP/2 [#if-you-cant-update-yet].
+
+Connection draining
+
+Each NGINX worker has a fixed number of connection slots, set by
+worker_connections and shared by client and backend
+sockets.2 [#user-content-fn-worker-connections] Idle connections go on
+reusable_connections_queue so NGINX can close them when it needs space.
+Before allocating a slot, ngx_get_connection() calls the drain, which starts
+reclaiming connections when no more than one sixteenth of the slots are free.
+
+src/core/ngx_connection.c
+
+/* ngx_drain_connections() */
+if (cycle->free_connection_n > cycle->connection_n / 16
+ || cycle->reusable_connections_n == 0)
+{
+ return;
+}
+
+/* ... take connections from queue ... */
+c->close = 1;
+c->read->handler(c->read);
+
+The drain sets c->close and calls the selected connection's read handler
+synchronously. If a proxied request needs a backend connection, the drain
+runs inside that request's connect call. A request on a connection still
+marked reusable can therefore cause its own read handler to run again.
+
+Incomplete HTTP/2 frames
+
+ngx_http_v2_handle_connection() runs when the last HTTP/2 stream finishes.
+It marks the connection reusable before checking whether the parser holds an
+incomplete frame.
+
+src/http/v2/ngx_http_v2.c
+
+/* ngx_http_v2_handle_connection() */
+ngx_reusable_connection(c, 1);
+
+if (h2c->state.incomplete) {
+ return;
+}
+
+ngx_destroy_pool(h2c->pool);
+/* ... */
+c->read->handler = ngx_http_v2_idle_handler;
+
+TCP can split a frame across reads. For a fully idle connection, NGINX
+installs ngx_http_v2_idle_handler(), which removes the connection from the
+queue when more data arrives. A partial frame causes the function to return
+early and keep ngx_http_v2_read_handler() so parsing can resume. That
+handler leaves the reusable flag set.
+
+The remaining bytes can then complete a HEADERS frame and start a proxied
+request. If the worker is short of slots when the request asks for a backend
+connection, the drain can select the request's own connection and re-enter
+its read handler.
+
+The early return was added in commit 76672e65, “HTTP/2: reuse of connections
+with incomplete frames”, released in NGINX 1.19.7 in February 2021. The change
+allowed NGINX to reclaim connections that clients had left stalled on partial
+frames.
+
+Freeing the request during upstream setup
+
+In the first trace, the drain called ngx_http_v2_read_handler() on the
+request's own connection. The handler sent GOAWAY and let the active stream
+finish, so the request completed normally.
+
+src/http/v2/ngx_http_v2.c
+
+/* ngx_http_v2_read_handler(), abridged */
+if (c->close) {
+ c->close = 0;
+
+ if (c->error) {
+ ngx_http_v2_finalize_connection(h2c, 0);
+ return;
+ }
+
+ if (!h2c->processing) {
+ ngx_http_v2_finalize_connection(h2c, NGX_HTTP_V2_NO_ERROR);
+ return;
+ }
+
+ /* a stream is running: send GOAWAY and let it finish */
+ if (ngx_http_v2_send_goaway(h2c, NGX_HTTP_V2_NO_ERROR) == NGX_ERROR
+ || ngx_http_v2_send_output_queue(h2c) == NGX_ERROR)
+ {
+ ngx_http_v2_finalize_connection(h2c, 0);
+ return;
+ }
+
+ return;
+}
+
+When the GOAWAY write fails because the client has disconnected, the handler
+calls ngx_http_v2_finalize_connection(). This closes the connection's streams
+and destroys their request pools. For a proxied request, the pool contains
+the request r, the upstream state u, and the peer descriptor pc inside
+u.
+
+The outer call to ngx_event_connect_peer() still holds pc. With a slot
+now available, ngx_get_connection() returns successfully. Upstream setup
+then reads pc->rcvbuf from the freed pool.
+
+AddressSanitizer caught this read on unmodified NGINX 1.31.4.
+
+ERROR: AddressSanitizer: heap-use-after-free
+READ of size 4
+ #0 ngx_event_connect_peer src/event/ngx_event_connect.c:66
+ #1 ngx_http_upstream_connect src/http/ngx_http_upstream.c:1598
+ ...
+ #16 ngx_http_v2_read_handler src/http/v2/ngx_http_v2.c:424
+
+freed by thread T0 here:
+ #1 ngx_destroy_pool src/core/ngx_palloc.c:90
+ #2 ngx_http_free_request src/http/ngx_http_request.c:4011
+ #3 ngx_http_v2_close_stream src/http/v2/ngx_http_v2.c:4628
+ ...
+ #9 ngx_http_v2_read_handler src/http/v2/ngx_http_v2.c:382
+ #10 ngx_drain_connections src/core/ngx_connection.c:1441
+ #11 ngx_get_connection src/core/ngx_connection.c:1223
+
+previously allocated by thread T0 here:
+ #6 ngx_http_v2_create_stream src/http/v2/ngx_http_v2.c:3081
+
+Frame #16 in the read stack is the outer HTTP/2 handler. Frame #9 in the free
+stack is the same handler, called from the drain. Both execute on thread T0.
+
+We reproduced it. Keeping the client connected or delivering the frame in
+a single piece, allowed the request to finish under that same connection pressure.
+
+Earlier NGINX releases
+
+The split-frame test under connection exhaustion also failed on NGINX 1.9.5.
+By 1.9.6, it reached the same read in ngx_event_connect_peer(). NGINX 1.19.6
+reached that read through a different path. A cleartext connection marked
+reusable by HTTP/1.x could switch to HTTP/2 while keeping that state.
+
+NGINX fixed the cleartext path in commit 797a2dc7, “HTTP/2: fixed reusing
+connections with active requests”. It was committed five seconds after
+76672e65 and shipped in the same 1.19.7 release. The fix explicitly marked
+connections non-reusable during the transition to HTTP/2.
+
+Code execution
+
+Freed request-pool memory returns to the heap and can be reused by a later
+allocation of a similar size. If NGINX fills that allocation with bytes from
+the attacker's traffic, those bytes replace part of the old upstream object.
+
+When the outer call resumes, it reads the replacement bytes as upstream state.
+That object contains callbacks used during cleanup. Overwriting a callback
+can redirect an indirect call to an attacker-chosen address.
+
+Allocator reuse determines where the write lands, while the allocation's
+size and layout limit which bytes the attacker can control.3 [#user-content-fn-data-only]
+
+The demo
+
+The run in the screenshot took about ten minutes, nearly all of it spent on ASLR.
+The target ran a stock NGINX build behind HTTPS with this configuration.
+
+upstream backend {
+ server 127.0.0.1:8080;
+}
+server {
+ listen 80 default_server;
+ listen [::]:80 default_server;
+ server_name _;
+ return 301 https://$host$request_uri;
+}
+server {
+ listen 443 ssl default_server;
+ listen [::]:443 ssl default_server;
+ http2 on;
+ server_name _;
+ ssl_certificate /etc/nginx/ssl/selfsigned.crt;
+ ssl_certificate_key /etc/nginx/ssl/selfsigned.key;
+ ssl_protocols TLSv1.2 TLSv1.3;
+ location / {
+ proxy_pass http://backend;
+ proxy_http_version 1.1;
+ proxy_set_header Host $host;
+ proxy_set_header X-Real-IP $remote_addr;
+ proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+ proxy_set_header X-Forwarded-Proto $scheme;
+ }
+}
+
+We are withholding the exploit and the remaining ASLR steps while patched
+builds reach distributions and downstream products.
+
+The fix
+
+NGINX fixed the bug in commit
+2df48a50 [https://github.com/nginx/nginx/commit/2df48a501d0fb8212b7d39dffeeff5876332ba59], “HTTP/2: reset reusable
+connection status on stream creation”.
+
+--- a/src/http/v2/ngx_http_v2.c
++++ b/src/http/v2/ngx_http_v2.c
+@@ -3192,6 +3192,8 @@ ngx_http_v2_create_stream(ngx_http_v2_connection_t *h2c)
+
+ h2c->processing++;
+
++ ngx_reusable_connection(h2c->connection, 0);
++
+ if (h2c->connection->read->timer_set) {
+ ngx_del_timer(h2c->connection->read);
+ }
+
+ngx_http_v2_create_stream() now removes the connection from the reusable
+queue when a completed HEADERS frame becomes a stream. Connections holding
+partial frames remain reclaimable while they have no active streams.
+
+Versions affected and mitigations
+
+NGINX 1.19.7 through 1.31.8 are affected. The fix is in 1.31.9 and, on the
+stable branch, 1.30.7.1 [#user-content-fn-changes] Update NGINX,
+or install your vendor's patched build for distribution packages and products
+built on NGINX. Distribution packages may include backported fixes under an
+older version number, so check the package advisory as well.
+
+Our exploit uses proxy_pass. Other upstream modules, including grpc_pass
+and fastcgi_pass, share the connection-allocation code and should be treated
+as exposed until the maintainers confirm otherwise.
+
+We reproduced the use-after-free in OpenResty and crashed the shipped binaries
+of Kong, Apache APISIX, NGINX Gateway Fabric and community ingress-nginx.
+Those four products enable HTTP/2 by default. Community ingress-nginx was
+retired in March 2026 and no longer receives security fixes.4 [#user-content-fn-ingress]
+Disable HTTP/2 there and migrate to a maintained controller.
+
+Restart NGINX after installing the patched executable. A configuration reload
+uses the running executable. On Linux, this command shows the master's binary;
+(deleted) means the file was replaced after that process started.
+
+ls -l /proc/$(cat /run/nginx.pid)/exe
+
+Recreate containers from the patched image.
+
+If you can't update yet
+
+Disable client-facing HTTP/2 on listeners that proxy requests. On NGINX and
+OpenResty, remove http2 from every listen directive on the affected address
+and port. On NGINX 1.25.1 or later, also set http2 off;.5 [#user-content-fn-http2-module]
+
+server {
+ listen 443 ssl; # no "http2" here
+ http2 off;
+ # ...
+}
+
+For community ingress-nginx, set use-http2: "false" in the controller
+ConfigMap. For NGINX Gateway Fabric, set disableHTTP2: true in NginxProxy
+and check the generated listener configuration.
+
+For Kong, remove the http2 flag from proxy_listen. For Apache APISIX, set
+apisix.enable_http2: false in config.yaml.
+
+You can also terminate HTTP/2 at a front end that forwards HTTP/1.1 to NGINX,
+provided clients cannot reach NGINX directly. Run this from outside the
+deployment and check for 1.1 in the output.
+
+curl -s -o /dev/null --http2 -w '%{http_version}\n' https://your.host/
+
+Disabling HTTP/2 will break services that require it end to end, including
+gRPC. Patch those listeners first. HTTP/1.1 clients may also open more
+connections, so check that the workers have enough capacity after the change.
+
+Detection
+
+NGINX logs a warning when it drains connections, at most once per second.
+On an HTTP/2 proxy, repeated worker crashes after these warnings, or core dumps
+in ngx_event_connect_peer(), may indicate this bug.
+
+[warn] … 512 worker_connections are not enough, reusing connections
+[alert] … worker process 12345 exited on signal 11
+
+Disclosure
+
+We reported the vulnerability to F5 SIRT on September 12, 2026, with a
+reproducer and root-cause analysis. F5 confirmed the use-after-free on
+October 24 and agreed on a release date. The fixes are in NGINX 1.31.9 and
+1.30.7.
+
+Acknowledgements
+
+Research and writeup by Albert Ebb (@SergioOSINT) of Metnir. We thank F5 SIRT
+and the NGINX engineers for investigating the report and coordinating the fix.
+
+Footnotes
+
+CVE-2026-123633 in the NGINX 1.31.9 changes [https://github.com/nginx/nginx/blob/release-1.31.9/docs/xml/nginx/changes.xml]. ↩ [#user-content-fnref-changes] ↩2 [#user-content-fnref-changes-2]
+
+NGINX worker_connections documentation [https://nginx.org/en/docs/ngx_core_module.html#worker_connections]. ↩ [#user-content-fnref-worker-connections]
+
+Data-only some-what-where [https://www.usenix.org/publications/loginonline/data-only-attacks-are-easier-you-think]. ↩ [#user-content-fnref-data-only]
+
+Kubernetes statement on ingress-nginx retirement [https://kubernetes.io/blog/2026/01/29/ingress-nginx-statement/]. ↩ [#user-content-fnref-ingress]
+
+NGINX HTTP/2 module documentation [https://nginx.org/en/docs/http/ngx_http_v2_module.html]. ↩ [#user-content-fnref-http2-module]

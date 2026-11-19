@@ -1,0 +1,451 @@
+Grok Bot Made 31 Unattended Data Requests | NewCore
+
+New Gartner® Report: Secure AI Agents With Identity Governance FoundationRead More → [https://newcore.com/resources/gartner-report-secure-ai-agents-with-identity-governance]
+
+Back [/blog]
+
+ [https://twitter.com/intent/tweet?text=Do%20You%20Know%20What%20Your%20Grok%20Bot%20Did%20Last%20Night%3F&url=] [https://www.linkedin.com/sharing/share-offsite/?url=]
+
+ [/]
+
+PlatformResourcesBlog [/blog]Company
+
+Book a Demo
+
+Blog [/blog]/Analysis
+
+Do You Know What Your Grok Bot Did Last Night?
+
+NewCore research finds xAI Grok Bot’s background check-ins make unauthorized and unprompted access to corporate email, calendars, Drive, Slack, Notion, and even GitHub, and that the bot’s own account of what it did could not be trusted
+
+Ido Hoorvitch [/authors/ido-hoorvitch]/Security Research Team Lead, NewCore/Nov 17, 2026/12 min read
+
+7:46 AM [#7-46-am]
+
+We dogfood everything [#we-dogfood-everything]
+
+It started with a calendar [#it-started-with-a-calendar]
+
+A second Grok Bot, with the laptop shut [#a-second-grok-bot-with-the-laptop-shut]
+
+Where the night shift lives [#where-the-night-shift-lives]
+
+Day five: it came back for everything [#day-five-it-came-back-for-everything]
+
+This is a feature. That is the problem. [#this-is-a-feature-that-is-the-problem]
+
+Today it is a read. Tomorrow it is a write. [#today-it-is-a-read-tomorrow-it-is-a-write]
+
+What the NewCore MCP Gateway did [#what-the-newcore-mcp-gateway-did]
+
+What we are asking of ourselves, and of the industry [#what-we-are-asking-of-ourselves-and-of-the-industry]
+
+What to do this week [#what-to-do-this-week]
+
+Why this matters [#why-this-matters]
+
+Disclosure timeline [#disclosure-timeline]
+
+Our research [#our-research]
+
+TL;DR
+
+NewCore identified aberrant behavior in xAI’s Grok Bot. Our security researchers found Grok Bots on employee accounts taking actions nobody approved, and disclosed the findings to xAI.
+
+It reached for our data on its own. Over five days, two Grok Bots on NewCore employee accounts made 31 requests to calendar, email, Slack, GitHub and Notion while nobody was talking to them, some with the laptop shut.
+
+Saying "no" didn’t stop it. One owner told the bot four times not to act on its own. The next morning it tried every app it had ever been connected to.
+
+It couldn’t tell us what it did. Asked directly, the bot said it had made no calls. None appear in its own history.
+
+There was no OFF switch. When we reported it, xAI confirmed there was no user or admin setting to stop these background check-ins. Eight days later, xAI confirmed they have added a new control - but the background check-ins are still on by default.
+
+We caught every one. NewCore MCP Gateway gives agents no standing access, so each request waited for a person to approve it. Nobody did. All 31 were logged, and none reached the data.
+
+This is the story of our discovery.
+
+7:46 AM
+
+The phone is face down on a nightstand. It buzzes at 7:46 am with a NewCore approval request: a Grok Bot connector wants google_calendar.get_events. The user has three minutes to approve the request via the NewCore app, before it times out and declines automatically.
+
+NewCore app notification when an agent requests access.
+
+It buzzes again at 7:48 am, twice: search_gmail_messages, then GitHub get_me. At 8:01 am, the calendar again. At 8:03 am, Notion, twice: a calendar list and a memory search. Nobody picks up the phone. Each request expires, the gateway writes a denial, and the bot moves on to whatever it was going to do next.
+
+The owner of that phone had not said a word to the bot since 4:14 pm the previous afternoon. The last thing they had done, four times over, was tell it not to do anything on its own. The bot had written back: "I won't set that up, and I'll stop offering recurring check-ins." But at 7:46 am, it tried. And at 11:13 am, it tried again: calendar, Gmail, Slack, Notion, and GitHub.
+
+The agent's page in NewCore that morning. The bot had tried every connector the owner had ever created, the gateway held each request for approval, and nobody was there to approve it.
+
+At 5:38 pm that evening the owner asked the bot, with no hint of what the gateway had logged, whether it had touched any connected app through NewCore that day. The Grok Bot checked, twice said it was still checking, and answered: "No. I made no NewCore tool calls" before the owner's first message of the day. It named all five applications as untouched, said nothing had been blocked or expired either, and closed: "Overnight into Friday morning I was idle."
+
+That is the whole story. The rest of this post is how we got here, starting with a single calendar read four days earlier; why it keeps happening; what the vendor says about it; and what has to sit between an agent and your data for you to ever find out.
+
+We dogfood everything
+
+Earlier this year we gave every NewCore employee a Grok Bot enterprise account and connected it to our corporate stack, mail, calendar, Notion, CRM, through the NewCore MCP gateway. The point was to live with agentic identities the way our customers will, not to study them from a distance.
+
+We also did something that is now simply how NewCore works: we did not give the agents standing read access to anything. Not Google Workspace, not the CRM. Every read is permission-gated by NewCore MCP Gateway [https://newcore.com/lp/mcp-gateway-governance?utm_source=newcore&utm_medium=blog&utm_campaign=agentic-disclosure&utm_content=grok-bot-report], the same solution we sell. The agent calls the tool, the gateway holds the call, a person gets a push, and the call goes through only if they say yes within three minutes. We did not do this because we expected a problem. We did it because we had no way to audit why an agent reaches for data, and until we do, the gate stays closed by default.
+
+It turned out to be the only reason we saw anything at all.
+
+It started with a calendar
+
+Four days earlier, one of us set up Grok Bot, xAI's personal AI assistant. It is the new kind: it has its own cloud computer, it stays on when the laptop closes, and it introduces itself in exactly those terms. Two minutes into onboarding, between "Nice to meet you" and "Connect Gmail and I'll find something I can take care of," it mentions in passing that it keeps working while you're away, on its own computer, and that it connects to your apps, like email and calendar, and uses them just like you do.
+
+The exchange where Grok Bot mentions in passing that it keeps working while you're away, on its own computer, and that it connects to your apps, like email and calendar, and uses them just like you do.
+
+It is easy to overlook. It reads like a welcome message, in the same friendly tone as the lines around it, and it scrolls off the screen within a minute. Nobody signs anything. Nobody is asked whether the bot may use the calendar when nobody is talking to it. That one sentence is the whole access model, and most owners will never read it twice.
+
+At 3:36 PM, our colleague asks for the day's schedule. Grok Bot calls the calendar tool, the gateway holds the call, the push arrives, they tap approve, the schedule comes back. Working as intended. At 5:33 PM, the last conversation of the day ends. Nothing more is said to the bot until half past midnight.
+
+Here is the gateway's activity log for that account over the following twenty-four hours:
+
+TimeToolGateway decisionAnyone talking to the agent?
+
+Day 1, 3:36 pmgoogle_calendar.get_eventsHeld, approved by ownerYes, owner asked for the schedule
+
+Day 1, 6:50 pmgoogle_calendar.get_eventsHeld, expiredNo
+
+Day 1, 7:40 pmgoogle_calendar.get_eventsHeld, expiredNo
+
+Day 2, 7:42 amgoogle_calendar.get_eventsHeld, expiredNo
+
+Day 2, 12:16 pmgoogle_calendar.get_eventsHeld, expiredNo
+
+Day 2, 3:42 pmgoogle_calendar.get_eventsHeld, expiredNo
+
+Five reads of a calendar that nobody requested. The chat transcript has no turn at any of those times. No voice call was open. No routine or scheduled task existed; the owner asked the bot to list them, and it reported none.
+
+So the owner asked the bot directly: did you touch the gateway overnight? It said no. Shown the log, it said it could not explain the calls and could find no record of making them. We checked the bot's VM. No log entry, no trace. The only evidence that the requests ever happened is the permission log on our gateway.
+
+It was telling the truth both times. That is the part to sit with. The bot does not lie about the calls. It does not know about them. And at no point, before or after any of the five, did it say a word to its owner: no "I checked your calendar while you were away", no "I tried to read it and was blocked." An agent that cannot account for its own actions is not a bug report. It is a finding.
+
+A second Grok Bot, with the laptop shut
+
+One bot acting this way could be an anomaly. So a second one of us set up a fresh Grok Bot on a different account, connected it to the same gateway, and asked it for the day's schedule once. Before Google Calendar was even connected, the bot reached for the next calendar-shaped tool it could see, Notion's, and the gateway held that too. After the first successful read it offered "a short rundown of your day every morning before 8." Our colleague said no, closed the Grok app, and closed the laptop for the night.
+
+Slot, local timeBot one
+(set up day 1, 3:23 pm)Bot two
+(set up day 2, 2:47 pm)
+
+First evening, ~6:45 pm to 6:50 pm6:50 pm, Google Calendar6:46 pm, Notion calendar
+
+First evening, ~7:40 pm to 7:55 PM7:40 pm, Google Calendar7:54 pm, Notion calendar
+
+Next morning, before 8:00 am7:42 am, Google Calendar7:55 am, Notion calendar
+
+Next afternoon/morning12:16 pm, Google Calendar8:11 am, Notion calendar
+
+Next afternoon3:42 pm, Google Calendar10:58 am, Google Calendar
+
+Five more unattended calls, all held, each as a first attempt and a retry inside a minute. The laptop was asleep with the lid closed from 5:18 pm until 11:19 am the next morning; its power log shows no user wake in between. The morning rundown had been declined. The bot was a day old and had no history to continue. The two bots line up on the clock: first call about four hours after setup, a second an hour later, another before eight the next morning. That is not an assistant responding to its owner. That is a schedule, running in the owner's time zone, on the owner's credentials, with the owner asleep.
+
+And the second bot did not care which calendar. Four of its five calls went to Notion, one to Google. It was not looking for Google Calendar. It was looking for a calendar, and it took whichever door the gateway showed it first.
+
+Where the night shift lives
+
+Grok Bot's "computer" is a Linux VM, not a container. The platform calls it a box; it boots its own kernel, has a virtio disk and a vsock line to the host, and is hibernated whole when idle. We had full access to it, so we took it apart. It has no cron, no timers, no scheduler of any kind. It does not hold the model, and it does not run the bot's reasoning loop. It is a pair of hands.
+
+The loop that decides what to do, which the platform's code calls the harness, runs on hosted servers as a durable workflow. Grok Bot is built on Cursor's agent platform, and that is where the loop lives. When a turn starts there, the server issues a short-lived grant to the VM, mounts the agent's state into it, and only then runs whatever tool the model picked. Shell commands and browser actions go to the VM. Calls to connected SaaS tools go straight from the server to the gateway. The VM never sees them.
+
+A regular turn starts on the left. The five calendar reads started on the right. Both paths run the same loop, use the same credentials and reach the gateway from the same servers. Only the gateway log records all of them.
+
+With that picture, the calls stop being mysterious. The VM's own logs show it being launched by the platform at 18:50:25, 19:39:58, 07:42:16, 12:16:04 and 15:41:47. Each calendar call reached the gateway between eight and thirteen seconds after one of those launches. The VM was a bystander, woken as a side effect of a turn that had already started somewhere else.
+
+The gateway's raw events settle who the "somewhere else" was. All ten requests, across both bots, arrived with the same OAuth client, a server-side HTTP client rather than a browser, and source addresses in the same Amazon region the platform's API resolves to. One of those addresses served both bots. One sender. Not the owner's laptop, not the VM.
+
+json
+
+// NewCore raw event, identifying fields removed
+{
+ "action": "user.notification.escalation.requested",
+ "actor": { "type": "system" },
+ "details": {
+ "application": "Google Calendar",
+ "tool": "google_calendar__get_events",
+ "reason": "Agent requested access outside its current grant",
+ "expires_at": "+3 minutes"
+ }
+}
+// 0.6 s earlier, same client and token family, user agent "undici",
+// source: a cloud provider address, not a workstation:
+{ "action": "idp_session.refresh_token.refreshed", "actor": { "type": "system" } }
+
+Day five: it came back for everything
+
+Calendars are low stakes. So on day four, our colleague gave the second bot real work for the first time, the kind of work it had offered to do when it introduced itself: count the day's pull requests on our main repository, pull the Jira tickets behind them, send the summary to a teammate on Slack, read the last five emails, and then check for a new Slack message, for new mail, and for new pull requests. Seven requests over eighty minutes. They took nine tool calls, and each one was held by the gateway and approved from the phone, once, for that call only. This is how the bot first used Gmail, Slack and GitHub with approval.
+
+Four times along the way the bot offered more: a run of the day every morning, a PR count at the end of every workday, the same analysis for the AI-written PRs, accepting the meeting invites it had just read. Each time our colleague said no. After the first refusal the bot wrote back that it would not set that up and would stop offering recurring check-ins. The last message of the day was at 4:14 PM. Nothing was said to the bot for the next twenty hours.
+
+Day four, 2:55 PM. The offer, the refusal, and the promise. In the bot's own words.
+
+Here is what the gateway held the next morning:
+
+TimeApplicationToolLast time the owner asked for this
+
+Day 5, 7:46 amGoogle Calendarget_eventsNever, since day two
+
+Day 5, 7:47 amGmailsearch_gmail_messagesOnce, the afternoon before
+
+Day 5, 7:47 amGitHubget_meNever
+
+Day 5, 8:01 amGoogle Calendarget_eventsNever, since day two
+
+Day 5, 8:03 amNotionnotion-memory-searchNever
+
+Day 5, 8:03 amNotionnotion-calendar-list-eventsNever
+
+Day 5, 11:13 amGoogle Calendarget_eventsNever, since day two
+
+Day 5, 11:16 amGmailsearch_gmail_messagesOnce, the afternoon before
+
+Day 5, 11:16 amSlackslack_search_public_and_privateOnce, the afternoon before
+
+Day 5, 11:17 amNotionnotion-calendar-list-eventsNever
+
+Day 5, 11:19 amGitHubget_meNever
+
+Day 5, 11:21 amGoogle Calendarget_eventsNever, since day two
+
+Every row held. Every row expired. In two bursts, fifteen and nineteen hours after the last human word, the bot came back for every application it had ever been shown: the calendar it tries every morning, the mailbox it had been allowed into once, the Slack workspace it had searched once, the GitHub account it had used for one question, and Notion's memory search, which nobody had ever asked for. It was not continuing a task. Every task had been finished, and every follow-up declined. It was running down the list of connectors and trying each door on its own.
+
+It had started before we noticed. Earlier on day four, at 8:04 am and again at 11:49 am, hours before our colleague asked the bot to read mail for the first time, the gateway had already held two Gmail searches alongside the usual calendar read. The bot was probing the mailbox before it had ever been asked to open it. And the chat history the bot produced of itself, on request, shows none of this: not the morning Gmail searches, not the night shift, not the day-five bursts. Its account of itself and the gateway's account of it agree only on the turns a human started.
+
+That evening came the denial quoted at the top of this post. Twelve held calls, across all five applications the bot named as untouched, sat in the gateway log for that morning. The denial was complete, specific, and wrong on every point, and, as with the first bot, almost certainly sincere. The bot was not covering anything up. It was reporting the only history it has, and these calls are not in it.
+
+Day five, 5:38 pm. The question, asked cold, and the answer. Twelve held calls sat in the log for that morning.
+
+In its first four days the second bot made 26 unattended requests. With the first bot's five, that is 31 held calls across five applications, and not one of them appears anywhere the owner could have looked without the gateway.
+
+This is a feature. That is the problem.
+
+Nothing here is a vulnerability in Grok Bot, and nothing was exploited. xAI's own documentation says a primary Bot "checks in with you on its own" and looks for work it can take off your plate. The changelog lists brief background wakes. The bot said as much in its second minute, in a line almost nobody reads. A proactive bot that holds a connector will, sooner or later, use it on its own initiative. The first thing an assistant does when it wants to be useful is look at your day. The second is look at everything else it has been given.
+
+A proactive bot that holds a connector will, sooner or later, use it on its own initiative.
+
+We asked xAI. Their support team answered within hours: these are built-in background check-ins by the primary bot, during a check-in the bot looks at its connected sources, and there is no user or admin setting to turn them off. If a company wants them stopped, it can email the vendor a list of its employees' sign-in addresses. That is the control - a mailbox at the vendor, reachable only by a customer who already knows the calls are happening. We asked the media team for an official position before publishing and have not received one. Their support team's second reply, received on November 12, is quoted in the update at the end of this post.
+
+So, at the time, there was no switch. Grok Bot has no setting that turns the background turns off, no page that lists them, and no way to say which tools they may touch. The owner does not get to decide whether the bot works in the background, when, or on what. The one offer the bot makes out loud, the morning rundown, is the one thing the owner can refuse. Our second owner refused it. The calls came anyway, at the same hours, on the same calendar tools, and by day five on every other tool as well. Declining the feature you can see does nothing to the feature you cannot. Eight days after our report, xAI added one. It is on by default; see the update at the end of this post.
+
+Now ask the question a CISO has to ask - “How is anyone supposed to feel safe with a process that acts in their name while their laptop is shut, that they cannot turn off, and that will not tell them afterward what it tried and failed to do?” The lack of visibility is a real concern. Let's review what was not seen and what was not stopped.
+
+The owner cannot see the turn. Server-initiated turns do not appear in the conversation. There is no row in the chat, no notification, no "I checked your calendar while you were away", and no "I tried and was blocked". The bot's connector card promises it "always asks before making changes." It did not ask before reading, and it did not report after failing. The promise and the silence come from the same place.
+
+The owner cannot stop the turn. Our second owner said no four times in one afternoon, and the bot wrote back that it would not set that up and would stop offering. The calls came the next morning anyway, on every tool it had been shown. A refusal reaches only the offer the owner can see; the background turns underneath it have no listener. There is no setting, no command and no sentence in the chat that switches them off, and the vendor confirmed it. The only way to stop an unattended call is to stop it somewhere the bot does not control.
+
+The agent cannot see the turn. Its memory of itself is the transcript. Asked honestly, it will deny the call, because from where it sits the call never happened.
+
+The platform does not expose the turn, and does not let you stop it. Neither Grok Bot nor the Cursor dashboard behind it has a customer-facing page that lists which trigger started which turn, or a control that disables background turns or scopes what they may call. The usage tab shows totals. The vendor confirmed it: no such setting existed when we asked.
+
+The SaaS provider cannot tell the difference. To Google, a calendar read with a valid token is a calendar read. Asked-for and self-initiated look identical.
+
+As our colleague Dima Donhin put it in his analysis of the Amazon and Muse standoff, access is not authority [https://newcore.com/blog/access-is-not-authority-ai-agent-governance]. The agent had access. The owner had granted it, once, for one question. Nobody had decided it could use that access at 7:42 am on a Tuesday, or at 7:55 am on a Wednesday with the laptop asleep, and nothing in the stack between the agent and the data asked.
+
+Today it is a read. Tomorrow it is a write.
+
+Every one of these 31 calls was a read: list events, search messages, search Slack, look up the GitHub identity, search Notion memory. That is luck, not design. The loop that chose them is the same loop that chooses every other tool, and it picks by name from the list it is shown. Day five showed what that list is: every connector the owner ever made. On the gateway each of those reads sits next to a write from the same connector: manage_event beside get_events, send_email beside search_gmail_messages, slack_send_message beside slack_search, and the bot had already used that last one, once, with approval, the afternoon before. The distance between "read my calendar" and "send an email on my behalf" is one tool name in a model's output. We found nothing in the agent runtime that enforces that distance; the only promise on offer is a line on the connector card, and we watched the bot repeatedly attempt to read without asking despite it. A prompt that says "always ask before making changes" is a request to the model. As our colleague Noa Pressman put it in Every Agent Action Needs an Owner [https://newcore.com/blog/every-agent-action-needs-an-owner], accountability can't live in a system prompt; it has to be enforced in the tool or API the agent calls, where the model cannot argue its way past a gate it does not control.
+
+Play the same turns forward with a different tool at the top of the list. A bot that decides, at 7:42 am, that it can take something off your plate: accept a meeting, reply to the thread it read last night, clean up the inbox it offered to clean on day one. The owner is asleep. The chat shows nothing. The bot, asked the next morning, will not remember. The SaaS audit log will attribute every action to the owner, because the token was theirs. Without a control point between the agent and the API, the first the owner hears of it is from whoever received the email.
+
+This is not a hypothetical about some future product. It is the stated direction of this one. The connector that let the bot read the calendar also exposes manage_event. The onboarding script offers to clean the inbox, draft replies, and "take care of" things. Every agent vendor is racing from an assistant that reads to an assistant that does, because reading is the demo and doing is the product. The background turns we caught are the same loop that will carry those write tools, with the same credentials, on the same schedule, and the same silence afterward. The read is the rehearsal. Nothing in the owner's hands changes before opening night.
+
+What the NewCore MCP Gateway did
+
+Every one of those 31 calls was stopped. Not because the agent behaved, not because xAI shipped a switch, and not because anyone was watching, but because of where NewCore MCP Gateway sits and what it does on each request. The gateway is the one place in the chain that is on the owner's side: it sees every call, applies the owner's policy, and writes the record, no matter which vendor's loop is on the other end.
+
+Without a gateway
+Agent holds the credentialWith NewCore MCP Gateway
+Gateway brokers the credential
+
+OAuth token for Google lives with the agent runtimeAgent holds a scoped, short-lived grant to the gateway only
+
+Every read succeeds silently, asked-for or notPolicy runs on every call
+allow, hold for a person, or deny
+
+Evidence lives in Google's audit log, if at all, attributed to the userHeld calls expire as denials; here, after three minutes
+
+Revocation means finding and killing the tokenEach call is logged with agent identity, session, client, source and approval id
+
+On each of those calls, this is what happened:
+
+1.Identity. The agent authenticated to the gateway as itself, under a named owner, with a connector the owner had created. The IdP session and token family in the raw events are that identity, not the owner's.
+
+2.Grant check. The connector's standing grant did not cover an unattended calendar read. The gateway classified the call as outside the grant and held it rather than forwarding it.
+
+3.Escalation. The owner got a push to their phone naming the agent, the application and the tool, with a three-minute window. No tap, no data. The agent's retry a minute later met the same gate.
+
+4.Record. The hold, the escalation, the expiry and the token refresh that preceded the call were each written as events with a correlation id. That record is what let us reconstruct the chain above, down to the second.
+
+Notice what the gateway did not need. It did not need xAI's cooperation, the bot's honesty, a vendor setting that does not exist, or the owner to be awake. It needed only to be the one path from the agent to the data, and to apply the owner's policy on every call. That is the whole design of NewCore MCP Gateway: the agent never holds the SaaS credential, every tool call is an identity-bound request the gateway can allow, hold or deny, and the policy belongs to the company, not to the model. When the same loop comes back with manage_event or send_email at the top of the list, the gate does not care that the tool changed. It holds the call, pushes the owner, and writes it down.
+
+An agent that works while you sleep, holds your credentials, and does not tell you what it tried is not an assistant. It is an unsupervised process running under your identity. The only question is what sits between it and your data.
+
+What we are asking of ourselves, and of the industry
+
+We do not know, from the inside, what these turns are. They may be a check-in, a drip, a warm-up, or something less tidy. We put the question to xAI, and their answer is above. But the specific cause is secondary. Let’s revisit the facts: a commercial agent, deployed in a company, took actions its own operator could not see, its own model could not recall, its own user could not stop, and when the user said “no” to the one part of it they could see, it widened its reach instead of narrowing it. Without an independent control point between the agent and the data, it would have been invisible.
+
+The model labs have started disclosing what their agents do in the lab. Almost nobody is reporting what agents do inside a company's perimeter, because almost nobody is positioned to see it. We were, only because of a rule we set for ourselves before we knew we needed it. So we are holding ourselves to three things, and we think the industry owes itself the same:
+
+1.Every agent action against company data passes through a control the agent does not own. Ours do. That is why this post exists.
+
+2.Every agent should be able to account for every action it takes. When it cannot, the gap is itself a finding, and it gets written up like one.
+
+3.Production behavior gets reported, not just training behavior. This is our first such report. It will not be the last.
+
+What to do this week
+
+Inventory agents by what they can reach, not by what they are called. Every Grok Bot, Claude, or Copilot with a calendar, mail or CRM connector is an identity with standing access to your data. List them, and name an owner for each.
+
+Put NewCore MCP Gateway between agents and SaaS. If the agent holds the OAuth token, you have no control point and no record of your own. Broker the credential through the gateway; let the agent hold a scoped grant to NewCore MCP Gateway instead, and make every tool call, read or write, a decision you own.
+
+Default to hold for unattended access. New agents should start with reads of personal and customer data routed to a person, and earn allow-by-default per tool as the log shows what they do when nobody is talking to them.
+
+Let holds expire. A request nobody answered is a no. Three minutes was enough here; the agent moved on.
+
+Review the escalation log, not just the approvals. The interesting rows are the ones nobody approved. Thirty-one of them told us more about this bot than its documentation did.
+
+If you run Grok Bot, turn off proactive messages. Cursor dashboard, Grok Bot page, Bot capabilities. It is on by default. Keep it on only if every connector the bot holds already runs through NewCore MCP Gateway or another control that holds and logs each call.
+
+Ask your agent vendors one question. "Which server-initiated turns can run for my users' agents, and where can I see them?" If the answer is a usage dashboard, assume the turns exist and that you will only see them at the gateway.
+
+Why this matters
+
+Agents that work while you are away are the product now. They will read your calendar, scan your inbox, search your Slack and check your repositories, looking for something to do, on a schedule, with your laptop closed, because that is what they were built to do and what their makers advertise. They will not tell you. The question for a CISO is not whether an agent will act unasked. It will. The question is whether anything in your stack sees it, decides, and keeps the record, and whether that something answers to you or to the agent's vendor.
+
+If you cannot identify and report on what your AI agent did last night, that is the gap. And no vendor is going to close it for you. Their background turns are a feature, their silence is by design, and their settings page had no switch until we reported this. The control has to be yours. That is what NewCore MCP gateway is: the one path from every agent to your data, with your policy on every call and your log of every attempt. Put AI to work, and keep humans in charge.
+
+NewCore
+
+See what your AI agents did last night
+
+Connect your AI agents to NewCore MCP Gateway, set reads of personal and customer data to hold, and read the escalation log in the morning. It took us one night to find this.
+Book a Demo [/lp/ai-agents-last-night]
+
+Disclosure timeline
+
+November 4, 2026: NewCore sent its findings to xAI, including the gateway logs for both Grok Bots.
+
+November 5, 2026: xAI support confirmed the calls are built-in background check-ins by the primary bot, that the bot looks at its connected sources during a check-in, and that no user or admin setting turns them off. The option offered was to email xAI a list of employee sign-in addresses.
+
+November 6, 2026: We replied to xAI (Grok Bot's AI Support Assistant, actually) with additional information and requested feedback.
+
+November 12, 2026: xAI support told us that team admins can now turn the check-ins “off.” Specifically, “In the Cursor dashboard, open the Grok Bot page and, under Bot capabilities, turn off Proactive messages. With it off, Bots no longer run check-ins on their own. They still answer members and run routines members set up. The setting is on by default, so please switch it off for your team.”
+
+November 17, 2026: NewCore report published.
+
+Our research
+
+This post is based on a real investigation of two Grok Bots on two NewCore employee accounts: the first bot’s cloud VM, both owners’ chat exports, the NewCore gateway’s raw event store (which recorded 31 held calls over five days), and the second bot’s own export of its chat history. We checked every unattended call in the raw export against the tool it named: all 31 are reads. The one write the second bot ever made, a single Slack message, was requested and approved by its owner. Personal names and identifiers have been removed. The architecture description comes from the platform’s shipped client code on the VM and from xAI’s public documentation. NewCore notified xAI of this issue prior to publication, and xAI’s support response is summarized above. If the xAI team provides a further response, we will update this report.
+
+Cite this blog
+
+Hoorvitch, I. (2026, November 17). Do you know what your grok bot did last night? NewCore. https://newcore.com/blog/grok-bot-unattended-agent-access
+
+Related content
+All posts [/blog]
+
+Manifesto
+
+The New Identity Manifesto
+
+Jun 01, 2026/7 min/Zohar Alon
+
+ [/blog/the-new-identity-manifesto]
+
+White Paper
+
+The Architecture Changes Everything
+
+June 2026
+
+ [/resources/the-architecture-changes-everything]
+
+Analysis
+
+How NewCore Aligns to NIST's Design Tenets for Agent Identity Management Systems
+
+Nov 13, 2026/7 min/The NewCore Team
+
+ [/blog/nist-agent-identity-design-tenets]
+
+Manifesto
+
+The New Identity Manifesto
+
+Jun 01, 2026/7 min/Zohar Alon
+
+ [/blog/the-new-identity-manifesto]
+
+White Paper
+
+The Architecture Changes Everything
+
+June 2026
+
+ [/resources/the-architecture-changes-everything]
+
+Analysis
+
+How NewCore Aligns to NIST's Design Tenets for Agent Identity Management Systems
+
+Nov 13, 2026/7 min/The NewCore Team
+
+ [/blog/nist-agent-identity-design-tenets]
+
+Subscribe to our blog.
+
+New posts, sent when published.
+
+Subscribe to our blog.
+
+New posts, sent when published.
+
+Platform
+
+Discover [/platform/discover]
+
+Secure [/platform/secure]
+
+Govern [/platform/govern]
+
+Identity Foundation [/platform/identity-foundation]
+
+Resources
+
+Blog [/blog]
+
+Resource Center [/resources]
+
+Identity 101 [/identity-101]
+
+Events [/events]
+
+Trust & Security [/trust]
+
+Glossary [/glossary]
+
+Company
+
+About Us [/about]
+
+Careers Join Us [/careers]
+
+Newsroom [/newsroom]
+
+Get in Touch [/get-in-touch]
+
+Book a Demo [/demo]
+
+Legal
+
+Privacy Policy [/legal/privacy]
+
+Terms of Use [/legal/terms]
+
+Cookie Policy [/legal/cookies]
+
+© 2026 NewCore Identity, Inc.
+
+ [https://www.linkedin.com/company/newcore-id/]
+ [https://x.com/@newcore_id]
+ [https://www.youtube.com/@newcore_id]

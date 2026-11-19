@@ -1,0 +1,1035 @@
+NGINX2Root (CVE-2026-123007): Live nginx RCE Updates
+
+Skip to main content [#main-content]
+
+ [/]
+ServicesSectorsPlatformResearch [/blog]Company
+
+0113 486 4873 [tel:+441134864873]Get a Quote [/contact]
+
+Intelligence Library [/blog]
+Threat IntelligenceLive
+
+NGINX2Root: Critical nginx RCE Vulnerabilities (CVSS 9.2)
+
+Flaws in nginx's HTTP/2 code give unauthenticated attackers code execution on one of the most widely used web servers, and a Linux kernel bug takes them to root. We are tracking developments as they happen.
+
+NGINX2Root is a set of five nginx vulnerabilities disclosed on 18 November 2026. The most serious, CVE-2026-123007 (CVSS 9.2), is HTTP/2 memory corruption in nginx 1.9.5 to 1.31.8 that allows unauthenticated remote code execution; chained with a Linux SCTP kernel flaw it gives host root. Upgrade to nginx 1.30.7 or 1.31.9 now, or disable HTTP/2 until you can.
+
+Published 18 November 2026
+·
+Updating live, last update 13:06 GMT
+·Precursor Security
+
+What you should do now
+
+1Find every nginx, including ones inside appliances, load balancers, Kubernetes ingress (community ingress-nginx is retired and will not be fixed) and container images. Updating the host operating system does not patch a bundled copy.
+
+2Upgrade to 1.30.7 or 1.31.9 (NGINX Plus 37.3.0.1 or 37.0.8.1), or your vendor's fixed package. Internet-facing servers with HTTP/2 enabled go first.
+
+3Restart, do not just reload. nginx -s reload keeps the old binary running. Rebuild and redeploy container images; fixed official Docker images are out. Distribution packages (Debian stable, Red Hat, SUSE) are not fixed yet; Ubuntu (USN-9159-1), Alpine 3.24 and edge, AlmaLinux 8, 9 and 10 (supported streams) and all Amazon Linux versions are.
+
+4Cannot upgrade today? Turn off HTTP/2 with http2 off; (nginx 1.25.1 and later) or remove http2 from the listen directive, then confirm from outside that h2 is no longer offered.
+
+5Reduce the path to root: where SCTP is not needed, block the module with install sctp /bin/false in /etc/modprobe.d/ until a kernel fix ships.
+
+6Hunt for signs of attempts: nginx worker crashes in the error log, nginx workers starting shells or new outbound connections, and long-lived HTTP/2 connections pushing very large volumes of data.
+
+NGINX2Root live timeline
+
+Would you have known you were exposed to NGINX2Root?
+
+EdgeProtect watches the technologies you run and maps your external attack surface, so the next critical CVE reaches you before it reaches attackers.
+
+Track your technologies
+
+Alerts on new critical CVEs
+
+Map your attack surface
+
+Sign up free [https://www.edgeprotect.io/register?utm_source=precursorsecurity&utm_medium=live-blog&utm_campaign=nginx2root&utm_content=timeline-card]How it works [https://www.edgeprotect.io/?utm_source=precursorsecurity&utm_medium=live-blog&utm_campaign=nginx2root&utm_content=timeline-card-learn]Free plan, no card needed
+
+16:20 GMT [#update-2026-11-18-1620]·18 Nov 2026Pinned
+
+What we know so far
+
+NGINX2Root is the name Xint gave to five nginx vulnerabilities, each with a working exploit, plus a separate Linux kernel flaw that turns code execution in nginx into root on the host. The most serious, CVE-2026-123007, is memory corruption in nginx's HTTP/2 flow control that lets an unauthenticated attacker run commands as the nginx worker. It has been in every official release since HTTP/2 arrived in nginx 1.9.5 in 2015.
+
+A second HTTP/2 flaw, CVE-2026-123633, is a use-after-free reachable when nginx proxies HTTP/2 traffic to a backend. Wiz and Rapid7 both score these flaws CVSS 4.0 9.2 (Critical). At least five teams found them independently: Xint, Wiz, Rapid7, Metnir and Ikotas Labs.
+
+Fixes: nginx 1.30.7 (stable) and 1.31.9 (mainline), released on 18 November, fix ten CVEs in total. NGINX Plus is fixed in 37.3.0.1 and 37.0.8.1. Exploit code: Rapid7 has published a proof of concept for CVE-2026-123007 on GitHub. Exploitation in the wild: none reported at the time of writing.
+
+If you cannot upgrade today, turn HTTP/2 off on internet-facing listeners. That blocks the two HTTP/2 flaws, but not the other three CVEs, which affect the resolver, HTTP/3 and the mail proxy.
+
+13:06 GMT [#update-2026-11-19-1306]·19 Nov 2026
+
+Japan's Chief Cabinet Secretary urges nginx users to act
+
+NGINX2Root has reached the top of the Japanese government. At his regular morning press conference on 19 November, Chief Cabinet Secretary Minoru Kihara asked businesses using nginx to "take the necessary measures", according to ITmedia [https://www.itmedia.co.jp/news/article/2611/19/2000003334/]. He pointed to the National Cybersecurity Office's warning in the early hours of the morning and said the government will keep sharing information across ministries.
+
+Asked about the impact on government systems, he said that "at this point, we have not received any reports of damage related to these vulnerabilities". That matches every other source we track: no confirmed exploitation in the wild as of 13:05 GMT.
+
+For comparison, the UK NCSC and the US CISA have still published nothing on NGINX2Root.
+
+12:07 GMT [#update-2026-11-19-1207]·19 Nov 2026
+
+SecurityWeek covers it; Censys clarifies its lab test is not a cheap path to RCE
+
+SecurityWeek [https://www.securityweek.com/f5-patches-critical-nginx2root-flaws-as-poc-exploits-go-public/] reports that F5 patched 22 vulnerabilities on 18 November, including the five NGINX2Root bugs. It adds two useful limits from Rapid7 on its public exploit: on slow connections, nginx's default one-hour connection lifetime prevents exploitation, and "should an HTTP/2 connection be proxied, the precise attacker-controlled HTTP/2 frames being transmitted will likely not be retransmitted in a way that satisfies exploiting the vulnerability."
+
+SecurityWeek also notes that Censys reproduced the CVE-2026-123007 behaviour without the huge traffic volume. Censys's own write-up [https://censys.com/blog/nginx2root-simple-test/] is more precise: its compact cleartext HTTP/2 test reaches the corrupted flow-control state so defenders can study the bug and test patches "without generating the 60 to 119 GiB of traffic reported for Rapid7's later crash and remote code execution (RCE) stages". In other words, it is a patch test, not a cheaper route to code execution. Censys also reproduced three of the use-after-free bugs and reminds readers that "disabling HTTP/2 addresses only two of the five nginx CVEs".
+
+11:40 GMT [#update-2026-11-19-1140]·19 Nov 2026
+
+Amazon Linux 2 nginx is now fixed too (ALAS2NGINX1-2026-018)
+
+Amazon has published ALAS2NGINX1-2026-018 [https://alas.aws.amazon.com/AL2/ALAS2NGINX1-2026-018.html], rated important, for the nginx1 package in Amazon Linux 2 Extras, released at 01:20 GMT on 19 November. Amazon's CVE page [https://explore.alas.aws.amazon.com/CVE-2026-123007.html] now lists every Amazon Linux platform as Fixed: Amazon Linux 2, Amazon Linux 2023 and the 2027 preview.
+
+Update with sudo yum update nginx and then restart nginx. Amazon Linux 2 itself is past its end of standard support, so if you still run nginx on it, treat this as a good moment to plan the move to Amazon Linux 2023.
+
+10:13 GMT [#update-2026-11-19-1013]·19 Nov 2026
+
+Imperva: Cloud WAF protects out of the box; keep HTTP/2 off to your origin
+
+Imperva has told customers that, "according to our initial analysis, Cloud WAF and WAF gateway protect out of the box against both vulnerabilities", meaning CVE-2026-123007 and CVE-2026-123633 (Imperva blog [https://www.imperva.com/blog/critical-nginx-http-2-vulnerabilities-cve-2026-123633-and-cve-2026-123007-what-imperva-customers-need-to-know/]).
+
+As an extra layer it recommends the Cloud WAF option that uses HTTP/2 only between the client and Imperva. Traffic from Imperva to your origin then does not use HTTP/2, so attackers cannot reach the vulnerable HTTP/2 code on your nginx servers through Imperva. This is the same principle as Cloudflare's advice: the bugs are only reachable if HTTP/2 from an untrusted client lands on nginx.
+
+The catch for any CDN or WAF: it only protects traffic that goes through it. If your origin's nginx is also reachable directly on the internet, patch it or lock it down to the provider's IP ranges.
+
+09:25 GMT [#update-2026-11-19-0925]·19 Nov 2026
+
+Asahi Shimbun: Ikotas used OpenAI's GPT-6 Astra to find NGINX2Shell
+
+The Asahi Shimbun [https://www.asahi.com/ajw/articles/17064605], one of Japan's largest national newspapers, reports that Ikotas Labs president Satoki Tsuji said OpenAI's GPT-6 Astra model was used in the discovery process, and that the Tokyo firm regularly works with OpenAI on vulnerability research. OpenAI president Greg Brockman reposted the announcement: "Further close collaboration to help secure the internet, from discovery to responsible disclosure."
+
+Tsuji also gave a useful reality check: "Exploiting them would require advanced hacking skills." But he warned that malicious hackers could use AI tools to find and exploit the same flaws early, and urged affected organisations to act promptly.
+
+Asahi also quotes CERT-EU that no exploitation in the wild has been reported, which is still the position across every source we track as of 09:25 GMT.
+
+09:22 GMT [#update-2026-11-19-0922]·19 Nov 2026
+
+Overnight status: 425,000 servers fixed, Sakura Internet patching, Debian unstable only
+
+Exposure: at its 09:06 GMT update the Censys tracker [https://nginx2root.censys.com/] counted 8,810,371 nginx services still on an affected version with HTTP/2 on, down from 9,482,482 last night. 425,260 have been seen fixed or with HTTP/2 off since disclosure, about 4.6% of those Censys has seen exposed. Progress, but slow.
+
+Hosting: Sakura Internet, one of Japan's largest hosting and cloud providers, began emergency maintenance [https://x.com/sakura_ope/status/2123266732840378543] overnight for all five CVEs, due to finish at 20:00 Japan time (11:00 GMT), with sites briefly unavailable for a few seconds. It follows XServer turning HTTP/2 off.
+
+Debian: the security tracker [https://security-tracker.debian.org/tracker/CVE-2026-123007] now shows the fix in unstable (sid) only. Bookworm, trixie and forky are still vulnerable, so Debian servers still need HTTP/2 off or nginx.org's packages. Red Hat (RHEL 8, 9 and 10) and SUSE remain unfixed; Rocky Linux has no advisory yet.
+
+09:21 GMT [#update-2026-11-19-0921]·19 Nov 2026
+
+Overnight: Germany's BSI and Japan's JPCERT add their warnings
+
+Germany: the BSI's CERT-Bund published advisory WID-SEC-2026-4658 [https://wid.cert-bund.de/portal/wid/securityadvisory?name=WID-SEC-2026-4658], "NGINX: Mehrere Schwachstellen" (multiple vulnerabilities), rated high, at 09:17 GMT.
+
+Japan: JPCERT/CC [https://www.jpcert.or.jp/newsflash/2026111902.html] published a CyberNewsFlash at 06:09 GMT. It notes the public proof of concept for CVE-2026-123007 has constraints on the environment it runs in, but warns that "attack methods may be improved in future" and advises updating to the fixed versions. Japan's government cyber office had already warned on 18 November.
+
+That brings the list of national agencies that have warned to Japan, Poland, Luxembourg, France, Germany, Belgium, the Netherlands, South Korea and the EU institutions. The UK NCSC and CISA had still published nothing as of 09:20 GMT.
+
+09:14 GMT [#update-2026-11-19-0914]·19 Nov 2026
+
+Ubuntu ships fixed nginx for every supported release (USN-9159-1)
+
+Canonical published USN-9159-1 [https://ubuntu.com/security/notices/USN-9159-1] at 05:21 GMT on 19 November. It fixes CVE-2026-123007, CVE-2026-123633, CVE-2026-123634, CVE-2026-121810 and CVE-2026-113425, plus three other nginx bugs from the same release, and Ubuntu rates CVE-2026-123007 high priority. This is the first of the big general-purpose distributions to ship, and for most Ubuntu servers a routine update now fixes NGINX2Root.
+
+Fixed versions: Ubuntu 24.04 LTS nginx 1.24.0-2ubuntu7.20, Ubuntu 22.04 LTS 1.18.0-6ubuntu14.23, Ubuntu 26.04 LTS 1.28.3-2ubuntu1.13 and Ubuntu 26.10 1.30.4-7ubuntu1.2. Ubuntu 20.04, 18.04 and 16.04 are fixed through Expanded Security Maintenance, which needs Ubuntu Pro. As with every backport, the version number stays below 1.30.7, so check the package version, not nginx -v.
+
+Run sudo apt update && sudo apt upgrade nginx, then fully restart nginx (sudo systemctl restart nginx), not just reload it. Debian, Red Hat and SUSE are still unfixed.
+
+07:39 GMT [#update-2026-11-19-0739]·19 Nov 2026
+
+Belgium and South Korea issue national warnings
+
+Belgium: the Centre for Cybersecurity Belgium, the national authority, has published "Warning: Multiple Critical NGINX Vulnerabilities, Patch Immediately!" [https://ccb.belgium.be/advisories/warning-multiple-critical-nginx-vulnerabilities-patch-immediately]. It says "the most significant concern is the potential for remote code execution" and notes that while F5 describes exploitation as dependent on certain conditions, Xint reports practical exploitation including an ASLR bypass. It flags the separate Linux SCTP kernel flaw as a route from a compromised worker to root.
+
+South Korea: broadcaster SBS [https://news.sbs.co.kr/english/article.do?news_id=N1008853731] reports that the South Korean government has issued an urgent security advisory, saying prompt updates are needed for businesses and public institutions. Citing W3Techs, SBS says nginx runs about 29.7% of websites with an identifiable web server worldwide, second only to Cloudflare, and 58.9% of sites hosted in South Korea.
+
+National warnings so far: Japan, Poland, Luxembourg, France, the EU institutions, the Netherlands, Belgium and South Korea. Still nothing from the UK NCSC or CISA.
+
+01:24 GMT [#update-2026-11-19-0124]·19 Nov 2026
+
+National media round-up: Germany, Australia and South Korea
+
+Germany: heise online [https://www.heise.de/news/Webserver-nginx-Update-schliesst-schwere-Luecken-11530216.html] says the patches "should be installed immediately" and notes two of the ten bugs fixed on 18 November date back to 2007. Golem.de [https://www.golem.de/news/millionen-webserver-gefaehrdet-nginx-luecke-erlaubt-codeausfuehrung-ohne-anmeldung-2611-215378.html] led with "Millions of web servers at risk". If you use NGINX Plus, take the fixed versions from F5's advisory (37.3.0.1 and 37.0.8.1), not from secondary reports.
+
+Australia: iTnews [https://www.itnews.com.au/news/nginx-servers-rootable-through-critical-flaws-unpatched-linux-kernel-bug-630447] focused on the root chain: "Nginx servers rootable through critical flaws, unpatched Linux kernel bug".
+
+South Korea: Xint is a product of Seoul-based Theori, and the Korean press has covered it as a national story. Electronic Times [https://www.etnews.com/20261119000034] reports that Theori coordinated its response with AWS, Microsoft and Google before disclosure, and quotes chief executive Park Se-jun: as AI speeds up finding and exploiting vulnerabilities, the traditional approach of people analysing and checking everything by hand "will become hard to keep up with". Edaily [https://www.edaily.co.kr/news/read?newsid=02020486645647360&mediaCodeNo=257] ran it as "a Korean AI found an 11-year-old hole in nginx".
+
+00:55 GMT [#update-2026-11-19-0055]·19 Nov 2026
+
+Japan's national press picks it up: nginx on about 60% of Japanese sites
+
+NGINX2Root has reached Japan's mainstream press. Kyodo News, the national news agency, ran a wire story headlined "Vulnerability in global server software: risk of attacks on nginx", carried by regional papers including the Chunichi Shimbun [https://www.chunichi.co.jp/article/1341454] and Hokkaido Shimbun [https://www.hokkaido-np.co.jp/article/1410920/], and syndicated on Yahoo! Japan News. The Sankei Shimbun followed with its own report.
+
+Kyodo reports that, according to a European research firm, nginx runs on about 60% of websites in Japan, and that the developer has urged an early response because attacks exploiting the flaw are possible. It follows the Japan National Cybersecurity Office warning and hosting provider XServer turning HTTP/2 off overnight.
+
+Still no BBC, Reuters or Guardian coverage in the UK and US as of 00:54 GMT.
+
+00:35 GMT [#update-2026-11-19-0035]·19 Nov 2026
+
+Amazon Linux 2023 now has a fixed nginx; Amazon Linux 2 still pending
+
+Amazon has published ALAS2023-2026-3494 [https://alas.aws.amazon.com/AL2023/ALAS2023-2026-3494.html], rated Important, which updates nginx on Amazon Linux 2023 to 1.30.7 (package 1.30.7-1.amzn2023.0.1). It covers all five NGINX2Root CVEs plus the other nginx fixes released on 18 November. Amazon's CVE page [https://explore.alas.aws.amazon.com/CVE-2026-123007.html] now marks Amazon Linux 2023 and the Amazon Linux 2027 preview as Fixed.
+
+To update, Amazon says to run dnf update --advisory ALAS2023-2026-3494 --releasever 2023.12.20261118, then restart nginx. Amazon Linux 2's nginx1 extra is still listed as Pending Fix, so disable HTTP/2 there for now.
+
+That makes Alpine, AlmaLinux and Amazon Linux 2023 with fixes. Debian, Ubuntu, Red Hat and SUSE still have none as of 00:34 GMT.
+
+00:15 GMT [#update-2026-11-19-0015]·19 Nov 2026
+
+AlmaLinux ships fixed nginx for AlmaLinux 8, 9 and 10, ahead of Red Hat
+
+AlmaLinux has released patched nginx packages [https://almalinux.org/blog/2026-11-18-nginx2root/] for all five NGINX2Root CVEs, backported to every nginx stream still in the RHEL life cycle. "Given the severity, these patches went straight to the production repositories, without a stop in the testing repository first," it says, noting that Red Hat has not yet released fixed packages and that its steering committee chose to ship ahead of RHEL.
+
+Patched: AlmaLinux 8 (nginx:1.24 stream), AlmaLinux 9 (default nginx 1.20 plus the nginx:1.24 and nginx:1.26 streams), AlmaLinux 10 and Kitten 10 (nginx 1.26). Not patched: the retired streams, which include nginx:1.14, still the default on AlmaLinux 8. If you installed nginx on AlmaLinux 8 without choosing a stream, you are on 1.14 and will not get a fix; AlmaLinux advises moving to a supported stream and turning HTTP/2 off until you can. Check with dnf module list nginx.
+
+AlmaLinux also points out that its default nginx.conf does not turn HTTP/2 on, though most sites serving HTTPS do. With Alpine, that makes two distributions with fixes. Rocky Linux, Oracle Linux and other RHEL rebuilds have not yet said the same.
+
+23:45 GMT [#update-2026-11-18-2345]·18 Nov 2026
+
+CSO Online: watchTowr says exploitation is "by no means a walk in the park"
+
+CSO Online [https://www.csoonline.com/article/4250460/ai-unearths-internet-breaker-flaws-in-nginx-web-server.html] has covered NGINX2Root, quoting Xint CEO Brian Pak calling the headline bug "essentially an internet breaker". It also has a useful reality check from watchTowr.
+
+"Exploitation is by no means a walk in the park, as the vulnerable systems must be directly exposed to the internet with no WAF or CDN terminating HTTP/2," Yordan Ganchev, principal threat intelligence specialist at watchTowr, told CSO. He added that an exploit has to handle different nginx versions, builds and configurations, and that against a busy internet-facing server "exploitation can cause more crashes than successful code execution." CSO also reports that Rapid7's technique relies on a glibc memory-copy routine used only on CPUs with AVX-512, which it notes are common on servers.
+
+Miggo Security CEO Daniel Shechter made the point we keep stressing: "The version number can be wrong because distros backport fixes without changing it, a reload doesn't swap out the running code, and the attack happens in HTTP/2 traffic that WAFs and access logs never see. If you can't prove the fix is actually running, assume you're still exposed."
+
+23:25 GMT [#update-2026-11-18-2325]·18 Nov 2026
+
+Alpine Linux is the first distribution with a fixed nginx package
+
+Alpine Linux's security tracker [https://security.alpinelinux.org/vuln/CVE-2026-123007] now marks CVE-2026-123007 as fixed in nginx 1.30.7-r0 on Alpine 3.24 and edge. The package index [https://pkgs.alpinelinux.org/packages?name=nginx&branch=v3.24&arch=x86_64] shows the 3.24 build landed at 17:06 GMT on 18 November, which makes Alpine the first Linux distribution we have seen ship a fixed nginx package.
+
+Older Alpine releases are not covered yet. Alpine 3.23 and 3.22 still carry nginx 1.28.3-r7, built in July, and the 1.28 branch gets no upstream fix. If you run nginx on those releases, disable HTTP/2 or move to 3.24.
+
+Debian, Ubuntu, Red Hat, Amazon Linux and SUSE still have no fixed package as of 23:24 GMT.
+
+22:55 GMT [#update-2026-11-18-2255]·18 Nov 2026
+
+Japanese host XServer turns HTTP/2 off across its shared hosting
+
+XServer, one of Japan's largest web hosting providers, has temporarily disabled HTTP/2 [https://www.xserver.ne.jp/news_detail.php?view_id=19977] on its hosting servers and switched them to HTTP/1.1 as an interim fix for CVE-2026-123007 and CVE-2026-123633. The change ran between about 18:00 and 19:15 GMT (03:00 to 04:15 on 19 November, Japan time) and covers XServer, XServer Business, XServer Shop, XServer Drive, XServer for WordPress and XServer Static. Customers do not need to do anything.
+
+XServer says it has seen no attacks or damage, and that the other three CVEs do not affect its set-up: it does not use the resolver configuration behind CVE-2026-123634, nginx's HTTP/3 support (CVE-2026-121810) or the mail proxy (CVE-2026-113425). It warns pages may load slightly slower, and anything that relies on HTTP/2 may not work, until it moves to a fixed version and turns HTTP/2 back on.
+
+It is a useful real-world example of the mitigation we recommend where patched packages are not yet available: turn HTTP/2 off on internet-facing listeners first, then patch.
+
+21:47 GMT [#update-2026-11-18-2147]·18 Nov 2026
+
+Censys tracker: 9.5 million nginx services exposed, under 1% fixed so far
+
+Censys has launched a live NGINX2Root exposure tracker [https://nginx2root.censys.com/] that counts what matters for CVE-2026-123007: services on an affected version with HTTP/2 actually turned on. At its 21:21 GMT update it showed 9,482,482 nginx services exposed on their most recent scans, and just 74,782 seen fixed (on 1.30.7 or 1.31.9, or with HTTP/2 off) since disclosure, under 1%. The United States had the most, 2,128,910.
+
+The breakdown: about 7.8 million are on an affected version with HTTP/2 on, and about 1.7 million are distribution builds with HTTP/2 on, which may carry backported fixes Censys cannot see. A further 61.3 million services are in the affected version range with no sign of HTTP/2, and around 100.9 million (91% of nginx it detects) hide their version altogether and are not counted.
+
+This is a better measure than the version-only figures quoted earlier today (Xint's 98.9% and Censys's own 74.2 million), and it confirms the scale: millions of internet-facing servers need patching or HTTP/2 turned off, and almost none have been dealt with yet.
+
+21:17 GMT [#update-2026-11-18-2117]·18 Nov 2026
+
+Managed hosting: check whether your platform patches nginx for you (Laravel Forge does not)
+
+Laravel's two hosting products show why it matters who runs your nginx. Laravel says [https://x.com/laravel/status/2123162049073250534] Laravel Cloud customers need do nothing: it has applied the fixes across the platform. But for Laravel Forge, which provisions and manages servers that customers own, it says [https://x.com/laravel/status/2123161888825733431] "Forge doesn't patch servers automatically, and we recommend users apply the fix to their servers now."
+
+The same split applies across the industry. Fully managed platforms and CDNs patch nginx for you, while server-management tools, control panels and one-click images usually leave patching to you. If a provider set up your server, check its advisory to see which side you are on, rather than assuming it has been handled.
+
+21:16 GMT [#update-2026-11-18-2116]·18 Nov 2026
+
+The Register: “treat every internet-connected system as potentially vulnerable”
+
+The Register [https://www.theregister.com/security/2026/11/18/ai-found-more-critical-bugs-in-another-widely-used-technology-running-225m-websites/5310887] has covered NGINX2Root as the latest in a run of AI-found flaws in foundational software, after PHP2Shell and Java4Shell. It quotes Wiz chief technology officer Tomer Schwartz: "We need to treat every internet-connected system as potentially vulnerable. AI has changed not only which vulnerabilities can be found, but how quickly longstanding risks can become real threats."
+
+It is the first major UK technology outlet to report it. At 21:14 GMT the BBC, Reuters, the Guardian and the Financial Times still had nothing.
+
+20:36 GMT [#update-2026-11-18-2036]·18 Nov 2026
+
+SUSE: nginx under analysis on SLES and openSUSE, so no major Linux distribution has shipped a fix yet
+
+SUSE has published its CVE page for CVE-2026-123007 [https://www.suse.com/security/cve/CVE-2026-123007.html], rating it important. nginx is listed as "Analysis" on every product, including SUSE Linux Enterprise Server 15 SP4 to SP7, SLES 16.0 and 16.1, the SAP and HPC editions and openSUSE Leap 16, with no SUSE security announcement yet.
+
+That completes the picture at 20:34 GMT: Debian, Ubuntu, Red Hat, Amazon Linux and SUSE have all confirmed or are assessing the flaw, and none has shipped an updated nginx package. A routine operating system update will not fix NGINX2Root on any of them today. Disable HTTP/2 on internet-facing nginx, or use nginx.org's own packages, which already carry 1.30.7 and 1.31.9.
+
+20:07 GMT [#update-2026-11-18-2007]·18 Nov 2026
+
+Censys counts 74.2 million web properties on affected nginx versions
+
+Internet scanning company Censys says [https://x.com/censysio/status/2123144159108239612] it identified 74.2 million web properties running versions of nginx affected by the NGINX2Root flaws, "though not all are necessarily vulnerable". It has published an advisory with search queries for its customers.
+
+That figure counts versions, like Xint's 98.9%, so it overstates real exposure: many servers will not have HTTP/2, HTTP/3, the resolver setup or the mail proxy turned on, and some distribution packages carry fixes under old version numbers. Florian Roth's spot check (19:24) suggests roughly two thirds of nginx HTTPS servers have HTTP/2 on, which still means a very large number of exposed machines.
+
+20:06 GMT [#update-2026-11-18-2006]·18 Nov 2026
+
+SANS ISC: “the new normal”, so no InfoCon Yellow, and patch faster
+
+The SANS Internet Storm Center has explained [https://isc.sans.edu/diary/33532] why it is not raising its InfoCon threat level to Yellow for Java4Shell or NGINX2Shell, as it did for PHP2Shell last month. Johannes Ullrich writes that its Java honeypots see "many attacks, but none that exploit Java4Shell (yet)", and that these flaws should not be treated as emergencies because "They are the 'new normal'."
+
+His practical warning: "You will not be able to patch nginx2shell across a large organization before the exploit is released." He recommends automating patching as much as possible, especially for less critical systems, reducing what is exposed to the internet, and building a defensible architecture, rather than treating each new named bug as a fire drill.
+
+19:34 GMT [#update-2026-11-18-1934]·18 Nov 2026
+
+CERT-EU and the Dutch NCSC issue advisories; the UK NCSC is still quiet
+
+CERT-EU, the cybersecurity service for EU institutions, published security advisory 2026-022, "Critical vulnerabilities in Nginx" [https://cert.europa.eu/publications/security-advisories/2026-022/], at 17:30 GMT. It recommends updating "as soon as possible, prioritising internet-facing devices", and says worker crashes ("worker process … exited on signal" in the error log) point to exploitation attempts rather than proof of a successful attack, so process creation logs need checking too.
+
+The Netherlands' NCSC has also published advisory NCSC-2026-0506 [https://advisories.ncsc.nl/advisories], "Kwetsbaarheden verholpen in NGINX door F5 Networks", rated high for both likelihood and impact. That makes six national or international bodies warning so far: Japan, Poland, Luxembourg, France, CERT-EU and the Netherlands. At 19:32 GMT the UK's NCSC, CISA, Australia's ACSC, Canada's Cyber Centre and Germany's BSI had published nothing on their websites.
+
+19:24 GMT [#update-2026-11-18-1924]·18 Nov 2026
+
+Florian Roth: about two thirds of nginx HTTPS servers he checked had HTTP/2 on
+
+Detection researcher Florian Roth of Nextron Systems put a number [https://x.com/cyb3rops/status/2123134097186783287] on how many servers can actually be reached by the two HTTP/2 flaws. The widely quoted 98.9% counts version strings, and nginx does not turn HTTP/2 on by default. In a spot check of a few hundred nginx HTTPS endpoints listed on Shodan, he found "roughly two thirds negotiate it. So not 99%, but still millions of servers."
+
+His quick external check: curl -sI --http2 -o /dev/null -w '%{http_version}\n' https://HOST/ prints 2 if HTTP/2 is on and 1.1 if it is off; test the nginx server itself, not a CDN in front of it. It is a small sample rather than a survey, but it is a useful corrective: assume most of your HTTPS nginx servers are exposed until you have checked.
+
+19:00 GMT [#update-2026-11-18-1900]·18 Nov 2026
+
+CyberScoop: “It’s NGINX’s turn to cause vulnpocalypse headaches”
+
+US security news outlet CyberScoop [https://cyberscoop.com/nginx-critical-vulnerabilities-exploits/] has covered NGINX2Root, with its editor-in-chief Greg Otto placing it alongside yesterday's Java4Shell and last month's run of critical bugs that some called "Black October". It reports F5 telling it that its cloud services are still being evaluated, while BIG-IP and F5OS are not vulnerable.
+
+It carries a new statement from Xint chief executive Brian Pak: "Others have targeted NGINX with AI pentesting, but none found this critical bug, which is a testament to our team and the engineering expertise that's gone into our AI harnesses." That is Xint's view; four other teams are credited with finding the HTTP/2 flaw independently.
+
+18:42 GMT [#update-2026-11-18-1842]·18 Nov 2026
+
+Mainstream media picks it up: Forbes leads on the AI angle; no BBC, Reuters or Guardian yet
+
+Forbes [https://www.forbes.com/sites/thomasbrewster/2026/11/18/ai-finds-major-web-security-flaws/] is the first mainstream outlet to cover NGINX2Root, under the headline "World's Best AI Hacker Just Uncovered A Massive Web Vulnerability". It reports that Xint, a Pentagon-contracted startup, used OpenAI models to find four of the flaws with no human help, and quotes Xint chief executive Brian Pak: "Xint went through about 50,000 lines of NGINX code in 90 minutes and came back with four bugs with no human guidance."
+
+UK trade title Infosecurity Magazine [https://www.infosecurity-magazine.com/news/five-critical-vulnerabilities/] and The Hacker News [https://thehackernews.com/2026/11/10-year-old-nginx-http2-flaw-lets.html] have also covered it; Infosecurity Magazine points out that the finders count the flaws differently (one, two or five), which is why reports vary. As of 18:42 GMT we have found nothing from the BBC, Reuters, the Guardian, Sky News, the Financial Times, Ars Technica, Wired, TechCrunch, The Verge, Der Spiegel or Le Monde.
+
+18:41 GMT [#update-2026-11-18-1841]·18 Nov 2026
+
+The Hacker News is the first major outlet to cover it
+
+The Hacker News [https://thehackernews.com/2026/11/10-year-old-nginx-http2-flaw-lets.html] has published "10-Year-Old NGINX HTTP/2 Flaw Lets Unauthenticated Attackers Execute Code on Servers", the first coverage we have seen from a major security news outlet. BleepingComputer, SecurityWeek, The Register, heise, Dark Reading, Help Net Security and the BBC had nothing on their front pages at 18:40 GMT.
+
+Its report matches the picture on this page: fixes in 1.30.7 and 1.31.9, a public proof of concept limited to lab conditions, no reported attacks, and no Debian or Ubuntu fixes yet. It also notes F5's own workarounds for two of the flaws that disabling HTTP/2 does not cover: for the resolver flaw, avoid SSI and mirror and do not build the proxied server name from variables; for the mail proxy flaw, limit listeners to trusted networks.
+
+18:36 GMT [#update-2026-11-18-1836]·18 Nov 2026
+
+NGINX Gateway Fabric v2.9.0 builds on fixed nginx 1.31.9
+
+Better news for Kubernetes Gateway API users. F5's NGINX Gateway Fabric v2.9.0 [https://github.com/nginx/nginx-gateway-fabric/releases], released at 13:29 GMT today, pins its open-source data-plane image to nginx 1.31.9 (NGINX_VERSION=1.31.9 in build/Dockerfile.nginx at the v2.9.0 tag), the fixed release. Metnir reported crashes in earlier Gateway Fabric builds, so upgrading to 2.9.0 is the fix; until you can, Metnir suggests disableHTTP2: true in NginxProxy.
+
+That is a contrast with F5's older NGINX Ingress Controller, whose v5.8.0 release today still ships nginx 1.31.8 (see 17:56). If you are choosing where to move from the retired community ingress-nginx, Gateway Fabric already has a fixed build.
+
+18:31 GMT [#update-2026-11-18-1831]·18 Nov 2026
+
+Metnir’s “Drainbreak”: Kong, APISIX, OpenResty and NGINX Gateway Fabric crash too
+
+Metnir, the fifth team credited with finding the HTTP/2 flaws, calls CVE-2026-123633 "Drainbreak" and has published its announcement [https://x.com/MetnirAI/status/2123083418791543243] and write-up [https://metnir.com/research/drainbreak-nginx-http2]. It says its tooling found the bug on 29 August and it reported it to F5 on 12 September, a month before Xint; F5 confirmed it on 24 October. Its demo took about ten minutes to get code execution as the unprivileged nginx user.
+
+The important new detail is reach beyond nginx itself. Metnir says it reproduced the bug in OpenResty and saw crashes in the shipped builds of Kong, Apache APISIX, NGINX Gateway Fabric and community ingress-nginx, all of which enable HTTP/2 by default. If you run any of these API gateways or Kubernetes ingress products, check your vendor for an update. For NGINX Gateway Fabric, Metnir suggests setting disableHTTP2: true in NginxProxy in the meantime. It also says grpc_pass and fastcgi_pass should be treated as exposed, not just proxy_pass.
+
+Two practical checks from the write-up: nginx logs a warning like 512 worker_connections are not enough, reusing connections when it starts draining connections, and repeated worker crashes after it (signal 11) may point to this bug. After patching, check /proc/<pid>/exe for each nginx process: a "(deleted)" suffix means it is still running the old binary and needs a restart.
+
+18:19 GMT [#update-2026-11-18-1819]·18 Nov 2026
+
+Red Hat confirms RHEL nginx is affected, adds its Hardened Images, still no fix
+
+Red Hat has moved CVE-2026-123007 from "Under investigation" to "Affected" on its CVE page [https://access.redhat.com/security/cve/CVE-2026-123007] for every nginx it ships: Red Hat Enterprise Linux 10, RHEL 9 (including the nginx 1.24 and 1.26 module streams) and the RHEL 8 nginx 1.24 stream. It has also added Red Hat Hardened Images to the affected list.
+
+No security updates (errata) are listed yet for any of them, so dnf update still will not fix this. If you run nginx from Red Hat packages or Hardened Images, disable HTTP/2 on internet-facing listeners now and watch the CVE page for errata.
+
+18:12 GMT [#update-2026-11-18-1812]·18 Nov 2026
+
+France’s CERT-FR issues an alert, but its HTTP/2 workaround has the versions the wrong way round
+
+CERT-FR, France's national CERT, published alert CERTFR-2026-ALE-017 [https://cert.cyber.gouv.fr/alerte/CERTFR-2026-ALE-017/] and posted it [https://x.com/CERT_FR/status/2123114901191151722] at 18:03 GMT, the fourth national body to warn after Japan, Poland and Luxembourg. It covers CVE-2026-123633 and CVE-2026-123007, notes a public proof of concept for CVE-2026-123007, and recommends disabling HTTP/2 until patched.
+
+Take care if you copy its configuration. The alert says to add http2 off; on nginx 1.25.0 and earlier, and that listen 443 ssl; alone is enough on 1.25.1 and later. It is the other way round: the http2 directive only exists from 1.25.1, so on newer versions set http2 off; in every affected server block, and on 1.25.0 and earlier remove http2 from the listen line. Adding http2 off; to an older nginx will make nginx -t fail.
+
+The alert's NGINX Plus versions also look mistyped ("3.1.x" and "3.7.3.0.1"); F5's fixed NGINX Plus releases are 37.0.8.1 and 37.3.0.1. Whichever way you disable HTTP/2, confirm it from outside with openssl s_client -connect HOST:443 -alpn h2.
+
+18:02 GMT [#update-2026-11-18-1802]·18 Nov 2026
+
+The HTTP/2 fixes were public on GitHub a week before disclosure
+
+nginx's public source repository shows the fixes for both HTTP/2 flaws were committed to its main branch on 11 November, seven days before today's release: "HTTP/2: reset reusable connection status on stream creation" [https://github.com/nginx/nginx/commit/2df48a501d] at 12:13 UTC (CVE-2026-123633) and "HTTP/2: account for queued frames when validating WINDOW_UPDATE" [https://github.com/nginx/nginx/commit/e27f5fa84f] at 12:16 UTC (CVE-2026-123007).
+
+The commit messages are explicit: one says the old behaviour resulted in "memory corruption and a possible segmentation fault" and is signed "Reported by Xint.io", the other describes "a use-after-free up the stack". Commenters on Hacker News spotted this. Attackers who watch open-source projects for security fixes, a well-known technique, could have worked on these bugs for a week before most defenders knew they existed.
+
+There is no report of that happening, and nothing we have seen suggests exploitation in the wild. But it is a reason to take the hunting guidance in the 17:34 entry seriously and look back over the past week, not just from today, for nginx worker crashes and programs started by nginx workers.
+
+17:56 GMT [#update-2026-11-18-1756]·18 Nov 2026
+
+Kubernetes: community ingress-nginx is retired with no fix coming, and F5’s ingress controller still ships 1.31.8
+
+If your Kubernetes clusters use the community ingress-nginx [https://github.com/kubernetes/ingress-nginx] controller, there will be no patch. The Kubernetes project retired it [https://www.kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/]: best-effort maintenance ended in March 2026, its last release was on 19 March, and the GitHub repository is now archived. Ingress controllers sit at the edge of the cluster and usually terminate HTTPS, often with HTTP/2 on.
+
+F5's separate NGINX Ingress Controller is maintained, but its v5.8.0 release [https://github.com/nginx/kubernetes-ingress/releases], published at 13:23 GMT today shortly before disclosure, says it updates NGINX to 1.31.8, the last vulnerable release. At 17:56 GMT there was no newer release with 1.31.9. Watch for one, and check F5's advisories for the NGINX Plus-based images.
+
+For community ingress-nginx, set use-http2: "false" in the controller's ConfigMap as a stopgap (it does not cover the other flaws) and plan the move to a maintained controller or a Gateway API implementation. Check what else in the cluster bundles nginx, too: sidecars, API gateways and Helm charts often pin their own image.
+
+17:49 GMT [#update-2026-11-18-1749]·18 Nov 2026
+
+How hard is it to exploit? 128 GB of traffic for the public PoC, but Xint’s works under real load
+
+Rapid7 says its public exploit for CVE-2026-123007 needs roughly 128 GB of HTTP/2 data over a single connection: about two minutes on a 10 Gbit/s link, seventeen minutes at 1 Gbit/s, and probably not achievable below about 300 Mbit/s before nginx's default one-hour connection limit cuts it off. It also depends on a glibc memory copy routine chosen on CPUs with AVX-512, and HTTP/2 that passes through a proxy will probably break it.
+
+Its README [https://github.com/sfewer-r7/CVE-2026-123007] goes further: the exploit is "only suitable to demonstrate" the attack against a freshly started local Docker container, ships memory profiles only for nginx 1.31.6 and 1.31.8 on Debian 13 (amd64), and will likely fail against a server with other clients connected or that has been running for a while. It is a lab exploit, not a scanner, and its simpler trigger script crashes nginx workers: do not run either against production to test exposure. Use the version and configuration checks in the 17:40 entry instead.
+
+Do not read those limits as safety. Xint says its own, unreleased exploit worked on AWS, GCP and Azure over public IPs while the servers handled normal traffic, and Wiz says it achieved reliable code execution with ASLR defeated. Rapid7 notes other exploitation strategies may exist. The heavy traffic does help defenders: a single client pushing gigabytes into one HTTP/2 connection while sending little else is exactly what the 17:34 hunting guidance looks for.
+
+17:48 GMT [#update-2026-11-18-1748]·18 Nov 2026
+
+Scoring check: no EPSS yet, NVD not analysed, CISA SSVC says “no exploitation”
+
+If your vulnerability tooling prioritises by score, it may be underrating NGINX2Root today. EPSS [https://www.first.org/epss/], the exploit prediction score many scanners use, has no score yet for any of the six nginx CVEs; FIRST calculates it once a day, so expect first scores tomorrow. NVD [https://nvd.nist.gov/vuln/detail/CVE-2026-123007] lists all six as "Received", not yet analysed, with only F5's scores (9.2 under CVSS 4.0, 8.1 under CVSS 3.1; 8.7 and 7.5 for the TLS 1.3 flaw CVE-2026-118899) and no product data yet, so tools that match on NVD product entries may not flag nginx at all.
+
+CISA's SSVC assessment on the records rates exploitation as "none", automatable "no" and technical impact "total". That "none" was recorded at 16:04 GMT and does not yet reflect Rapid7's public proof of concept, which SSVC would normally class as "PoC". GreyNoise has no tag for any of the CVEs yet, and none is in CISA's Known Exploited Vulnerabilities catalogue. Do not wait for the scores to catch up: patch on the facts.
+
+17:47 GMT [#update-2026-11-18-1747]·18 Nov 2026
+
+First downstream product patches: BTCPay Server ships an emergency nginx update
+
+BTCPay Server, the self-hosted payment processor, announced [https://x.com/BtcpayServer/status/2123106381729591461] at 17:29 GMT that it is releasing an emergency update for all five NGINX2Root CVEs, and recommends that everyone running it updates as soon as possible. It is the first product we have seen ship a fix for the nginx it bundles.
+
+It will not be the last. Many products and appliances bundle their own copy of nginx, often in a container image, and they will not be fixed by your operating system updates or by upgrading nginx on the host. Check your vendors' advisories for anything that ships nginx, and apply their updates as they arrive.
+
+17:46 GMT [#update-2026-11-18-1746]·18 Nov 2026
+
+If nginx was compromised: what the attacker gets and what to do
+
+Each NGINX2Root nginx flaw gives code execution as the nginx worker, usually an unprivileged account such as www-data or nginx, not root. That is still serious: the worker handles all the traffic passing through it and can reach whatever that account can, including application data, credentials and internal services. Root comes from chaining the separate, unpatched SCTP kernel bug.
+
+If you find signs of compromise, the nginx2root.com [https://nginx2root.com/] guidance is to isolate the system, preserve evidence, work out which files, credentials and services the worker could reach, and rotate any exposed secrets. Assume the host itself may be compromised too, and rebuild from a trusted image: patching does not undo anything an attacker has already changed. Our incident response team [/services/defensive-security/incident-response] can help.
+
+17:45 GMT [#update-2026-11-18-1745]·18 Nov 2026
+
+Copying Xint’s mirror workaround? Fix the upstream name first
+
+Xint's write-up [https://xint.io/blog/nginx2root-remote-code-execution] gives two example configurations for the resolver flaw, CVE-2026-123634. The second, for sites that still need mirroring, defines upstream groups called backend_main_hotfix and backend_mirror_hotfix, but its main location still says proxy_pass http://backend_hotfix;, a name only defined in the first example.
+
+If you paste it as written, change that line to proxy_pass http://backend_main_hotfix; and run nginx -t before reloading. The point of the change is to stop nginx resolving a hostname taken from the request; the exact upstream names are yours to choose.
+
+17:44 GMT [#update-2026-11-18-1744]·18 Nov 2026
+
+Why a WAF will not catch the main NGINX2Root bug
+
+Xint's analysis [https://xint.io/blog/nginx2root-remote-code-execution] notes that every individual HTTP/2 message in the attack is valid: "Each increment still complies with the HTTP/2 specification." The problem is nginx's running total, which has already gone past the allowed maximum without nginx noticing.
+
+So a WAF or IDS that checks requests or frames one at a time has nothing to match, which is why Cloudflare says it has no WAF rule for these flaws. What does help in front of nginx is something that terminates HTTP/2 itself and talks to nginx over HTTP/1.1, such as a CDN or load balancer, provided nginx cannot be reached directly. Patching remains the fix.
+
+17:43 GMT [#update-2026-11-18-1743]·18 Nov 2026
+
+New detection signs for reverse-proxy setups: a resolver alert, crash loops and odd DNS
+
+Xint's technical analysis [https://xint.io/blog/nginx2root-remote-code-execution] reveals signs worth hunting for on servers that proxy to backends. For the resolver flaw (CVE-2026-123634), the vulnerable code path writes an alert to the error log reading could not cancel <name> resolving. A hit naming an unfamiliar domain deserves a closer look, though Xint does not say it only appears during attacks.
+
+For CVE-2026-123633, Xint's exploit crashes a worker during the first stage, and the replacement worker keeps the same memory layout, so the attacker can carry on. Repeated worker crashes on an HTTP/2 server that proxies to backends, especially alongside spikes in connections or outbound connections to unknown hosts, should be investigated, not dismissed. Xint's resolver exploit also sent memory addresses out inside DNS queries, so unusual lookups from nginx hosts to unfamiliar zones are another lead.
+
+17:42 GMT [#update-2026-11-18-1742]·18 Nov 2026
+
+A fixed internal backend does not protect you from CVE-2026-123633; outbound filtering helps
+
+It is tempting to think the HTTP/2 proxy flaw only matters if your config could send traffic to an attacker. Xint's write-up [https://xint.io/blog/nginx2root-remote-code-execution] shows otherwise: its test used a single ordinary proxy_pass to a fixed backend, and the exploit rewrote the backend address in memory so nginx connected out to the attacker's server instead.
+
+The trigger is connection pressure. Client and backend connections share each worker's worker_connections slots, and when 1/16 or fewer are free nginx starts closing idle connections, which is where the bug lies; Xint held slots open with plain HTTP/1 connections, no login needed. Two stopgaps make this harder while you patch: firewall nginx hosts so they can only connect out to known backends, and limit connections per client IP.
+
+17:41 GMT [#update-2026-11-18-1741]·18 Nov 2026
+
+Old nginx is not safe: the mail proxy flaw goes back to 0.5.x, and shares the web workers
+
+The common rule that nginx 1.9.4 and earlier is not affected applies only to the HTTP/2 flaw. Xint traces the mail proxy flaw, CVE-2026-113425, back to 0.5.15 (nginx.org says 0.5.33), and the resolver flaw to 0.6.18, so very old builds are still in scope if they use those features. The attacker needs no valid login.
+
+In Xint's test [https://xint.io/blog/nginx2root-remote-code-execution], the same nginx worker processes served IMAP, POP3 and the website on port 80. If you run nginx as a mail proxy on a server that also hosts websites or APIs, a mail-side compromise is a web server compromise. Keep mail listeners off the internet or limited to trusted addresses until you patch.
+
+17:40 GMT [#update-2026-11-18-1740]·18 Nov 2026
+
+Checking HTTP/2 exposure: four checks, and three ways to get a false all-clear
+
+Xint's exposure checks [https://xint.io/blog/nginx2root-remote-code-execution] for CVE-2026-123007: check the version with nginx -v; check the binary includes HTTP/2 with nginx -V 2>&1 | grep -- --with-http_v2_module (if it does not, you are not affected by this flaw); look for http2 in nginx -T; and from outside your network run openssl s_client -connect HOST:443 -servername HOST -alpn h2, where "ALPN protocol: h2" means HTTP/2 is reachable.
+
+The traps: behind a CDN the external test only reaches the CDN, so test nginx directly too. nginx -T reads the config on disk, not what is running if you have not reloaded. And when disabling HTTP/2, set http2 off; in every server block sharing that address and port, expect native gRPC to break, and remember the openssl check also prints nothing if the connection fails, so confirm the site still loads.
+
+17:39 GMT [#update-2026-11-18-1739]·18 Nov 2026
+
+Only one in five nginx servers shows its version, so treat the 98.9% figure with care
+
+Xint's full write-up [https://xint.io/blog/nginx2root-remote-code-execution] gives the detail behind its headline exposure figure. Shodan returned 56.7 million hosts running nginx on 10 November, but only 11.94 million (21.1%) reported a version. The 98.9% in the affected range is 98.9% of that fifth.
+
+It cuts both ways. The other 45 million hosts are not known to be safe; they simply hide their version. And a reported version may already include a backported fix: Xint notes Ubuntu 22.04 still reports nginx 1.18.0 while its package has moved to 1.18.0-6ubuntu14.22. Check the full package version against your distribution's advisory, not nginx -v.
+
+17:38 GMT [#update-2026-11-18-1738]·18 Nov 2026
+
+Mitigations for the three CVEs that disabling HTTP/2 does not stop
+
+Xint's write-up [https://xint.io/blog/nginx2root-remote-code-execution] gives specific stopgaps for the flaws that turning off HTTP/2 does not block. For the HTTP/3 flaw (CVE-2026-121810), remove the quic listeners, set http3 off;, send Alt-Svc 'clear', and check nothing still listens on UDP 443 with ss -lunp.
+
+For the resolver flaw (CVE-2026-123634), point proxy_pass at a fixed upstream group instead of a variable. Setting mirror_request_body on stopped Xint's exploit but does not fix the bug, and SSI can reach it too, so turning off mirroring alone is not enough. For the mail proxy flaw (CVE-2026-113425), bind IMAP, POP3 and SMTP listeners to 127.0.0.1 or firewall them to trusted addresses.
+
+After any change, old workers keep serving existing connections with the old configuration (they show as "worker process is shutting down"). Restart nginx with systemctl restart nginx to close them.
+
+17:37 GMT [#update-2026-11-18-1737]·18 Nov 2026
+
+The kernel bug: one compromised container can mean every container on the host
+
+The sixth NGINX2Root bug is a use-after-free in the Linux kernel's SCTP code, present since 2018 and still unpatched. Xint says it gives both a memory leak that defeats kernel ASLR and an arbitrary function call in the kernel, and that an attacker running as the nginx worker could reliably get root, including from inside a Docker container.
+
+The worrying detail: on many Linux distributions the SCTP module is installed by default and loads automatically the first time any program opens an SCTP socket. All containers share the host kernel, so where SCTP is reachable a single compromised nginx container can lead to control of the host and every container on it.
+
+Until a kernel fix ships, block the module on hosts that do not use SCTP with install sctp /bin/false in a file under /etc/modprobe.d/, and check whether it is already loaded with lsmod | grep sctp, as the block does not unload it.
+
+17:36 GMT [#update-2026-11-18-1736]·18 Nov 2026
+
+Tested on AWS, GCP and Azure over public IPs, under normal traffic
+
+Xint's validation results [https://xint.io/blog/nginx2root-remote-code-execution] show its CVE-2026-123007 exploit worked on AWS, GCP and Azure from inside the server, across a private network, and over a public HTTPS endpoint, while the server was also handling normal traffic and on different hardware. It needed only a reachable TLS port with HTTP/2.
+
+The other four were each proven against the official nginx:1.31.8 Docker image with a small addition to the stock configuration. The mail proxy exploit worked even though the authentication service rejected every login, so no valid account is needed. Two of them needed nginx to connect back to the attacker (a TCP connection, or a DNS lookup to the attacker's server), so blocking outbound traffic from web servers is a useful extra layer.
+
+17:35 GMT [#update-2026-11-18-1735]·18 Nov 2026
+
+How the main bug works, in plain English
+
+HTTP/2 lets a client tell the server how much data it is ready to receive, a "send window". Xint's analysis [https://xint.io/blog/nginx2root-remote-code-execution] shows nginx can hand the same credit back twice. The attacker gets nginx to queue response data it cannot send, tops the window back up with a WINDOW_UPDATE frame, then cancels the streams with RST_STREAM, and nginx returns the queued credit a second time without checking the maximum.
+
+Once the window is over its limit, a later check wraps round to a huge number and nginx accepts any further increase. The window is then treated as a small negative number, which turns into an enormous copy length. That lets the attacker leak memory addresses in a response, corrupt memory, and replace a cleanup function nginx runs when the connection closes, so their command runs as the nginx worker.
+
+17:34 GMT [#update-2026-11-18-1734]·18 Nov 2026
+
+How to hunt for NGINX2Root attacks: your access logs will not show them
+
+The attack uses HTTP/2 WINDOW_UPDATE and RST_STREAM control frames, which nginx does not log as requests and TLS encrypts, so normal access logs show almost nothing. Xint's investigation guide [https://xint.io/blog/nginx2root-remote-code-execution] suggests four places to look instead.
+
+First, connections: run ss -tinp state established '( sport = :443 )' twice and look for a single client connection open for minutes with bytes_received climbing fast while little is sent back, plus many short TLS connections from the same IP. Second, add a log format that records $connection, $connection_requests and $request_length, and compare logged request sizes with the bytes actually received.
+
+Third, and the clearest sign of success: any program started by an nginx worker. Add an auditd rule on the worker's UID for execve and watch for /bin/sh or /bin/bash. Fourth, failed attempts can crash workers, so check grep -Ei 'worker process.*exited|signal 11|segfault' /var/log/nginx/error.log and coredumpctl list nginx.
+
+17:33 GMT [#update-2026-11-18-1733]·18 Nov 2026
+
+nginx went from 2 security advisories in 2025 to 26 this year
+
+Unauthenticated remote code execution in nginx has been very rare: Xint's write-up [https://xint.io/blog/nginx2root-remote-code-execution] points to CVE-2013-2028, a stack overflow from 2013, as the best-known previous example. Yet nginx's advisory list recorded two vulnerabilities in the whole of 2025 and 26 by 17 November this year, before NGINX2Root added five more.
+
+Xint puts this down to AI-assisted research finding bugs faster, even in heavily studied code; at least three of the five finders this week credit AI. Expect more nginx security releases, and treat nginx like any other component that needs patching within days, not months.
+
+17:32 GMT [#update-2026-11-18-1732]·18 Nov 2026
+
+Xint: fixes coordinated with AWS, Azure and Google Cloud; “more exploitable” than PHP2Shell
+
+In a press release [https://www.businesswire.com/news/home/20261118449389/en/PSA-Immediately-Patch-NGINX-Web-Servers-Due-to-Critical-Vulnerability-Allowing-Unauthenticated-User-RCE] issued at 16:00 GMT, Xint says the fix was coordinated with F5 and the three big cloud providers, AWS, Azure and Google Cloud, and that it limited early sharing to reduce the chance of attackers getting ahead of the patch.
+
+Xint chief executive Brian Pak says: "Because nginx2root is even more exploitable with broader impact than PHP2Shell, we erred on the side of limiting who" received details before release. It is Xint's own assessment, but it is the clearest signal yet of how the finders rank it against last month's PHP flaw.
+
+17:31 GMT [#update-2026-11-18-1731]·18 Nov 2026
+
+Luxembourg’s CIRCL: do not close findings because ASLR is on
+
+CIRCL, Luxembourg's national CERT, has published technical report TR-105 [https://www.circl.lu/pub/tr-105/] on NGINX2Root, the third national body to issue guidance after Japan and Poland. Its most useful line for defenders: "Do not downgrade or close an NGINX2ROOT finding merely because ASLR or PIE is enabled." That matches Wiz's report of an ASLR bypass, despite F5's caveat.
+
+CIRCL also gives shell checks for ASLR, PIE and HTTP/2 exposure, and host-side signs to hunt for, such as nginx workers starting unexpected programs. Like CERT Polska, it describes the 1.31.9 release as due on 19 November; that is Korean time, and the fixed releases are already available.
+
+17:30 GMT [#update-2026-11-18-1730]·18 Nov 2026
+
+Cloudflare: edge already patched; origins behind its proxy are protected while you update
+
+Cloudflare has published a Radar Zero Wire advisory [https://radar.cloudflare.com/zero-wire/nginx2root]. Its edge proxy is built on a heavily modified nginx fork, and Cloudflare says a fix for the affected code paths finished rolling out globally before the flaws were made public. Customers need to do nothing for traffic served through its proxy.
+
+If your own nginx can only be reached through Cloudflare's HTTP proxy (proxied DNS records), Cloudflare says you should be safe from these attacks while you update, because it terminates client HTTP/2 and HTTP/3 at its edge and opens its own connection to your server. That protection does not apply to Spectrum TCP or UDP applications, DNS-only records, or mail proxies, and Cloudflare has released no WAF rule, saying these flaws cannot be reliably matched by one.
+
+Cloudflare also notes some of Xint's exploits need more than reaching nginx: for CVE-2026-123633 and CVE-2026-121810, nginx had to open a TCP connection to the attacker, and for CVE-2026-123634 nginx's resolver had to reach the attacker's DNS server. Restricting outbound traffic from web servers makes those harder. Make sure nginx cannot be reached directly, bypassing the CDN, and still patch.
+
+17:26 GMT [#update-2026-11-18-1726]·18 Nov 2026
+
+nginx:alpine Docker tag now fixed
+
+The plain nginx:alpine tag on Docker Hub was updated at 17:20 GMT and now points to the same image as nginx:1.31.9-alpine. Every main official tag, latest, mainline, stable and alpine, now carries a fixed nginx. Pull, rebuild and redeploy as before.
+
+17:25 GMT [#update-2026-11-18-1725]·18 Nov 2026
+
+Debian: nginx vulnerable and unfixed on every release
+
+Debian's security tracker [https://security-tracker.debian.org/tracker/CVE-2026-123007] now lists CVE-2026-123007 as unfixed, with nginx vulnerable in Debian 12 (bookworm), Debian 13 (trixie), testing (forky) and unstable (sid), including the security archives. No fixed package has been released for any of them yet.
+
+That completes the picture for the big distributions: Debian, Ubuntu, Red Hat and Amazon Linux all have nginx open, with no update shipped, and SUSE has no page yet. If you run nginx from distribution packages, disable HTTP/2 on internet-facing listeners now, or switch to nginx.org's own packages, which already carry 1.30.7 and 1.31.9.
+
+17:15 GMT [#update-2026-11-18-1715]·18 Nov 2026
+
+Amazon Linux: nginx fixes pending on AL2, AL2023 and the 2027 preview
+
+Amazon Linux has published its CVE page for CVE-2026-123007 [https://explore.alas.aws.amazon.com/CVE-2026-123007.html], rating it Important with a CVSS 3.1 score of 8.1. The nginx package is "Pending Fix" on Amazon Linux 2 (the nginx1 extra), Amazon Linux 2023 and the Amazon Linux 2027 preview, which also lists its nginx-awslc build.
+
+That makes three major distributions, Red Hat, Ubuntu and Amazon Linux, with no nginx update yet, and Debian and SUSE still have no page. On EC2 instances running nginx from Amazon's packages, disable HTTP/2 on internet-facing listeners until the ALAS advisory ships, or put a load balancer that terminates HTTP/2 in front of them.
+
+17:05 GMT [#update-2026-11-18-1705]·18 Nov 2026
+
+Ubuntu: nginx fix needed on every supported release, none shipped yet
+
+Ubuntu has published its CVE page for CVE-2026-123007 [https://ubuntu.com/security/CVE-2026-123007], rating it High priority. The nginx package is marked "needed" on every listed release from Ubuntu 16.04 onwards, including 20.04, 22.04 and 24.04, which means a fix is required but has not been released. Only 14.04 is listed as not affected.
+
+So apt upgrade will not fix this on Ubuntu today, just as dnf update will not on Red Hat. Debian, Amazon Linux and SUSE had not published pages at 17:00 GMT. If you run nginx from distribution packages, disable HTTP/2 on internet-facing listeners now and watch for a Ubuntu Security Notice.
+
+17:00 GMT [#update-2026-11-18-1700]·18 Nov 2026
+
+Fixed official nginx Docker images are out, but check the alpine tag
+
+The official nginx images on Docker Hub [https://hub.docker.com/_/nginx/tags] were updated at about 16:53 GMT. nginx:latest and nginx:mainline now point to 1.31.9, and nginx:stable points to 1.30.7, with explicit 1.31.9, 1.30.7 and 1.31.9-alpine tags also published.
+
+At 16:56 GMT the plain nginx:alpine tag still pointed to an image from 13 November, which is the vulnerable 1.31.8. If you build on Alpine, use nginx:1.31.9-alpine explicitly rather than nginx:alpine until it catches up.
+
+Pull the new image, rebuild anything that uses it as a base, and redeploy. Restarting a running container keeps the old image, and images built on top of nginx need rebuilding by whoever maintains them.
+
+16:55 GMT [#update-2026-11-18-1655]·18 Nov 2026
+
+CERT Polska warns of NGINX2Root; the fixes are already out, not due tomorrow
+
+Poland's national CERT, CERT Polska, warned [https://x.com/CERT_Polska/status/2123094125465460991] at 16:40 GMT about the five critical nginx vulnerabilities known as NGINX2Root, highlighting CVE-2026-123007, and published an advisory with recommendations [https://moje.cert.pl/komunikaty/2026/217/krytyczne-podatnosci-w-serwerze-nginx-umozliwiajace-zdalne-wykonanie-kodu-nginx2root/]. It is the second national body to warn, after Japan's National Cybersecurity Office.
+
+CERT Polska says the security fixes are scheduled for tomorrow, 19 November. That date comes from Xint's timeline, which is in Korea Standard Time. In the UK and Europe the fixed releases, nginx 1.30.7 and 1.31.9, are already available from nginx.org and have been since this afternoon. Do not wait until tomorrow to patch.
+
+16:50 GMT [#update-2026-11-18-1650]·18 Nov 2026
+
+Red Hat rates CVE-2026-123007 Critical; no RHEL fixes yet
+
+Red Hat has published its CVE page for CVE-2026-123007 [https://access.redhat.com/security/cve/CVE-2026-123007] and rates it Critical, with a CVSS 3.1 score of 8.1. The nginx packages in Red Hat Enterprise Linux 10, RHEL 9 (including the nginx 1.24 and 1.26 module streams) and the RHEL 8 nginx 1.24 stream are all listed as "Under investigation", with no security updates yet.
+
+That means a dnf update on RHEL will not fix this today. If you run nginx from Red Hat packages, disable HTTP/2 on internet-facing listeners now and watch Red Hat's page for errata. Debian, Ubuntu and Amazon Linux had still not published pages for the CVE at 16:46 GMT.
+
+16:41 GMT [#update-2026-11-18-1641]·18 Nov 2026
+
+Beware fake NGINX2Root exploits on GitHub
+
+New GitHub repositories named after NGINX2Root and its CVE numbers are already appearing. After every headline vulnerability, some "proof of concept" code turns out to be malware aimed at the defenders and researchers who download it, or does nothing at all.
+
+As of 16:41 GMT, the only genuine public exploit we know of is Rapid7's, published by Stephen Fewer [https://github.com/sfewer-r7/CVE-2026-123007]. Xint and Wiz have said they are not releasing theirs, so anything claiming to be the Xint or Wiz exploit is not what it says.
+
+To check whether you are exposed, use the version and configuration checks on this page rather than running someone else's exploit. If you must test one, read the code first, never run it on a workstation or production system, use a throwaway virtual machine with no credentials on it, and walk away from anything that ships compiled binaries, obfuscated code or asks you to install extra packages.
+
+16:40 GMT [#update-2026-11-18-1640]·18 Nov 2026
+
+Ikotas Labs calls it NGINX2Shell, found with OpenAI
+
+Ikotas Labs, one of the five independent finders, announced [https://x.com/ikotas00/status/2123071157083754677] the HTTP/2 flaw at 15:09 GMT under its own name, NGINX2Shell, describing it as a pre-authentication RCE in nginx 1.31.8, the current mainline release. It says the work was done with OpenAI from discovery through to disclosure, and that more is to come.
+
+NGINX2Shell and NGINX2Root refer to the same nginx HTTP/2 flaw, CVE-2026-123007, which Ikotas says Rapid7, Wiz and Xint also found. NGINX2Root is Xint's wider name for all five nginx CVEs plus the Linux kernel chain. The fixes are the same either way: nginx 1.30.7 or 1.31.9.
+
+16:38 GMT [#update-2026-11-18-1638]·18 Nov 2026
+
+F5 rates all five NGINX2Root flaws critical, with no fix for older NGINX Plus
+
+F5's out-of-band security notification [https://my.f5.com/manage/s/article/K000164058] for 18 November indexes all of today's advisories. Its individual advisories for the NGINX2Root flaws, CVE-2026-123007 [https://my.f5.com/manage/s/article/K000163926], CVE-2026-123633 [https://my.f5.com/manage/s/article/K000163928], CVE-2026-123634 [https://my.f5.com/manage/s/article/K000163925], CVE-2026-121810 [https://my.f5.com/manage/s/article/K000163927] and CVE-2026-113425 [https://my.f5.com/manage/s/article/K000163931], score every one 9.2 (Critical) under CVSS 4.0 and 8.1 (High) under CVSS 3.1. That is well above the "medium" label nginx.org gives three of them, so treat all five as critical.
+
+There is no fix for NGINX Plus R34 to R36 for any of the five; the mail proxy flaw also covers R33. F5 also lists the resolver flaw as affecting nginx 0.6.18 to 0.8.55 with no fix. Those releases are more than a decade old, so if you still have one, replace it.
+
+The same notification covers separate fixes for BIG-IP, including iControl REST, iControl SOAP, APM and iRule vulnerabilities. They are not part of NGINX2Root, but if you run BIG-IP, check the notification today too.
+
+16:37 GMT [#update-2026-11-18-1637]·18 Nov 2026
+
+Wiz: its exploit defeats ASLR, despite F5’s caveat
+
+F5's advisory says code execution needs ASLR to be disabled or bypassed. Wiz researcher Nir Ohfeld says [https://x.com/nirohfeld/status/2123070394227663006] Wiz achieved "reliable remote code execution (ASLR defeated)" on nginx serving only static files, with no backend or third-party modules. Do not rely on ASLR as a mitigation.
+
+Ohfeld says Wiz found both HTTP/2 flaws with its own AI tool, Wiz Atlas, and used Gemini 4 Carbon and ChatGPT 5.6 Sol to confirm their impact. With Xint and Ikotas Labs also crediting AI, at least three of the five finders used AI to find these bugs.
+
+16:36 GMT [#update-2026-11-18-1636]·18 Nov 2026
+
+Japan’s National Cybersecurity Office issues an nginx alert
+
+Japan's National Cybersecurity Office (国家サイバー統括室) posted an alert [https://x.com/cyber_forecast/status/2123084867252748401] at 16:04 GMT asking administrators to update nginx promptly, the first government warning we have seen. Japanese media are also calling the flaws "NGINX2Shell", which is the same issue under another name.
+
+As of 16:36 GMT we have not seen guidance from the UK's NCSC, CISA or CERT-EU. CISA has not added any of the CVEs to its Known Exploited Vulnerabilities catalogue, which would signal confirmed attacks.
+
+16:35 GMT [#update-2026-11-18-1635]·18 Nov 2026
+
+nginx2root.com was registered 16 days before disclosure
+
+Registry records show nginx2root.com was registered through Cloudflare on 2 November 2026 at 17:24 UTC. That was 17 days after Xint reported the flaws to F5 on 16 October, 6 days after its reports reached the nginx developers on 27 October, and 16 days before today's coordinated disclosure.
+
+A named site with demos, FAQs and remediation steps prepared weeks in advance is now normal for headline vulnerabilities, as it was for PHP2Shell and Java4Shell. It also means the name existed in public DNS records before the fix did. Anyone watching new domain registrations could have spotted "nginx2root" on 2 November, although the domain gave away nothing about the bugs themselves.
+
+For defenders the takeaway is the same as ever: the disclosure date was set well in advance, so vendors and distributions had time to prepare packages. If your supplier still has no fix for nginx today, ask them when it is coming, and disable HTTP/2 in the meantime.
+
+16:30 GMT [#update-2026-11-18-1630]·18 Nov 2026
+
+Official nginx Docker images still ship vulnerable 1.31.8
+
+If you run nginx from the official Docker Hub image, pulling it again today still gets you a vulnerable build. At 16:22 GMT the nginx:latest and mainline tags were still 1.31.8, and no 1.31.9 or 1.30.7 tags had been published.
+
+A fix is on its way. The image maintainers moved the build files to 1.31.9 and 1.30.7 at 16:00 GMT in docker-nginx [https://github.com/nginx/docker-nginx/commits/master], and the request to publish them, official-images pull request 22789 [https://github.com/docker-library/official-images/pull/22789], was opened at 16:19 and has not been merged yet.
+
+Until the new tags appear, disable HTTP/2 in your container's nginx configuration. When they do, rebuild and redeploy: restarting a running container does not pull the new image. Check images that are built on top of nginx too.
+
+16:25 GMT [#update-2026-11-18-1625]·18 Nov 2026
+
+F5: no fix for NGINX Plus R34 to R36; BIG-IP and F5OS not affected
+
+F5's advisory K000163926 [https://my.f5.com/manage/s/article/K000163926] lists NGINX Plus R34, R35 and R36 as vulnerable to CVE-2026-123007 with no fixed release. F5 says that where no fix exists for your branch, you should upgrade to one that has it: NGINX Plus 37.0.8.1 or 37.3.0.1. If you cannot move to 37.x straight away, turn off HTTP/2 on internet-facing listeners, which blocks both HTTP/2 flaws.
+
+F5 scores the flaw 8.1 (High) under CVSS 3.1 and 9.2 (Critical) under CVSS 4.0, calls it a data plane issue with no control plane exposure, and says code execution needs ASLR to be disabled or bypassed. Rapid7, Wiz and Xint all report working exploits, so do not treat that as protection. F5's advisory lists no mitigation of its own.
+
+BIG-IP (all modules), BIG-IQ, F5OS, BIG-IP CNF, BIG-IP Next for Kubernetes and F5 AI Gateway are not vulnerable. F5 is still checking F5 Distributed Cloud and NGINX One Console. F5 credits Rapid7, Wiz, Xint and Ikotas Labs, which it says used GPT-6 Astra.
+
+16:05 GMT [#update-2026-11-18-1605]·18 Nov 2026
+
+Rapid7 publishes a working exploit for CVE-2026-123007, with real-world limits
+
+Stephen Fewer of Rapid7, one of the independent finders, has released a proof-of-concept exploit [https://github.com/sfewer-r7/CVE-2026-123007] alongside Rapid7's write-up [https://www.rapid7.com/blog/post/ve-cve-2026-123007-critical-nginx-http-2-integer-underflow-leads-to-rce-fixed/]. It gets unauthenticated code execution against a linux/amd64 Docker image running nginx 1.31.8 with HTTP/2 and TLS on.
+
+It is not trivial to use at scale. Rapid7 says the attack needs roughly 128 GB of HTTP/2 traffic over one connection: about two minutes on a 10 Gbit/s link, seventeen minutes at 1 Gbit/s, and probably not achievable below about 300 Mbit/s with nginx's default one-hour connection limit. It also relies on a specific glibc memory copy routine chosen on CPUs with AVX-512, and HTTP/2 connections that pass through a proxy will probably not work.
+
+Those limits buy time; they are not a fix. Public code is the point at which scanning and copycat exploit attempts usually start, so treat internet-facing nginx with HTTP/2 enabled as urgent.
+
+15:20 GMT [#update-2026-11-18-1520]·18 Nov 2026
+
+Xint launches nginx2root.com: five nginx CVEs plus a Linux kernel bug to host root
+
+Xint (part of Theori) announced [https://x.com/xint_official/status/2123073835742486657] the disclosure and published nginx2root.com [https://nginx2root.com/] and a technical blog [https://xint.io/blog/nginx2root-remote-code-execution]. It says each of the five nginx flaws has its own working exploit:
+
+CVE-2026-123007: HTTP/2 flow control memory corruption. Needs HTTP/2 enabled.
+
+CVE-2026-123633: HTTP/2 use-after-free when requests are forwarded to a backend.
+
+CVE-2026-123634: DNS resolver use-after-free, reached with resolver, a request-dependent proxy_pass and mirror.
+
+CVE-2026-121810: HTTP/3 (QUIC) use-after-free when requests are forwarded to a backend.
+
+CVE-2026-113425: mail proxy use-after-free in the auth_http path.
+
+The sixth bug is in the Linux kernel's SCTP code (since Linux 4.15) and has no patch yet. Xint used it to go from the nginx worker account to root, and says the chain also escaped a Docker container running nginx. Until a kernel fix ships, Xint suggests stopping the SCTP module from loading with install sctp /bin/false in a file under /etc/modprobe.d/. That does not unload a module already in use or disable SCTP built into the kernel.
+
+On reach, Xint's Shodan snapshot of 10 November found 11.8 million of 11.94 million version-identifiable nginx hosts (98.9%) running a release in the CVE-2026-123007 range. That measures version spread, not confirmed exploitable servers: many will not expose HTTP/2, and distribution packages may carry the fix under an older version number.
+
+15:15 GMT [#update-2026-11-18-1515]·18 Nov 2026
+
+Wiz: two critical nginx HTTP/2 RCEs, found by five teams independently
+
+Wiz Research posted on X [https://x.com/wiz_io/status/2123072693042082117] that it, Xint, Metnir, Rapid7 and Ikotas Labs independently found CVE-2026-123633 and CVE-2026-123007, and published a full advisory [https://www.wiz.io/blog/nginx-http2-rce-vulnerabilities]. Wiz rates both CVSS 4.0 9.2 and says it got code execution against nginx serving plain static files, with no backend application or third-party module.
+
+Wiz is not releasing its exploits and says reliable attacks take real work: leaking memory addresses, shaping the heap and adjusting for each build. It expects the first wide attacks to hit packaged products that ship identical nginx builds, such as appliances and container images.
+
+For detection, Wiz suggests watching for unexpected nginx worker crashes, commands started by nginx, and long-lived HTTP/2 connections sending large amounts of data, since CVE-2026-123007 needs many WINDOW_UPDATE frames. It notes that a CDN or WAF that terminates HTTP/2 in front of nginx may partly reduce the risk.
+
+Release [#update-2026-11-18-release]·18 Nov 2026
+
+nginx 1.30.7 and 1.31.9 released, fixing ten CVEs at once
+
+The nginx project released [https://nginx.org/] 1.30.7 (stable) and 1.31.9 (mainline) with fixes for ten vulnerabilities: the five NGINX2Root flaws plus five more. The extra five are an infinite loop while reading a request body over TLS 1.3 (CVE-2026-118899), a NULL pointer dereference with PROXY protocol version 2 (CVE-2026-120993, mainline only), a buffer overflow with alias and try_files (CVE-2026-125283), an SNI bypass in stream module client certificate checks (CVE-2026-120967) and weak validation in the stream ssl_preread module (CVE-2026-123640).
+
+nginx's own advisories [https://nginx.org/en/security_advisories.html] label CVE-2026-123007 and CVE-2026-113425 "major" and CVE-2026-123633, CVE-2026-123634 and CVE-2026-121810 "medium", below the CVSS 9.2 that Wiz and Rapid7 give the HTTP/2 flaws. Do not let the "medium" label slow you down: Wiz and Xint both report working code execution exploits for CVE-2026-123633.
+
+For NGINX Plus, F5 advisory K000163926 [https://my.f5.com/manage/s/article/K000163926] covers the fixes: 37.3.0.1 and 37.0.8.1 for CVE-2026-123007, and 37.2.0.1 and 37.0.7.1 for CVE-2026-123633. This is nginx's second security release in five weeks, after 1.30.6 and 1.31.7 fixed five other CVEs on 14 October.
+
+Confirmed [#update-2026-11-17-confirmed]·17 Nov 2026
+
+F5 confirms Wiz’s second report is CVE-2026-123007, already in the planned release
+
+One day after Wiz reported the HTTP/2 flow control bug, F5 told it the issue matched CVE-2026-123007 and was already fixed in the release planned for 18 November, according to Wiz's timeline [https://www.wiz.io/blog/nginx-http2-rce-vulnerabilities]. By this point at least four teams had reported the same bug.
+
+CVE [#update-2026-11-16-cve]·16 Nov 2026
+
+CVE-2026-123007 assigned and 18 November disclosure date set; Wiz reports the same bug
+
+F5 validated Rapid7's report, assigned CVE-2026-123007 and set coordinated disclosure for 18 November, per Rapid7's timeline [https://www.rapid7.com/blog/post/ve-cve-2026-123007-critical-nginx-http-2-integer-underflow-leads-to-rce-fixed/]. The same day, Wiz reported the flow control bug to F5 as a separate issue from the use-after-free it had reported in October.
+
+Outreach [#update-2026-11-11-outreach]·11 Nov 2026
+
+Rapid7 contacts F5 about an HTTP/2 flaw and shares details the next day
+
+Stephen Fewer of Rapid7 made initial contact with F5 on 11 November. F5 confirmed on 12 November and Rapid7 sent the technical details that day. Rapid7 went on to build the proof-of-concept exploit it released on disclosure day.
+
+Patch [#update-2026-11-10-patch]·10 Nov 2026
+
+Patches go out for review; Xint takes its exposure snapshot
+
+F5 sent Wiz a patch for the HTTP/2 use-after-free (CVE-2026-123633) to review, and Xint completed validation of the nginx team's fixes, which the team had asked for on 9 November. Xint also ran the Shodan snapshot behind its exposure figure: 11.8 million of 11.94 million version-identifiable nginx hosts in the affected range for CVE-2026-123007.
+
+Handover [#update-2026-10-27-handover]·27 Oct 2026
+
+Xint’s reports reach the nginx development team
+
+Eleven days after Xint first reported, its findings were passed from F5's HackerOne programme to the nginx developers, according to the Xint blog [https://xint.io/blog/nginx2root-remote-code-execution]. HackerOne had completed validation on 20 October.
+
+Wiz [#update-2026-10-21-wiz]·21 Oct 2026
+
+Wiz reports the HTTP/2 use-after-free and learns it is a duplicate
+
+Wiz Research reported the bug that became CVE-2026-123633 to F5, which replied that another team had already reported it. Wiz says the flaw happens when an HTTP/2 connection is wrongly left on nginx's list of reusable connections while a request is still active, so nginx can free it mid-request when connection slots run low.
+
+Reported [#update-2026-10-16-reported]·16 Oct 2026
+
+Xint reports the nginx flaws to F5 through HackerOne
+
+Five days after finding them, Xint submitted its reports to F5, nginx's owner, through HackerOne. Xint's blog gives its timeline in UTC; nginx2root.com gives Korea Standard Time, which is why some sources say the fix lands on 19 November. Xint counts 39 days from discovery to fix.
+
+Found [#update-2026-10-11-found]·11 Oct 2026
+
+Xint finds the first bug with an AI-assisted scan and a human researcher
+
+While testing a new capability ahead of Wiz's ZeroDay Cloud competition, a Xint researcher pointed the tool at about 50,000 lines of nginx. Within 90 minutes it flagged high-severity issues with reproduction steps that became a working exploit in under ten minutes, Xint says.
+
+The researcher personally found CVE-2026-123007, the HTTP/2 flaw that affects a default nginx setup with HTTP/2 on. Xint then built what it learned into its general tooling, which found the other four nginx bugs with no human guidance. The flawed code had been in nginx since HTTP/2 support arrived in version 1.9.5 in 2015.
+
+NGINX2Root key facts
+
+Main CVE
+
+CVE-2026-123007, HTTP/2 flow control memory corruption. CVSS 4.0 9.2 (Critical); F5 rates all five NGINX2Root CVEs 9.2.
+
+Affected
+
+nginx 1.9.5 to 1.31.8 with HTTP/2 enabled. NGINX Plus 37.x before 37.3.0.1 and 37.0.8.1, and R34 to R36, which get no fix.
+
+Fixed in
+
+nginx 1.30.7 (stable) and 1.31.9 (mainline), released 18 November 2026.
+
+Impact
+
+Unauthenticated remote code execution as the nginx worker; root on the host when chained with an unpatched Linux SCTP kernel flaw.
+
+Exposure
+
+Censys counts about 8.8 million nginx services on an affected version with HTTP/2 on (19 November, 09:06 GMT), with about 425,000 fixed since disclosure. Public proof of concept from Rapid7; no exploitation in the wild reported yet.
+
+Workaround
+
+Disable HTTP/2 on every internet-facing listener until you can upgrade.
+
+The five nginx CVEs at a glance
+
+CVEFlawExposed whenHTTP/2 off helps?
+
+CVE-2026-123007HTTP/2 flow control memory corruptionHTTP/2 enabled. Versions 1.9.5 to 1.31.8Yes
+
+CVE-2026-123633HTTP/2 use-after-freeHTTP/2 with requests passed to a backend (proxy_pass, fastcgi_pass, grpc_pass). Versions 1.19.7 to 1.31.8Yes
+
+CVE-2026-123634Resolver use-after-freeresolver, proxy_pass, mirror and mirror_request_body off together. Versions 0.6.18 to 1.31.8No
+
+CVE-2026-121810HTTP/3 use-after-freeHTTP/3 (QUIC) with requests passed to a backend. Versions 1.25.0 to 1.31.8No
+
+CVE-2026-113425Mail proxy use-after-freeMail proxy with proxy on and auth_http. Versions 0.5.33 to 1.31.8No
+
+All five are fixed in nginx 1.30.7 and 1.31.9. Configurations from Xint's disclosure, version ranges from the nginx security advisories [https://nginx.org/en/security_advisories.html]. Distribution packages may carry the fix under an older version number.
+
+Why this one is different: pre-auth RCE in nginx is rare
+
+nginx serves roughly a third of websites whose web server can be identified, and it has been fuzzed and audited for two decades. Xint says the best known previous pre-authentication RCE in nginx dates from 2013. This time five teams, several using AI-assisted tooling, found the same HTTP/2 bugs within weeks of each other.
+
+When that many people find a bug independently, assume others have too. With exploit code now public, the gap between disclosure and attack attempts will be short.
+
+Sources and advisories
+
+Xint: NGINX2Root, from nginx visitor to root of the server host [https://nginx2root.com/]
+
+Xint blog: NGINX2Root, new RCE vulnerabilities in nginx require urgent patching [https://xint.io/blog/nginx2root-remote-code-execution]
+
+nginx security advisories [https://nginx.org/en/security_advisories.html]
+
+nginx.org: nginx 1.30.7 and 1.31.9 security release, 18 November 2026 [https://nginx.org/]
+
+Wiz: Unauthenticated RCE in NGINX, CVE-2026-123633 and CVE-2026-123007 [https://www.wiz.io/blog/nginx-http2-rce-vulnerabilities]
+
+Rapid7: CVE-2026-123007, critical NGINX HTTP/2 integer underflow leads to RCE [https://www.rapid7.com/blog/post/ve-cve-2026-123007-critical-nginx-http-2-integer-underflow-leads-to-rce-fixed/]
+
+Rapid7 proof-of-concept exploit for CVE-2026-123007 (GitHub) [https://github.com/sfewer-r7/CVE-2026-123007]
+
+F5 security advisory K000163926 [https://my.f5.com/manage/s/article/K000163926]
+
+NGINX2Root frequently asked questions
+
+What is NGINX2Root?
+
+NGINX2Root is the name Xint (Theori) gave to five nginx vulnerabilities disclosed on 18 November 2026, CVE-2026-123007, CVE-2026-123633, CVE-2026-123634, CVE-2026-121810 and CVE-2026-113425, plus a separate Linux kernel SCTP flaw. Each nginx flaw has a working exploit for code execution as the nginx worker, and chaining one with the kernel flaw gave root on the host, including from inside a Docker container.
+
+Which nginx versions are affected by CVE-2026-123007?
+
+Official nginx releases from 1.9.5 to 1.31.8 are affected, which covers every release since HTTP/2 support was added in 2015. A server is only exposed if nginx is built with HTTP/2 and a listener accepts HTTP/2 connections. NGINX Plus 37.x releases before 37.3.0.1 and 37.0.8.1 are also affected, as are NGINX Plus R34 to R36, which F5 will not fix. BIG-IP, BIG-IQ and F5OS are not affected. Distribution packages may have backported the fix without changing the version number, so check your vendor advisory.
+
+Which versions fix NGINX2Root?
+
+nginx 1.30.7 (stable) and 1.31.9 (mainline), released on 18 November 2026, fix all five NGINX2Root CVEs and five other nginx CVEs. For NGINX Plus, upgrade to 37.3.0.1 or 37.0.8.1; there is no fix for R34 to R36, so move those to 37.x. Restart nginx after upgrading: a configuration reload does not load the new binary.
+
+Does disabling HTTP/2 protect against NGINX2Root?
+
+Partly. Disabling HTTP/2 blocks the two most serious flaws, CVE-2026-123007 and CVE-2026-123633. It does not address CVE-2026-123634 (resolver with mirror), CVE-2026-121810 (HTTP/3 proxying) or CVE-2026-113425 (mail proxy auth_http). On nginx 1.25.1 and later set http2 off; in each server block; on older versions remove http2 from the listen directive. Then reload and confirm from outside that the server no longer negotiates h2.
+
+Is NGINX2Root being exploited?
+
+At the time of writing no exploitation in the wild has been reported. However, Rapid7 has published a proof-of-concept exploit for CVE-2026-123007 on GitHub, and Xint and Wiz both have working exploits they are not releasing. Public exploit code usually brings scanning and attack attempts within days. Beware fake exploits on GitHub: some carry malware, so only test code you have read, in an isolated virtual machine.
+
+How do I check if my nginx server is vulnerable?
+
+Check the version with nginx -v, then whether HTTP/2 is active: look for http2 in your listen directives or an http2 on; directive, and test from outside with openssl s_client -alpn h2 against the host. Also check for resolver with mirror, HTTP/3 proxying and the mail proxy with auth_http, which are affected by the other three CVEs. For distribution packages, appliances and container images, rely on the vendor advisory rather than the version string.
+
+Does a CDN or load balancer in front of nginx protect me?
+
+Cloudflare says origins reachable only through its HTTP proxy are protected while you update, as it terminates HTTP/2 and HTTP/3 at its edge (not for Spectrum, DNS-only records or mail). More generally, only if it terminates HTTP/2, forwards requests to nginx over HTTP/1.1, and direct access to nginx is blocked. Then the HTTP/2 flaws cannot be reached through it, and Rapid7 says its exploit probably fails over proxied HTTP/2. If the front end uses TLS passthrough or speaks HTTP/2 to nginx, nginx is still exposed. nginx is also often the load balancer itself. Patch regardless.
+
+Is NGINX2Root the same as CVE-2026-123007?
+
+CVE-2026-123007 is the headline NGINX2Root flaw, but NGINX2Root covers five nginx CVEs: CVE-2026-123007 (HTTP/2 flow control), CVE-2026-123633 (HTTP/2 use-after-free), CVE-2026-123634 (resolver use-after-free), CVE-2026-121810 (HTTP/3 use-after-free) and CVE-2026-113425 (mail proxy use-after-free), plus a Linux kernel SCTP flaw without a CVE at disclosure. Wiz and Rapid7 refer to the HTTP/2 flaws by CVE number rather than the NGINX2Root name.
+
+What can an attacker do with NGINX2Root?
+
+Each nginx flaw lets an unauthenticated attacker run commands as the nginx worker process. From there they can read application data, credentials and secrets the worker can reach, and talk to internal services. Chained with the Linux SCTP kernel flaw, Xint reached root on the host, including escaping a Docker container.
+
+Am I safe if nginx is only on my internal network?
+
+No. Restricting access limits who can reach nginx but does not remove the flaw. An attacker who already has a foothold inside your network could use it to move laterally. Include internal nginx servers, ingress controllers and reverse proxies in your patching.
+
+Will disabling HTTP/2 break my application?
+
+Most browsers and web clients fall back to HTTP/1.1, possibly with some loss of performance. gRPC needs HTTP/2, so gRPC services behind nginx will stop working if you turn HTTP/2 off. Test before changing production, and patch instead where HTTP/2 is required.
+
+Can a WAF or rate limiting replace patching?
+
+No. Web application firewall rules inspect URLs and request bodies, but the HTTP/2 flaws are triggered by low-level control frames such as WINDOW_UPDATE and RST_STREAM. Use a WAF or connection limits only alongside patching or disabling the affected features.
+
+How do I tell if my nginx server was attacked?
+
+Ordinary access logs do not record the HTTP/2 control frames used in these attacks, so a clean access log proves nothing. Look at the nginx error log for repeated worker crashes, process execution records for nginx workers starting shells or other programs, and network data for long-lived HTTP/2 connections moving unusually large amounts of data. If you confirm compromise, isolate the host, rotate any secrets the worker could read, and rebuild from a trusted image.
+
+Who found NGINX2Root?
+
+Xint, the AI security platform from Theori, found and named NGINX2Root: researchers Soomin Shin, Joohyun Park, Tim Becker and Yves Bieri. The two HTTP/2 flaws were also found independently by Wiz Research, Rapid7 (Stephen Fewer), Metnir and Ikotas Labs.
+
+Does patching nginx close the whole NGINX2Root chain?
+
+It closes the remote entry point. The Linux kernel SCTP flaw that escalates from the nginx worker to root is separate and had no kernel patch at disclosure. Until one ships, Xint suggests blocking the SCTP module from loading with install sctp /bin/false in /etc/modprobe.d/, where SCTP is not built into the kernel and not already loaded.
+
+Related
+
+Java4Shell live blog: the critical OpenJDK RCE disclosed this week [/blog/java4shell-critical-openjdk-rce-vulnerability]
+
+PHP2Shell live blog: the critical PHP RCE from October 2026 [/blog/php2shell-critical-php-rce-vulnerabilities]
+
+Vulnerability management: find and prioritise exposed nginx servers [/services/defensive-security/vulnerability-management]
+
+EdgeProtect attack surface management: see what you expose to the internet [/services/defensive-security/edge-protect-attack-surface-management]
+
+24/7 CREST-accredited SOC: detect exploitation attempts [/services/defensive-security/security-operations-centre]
+
+Incident response: if you think you have been compromised [/services/defensive-security/incident-response]
+
+Need help responding to NGINX2Root?
+
+Precursor's CREST-accredited SOC monitors for active exploitation 24/7. If you need help finding exposed nginx servers, prioritising patching or investigating a suspicious crash, we can help.
+
+Contact Precursor [/contact]Our SOC Service [/services/defensive-security/security-operations-centre]
+
+Take the next step with the evidence.
+
+Research explains the threat. EdgeProtect helps you explore the vulnerability, exploitation and actor context, then relate it to the technology you run.
+
+Explore the Intelligence Library [/intelligence#intelligence-library]Discuss platform guidance [/contact?service=intelligence-platform&source=platform-research&intent=platform-guidance]
+
+EdgeProtect
+
+CVE, EPSS and CISA KEV intelligence
+
+Exploitation telemetry and threat-actor context
+
+Your technology stack and remediation priorities
+
+Platform access and managed service scope are agreed separately.
+
+The closed-loop security firm. Offensive testing, defensive monitoring, and compliance certification from one CREST-accredited team. [/closed-loop-security]
+
+info@precursorsecurity.com [mailto:info@precursorsecurity.com]0113 486 4873 [tel:+441134864873]55 St Paul's Street
+Leeds, LS1 2TE [/locations/leeds-headquarters]
+
+ [https://uk.linkedin.com/company/precursor-security]
+
+Offensive
+
+Penetration Testing [/services/offensive-security/penetration-testing]
+
+Web App Pentest [/services/offensive-security/web-application-penetration-test]
+
+Internal Network Pentest [/services/offensive-security/internal-network-penetration-test]
+
+External Network Pentest [/services/offensive-security/external-network-penetration-test]
+
+Cloud Pentest [/services/offensive-security/cloud-penetration-testing]
+
+Red Team Operations [/services/offensive-security/red-team-operations]
+
+Social Engineering [/services/offensive-security/social-engineering]
+
+Defensive
+
+Managed SOC [/services/defensive-security/security-operations-centre]
+
+MDR [/services/defensive-security/managed-detection-response-mdr]
+
+Threat Hunting [/services/defensive-security/threat-hunting]
+
+Incident Response [/services/defensive-security/incident-response]
+
+Attack Surface Management [/services/defensive-security/edge-protect-attack-surface-management]
+
+Cyber Insurance Readiness [/services/cyber-insurance]
+
+Compliance
+
+Cyber Essentials Plus [/services/compliance/cyber-essentials-plus]
+
+ISO 27001 Consultancy [/services/compliance/iso-27001-consultancy]
+
+GDPR & Data Protection [/services/compliance/gdpr-data-protection-services]
+
+PCI DSS Compliance [/services/compliance/pci-dss-compliance-testing]
+
+UK Cyber Resilience Bill [/services/compliance/uk-cyber-security-resilience-bill-2025]
+
+All Compliance Services [/services/compliance]
+
+Platform & Research
+
+EdgeProtect [/intelligence]
+
+Attack Surface Management [/services/defensive-security/edge-protect-attack-surface-management]
+
+API & MCP [/intelligence/mcp]
+
+Industry Sectors [/sectors]
+
+Research & Insights [/blog]
+
+Cyber Security Glossary [/blog/cyber-security-glossary]
+
+Pen Test Cost Guide [/services/offensive-security/penetration-testing/cost]
+
+Best Pen Test Companies UK [/blog/best-penetration-testing-companies-uk]
+
+Best MDR Providers UK [/blog/best-mdr-providers-uk]
+
+Best Managed SOC Providers UK [/blog/best-managed-soc-providers-uk]
+
+All Comparison Guides [/blog#comparison-guides]
+
+MDR vs SOC Guide [/services/defensive-security/mdr-vs-soc-vs-siem]
+
+Our Accreditations [/accreditations]
+
+Outsourced SOC [/services/defensive-security/soc/outsourced-soc]
+
+Urgent Incident?
+
+24/7 Response
+
+Active breach or ransomware event? Our Incident Response team deploys within hours. Available 24/7/365.
+Contact IR Team [/services/defensive-security/incident-response/emergency-cyber-breach-support]Emergency Hotline: 0113 486 4873 [tel:+441134864873]
+
+The week's threats, in one short email
+
+A free weekly email from the EdgeProtect team: the threats that mattered this week and what to do about them. No spam, unsubscribe any time.
+Sign up to the Brief [https://www.edgeprotect.io/newsletter]
+
+Locations
+
+Leeds HQ [/locations/leeds-headquarters]
+
+Newcastle SOC [/locations/newcastle-soc]
+
+London [/locations/london-office]
+
+Edinburgh [/locations/edinburgh-office]
+
+© 2026 Precursor Security Ltd. All rights reserved.
+
+Privacy Policy [/privacy]Terms of Service [/terms]Sitemap [/sitemap]

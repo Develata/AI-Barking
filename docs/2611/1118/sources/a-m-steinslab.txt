@@ -1,0 +1,218 @@
+躲了十年的漏洞被AI几天挖出，2.25亿网站待修 — 团子技术日报
+
+ 团子技术日报 中文看懂全球开发者趋势 
+ [/] 
+ 首页 [/] 事件 [/events] 消费 [/consumer] 语言 [/lang] 教程 [/tutorials] 存档 [/archive] RSS [/rss.xml] 🔍 🇨🇳🇬🇧 [https://daily.steinslab.io/en/events/2026-11-19-nginx-http2-rce/]🇯🇵 [https://daily.steinslab.io/ja/events/2026-11-19-nginx-http2-rce/]🇰🇷 [https://daily.steinslab.io/ko/events/2026-11-19-nginx-http2-rce/]🇪🇸 [https://daily.steinslab.io/es/events/2026-11-19-nginx-http2-rce/]🇫🇷 [https://daily.steinslab.io/fr/events/2026-11-19-nginx-http2-rce/]🇩🇪 [https://daily.steinslab.io/de/events/2026-11-19-nginx-http2-rce/] 
+
+躲了十年的漏洞被AI几天挖出，2.25亿网站待修
+
+2026年11月19日
+
+ 安全AI 
+
+ 数据源：HN + web research 
+
+在全球超过 2.25 亿个网站的最外侧，几乎都站着同一个极少犯错的门卫。企业花费巨资加固内部系统，程序员用严苛规范编写业务代码。只要门卫在查验访客时倒下，整座大厦的钥匙便全数失守。两枚评分高达 9.2 分的漏洞，打破了这里的宁静。
+
+2026 年 11 月 18 日，网络基础设施巨头 F5 针对开源 Web 服务器软件 nginx 发布了紧急安全修复。黑客无需账号密码，单凭隔空发送特制请求就能执行任意代码。一个潜伏十年的底层缺陷，避开了全球专家的审视，如今被 AI 连根翻出。面对直接击穿服务器的攻击链，留给运维人员的响应时间已从数周缩减至几天。
+
+守卫2.2亿网站，门卫倒下让内层防护全部作废
+
+在现代互联网架构中，nginx 是使用最广泛的 Web 服务器软件。它像大厦传达室的门卫一样立在网络最前沿。它的职责是接收外部网页请求，再分发给后端系统。这次暴露的未授权远程代码执行（RCE）漏洞，让黑客能隔空向公网端口发送特定数据，强行运行恶意程序。
+
+很多团队花费精力防范数据库注入与密码窃取，默认大门处的门卫坚如磐石。实际上，这两个漏洞存在于 nginx 自身的解析逻辑中。业务代码写得再干净，也无法抵挡入口网关的坍塌。哪怕服务器只存放静态图片，不运行任何后台程序，攻击者同样能接管系统。
+
+图：nginx 站在前端收下发请求、按配置转发给后端应用的部署示意。来源：Wiz 研究博客
+
+受影响的设备规模超出了很多人的预期。网络空间测绘平台 Shodan 在 2026 年 11 月 10 日统计，公网带有 nginx 标识的主机多达 5670 万台。在能识别具体版本的 1194 万台主机中，高达 98.9% 落在受影响区间内。基础组件一旦失手，下游所有的业务防御都失去了依托。
+
+十年前埋入算术错误，躲过人眼却被AI批量翻出
+
+代号 CVE-2026-123007 的漏洞影响深远。它的根源是一个基础算术错误，即整数下溢。在处理传输加速协议 HTTP/2 的窗口代码中，数值减到小于零后，被系统误当成了巨大的正数。这让程序误以为发送窗口空间无限，进而引发越界内存拷贝。
+
+这个漏洞潜伏的跨度令人震惊。从 2015 年发布的 1.9.5 版本，到 2026 年的 1.31.8 版本，整整十年间的所有官方版本全部中招。甚至连 2026 年 11 月 10 日的代码主干也没能幸免。同期披露的 CVE-2026-123633 漏洞，则是 HTTP/2 连接中内存释放后仍在读取的错误。
+
+底层 C 语言代码逻辑错综复杂，人工查验几十万行代码需要承受巨大的认知负荷。人类的精力和注意力极限，长期成为阻止漏洞过快曝光的天然屏障。安全机构 Wiz Research 利用自研的 Atlas 代码扫描工具，迅速锁定了这两处隐秘路径。他们借助商业大模型，顺利完成了漏洞验证。
+
+另一家团队 Xint 的战果更为迅猛。研究人员手工找到一处漏洞后启动全自动 AI 扫描流程，在无人干预的情况下连环挖出另外四条严重漏洞。同批修复还涵盖针对 HTTP/3 代理与 DNS 解析模块的数条 9.2 分漏洞。正如 Wiz 团队所言，复杂度曾是现实屏障，如今 AI 正在溶解它，海量代码再也无法阻挡机器的穿透。
+
+连环攻破六个关卡，攻击者从公网直取宿主机根权限
+
+面对单点漏洞，部分技术团队仍心存侥幸。许多人觉得只要把应用装进 Docker 容器，物理服务器就很安全。安全团队 Xint 公开的名为 nginx2root 的攻击链演示，打破了这一设想。他们把五条 nginx 解析漏洞与一条 Linux 内核提权漏洞串联了起来。
+
+在真实网络环境中，攻击者通过公网 IP 发送特制数据包。程序先利用 CVE-2026-123007 攻破 nginx 入口，在容器内以普通工作进程身份执行任意代码。紧接着，攻击程序在容器内触发 Linux 内核协议缺陷，冲破沙箱隔离壁垒。攻击者由此直接夺取了物理宿主机的最高管理员 root 权限。
+
+图：攻击者利用 nginx 执行代码后，它背后的应用与数据一并暴露的示意。来源：Wiz 研究博客
+
+现代操作系统常配有地址空间随机化（ASLR）等防护，试图打乱内存地址阻止攻击定位。但在本次利用中，攻击者先利用越界特性读取内部信息，反向算出内存布局。常规保护手段因此失去效用。由单点失守演变为全面沦陷只需几秒，常规的纵深防御在组合漏洞面前出现了断层。
+
+关掉协议挡不住隐患，系统版本号还会制造虚假安全感
+
+升级到官方修复的 nginx 1.31.9 版本是最干净的手段，但在庞大的生产线上停机更新困难重重。有工程师试图在配置文件中关闭 HTTP/2 协议来临时避险。这一措施确实能化解前述两枚漏洞，却对同批公开的 DNS 解析漏洞与邮件代理漏洞无能为力。
+
+业务依赖同样让临时处置进退两难。在现代微服务系统中，大量后台接口运行着远程过程调用协议 gRPC，底层强行绑定 HTTP/2 传输。该协议没有任何平滑降级选项。一旦强行切断传输，整条业务通信链路便会当场中断。
+
+即便运维团队着手比对版本，操作系统层面的回移植机制也会带来严重干扰。主流 Linux 发行版普遍采用补丁回移植做法，把安全补丁单独合入老版本代码，不会提升主版本号。例如在 Ubuntu 22.04 中，软件包即使多次打了安全补丁，终端查询显示依然是 1.18.0。
+
+这种机制造成了现场排查的认知混乱。不了解机制的人容易被表面版本号误导，误判系统处于未修复状态。确认安全状态必须核对系统包管理器的完整发布编号。协议依赖让服务难以及时关停，版本标识模糊了实际隐患，现场应急落地的复杂度远超预期。
+
+补丁代码提前进库，防守方处置窗口从一个月压到几天
+
+除开漏洞本身的技术风险，事件展现出更深层的防御时间危机。梳理披露时间线可以发现，相关团队在 10 月 21 日提交首批报告。修复代码在公开披露前一周已进入仓库。提交记录中甚至明确标注了漏洞报告团队的名称。
+
+在开源体系中，代码修改向来是公开透明的。但在 AI 工具全面普及的当下，自动化工具能以分钟级频率抓取仓库更新并交由大模型逆向解析。AI 能够迅速判断补丁到底修改了哪处逻辑缺陷，并反推武器化攻击脚本。
+
+过去安全团队享有一段舒适的应对窗口。官方通告发布后，往往需要数月才会出现武器化利用。如今这段缓冲期被压缩殆尽。补丁进入公开仓库之时，攻防对抗的计时便已同步开启。
+
+攻击方借助 AI 几天内就能重构利用，防御方却受制于测试流程。十年老漏洞的集中爆发表明，依赖人眼盲区的被动安全期已经告终。AI 抹平了漏洞挖掘门槛，补丁公开几乎等同于攻击就绪。能否在几天内跑完从排查到加固的流程，将决定无数数字大门的安危。
+
+参考链接：
+
+Wiz 研究博客
+
+Xint 博客
+
+Netcraft 2026 年 9 月 Web 服务器调查
+
+Hacker News 讨论
+
+ 参考来源（3） 
+
+https://www.wiz.io/blog/nginx-http2-rce-vulnerabilities [https://www.wiz.io/blog/nginx-http2-rce-vulnerabilities]
+
+https://xint.io/blog/nginx2root-remote-code-execution [https://xint.io/blog/nginx2root-remote-code-execution]
+
+https://www.netcraft.com/blog/september-2026-web-server-survey [https://www.netcraft.com/blog/september-2026-web-server-survey]
+
+ 阿里云 AI 开发 Token Plan：主流旗舰模型一网打尽 全模型通用节省计划直省 55%，多 Agent 并行协作不降速。 领取额度 → [/go/aliyun-ai]
+
+ 阿里云 AI Agent ¥38/年，部署你的第一个 AI Agent 最新代 ECS + AI 应用组合，一人公司的创业底座。 抢新客价 → [/go/aliyun-office]
+
+ 阿里云 AI Agent 开服 68 元/年起，分钟级开服 Hermes / OpenClaw 官方镜像一键部署，不写代码，7×24 在线，支持海外地域。 一键开服 → [/go/aliyun-selfhost]
+
+ 阿里云 组合购 云+AI 组合购，一次配齐再打折 服务器、大模型、存储打包价，覆盖 90% 业务场景。 去看组合 → [/go/aliyun-devtools]
+
+ 阿里云 新客福利 云小站 8 折起，120+ 款产品折上折 轻量服务器 2核2G、大模型 API，新客首购特惠进行中。 领取福利 → [/go/aliyun-vps]
+
+ 阿里云 新客福利 云小站 8 折起，120+ 款产品折上折 轻量服务器 2核2G、大模型 API，新客首购特惠进行中。 领取福利 → [/go/aliyun-default]
+
+ 腾讯云 办公效率 WorkBuddy：AI 办公工作台 全场景办公套件，团队旗舰版低至 198 元/月。 限时特惠 → [/go/tencent-office]
+
+ 腾讯云 自建站 轻量 4 核 4G，新客首年 79 元 Lighthouse 一键部署：OpenClaw 开服、建站、私有服务都顺手。 抢新客价 → [/go/tencent-selfhost]
+
+ 腾讯云 开发者工具 云服务器、COS、CDN 特惠热卖 开发者的基础设施全家桶，新客首单优惠进行中。 去看看 → [/go/tencent-devtools]
+
+ 腾讯云 新客福利 腾讯云新客礼包 云服务器、数据库、对象存储 COS、CDN 首单特惠。 领取福利 → [/go/tencent-vps]
+
+ 腾讯云 新客福利 腾讯云新客礼包 云服务器、数据库、对象存储 COS、CDN 首单特惠。 领取福利 → [/go/tencent-default]
+
+ RackNerd 百元年付 RackNerd：年付约 ¥158 的入门 VPS 1G 内存 + 3TB 月流量，学 Linux、跑 Docker 的第一台海外机，支持支付宝。 去看看 → [/go/racknerd-ai]
+
+ RackNerd 百元年付 RackNerd：年付约 ¥158 的入门 VPS 1G 内存 + 3TB 月流量，学 Linux、跑 Docker 的第一台海外机，支持支付宝。 去看看 → [/go/racknerd-office]
+
+ RackNerd 自建练手 年付约 ¥158，跑通第一个自托管服务 3TB 大流量，挂 Bot、跑定时任务不心疼，工单响应快。 去看看 → [/go/racknerd-selfhost]
+
+ RackNerd 百元年付 RackNerd：年付约 ¥158 的入门 VPS 1G 内存 + 3TB 月流量，学 Linux、跑 Docker 的第一台海外机，支持支付宝。 去看看 → [/go/racknerd-devtools]
+
+ RackNerd 海外 VPS RackNerd：百元档年付老牌商家 多机房可选、续费同价，练手与轻量自托管两相宜。 去看看 → [/go/racknerd-vps]
+
+ RackNerd 百元年付 RackNerd：年付约 ¥158 的入门 VPS 1G 内存 + 3TB 月流量，学 Linux、跑 Docker 的第一台海外机，支持支付宝。 去看看 → [/go/racknerd-default]
+
+ 搬瓦工 老牌标杆 搬瓦工：运营超 12 年的老牌 VPS 多机房一键切换 + 免费快照备份，长期建站省心。 去看看 → [/go/bandwagon-ai]
+
+ 搬瓦工 老牌标杆 搬瓦工：运营超 12 年的老牌 VPS 多机房一键切换 + 免费快照备份，长期建站省心。 去看看 → [/go/bandwagon-office]
+
+ 搬瓦工 建站省心 搬瓦工经典建站款：3核 2G + 免费快照 升级前一键回滚，个人博客与长期小服务的稳妥选择。 去看看 → [/go/bandwagon-selfhost]
+
+ 搬瓦工 老牌标杆 搬瓦工：运营超 12 年的老牌 VPS 多机房一键切换 + 免费快照备份，长期建站省心。 去看看 → [/go/bandwagon-devtools]
+
+ 搬瓦工 CN2 GIA 搬瓦工 GIA-E：多机房一键切换 美西 CN2 GIA 与日本软银之间免费切换，2.5Gbps 大端口。 去看看 → [/go/bandwagon-vps]
+
+ 搬瓦工 老牌标杆 搬瓦工：运营超 12 年的老牌 VPS 多机房一键切换 + 免费快照备份，长期建站省心。 去看看 → [/go/bandwagon-default]
+
+ HostDare 平价优化线 HostDare：平价 CN2 GIA 入门款 晚高峰直连稳定的平价选择，NVMe 固态 + 支付宝。 去看看 → [/go/hostdare-ai]
+
+ HostDare 平价优化线 HostDare：平价 CN2 GIA 入门款 晚高峰直连稳定的平价选择，NVMe 固态 + 支付宝。 去看看 → [/go/hostdare-office]
+
+ HostDare 国内直连 2核 2G + 优化线路：面向国内访客建站 不套 CDN 也有不错的国内访问速度，支持季付试错。 去看看 → [/go/hostdare-selfhost]
+
+ HostDare 平价优化线 HostDare：平价 CN2 GIA 入门款 晚高峰直连稳定的平价选择，NVMe 固态 + 支付宝。 去看看 → [/go/hostdare-devtools]
+
+ HostDare GIA / 日本 HostDare：美西 GIA 与日本 IIJ/软银 线路选择多，价格门槛在同档位里偏低。 去看看 → [/go/hostdare-vps]
+
+ HostDare 平价优化线 HostDare：平价 CN2 GIA 入门款 晚高峰直连稳定的平价选择，NVMe 固态 + 支付宝。 去看看 → [/go/hostdare-default]
+
+ VMiss 亚太月付 VMiss：香港/日本月付 VPS 加元计费汇率友好，按月付试错成本低，支持支付宝。 去看看 → [/go/vmiss-ai]
+
+ VMiss 亚太月付 VMiss：香港/日本月付 VPS 加元计费汇率友好，按月付试错成本低，支持支付宝。 去看看 → [/go/vmiss-office]
+
+ VMiss 低延迟 日本大阪 IIJ：2G 内存月付 亚太延迟低，SSH 操作跟手，适合日区业务与日常办公。 去看看 → [/go/vmiss-selfhost]
+
+ VMiss 亚太月付 VMiss：香港/日本月付 VPS 加元计费汇率友好，按月付试错成本低，支持支付宝。 去看看 → [/go/vmiss-devtools]
+
+ VMiss 香港/日本 VMiss：亚太优化线路专精 香港年付约 ¥155 起，移动直连常有惊喜。 去看看 → [/go/vmiss-vps]
+
+ VMiss 亚太月付 VMiss：香港/日本月付 VPS 加元计费汇率友好，按月付试错成本低，支持支付宝。 去看看 → [/go/vmiss-default]
+
+ DMIT 高端线路 DMIT：对稳定性有硬要求时看它 大厂品控 + 高端线路调优，主力生产机的天花板。 去看看 → [/go/dmit-ai]
+
+ DMIT 高端线路 DMIT：对稳定性有硬要求时看它 大厂品控 + 高端线路调优，主力生产机的天花板。 去看看 → [/go/dmit-office]
+
+ DMIT 生产主力 DMIT 香港：低延迟 + 大厂运维 月付可随时上下车，适合对在线率敏感的业务。 去看看 → [/go/dmit-selfhost]
+
+ DMIT 高端线路 DMIT：对稳定性有硬要求时看它 大厂品控 + 高端线路调优，主力生产机的天花板。 去看看 → [/go/dmit-devtools]
+
+ DMIT 香港/日本/美西 DMIT：高端线路 VPS 香港年付约 ¥266 起，硬件与稳定性远超小作坊。 去看看 → [/go/dmit-vps]
+
+ DMIT 高端线路 DMIT：对稳定性有硬要求时看它 大厂品控 + 高端线路调优，主力生产机的天花板。 去看看 → [/go/dmit-default]
+
+ CloudCone 超低价 CloudCone：年付约 ¥103 的大硬盘 VPS 55G 存储 + 4TB 月流量，做备份仓库和探针正合适。 去看看 → [/go/cloudcone-ai]
+
+ CloudCone 超低价 CloudCone：年付约 ¥103 的大硬盘 VPS 55G 存储 + 4TB 月流量，做备份仓库和探针正合适。 去看看 → [/go/cloudcone-office]
+
+ CloudCone 私有网盘 110G 大硬盘年付约 ¥156 Nextcloud、图床、异地备份的单位存储成本极低。 去看看 → [/go/cloudcone-selfhost]
+
+ CloudCone 超低价 CloudCone：年付约 ¥103 的大硬盘 VPS 55G 存储 + 4TB 月流量，做备份仓库和探针正合适。 去看看 → [/go/cloudcone-devtools]
+
+ CloudCone 按小时计费 CloudCone：弹性按小时计费 VPS 随开随删，测试与临时任务的成本压到最低。 去看看 → [/go/cloudcone-vps]
+
+ CloudCone 超低价 CloudCone：年付约 ¥103 的大硬盘 VPS 55G 存储 + 4TB 月流量，做备份仓库和探针正合适。 去看看 → [/go/cloudcone-default]
+
+相关阅读
+
+ 深度 2026年8月12日 
+AI 的思考过程被偷走了，只需两次请求
+
+ AI安全 
+
+ [/events/2026-08-12-stealing-llm-reasoning-traces/] 
+
+ 深度 2026年7月25日 
+27分钟攻破Redis：Kimi K3证明AI自主挖洞已跨过实用门槛
+
+ 安全AI 
+
+ [/events/2026-07-25-kimi-k3-redis-exploit/] 
+
+ 深度 2026年11月9日 
+高盛收回交易员AI权限：写代码工具撞上信息隔离墙
+
+ AI金融 
+
+ [/events/2026-11-09-goldman-agent-rollback/] 
+
+ ← 上一篇 一天罚1000欧: 法国为封盗版逼走瑞士安全服务 [/events/2026-11-19-quad9-quits-france/] 
+
+ 下一篇 → 微软连发7款新模型，把价格打到对手2% [/events/2026-11-19-microsoft-mai-price-war/] 
+
+团子技术日报 · 每日中文科技趋势简报
+
+ 数据源：
+Hacker News [https://news.ycombinator.com] +
+Lobsters [https://lobste.rs] 
+
+ 存档 [/archive] · RSS [/rss.xml] · 资源 [/resources] 
+
+ 站内搜索 × 
+
+ [#] ×
