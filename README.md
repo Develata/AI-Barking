@@ -67,6 +67,7 @@ AI 吠点是由 **[Develata](https://github.com/Develata)** 主理的独立内�
 | 2026 / 1115 | [千问省六成？腾讯便宜20倍？](docs/2611/1115/doc_1115_publish.txt) | [配图说明](docs/2611/1115/images/README.md) | [来源入口](docs/2611/1115/sources/README.md) |
 | 2026 / 1116 | [Win11记你用啥AI？Siri每天限量](docs/2611/1116/doc_1116_publish.txt) | [配图说明](docs/2611/1116/images/README.md) | [来源入口](docs/2611/1116/sources/README.md) |
 | 2026 / 1117 | [AI没做成也不说？新GPT测试中22%](docs/2611/1117/doc_1117_publish.txt) | [配图说明](docs/2611/1117/images/README.md) | [来源入口](docs/2611/1117/sources/README.md) |
+| 2026 / 1118 | [AI挖出11年老漏洞，有条件才中招](docs/2611/1118/doc_1118_publish.txt) | [配图说明](docs/2611/1118/images/README.md) | [来源入口](docs/2611/1118/sources/README.md) |
 
 正文采用可直接复制的纯文本，图片单独保存。阅读或发布时不需要依赖 Markdown 插图。
 
