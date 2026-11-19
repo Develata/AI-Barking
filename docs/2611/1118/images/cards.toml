@@ -1,0 +1,149 @@
+# 1118 期卡片。规则见 EDITORIAL.md“省流卡与批注截图”“速览”；字段见 templates/cards/example.toml。
+
+date = "11月19日"
+
+[[tldr]]
+tag = "NGINX"
+fact = "NGINX 修了两个要开 HTTP/2 等条件才能利用的漏洞，Wiz 称用 AI 找到"
+
+[[tldr]]
+tag = "谷歌"
+fact = "谷歌称 Gemini-4-Neon 比 Carbon 便宜；AA 的比价按 Carbon 原价，而它正打五折。"
+
+[[roundup]]
+tag = "NGINX"
+main = true
+text = "AI 挖出老漏洞，中招有前提"
+
+[[roundup]]
+tag = "谷歌"
+main = true
+text = "新模型称更省，测评按原价比"
+
+[[roundup]]
+tag = "Anthropic"
+text = "Anthropic IPO 定价每股83美元，发售9.8亿股，含老股东出售部分"
+
+[[roundup]]
+tag = "谷歌"
+text = "谷歌 Genie 4 向符合条件的 Ultra 订阅用户开放，Pro 用户可排队"
+
+[[roundup]]
+tag = "DeepSeek"
+text = "DeepSeek：调用模型时触发的服务端搜索，11月18日12时起不再按次收费"
+
+[[roundup]]
+tag = "安全"
+text = "研究者称接管了语音模型 Kokoro 的发布账号，在本地改过权重但未上传"
+
+[[roundup]]
+tag = "OpenAI"
+text = "OpenAI 自报：估计人做2–4小时的内部研发任务，无人干预估计成功率达46%"
+
+[[event]]
+tag = "NGINX"
+paras = [
+  "开源网站服务器软件 NGINX 11月18日修了两个漏洞：都要开着 HTTP/2（一种网页传输协议），其中一个还要转发请求且连接数吃紧；内存随机化防护关闭或被绕过时，未登录者可在服务器上执行代码。安全公司 Wiz 称用 AI 工具找到，其中一个2015年就在；另有四个团队也独立发现。",
+  "对你：受影响的是网站服务器，开源版 NGINX 升到1.30.7或1.31.9及以上（1.31.8仍有漏洞）并重启；暂时升不了，Wiz 等建议先关 HTTP/2。",
+]
+
+[[event]]
+tag = "谷歌"
+paras = [
+  "谷歌发布 Gemini-4-Neon，称默认档每任务成本比 Carbon 低32%；评测机构 AA 测得 Neon 最高档每任务6.44美元，比 Carbon（high 档，原价7.76美元）便宜约17%。API 标准价每百万 token 输入、输出：Neon 收3、15美元；Carbon 原价4、20美元，半价促销到11月30日。",
+  "对你：Neon 免费层不能用；截至11月30日，Carbon 每 token 单价比 Neon 低三分之一。",
+]
+
+[[bark]]
+tag = "NGINX"
+points = [
+  "“超过2.25亿网站”是使用量；Censys 按版本和 HTTP/2 数，一个漏洞暴露约882万个服务，另约1亿个看不出版本。",
+  "有中文稿写“从公网直取宿主机根权限”；漏洞本身只到 NGINX 进程权限，Xint 另串了一个截至19日无补丁的 Linux 内核漏洞才拿到。",
+]
+
+[[bark]]
+tag = "谷歌"
+points = [
+  "谷歌的32%没写按哪个价。AA 按原价测，同为 high 档 Neon 3.74美元、Carbon 7.76美元；按现在半价、同样用量折算，Carbon 约3.88美元，与 Neon 相近，比 Neon 最高档6.44美元便宜约四成（本号推算）。",
+  "36氪等写的“成本只有 Carbon 的60%”，出自 Glean 公司的早期评估，谷歌博客只是引用。",
+]
+
+# ---- 主帖 1：NGINX ----
+[[annot]]
+out = "nginx-wiz"
+post = 1
+title = "Wiz 博客 · NGINX 漏洞摘要"
+source = "wiz.io 原文截图（2026-11-19 存档）"
+lang = "eng"
+
+[[annot.note]]
+rects = [[125, 14, 1090, 54], [125, 78, 1180, 54]]
+gloss = "Wiz Research、Ikotas Labs、Metnir、Rapid7 和 Xint 独立发现了 NGINX 的两个严重远程代码执行漏洞。"
+
+[[annot.note]]
+quote = "it powers more than 225 million websites."
+gloss = "它为超过 2.25 亿个网站提供服务。"
+
+[[annot.note]]
+quote = "Both vulnerabilities require HTTP/2 to be enabled on the affected NGINX server."
+gloss = "两个漏洞都要求受影响的 NGINX 服务器开启了 HTTP/2。"
+
+[[annot]]
+out = "censys-exposed"
+post = 1
+title = "Censys 追踪看板 · CVE-2026-123007"
+source = "censys.com 原文截图（2026-11-19 存档）"
+lang = "eng"
+
+[[annot.note]]
+rects = [[592, 285, 470, 255]]
+gloss = "当前暴露：8,817,296 个 nginx 服务处于受影响版本且开着 HTTP/2（按最近一次扫描）。"
+
+[[annot]]
+out = "f5-aslr"
+post = 1
+title = "F5 安全公告 K000163926"
+source = "my.f5.com 原文截图（2026-11-19 存档）"
+lang = "eng"
+
+[[annot.note]]
+quote = "Additionally, attackers can execute code on systems with Address Space Layout Randomization (ASLR) disabled or when the attacker can bypass ASLR."
+gloss = "此外，在关闭了地址空间布局随机化（ASLR）的系统上，或攻击者能绕过 ASLR 时，可以执行代码。"
+underline = "disabled or when the attacker can bypass ASLR"
+emph = "关闭了地址空间布局随机化（ASLR）的系统上，或攻击者能绕过"
+
+# ---- 主帖 2：谷歌 ----
+[[annot]]
+out = "google-32pct"
+post = 2
+title = "谷歌博客 · Gemini 4 Neon"
+source = "blog.google 原文截图（2026-11-19 存档）"
+lang = "eng"
+
+[[annot.note]]
+quote = "At its default high thinking level, it pairs a high Artificial Analysis Intelligence Index score with a 32% lower cost per task than Carbon."
+gloss = "在默认的 high 思考档，它在 AA 智能指数上得分高，每任务成本比 Carbon 低 32%。"
+
+[[annot]]
+out = "aa-17pct"
+post = 2
+title = "Artificial Analysis 测评 · 要点"
+source = "artificialanalysis.ai 原文截图（2026-11-19 存档）"
+lang = "eng"
+
+[[annot.note]]
+quote = "It costs $6.44 per task, ~17% less than Carbon ($7.76 at non-discounted pricing),"
+gloss = "Neon（xhigh 档）每任务 6.44 美元，比 Carbon（high 档）便宜约 17%；Carbon 的 7.76 美元按非折扣价。"
+underline = "at non-discounted pricing"
+emph = "按非折扣价"
+
+[[annot]]
+out = "glean-60pct"
+post = 2
+title = "谷歌博客 · Glean 产品负责人引语"
+source = "blog.google 原文截图（2026-11-19 存档）"
+lang = "eng"
+
+[[annot.note]]
+quote = "In our early evaluations, it matched or exceeded Gemini 4 Carbon on overall quality at 3x the speed and 60% of the cost."
+gloss = "在我们的早期评估中，它整体质量追平或超过 Gemini 4 Carbon，速度 3 倍、成本为其 60%。"
