@@ -73,11 +73,6 @@
 
 | 期次 | 标签 | 事实 |
 |---|---|---|
-| 1116 | AMD | AMD 称已完成收购 World Labs，李飞飞任 AMD 首席科学家 |
-| 1116 | Hugging Face | HF 托管推理的语言模型改走 OpenRouter，不能再用自带供应商密钥 |
-| 1116 | Databricks | Databricks 编码自测：两模型成功率同为89.1%，按标价成本差约32倍 |
-| 1116 | Mem | 笔记应用 Mem 宣布2027年1月15日关停，12月18日起笔记只读 |
-| 1116 | 加州 | 加州总检察长起诉 OpenAI，指其测试 AI 防护不足，称至少80起网络事件 |
 | 1117 | Gemini | 谷歌称 Gemini 免费版 Tasks 在美日韩等6国逐步推出，高级功能先美国 |
 | 1117 | 谷歌 | Google Wallet 上线美国 iOS，iOS 上暂不支持碰一碰支付 |
 | 1117 | 评测 | Runta 自家评测22种智能体配置：按标价，64.5%的成本花在没通过的尝试上 |
@@ -89,6 +84,11 @@
 | 1118 | DeepSeek | DeepSeek：调用模型时触发的服务端搜索，11月18日12时起不再按次收费 |
 | 1118 | 安全 | 研究者称接管了语音模型 Kokoro 的发布账号，在本地改过权重但未上传 |
 | 1118 | OpenAI | OpenAI 自报：估计人做2–4小时的内部研发任务，无人干预估计成功率达46% |
+| 1119 | 芯片 | 美众院：截至5月11日，对华 H200、MI325X 获批约88万颗，均未出货 |
+| 1119 | Anthropic | Anthropic 招股书：创始人捐出个人股权80%的承诺自愿、可撤销 |
+| 1119 | Claude | Anthropic：Claude 解的黑洞一题，证明一半沿用 OpenAI 思路 |
+| 1119 | 法律 | 美法官：若如原告所称仅凭 AI 人脸比对申请逮捕，警探暂不获豁免 |
+| 1119 | DeepMind | 英国 DeepMind 员工工会称谷歌拒绝自愿承认，已申请法定承认 |
 
 ## 已发过
 
@@ -150,3 +150,4 @@
 | 1116 | Win11记你用啥AI？Siri每天限量：研究者 Xusheng Li 博文（页脚日期11/16，HN 北京11/17 620+分）称借助 AI 翻查 Win11 系统文件，发现诊断组件 MissionControlAggregator 按程序名认出 Codex、Claude、Copilot、Cursor 等编码代理，cmd.exe 改名 codex.exe 即被记为用过 Codex，报告进可选诊断数据上传队列；美国区域干净安装时可选诊断默认开；吠点：博文只介绍一台测试机（Parallels ARM64 VM，功能作为服务端实验已开、非手动），只证到上传队列、未证实数据离开机器，“似乎”只记出没出现过；原文“公开 ISO 基线虚拟机里该功能默认关、证据不支持每台都开”一段北京11/17 19:40前后被删、页面未注明（Wayback 07:00 快照仍有）。苹果 11/16 改版 Apple Support 127901：Siri AI、修图等服务器模型功能每日限额，免费与50GB 为基础额度、200GB 最多2倍、12TB 最多20倍，27.3起提供，加量部分同账号设备与家人先到先得；Siri AI 不支持中国大陆账号，部分 Apple 智能功能加量在中国不提供；吠点：不公布基础次数，50GB 付费（国内¥6/月）不加量，6/8 新闻稿已写每日限额与 iCloud+ 加量、新的只是倍数表。 |
 | 1117 | AI没做成也不说？新GPT测试中22%：OpenAI GPT-6.2-Astra/Sol 系统卡（Published 11/17）的 Blocker Deception 设障测试（删掉要改的文件等）里，GPT-6.2-Astra 有22.28%最终回复没提或说错障碍，GPT-6-Astra 11.09%（Sol 24.08%），OpenAI 写“concerned by this regression”、猜测与“让回答简洁、少加 caveats”有关；吠点：题目为诱发而设、原文写不一定反映真实使用；Codex 里加指令后 Astra 降到8.04%，但该指令不作用于直接 API 请求；ChatGPT 里只进 Work 和 Codex，免费版不在名单。微软 MAI-Code-2（Ignite，北京11/18 02:15）称四项编程测试平均通过率为 GPT-6.1-Sol 的98%、成本40%（每任务 $0.309 对 $0.761）；吠点：Ignite 总览页与苏莱曼写“40% of the price”不提促销，博客脚注才写按50%促销价（GitHub 价目 $0.50/$2.50 至2027-05-17，之后 $1/$5）；“98%”是63.2%对64.1%，MAI 更低的三项正是微软 MSBench 自跑的三项。WorkBuddy“GPT-6.2 长请求比上代还贵”不成立（旧 GPT-6-Astra 同样有 272K 整单加价） |
 | 1118 | AI挖出11年老漏洞，有条件才中招：【NGINX】11/18 发 1.30.7、1.31.9 修两个 HTTP/2 远程代码执行漏洞（CVE-2026-123007、CVE-2026-123633；nginx.org 评级 major、medium，F5 CVSS 3.1 8.1、4.0 9.2）；Wiz 称用自家 AI 扫描工具 Atlas 发现、Gemini-4-Carbon 与 GPT-5.6-Sol 验证，123007 自 1.9.5（2015）就在，称另有 Ikotas、Metnir、Rapid7、Xint 独立发现（F5 致谢逐 CVE 各四方、名单不同；Rapid7 写明研究员发现、无 AI）；前提：都要开 HTTP/2，123633 另需转发请求且 worker 连接数吃紧，ASLR 关闭或被绕过时才能执行代码；吠点：“2.25亿网站”是 Netcraft 使用量，Censys 看板（只追踪 123007）暴露约882万个服务、另约1亿个不显示版本；团子技术日报“从公网直取宿主机根权限”，漏洞本身只到 worker 权限，Xint 另串了一个尚无补丁的 Linux SCTP 内核漏洞才拿到 root；1.31.8 仍受影响、1.30.7 不受影响；CERT-EU、Censys 称未见在野利用。【Gemini-4-Neon】谷歌称默认 high 档每任务比 Carbon 低32%（未写口径）；AA 测得 Neon xhigh $6.44、比 Carbon high（标准价）$7.76 低约17%；Neon $3/$15，Carbon 原价 $4/$20、半价促销 $2/$10 至 11/30，Neon 免费层不可用；吠点：同为 high 档按原价 Neon $3.74、Carbon $7.76，按促销半价折算 Carbon 约 $3.88 与 Neon 相近、比 Neon xhigh 便宜约四成（本号推算）；36氪等“成本只有 Carbon 的60%”出自谷歌博客里 Glean 产品负责人的早期评估 |
+| 1119 | 公司称AI设计CPU能效4.59倍，没造：Architect Labs 博客（11/18）称 AI 智能体从指令集做到版图设计出 CPU 架构 Frostbite，拿四个计算单元（quad+L3，0.792 mm²）比面积相近的一颗双发射顺序执行核（0.895 mm²，型号“因法律原因”不公开），25个自选小程序每瓦性能几何平均4.59倍；吠点：调优用的10个6.02倍、没调过的15个3.83倍（其中5个后加），只到7 nm 最终 GDS、功耗为流片前估算，跟乱序大核与多核比“未来几个月”才做，Notebookcheck 标题“AMD and Intel, move over”（对手可能就是这两家的产品，不能写“没比过”）。Signal（11/20 博文）在 iOS 27 上禁应用内截屏挡 Siri AI，Android 检测到 AI 助手读屏才开“屏幕安全”（设置页写 some AI assistants），据路透默认开启、可在设置-隐私关掉；吠点：The Verge 标题“blocking Gemini and Siri AI from reading your screen”，Signal 自称只拦截屏，读手机已存文件拦不住，macOS 目前做不到；苹果称中国大陆没有 Siri AI。Contra 设计榜（盲选网站设计，17行）：HN 帖称“两个隐身模型都在 Fable 5.2 前面”，实为只有 Gestalt（1931）一个隐身模型，第二是 Contra 请设计师做的参考作品（1739），Fable 5.2 第三（1713）；吠点：据 Contra，Gestalt 胜参考作品是28次二选一选它20次，评分细则 Gestalt 83 低于 Fable 5.2 的84，参考稿经 Contra 反馈修改、方法页没写模型提示词 |
