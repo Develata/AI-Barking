@@ -37,7 +37,7 @@
 | 顺序 | 文件 | 对应正文 | 图注与来源 |
 |---|---|---|---|
 | 1 | publish/01-tldr.png | 省流 | 三条，逐字取自正文省流 |
-| 2 | publish/02-roundup.png | 今日速览 | 三条主帖小标题＋对华 H200、MI325X 许可、Anthropic 创始人捐赠承诺可撤销、Claude 黑洞一题证明一半沿用 OpenAI 思路（跟进1109）、Osorio 案、DeepMind 员工工会，共 8 条（Gemini Mac 版第 2 轮反向核验后删去） |
+| 2 | publish/02-roundup.png | 今日速览 | 三条主帖小标题＋对华 H200、MI325X 许可、Anthropic 员工称与 Claude 证明黎曼猜想（北京 11-21 补入）、Anthropic 创始人捐赠承诺可撤销、Claude 黑洞一题证明一半沿用 OpenAI 思路（跟进1109）、Osorio 案、DeepMind 员工工会，共 9 条（Gemini Mac 版第 2 轮反向核验后删去） |
 | 3 | publish/03-event-1.png | 第一条事实段 | 事件卡（芯片），逐字取自正文事实段（含“对你”句）；公众号不插 |
 | 4 | publish/04-bark-1.png | 第一条吠点 | 吠点卡（芯片），逐字取自正文吠点段；公众号不插 |
 | 5 | publish/05-frostbite-tcpu.png | 第一条事实段、吠点①② | 博客 Results 段与 Notes 脚注，批注四核簇对单核（双发射、顺序执行）、6.02/3.83、“因法律原因不透露具体 CPU”；来源 architectlabs.com 原文截图（2026-11-20 存档） |

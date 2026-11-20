@@ -26,6 +26,7 @@
 ## 速览
 
 - 对华芯片许可：[众院外委会通稿](https://foreignaffairs.house.gov/news/press-releases/chairman-brian-mast-exercises-legislative-authority-to-publicly-release-ai-chip-license-information-for-china)（北京 11-20 03:18）与通稿内嵌的两份 ECRA 披露件（Scribd；截至 2026-05-11 申请 3,444,160 颗、批准 879,868 颗、21 份许可，附表 21 行均 “Approved, not shipped”）、[CNBC](https://www.cnbc.com/2026/11/19/nvidia-amd-china-chip-sales-congress.html)。风控：标题、封面不碰。
+- 黎曼猜想声明（北京 11-21 00:40 Develata 要求补入速览）：[Levent Alpöge 的 remark.pdf](https://alpo.ge/remark.pdf)（个人网站，PDF 创建于北京 11-20 20:52）与 Lean 分卷 part01–part14（未下载全文、未编译）；[Scientific American](https://www.scientificamerican.com/article/anthropic-mathematician-claims-to-prove-riemann-hypothesis-most-famous-problem-in-all-of-math/)；HN 50574968 1072 分 / 695 评。线索来自 Develata 贴来的 ChatGPT 回答，其中 Reddit“解压约 1.3 GB”、“有人尝试复现”未核。
 - Anthropic 424B4（EDGAR，申报日 11-19）“voluntary, revocable … not legally binding”；[TechCrunch](https://techcrunch.com/2026/11/19/anthropics-7-founders-cashed-out-nearly-2b-in-record-breaking-ipo/) 称创始人售股约 19.5 亿美元（未上卡）。
 - 【跟进1109】[Anthropic 研究页](https://www.anthropic.com/research/claude-black-hole-physics)（11-17）：22 个候选、一题上界证明的一半沿用 OpenAI 证明思路、9 月 Lean 验证。HN 50563148 518 分。
 - Osorio v. Kilmer：判决书（东肯塔基联邦地区法院，11-09 签署，经路透页内链接取得）、路透 11-10、Techdirt 11-20。

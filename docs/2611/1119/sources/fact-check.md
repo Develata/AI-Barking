@@ -52,6 +52,7 @@
 | 文中事实 | 级 | 结果 | 一手来源 | 备注（条件、时区、口径） |
 |---|---|---|---|---|
 | 美众院：截至5月11日，对华 H200、MI325X 获批约88万颗，均未出货 | L1 | ✅ | `d-scribd-1-disclosure.txt` L74：“Covered integrated circuits are the following products: NVIDIA’s H200 and AMD’s MI325X.”；“as of that date, BIS received applications to sell 3,444,160 covered integrated circuits to PRC companies”；“BIS approved … 879,868 covered integrated circuits to PRC companies across 21 license applications, as of May 11, 2026.”；`d-scribd-2-disclosure.txt`：“H200 License and Equivalent Application Status as of May 11, 2026”，21 行均为 “Approved, not shipped” | 众院外委会 11-19 公布（通稿北京 11-20 03:18）；芯片为 NVIDIA H200、AMD MI325X；“约88万颗”= 879,868；“均未出货”指 21 份获批许可，为 5 月 11 日附表口径；Nvidia 11-19 称已停止向中国发 H200（CNBC 转引）。风控：标题、封面不碰本条 |
+| Anthropic 员工称与 Claude 证明黎曼猜想，待独立核验 | L2 | ✅ | `d-rh-remark.txt`（alpo.ge/remark.pdf，4 页）：“I believe I have, working with Claude, discovered a proof1 of the Riemann Hypothesis. In fact, the method easily extends much further, resolving the so-called Generalized Riemann Hypothesis”；“Claude and I have also formalized the arguments without assumptions.”；第 2 页：“It being obviously inappropriate to attempt to post some massive unreadable travesty of "slop", I decided to only present Lean.”；脚注 1 列出 lean.tar.gz.part01 至 part14；主页 `d-rh-home.html`：“hi from anthropic!” | Levent Alpöge 个人网站发布（PDF 创建时刻北京 11-20 20:52），是个人声明，不是 Anthropic 官方公告；声明另称方法可推出广义黎曼猜想（GRH）；作者自述 Claude 曾写出 25 万页以上非正式文稿、未公开，且承认自己尚未掌握论证涉及的全部数学（高秩自守形式）。Lean 分卷 01–14 均可下载（part01 为 18,000,000 字节 gzip，part15 返回网站首页，北京 11-21 00:40 查）；本号未编译、未审 `#print axioms` 与顶层定理表述。截至北京 11-21 00:35，HN 50574968（1072 分 / 695 评，北京 11-20 22:16 提交）评论里只有网友称正在跑 lake build，未见独立完成编译或数学审查的报告；Scientific American（L4，`d-rh-sciam.txt`）称专家应很快能核实命题是否写对、证明是否成立。“员工”= 主页自述在 Anthropic 工作。“待独立核验”指截至北京 11-21 00:35 本号所查范围（声明、HN 评论、SciAm）内无人报告完成编译或数学审查；“只给了 Lean 代码”（声明第 2 页 “I decided to only present Lean”）为初稿措辞，经补充复核改掉 |
 | Anthropic 招股书：创始人捐出个人股权80%的承诺自愿、可撤销 | L1 | ✅ | `d-edgar-424b4-excerpt.txt` L15：“our co-founders have each pledged to dedicate 80% of their personal equity in Anthropic to philanthropic causes. These commitments are voluntary, revocable expressions of each co-founder’s philanthropic intent and do not constitute legally binding obligations.” | 424B4 申报日 11-19；1018 期只收过“承诺捐出80%”。TechCrunch 称七位创始人售股约 19.5 亿美元（未上卡） |
 | Anthropic：Claude 解的黑洞一题，证明一半沿用 OpenAI 思路 | L1 | ✅ | `d-anthropic-blackhole.txt` L89：“One half of the final proof, showing that the ceiling can’t be lowered, follows the strategy of the OpenAI proof.” | 跟进1109；指模块化自举（最轻黑洞上限）一题；研究页 11-17；HN 50563148 518 分 |
 | 美法官：若如原告所称仅凭 AI 人脸比对申请逮捕，警探暂不获豁免 | L1 | ✅ | `d-osorio-ruling-pdf.txt` L49：“more than an uncorroborated conclusion by AI that the individual in question has…”；L501：“the only tool was uncorroborated AI facial recognition”；L396：“defeat qualified immunity at this stage of the action” | 东肯塔基联邦地区法院 11-09 驳回被告动议；该阶段假定原告主张属实（“若如原告所称”），未认定责任；“豁免”指合格豁免；路透 11-10 报道 |
@@ -100,6 +101,10 @@
 6. SHOULD_FIX Contra 评测数据应为 L3——采纳：相关行改 L3；吠点① 加“据 Contra”。
 7. NICE_TO_HAVE 证据定位——采纳：marketplace 原句改指 `c-board.txt`，iOS 路径补 JSON 存档，提示词一行改指方法页。
 8. NEEDS_VERIFICATION 对华芯片条风控——交付时提示 Develata；Develata 终审决定保留（北京 11-21）。
+
+### 补充复核（速览补入黎曼猜想声明，Codex `gpt-6-astra` medium，北京 11-21 约 00:50；只审这一条）
+
+1. SHOULD_FIX 初稿“只给了 Lean 代码”只说交付形式，没说核验状态——采纳，改为“待独立核验”；作者另公布了思路与时间线，“只”易误读。Develata 同时决定：今天先进速览，信息不足，留作 1120 期主帖候选。
 
 ## 视觉复核
 
