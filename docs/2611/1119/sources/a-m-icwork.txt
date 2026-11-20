@@ -1,0 +1,197 @@
+Frostbite 每瓦性能达顺序核的 4.59 倍，流片前跑分的边界 - ic.work
+
+ IC
+ . Now you see it too.
+ [/]
+
+ Go
+
+ 分类
+
+ 全部 [/]
+ 人工智能 [/category/ai]硬件 [/category/hardware]商业 [/category/business]安全 [/category/security]开发工具 [/category/dev-tools]云计算 [/category/cloud]其他 [/category/other]
+
+ 首页 [/]
+
+ /
+
+ 硬件 [/category/hardware]
+
+Frostbite 每瓦性能达顺序核的 4.59 倍，流片前跑分的边界
+
+ 硬件
+ 2026年11月20日
+ 作者：Ada Vector
+ 版权所有：ic.work
+
+ 核心摘要
+ Summary
+
+Architect Labs 公布了采用交互网和新指令集的 Frostbite CPU，流片前评估的每瓦性能是面积相近的顺序核的 4.59 倍。
+
+留出负载仍有优势，但部分内核只有原规模的 1/64，现有结果还无法回答完整应用接入真实存储系统后能省多少电。
+
+ 01
+ Frostbite 的 4.59 倍，留到最终评估的负载跑出了 3.83 倍
+
+ [#section-1]
+
+ 02
+ 交互网能显露并行，芯片还得付数据搬运的账
+
+ [#section-2]
+
+ 03
+ AI 交付了版图，架构贡献还要拆开看
+
+ [#section-3]
+
+ 内容导图
+ Mind Map
+
+ -
+ 100%
+ +
+
+Frostbite 评估
+
+流片前能效领先
+
+性能4.59倍
+
+留出组降至3.83倍
+
+验证边界
+
+未实测，口径待核
+
+架构风险
+
+省调度难抵搬运成本
+
+Architect Labs 公布了 Frostbite，一款用交互网执行程序、采用全新指令集的通用 CPU。公司称，AI 系统迭代了从编译器、指令集到硬件实现和验证的各个环节，并交付最终芯片版图 GDS。在 25 项预选负载上，Frostbite 的每瓦性能是面积相近的双发射顺序核的 4.59 倍，这个数字是几何平均值。
+
+对照核心已有硅片验证，Frostbite 则尚未公布硅片实测。现有结果给了芯片团队一个理由去试这条路线：把程序依赖保留到硬件执行阶段，可能比沿用传统指令流更省电。但一次流片前比较，还不足以把这项优势推到现代乱序 CPU 或完整应用上。
+
+Frostbite 的 4.59 倍，留到最终评估的负载跑出了 3.83 倍
+
+参与设计搜索的 10 项负载，几何平均每瓦性能是对照核心的 6.02 倍；留到最终评估的 15 项为 3.83 倍。留出组仍有优势，但两组程序的构成不同，不能把均值落差全算成调优的结果。逐项差别更大：Fibonacci 只有 1.15 倍，卷积达到 23.12 倍。对采用者而言，自家的程序如何暴露并行工作，比它是否属于某个应用大类更有参考价值。
+
+比较的一侧是计入 L3 节点的 Frostbite quad，另一侧是一颗面积相近、型号未公开的双发射顺序核。面积相近让比较有了起点，却不能替代对工艺、频率和存储配置的核对。Frostbite 的最终版图对应 7 nm 工艺、500 MHz；公司称系统模型校准后与 RTL 的偏差在 5% 以内，这证明的是两套流片前估算更接近，并不能代替上电测量。公告将占比较大的时钟分配单独列出（占 Frostbite quad 能耗的 41%，占基线的 49%；来源：architectlabs.com）， headline 倍率是否完整计入这笔开销，以及双方是否按同一口径计入片外存储和互连，仍需核对。
+
+交互网能显露并行，芯片还得付数据搬运的账
+
+交互网把程序表示成一张图。计算时，互不重叠的节点对可以各自改写，不必排队等前一对完成。公司用五皇后搜索演示了这个差别：总计 3,183 次交互，最长的依赖链只有 262 步。传统乱序核心也会寻找能同时执行的指令，但它要从指令流里判断哪些操作互不依赖；交互网把这些依赖直接留在程序表示里。关键路径短说明有活可并行做，不等于芯片能按这个比例提速。
+
+图上相邻的节点，放到芯片上未必离得近。硬件仍要分配和回收节点存储、调度可执行的节点对，并搬运跨区域的数据。测试中的 FFT、基数排序和 LU 用的是缩至原规模 1/64 的 SPLASH-2 实现。小规模结果可以用来筛选架构，但要判断能效能否保留，得把工作集放大，观察局部存储放不下数据后，等待和通信会吃掉多少收益。
+
+AI 交付了版图，架构贡献还要拆开看
+
+HVM2 已能在 CPU 和 CUDA GPU 上执行同类图改写，也已有公开的交互网 FPGA 处理器设计。Frostbite 的新意应放在它如何让新指令集、编译器和专用硬件一起处理这些改写。Architect Labs 称，AI 代理在多轮搜索和消融中试了 58 个点子，保留 37 个。这个记录说明搜索走到了硬件实现；要判断 AI 对最终架构的具体贡献，还得看哪些方案由它提出、哪些约束由人设定，以及留下的方案分别省了多少时间和能耗。
+
+ 锐评
+ Commentary
+
+工作集一旦放大，片上放不下的数据就得搬。省下的调度开销能不能抵这笔账，决定新架构能走多远。
+
+ 参考来源
+ References
+
+architectlabs.com [https://architectlabs.com/blog/frostbite?utm_source=openai]https://architectlabs.com/blog/frostbite?utm_source=openai
+
+arxiv.org [https://arxiv.org/abs/1010.1066?utm_source=openai]https://arxiv.org/abs/1010.1066?utm_source=openai
+
+academia.edu [https://www.academia.edu/996547/Deduction_graphs_with_universal_quantification?utm_source=openai]https://www.academia.edu/996547/Deduction_graphs_with_universal_quantificat…
+
+drops.dagstuhl.de [https://drops.dagstuhl.de/storage/00lipics/lipics-vol052-fscd2016/LIPIcs.FSCD.2016.35/LIPIcs.FSCD.2016.35.pdf?utm_source=openai]https://drops.dagstuhl.de/storage/00lipics/lipics-vol052-fscd2016/LIPIcs.FS…
+
+sciencedirect.com [https://www.sciencedirect.com/science/article/pii/S1571066109004381?utm_source=openai]https://www.sciencedirect.com/science/article/pii/S1571066109004381?utm_sou…
+
+docs.rs [https://docs.rs/crate/hvm/latest/source/paper/PAPER.pdf?utm_source=openai]https://docs.rs/crate/hvm/latest/source/paper/PAPER.pdf?utm_source=openai
+
+ 延伸阅读
+ Topic Hub
+
+ 硬件 专题 [https://www.ic.work/category/hardware]
+
+ 01
+ floppy3.5 让 1.44 MB 软盘现场周转，归档还得另算
+ [/article/floppy3-5-brings-wifi-to-mavica-floppy-disks]
+
+ 02
+ TP-Link Wi-Fi 8 新款在美国卡关，旧款照卖背后的准入门槛
+ [/article/tp-link-wi-fi-8-us-router-approval-stall]
+
+ 03
+ SpaceX 屋顶微基站拟于2027年投产，Starlink室内补盲待实测
+ [/article/spacex-starlink-rooftop-microcells-indoor-coverage]
+
+ 04
+ Muse Charm 或售 300 美元，少掏一次手机还撑不起这笔账
+ [/article/meta-muse-charm-reported-300-dollar-price-versus-your-phone]
+
+ 05
+ Steam Machine 512GB开放直售，2TB缺货停收预约
+ [/article/steam-machine-512gb-available-without-waitlist-2tb-out-of-st]
+
+ FrostbiteArchitect LabsCPU每瓦性能交互网新指令集流片前评估顺序核乱序 CPU硅片实测
+
+推荐阅读
+
+ Latest
+
+ 硬件
+ 2026/11/20
+
+floppy3.5 让 1.44 MB 软盘现场周转，归档还得另算
+
+开源项目 floppy3.5 让索尼 Mavica 用户不带电脑也能预览软盘照片，并导出到 microSD 卡。它省下的是拍摄现场反复倒盘的工夫；桌面迁移健康盘未必需要它，难读盘和整盘归档则需要另一套工具。
+
+ [/article/floppy3-5-brings-wifi-to-mavica-floppy-disks]
+
+ 硬件
+ 2026/11/20
+
+TP-Link Wi-Fi 8 新款在美国卡关，旧款照卖背后的准入门槛
+
+TP-Link 两款 Wi-Fi 8 路由器尚未取得在美国上市所需的有条件批准，禁令前已获授权的旧款仍可销售。华硕和 Netgear 获批的也只是指定产品线，判断一台新品能否买到，还得看具体型号的 FCC 授权和开售安排。
+
+ [/article/tp-link-wi-fi-8-us-router-approval-stall]
+
+ 硬件
+ 2026/11/20
+
+SpaceX 屋顶微基站拟于2027年投产，Starlink室内补盲待实测
+
+SpaceX 已完成屋顶微基站设计，预计 2027 年投产，并考虑搭配 Starlink 终端。卫星可以承担回传，但屋内手机能否稳定接入，仍要看天线装在哪里、设备获准使用哪段频谱，以及同条件的室内实测。
+
+ [/article/spacex-starlink-rooftop-microcells-indoor-coverage]
+
+ 硬件
+ 2026/11/20
+
+Muse Charm 或售 300 美元，少掏一次手机还撑不起这笔账
+
+据报道，Meta 计划给 Muse Charm 定价 300 美元，附赠最长 12 个月的 Verizon 5G 流量。Meta 尚未确认价格和优惠，美国官网只开放上市通知登记。值不值得多带一台设备，要看它能否比手机更稳地办完高频任务，以及用户能否管住它代办的权限。
+
+ [/article/meta-muse-charm-reported-300-dollar-price-versus-your-phone]
+
+ 硬件
+ 2026/11/20
+
+Steam Machine 512GB开放直售，2TB缺货停收预约
+
+Valve 在美国开放 512GB Steam Machine 直售，起价 1,049 美元；2TB 版缺货，已有排位也不保证买得到。免排队只说明这批货能直接卖，Valve 还没法承诺下一批有多少、卖多少钱。
+
+ [/article/steam-machine-512gb-available-without-waitlist-2tb-out-of-st]
+
+ 硬件
+ 2026/11/20
+
+Sony WH-1000XM5 黑五报169.99美元，别拿首发价算折扣
+
+Best Buy 的索尼 XM5 黑五报道价为 169.99 美元，比 Amazon 反复出现的 198 美元低点少 28.01 美元，现有记录不足以证明全渠道历史最低。能按报价买到，XM5 仍适合预算有限的通勤用户；常在嘈杂环境开会，才更有理由为 XM6 加钱。
+
+ [/article/sony-wh-1000xm5-black-friday-deal-beyond-launch-price]
+
+© 2026 ic.work [/]. All Rights Reserved.

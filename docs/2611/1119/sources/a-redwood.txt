@@ -1,0 +1,117 @@
+Introducing Redwood: A frontier AI accelerator designed, verified, and deployed from scratch in two weeks by AI | Architect Labs
+
+Architect Labs [/]
+Home [/]Blog [/blog]About [/about]Careers [/careers]
+
+Get in touch→Get in touch→
+
+ [mailto:contact@architectlabs.com] [https://x.com/architectlabs] [https://www.linkedin.com/company/architectlab/]
+
+Privacy Policy [/privacy]
+© 2026 Architect Silicon Inc.
+
+Architect Labs [/]
+
+←Back to Posts [/blog]
+Introducing Redwood: A frontier AI accelerator designed, verified, and deployed from scratch in two weeks by AI
+
+ResearchAugust 27, 2026
+
+Today we are announcing Redwood, a frontier AI accelerator designed, verified, and deployed from scratch autonomously by our AI system in under two weeks.
+
+Redwood was not designed in a traditional chip design process. There were no sequential and manual handoffs from software and architecture to RTL, verification, and more. Instead, our end-to-end AI system collapsed the entire software-to-silicon stack into a single optimization loop: from a high-level specification written by two human architects, it autonomously generated and co-optimized the performance model, RTL design, UVM environments, formal proofs, firmware, drivers, and custom compute kernels in under two weeks, with no human intervention below the specification and from scratch with zero pre-existing accelerator IP. Redwood Nano, the ultra-low-power variant of the accelerator, is deployed on an FPGA, running live inference on multi-billion-parameter models like Llama and Qwen.
+
+decode throughput
+
+1.75x
+
+lower power
+
+1.9x
+
+performance-per-watt gain
+
+3.4x
+
+Redwood is not merely a proof of concept. Projected onto Samsung 8 nm, the Jetson Orin Nano's process class, Redwood delivers 1.75x the decode throughput at 1.9x lower power, a 3.4x performance-per-watt gain against a measured Jetson baseline running the same model. Furthermore, the Qwen3 model running on Redwood was exposed to our AI system as an API endpoint, which was used to optimize the next generation of Redwood, an early step toward recursive self-improvement of AI and the underlying silicon that fuels it.
+
+To our knowledge, this is the world's first production-worthy AI accelerator designed end-to-end by an AI system that runs multi-billion-parameter AI models. The full technical paper is here [https://arxiv.org/abs/2608.26418].
+
+Redwood Architecture
+
+Redwood is built for single-batch, low-power, ultra-low-latency physical AI workloads. It is a tile-based, spatial-dataflow accelerator: an N x M mesh of identical tiles surrounded by DMA engines, connected by a custom credit-based on-chip network with broadcast, multicast, and per-link flow control. Each tile pairs a RISC-V control core with compute engines co-designed for transformer inference: a matrix engine with systolic GEMM and GEMV datapaths built from INT8 MAC arrays, streaming directly into a vector engine with multi-lane SIMD, transpose, and floating-point activation units, all sharing a 512 KB local memory. The co-design reaches down to individual operators: softmax uses the emulated algorithm from FlashAttention-4, reusing existing SIMD resources instead of dedicated, area-expensive hardware.
+
+Fig. 1. Redwood SoC architecture (top) and Redwood tile architecture (bottom).
+
+Each tile separates a control front end from a compute back end, so sparse control logic runs in a slower clock domain and can shut down entirely during kernel execution for aggressive power savings. Tiles and DMA engines coordinate through explicit hardware messages, which the compiler uses for prefetching, double-buffering, and out-of-order computation: scheduling moves into the software stack, and the mesh needs no complex arbitration. Because all external memory traffic is confined to modular DMA engines on standard AXI4 interfaces, Redwood integrates into a larger SoC, retargets to ACE or CHI without disturbing the compute fabric, or ships as a standalone chiplet.
+
+Evaluation: currently measured on FPGA, projected to ASIC
+
+A scaled down version of Redwood Nano is a 2x2 tile configuration synthesized on an AMD Versal VPK180 at 250 MHz, running Qwen3-0.6B end to end, including host prompt transfer and per-token streaming back to the host.
+
+Fig. 2. Redwood Nano FPGA placement and instantiation hierarchy.
+
+Redwood Nano runs Qwen3-0.6B at 12.1 tokens-per-second, and our early performance projections suggest that, on an ASIC at the same technology node as the NVIDIA Jetson Orin Nano, we would sustain at least a 3.4x increase in performance-per-watt. Another benefit of the extremely co-designed nature of Redwood is that it projects an order of magnitude in area efficiency compared to the Jetson, which would help to alleviate supply-side bottlenecks if taken to volume production. We discuss architecture details, performance, and area projections in our whitepaper.
+
+We understand that real silicon is the final ground truth, which is why we’re further developing our flow to take Redwood to full GDSII and a tapeout on TSMC. As AI workloads disaggregate within and beyond datacenters, we believe there will be an order of magnitude of increased demand in custom silicon that pushes the pareto-frontier of intelligence-per-watt. Redwood is our first step in enabling this future of cost-effective, globally democratized intelligence.
+
+The Architect Labs System
+
+Redwood was enabled not only by post-training our own models, building long-horizon agent harnesses, and AI-native EDA tools, but also by a fundamental rethinking of the hardware-design flow from software to silicon. The traditional chip-design life cycle is highly sequential, progressing through stages from architectural definition to final tapeout, which usually takes multiple years to release subsequent iterations of the hardware. While its throughput may be acceptable, the latency of this sequential approach makes true hardware–software (HW–SW) co-design impractical. In the current AI landscape, by the time an architecture is defined and RTL design and verification are underway, new models can invalidate months of optimization. Hardware teams must therefore predict where workloads are heading years in advance and add general-purpose features as a hedge.
+
+The Architect Labs end-to-end chip design process is as automated and parallel as possible, removing the requirement for a “freeze” and enabling flexible architectural exploration and end-to-end implementation. It is built around the Architect Labs Platform (ALP), our in-house platform for end-to-end chip design. Once design intent is captured in ALP through interaction with human architects, the automated flow explores the architectural space across HW/SW, finding relevant trade-offs and optimizations that can be priced against each other. Each architectural option can be implemented through generation of RTL design, a UVM verification environment, SVA assertions, formal proofs, and other artifacts. No human intervention is required below the specification; human experts maintain ALP throughout the chip program life cycle and drive the design end to end through tapeout using functional, area, performance, timing, and power feedback.
+
+Key statistics on autonomous Redwood design:
+
+Fig. 3. Redwood design process history (top) and Redwood repository commit activity (bottom).
+
+100% of the RTL, UVM verification environments, formal verification, firmware, drivers, and custom compute kernels were generated end-to-end by Architect Labs' AI system from a human-written specification in under two weeks, with two human architects working on the project.
+
+Every architectural iteration was regenerated, reverified, and redeployed to the FPGA platform within 48 hours.
+
+Every block through the SoC level achieved 95% or higher code and functional coverage via commercial EDA tools, our proprietary formal engine, and hardware-in-the-loop validation. The first RTL drop from simulation to the FPGA platform contained zero bugs.
+
+The AI system peaked at 115 merge commits in a single day while bringing workloads online and optimizing firmware and kernels.
+
+Redwood Nano is deployed on an AMD Versal FPGA at 250 MHz, executing real-time, single-batch inference on open-weight models including Qwen. Architect Labs ran live hardware demos at this year's Design Automation Conference (DAC), one of the only companies at the show demonstrating an AI-designed accelerator running live model inference.
+
+An AI model deployed on Redwood and exposed as an API endpoint discovered timing and kernel optimizations for the accelerator itself at near-zero inference cost, closing the loop of AI and the silicon that fuels it.
+
+Automated verification and coverage closure
+
+Testbench generation, test-case development, and coverage closure were fully automated. Typical “AI agents for verification” keep a human engineer in the loop driving testbench construction through chat, which does not scale with chip complexity and has not materially shortened end-to-end development. In our flow, every testbench, test case, formal artifact, and simulation was generated from ALP using AI and compiler-based methods with no human DV participation. We use UVM alongside modern formal methods, including the first version of our proprietary formal engine, which generates sections of each verification environment directly from the human-written specification, and the flow measures and optimizes its own coverage criteria. The consequence: verification rigor scales with available compute, not with team size or EDA licenses.
+
+Design and exploration
+
+With RTL design fully automated, the system explores a microarchitectural search space an order of magnitude larger than a human team can cover in the same time. For Redwood's SIMD engine, the system traversed the performance-area-timing space over multiple days, generating, verifying, and optimizing candidates while maintaining coverage. Where prior automated exploration was limited to bit-width adjustments and register rearrangements, these candidates use fundamentally different control paths, datapaths, and state machines, free to find solutions beyond what humans believe optimal. As compute scales, exploration quality is bounded by available compute rather than human insight, and the system will surface architectures outside the cognitive limits of the best human designers.
+
+Fig. 4. SIMD engine microarchitectural exploration and optimization for performance, area, timing, and code coverage.
+
+Firmware and kernels
+
+ALP co-develops all system software, including firmware, kernels, and performance models, before any RTL or verification collateral exists, so architects see software consequences before committing to an implementation. The AI system wrote and tested every line of firmware and every kernel required to bring up the SoC and run Qwen inference, validating against ALP projections, cycle-accurate RTL simulation, or a live FPGA build depending on runtime. A custom emulation environment multiplexes FPGA access across hundreds of concurrent agents, cutting optimization runs from 15 hours to roughly 15 to 30 minutes and letting agents iterate without human intervention for days. In several instances the system discovered optimizations and architectural improvements our human experts had not considered, including new hardware features for the next generation of Redwood.
+
+Recursive self-improvement
+
+Finally, we deployed Qwen3 on Redwood and exposed it as an inference endpoint inside our own AI system. Through repeated sampling, the model discovered multiple timing improvements and kernel optimizations for several of its own operations, at zero inference cost.
+
+Fig. 5. Requirements for recursive self-improvement.
+
+We believe this is one of the earliest demonstrations of recursive self-improvement: an AI system designed an AI accelerator, deployed an AI model on it, and used that model to improve a future generation of the accelerator. A gap remains between the AI systems capable of designing frontier hardware and the models small enough to deploy on it. As the system scales to more complex designs and that mismatch closes, sustained AI-driven improvement of the hardware substrate becomes one of the largest available drivers of AI progress.
+
+A fundamentally new way from software to silicon
+
+AI assistance inside the conventional, sequential flow has not substantially shortened end-to-end chip development. Our system takes an orthogonal approach: a high-level specification is the source of truth from which architecture, RTL, verification, firmware, and kernels are co-designed and optimized together. An operation that would have cost thousands of software cycles gets built directly into a datapath. A scheduling problem the hardware would otherwise carry in silicon gets handed to the compiler. Trade-offs like these have always been the right ones to make. What never existed is the ability to make them, verify them, and see the result running on hardware in days.
+
+Three decades ago, foundries made world-class manufacturing available to anyone with a design, and the fabless industry was born. We are pioneering the designless semiconductor industry, where chips are co-designed and co-evolved with the workloads they run. Every workload that matters deserves its own chip. We are already applying this approach with Fortune 500 partners, compressing programs that traditionally run for months into weeks; Redwood is the first public demonstration. Future work focuses on closing the remaining gap to the memory roofline, scaling Redwood to larger models and fabrics, and extending the system through physical design, tapeout, and post-silicon validation, toward the goal of making intelligence abundant through this loop.
+
+Read the full paper here [https://arxiv.org/abs/2608.26418]. Partnership and technical inquiries: contact@architectlabs.com [mailto:contact@architectlabs.com].
+
+Partner with us
+
+If your edge depends on the silicon underneath it, whether you're an AI lab, a fabless chip company, an OEM, a defense prime, or ASIC design partner, we want to hear from you.
+
+Get in touch→Get in touch→
+
+Join our team
+See open positions→See open positions→ [https://jobs.ashbyhq.com/architect]
