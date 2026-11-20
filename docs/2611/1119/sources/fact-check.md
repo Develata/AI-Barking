@@ -99,7 +99,7 @@
 5. SHOULD_FIX Notebookcheck 译注“高4.6倍”——视觉复核时已改为“为对手的 4.6 倍”。
 6. SHOULD_FIX Contra 评测数据应为 L3——采纳：相关行改 L3；吠点① 加“据 Contra”。
 7. NICE_TO_HAVE 证据定位——采纳：marketplace 原句改指 `c-board.txt`，iOS 路径补 JSON 存档，提示词一行改指方法页。
-8. NEEDS_VERIFICATION 对华芯片条风控——保留，交付时提示 Develata。
+8. NEEDS_VERIFICATION 对华芯片条风控——交付时提示 Develata；Develata 终审决定保留（北京 11-21）。
 
 ## 视觉复核
 
