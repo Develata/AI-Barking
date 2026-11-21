@@ -1,0 +1,180 @@
+RH Lean proof: verification files
+
+Verification files for the Lean proof of the Riemann Hypothesis
+
+Announced at alpo.ge/remark.pdf [https://alpo.ge/remark.pdf] on 20 November 2026.
+
+Andrew Sutherland (MIT), checks run with Claude Code. Page last updated 2026-11-21 09:30 UTC. Results below are as of that time and this page will be updated as the remaining checks finish.
+
+Summary
+
+The published Lean source compiles without errors, the five headline theorems depend only on the three standard axioms, every module has been replayed through the Lean kernel, two independently written kernels, nanoda and con-leche, accept the full exported proof, and lean4lean accepts every compiled module. con-leche's --compare mode, an independent implementation of Comparator's statement matching, confirms all five theorems against the challenge. The lake comparator run and the Lean-kernel replay of the export are still in progress.
+
+CheckResultDetail
+
+All 175,187 modules compile (Lean v4.33.1, Mathlib v4.33.1)passzero errors; finished 16:43:21 UTC
+
+#print axioms for the five theorems in Main.leanpasspropext, Classical.choice, Quot.sound only (audit.log [audit.log])
+
+No axioms declared outside Lean corepass15 axioms in the environment, all in Init
+
+Mathlib files identical to the official cachepass8,322 Mathlib and 378 dependency .olean files, byte for byte
+
+leanchecker kernel replay of every modulepass175,187 of 175,187; zero rejections; finished about 18:17 UTC
+
+Challenge export equals the one published by Deicyde/riemann-hypothesis [https://github.com/Deicyde/riemann-hypothesis] CImatchsha256 bd484ac9…b2b9
+
+nanoda (independent Rust kernel) on the full exportacceptsexit 0 at 19:05:45 UTC; 27 min 42 s on 80 threads (nanoda.log [nanoda.log])
+
+Lean default kernel and Lean paranoid kernel on the exportrunningsingle-threaded; no verdict yet
+
+lake comparator (Lean v4.36.0) end to endrunningstatement comparison and axiom check already passed in one run; kernels in progress
+
+con-leche master (cd2eceab) on the full exportaccepts1,468,418 declarations accepted in --verified mode; exit 0 at 21:19:04 UTC; 3 min 15 s on 64 threads (log [con-leche-master.log])
+
+con-leche --compare (branch compare, 5dc36dc1): challenge against solutionacceptsall five theorems "justified by the solution"; 51,692 challenge declarations accepted; exit 0 at 21:19:12 UTC (log [con-leche-compare.log])
+
+lean4lean (67f63b0c, built with Lean v4.33.1) on the compiled files, module by modulepass175,187 of 175,187; finished about 21:55 UTC. 175,182 passed with default settings. Five hit lean4lean's default step limit ("deterministic timeout") on decide +kernel computations and passed when rerun with the limit raised (timeouts [lean4lean-default-fuel-timeouts.log], reruns with flags [lean4lean-raised-fuel.log])
+
+con-leche and con-ron as bundled with Lean v4.36.0declinedexit 2, not a rejection: those older binaries do not support one reflexive inductive type in the proof. con-leche master, above, does. (log [con-leche-bundled-4.36.log], log [con-ron-bundled-4.36.log])
+
+lean4lean bundled with Lean v4.36.0not applicablecannot read a v4.33 core library (unknown constant 'Decidable.intro')
+
+What was verified
+
+The theorem riemannHypothesis : RiemannHypothesis in the submission's Main.lean, where RiemannHypothesis is Mathlib's own definition (Mathlib/NumberTheory/LSeries/RiemannZeta.lean):
+
+def RiemannHypothesis : Prop :=
+ ∀ (s : ℂ) (_ : riemannZeta s = 0) (_ : ¬∃ n : ℕ, s = -2 * (n + 1)) (_ : s ≠ 1), s.re = 1 / 2
+
+and four further theorems, including the analogous statement for all Dirichlet L-functions. "GRH" here means Dirichlet L-functions only.
+
+Arithmetic consequences
+
+As a check that does not depend on Mathlib's definition of the zeta function, the proof was combined with kimihiro64/Robin1984 [https://github.com/kimihiro64/Robin1984] (commit acab1a3), an independent formalization of Robin's and Lagarias's criteria on the same Lean and Mathlib versions. Importing both gives two theorems about the divisor sum, with no hypotheses and no mention of zeta (ArithSolution.lean [ArithSolution.lean]; statements alone in ArithChallenge.lean [ArithChallenge.lean], which imports only Mathlib):
+
+theorem robin_inequality :
+ ∀ n : ℕ, 5040 < n →
+ ((ArithmeticFunction.sigma 1 n : ℕ) : ℝ) <
+ Real.exp Real.eulerMascheroniConstant * (n : ℝ) * Real.log (Real.log (n : ℝ))
+
+theorem lagarias_inequality :
+ ∀ n : ℕ, 0 < n →
+ ((ArithmeticFunction.sigma 1 n : ℕ) : ℝ) ≤
+ (harmonic n : ℝ) + Real.exp (harmonic n : ℝ) * Real.log (harmonic n : ℝ)
+
+Robin1984 on its own (its three equivalences with RH)ResultDetail
+
+Robin1984 builds with lake buildpass4,435 jobs, exit 0
+
+con-leche master and --compareaccepts69,293 declarations accepted; all three theorems justified against its own challenge (log [robin1984-con-leche-compare.log])
+
+Unmodified Comparator v4.33.0 with the repository's own configpassnanoda accepts, Lean default kernel accepts, "Your solution is okay!"; exit 0 at 03:31:06 UTC (log summary [robin1984-comparator-v4.33.0.log])
+
+lake comparator (Lean v4.36.0) from exportspassLean paranoid kernel, nanoda and Lean default kernel all accept; "Your solution is okay!"; exit 0 at 04:16:52 UTC (log summary [robin1984-lake-comparator-4.36.log])
+
+The two inequalities (RH proof combined with Robin1984)ResultDetail
+
+robin_inequality and lagarias_inequality compile; #print axiomspasspropext, Classical.choice, Quot.sound only (audit [arith-audit.log])
+
+con-leche master on the full combined exportaccepts1,472,825 declarations accepted in --verified mode; exit 0 at 02:29:56 UTC (log [arith-con-leche-master.log])
+
+con-leche --compare against ArithChallengeacceptsboth theorems "justified by the solution"; exit 0 at 02:29:06 UTC (log [arith-con-leche-compare.log])
+
+nanoda on the full combined exportacceptsexit 0 at 02:56:46 UTC; 33 min 46 s on 64 threads (log [arith-nanoda.log])
+
+lake comparator (Lean v4.36.0) on the combined exportrunningstatement comparison and axiom check passed; its Lean kernel stages are single-threaded on a 62 GB export and are expected to take many hours, as for the main proof
+
+The combined export is 61,752,134,938 bytes, sha256 44651dcc482a6e06e8d626994221aff638e422fded189bf856e0c31176926f0d; its challenge export has sha256 088a57c9e7454fa5279a86a825e551828ac8431694855aadd1f6e6a6eb37bb1d. These statements still rely on Mathlib's definitions of the divisor sum, Euler's constant, harmonic numbers, exp and log, and on the Robin1984 proof, which is why that proof was put through the same checks.
+
+Downloads
+
+solution.ndjson.zst [solution.ndjson.zst] 7.7 GB (7,699,933,588 bytes)
+
+The exported proof: output of lean4export on module Main. Unpacks to 61,570,595,788 bytes.
+
+compressed sha256 61a8938ad5f5e57397c1c0e3b954916af546d9004ade01c3555744a681b05381
+
+unpacked sha256 5ea74b912147c5c93cc2b6d70cc727cf908df2f62ac6a20480a3fa02f6be244e
+
+challenge.ndjson.zst [challenge.ndjson.zst] 47 MB
+
+The exported challenge: the five statements with sorry proofs, importing only Mathlib. Unpacks to 350,862,970 bytes.
+
+unpacked sha256 bd484ac9886a96f26b1d9a7a59ebd45b7a70d102c015d4f31f9302bbdd6ab2b9
+
+Smaller files:
+
+comparator.json [comparator.json]: Comparator config naming the checkers that can process this proof
+
+SHA256SUMS [SHA256SUMS]: hashes of everything on this page
+
+audit.log [audit.log] and Audit.lean [Audit.lean]: the axiom audit and the file that produced it
+
+project-oleans.sha256 [project-oleans.sha256]: sha256 of each of the 175,187 compiled files (29 MB). These hashes depend on the build directory; see the note below [#manifest-path].
+
+nanoda.log [nanoda.log]: timing and exit status of the nanoda run
+
+con-leche-master.log [con-leche-master.log] and con-leche-compare.log [con-leche-compare.log]: the two con-leche runs
+
+Check it yourself
+
+With Lean v4.36.0 installed, nothing needs to be built. You need roughly 100 GB of RAM and 70 GB of disk.
+
+zstd -d --long=30 solution.ndjson.zst # --long=30 is required
+zstd -d --long=27 challenge.ndjson.zst
+sha256sum solution.ndjson challenge.ndjson # compare with the hashes above
+
+lake comparator --config comparator.json \
+ --challenge-from-export challenge.ndjson --solution-from-export solution.ndjson
+
+nanoda alone took about 28 minutes on 80 threads. The Lean kernels are single-threaded and take much longer.
+
+The fastest independent check is con-leche built from source (Lean v4.36.0, about two minutes to build). It needs about 50 GB of RAM and took under four minutes on 64 threads:
+
+git clone https://github.com/leanprover/con-leche && cd con-leche
+git checkout compare # 5dc36dc1; master (cd2eceab) for the plain check
+lake build con-leche
+.lake/build/bin/con-leche --compare challenge.ndjson solution.ndjson
+
+Provenance
+
+ItemValue
+
+Source archivelean.tar.gz, the 14 parts from alpo.ge joined; 239,275,554 bytes
+sha256 9631b4f020199e580ba86178cb56c6e9b09f690c2369a80dc4334aa93f49c7fc
+
+Source mirrorDeicyde/riemann-hypothesis [https://github.com/Deicyde/riemann-hypothesis], byte-identical to the archive apart from the Comparator files it adds
+
+Lean / MathlibLean v4.33.1 (commit 819816b2); Mathlib tag v4.33.1 (0df444a3)
+
+Exporterlean4export tag v4.33.0 (15f6055e), built with Lean v4.33.1; target list as in Deicyde's export-targets.txt
+
+Judge and extra kernelsLean v4.36.0: lake comparator, leanchecker, leanchecker-paranoid, nanoda_bin
+
+lean4leandigama0/lean4lean [https://github.com/digama0/lean4lean] at 67f63b0c, built with Lean v4.33.1; run on the compiled .olean files, not the export
+
+con-lecheleanprover/con-leche [https://github.com/leanprover/con-leche] master at cd2eceab and branch compare at 5dc36dc1, each built with Lean v4.36.0
+
+Main.oleansha256 9146dfb4148e24d2252e04c50742f3e49dd126dfcc5006d10bf5f873ddf796ad
+
+Manifest of all compiled filessha256 375cbee2fc3fc0f5088ef2e6dc9a5ac5530924310dc62422ec65aac9dc4c1d25
+valid only for the build directory /home/ubuntu/grh/src/lean; see the note below [#manifest-path]
+
+Build directorythe archive's lean/ directory was at /home/ubuntu/grh/src/lean on every build machine, so each source file was passed to Lean as /home/ubuntu/grh/src/lean/src/<Module/Path>.lean
+
+Caveats
+
+The build ran on cloud machines without a sandbox, and compiled each file by calling lean directly with the same inputs lake supplies (module name, package name and the lakefile's options), not through lake build.
+
+The per-file .olean hashes depend on the build directory. In Lean v4.33.1 a compiled file stores each linter message together with the absolute path of its source file. Of our 175,187 compiled files, 98,219 contain the path /home/ubuntu/grh/src/lean/src/…; the other 76,968, including Main.olean, contain no path. So project-oleans.sha256 and its sha256 can be reproduced in full only by a build whose source tree is at /home/ubuntu/grh/src/lean. For a build at any other path, only the files of modules that emit no linter messages should match.
+
+ What we checked: a lake build of 240 modules on a different machine, at a different path, gave 168 files identical to the manifest and 72 different; all 72 contain that build's path and none of the 168 do. Separately, 77 modules compiled both ways in the same directory, by lake build and by our direct invocation, were byte-identical. We have not compared the full set against a lake build.
+
+The exported proof (solution.ndjson) is the artifact the independent kernels checked. Its hash is the one to compare across builds; we have not examined whether the export format can carry a source path.
+
+The export was produced from that unsandboxed build. We have not ourselves compared its sha256 with an export made from a sandboxed lake build.
+
+A passing check shows that the formal statements, as written in Lean against Mathlib's definitions, follow from the three standard axioms according to the kernels used. It relies on those kernels and on Mathlib's definitions being what they are intended to be.
+
+A first build attempt used a wrong module root and was discarded in full; none of it is in these results.

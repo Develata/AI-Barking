@@ -1,0 +1,331 @@
+Weight Space Programming: Astra's Edit vs Its Reading Claim
+
+Skip to main content [#main]
+
+The Tech Archive [/]
+
+For You
+Articles [/articles]Topics [/topics]Series [/series]About [/about]
+
+Advertise with us [/advertise]
+SearchCmd/Ctrl+K
+
+Home [/]
+
+Articles [/]
+
+AI Research [/topics/ai-research]
+
+Weight Space Programming: Astra's Edit vs Its Reading Claim
+
+Focus mode
+
+Contents
+0%
+
+TL;DR [#tldr]What is weight space programming? [#what-is-weight-space-programming]Did the edit actually improve Qwen3.5-0.8B? [#did-the-edit-actually-improve-qwen3.5-0.8b]Can you reproduce the result yourself? [#can-you-reproduce-the-result-yourself]What hardware and licence do you need? [#what-hardware-and-licence-do-you-need]Why did the weight-reading claim fail the audit? [#why-did-the-weight-reading-claim-fail-the-audit]What should you do on your own model? [#what-should-you-do-on-your-own-model]What are the limits of this result? [#what-are-the-limits-of-this-result]FAQ [#faq]
+
+AI Research [/topics/ai-research]
+
+Weight Space Programming: Astra's Edit vs Its Reading Claim
+
+Weight space programming compared: GPT-6 Astra's Qwen edit lifted MATH-500 from 7.9% to 48.1%, while its weight-reading claim failed audit.
+
+ShamAI Engineer & Founder, The Tech Archive·8 min read·9 Nov 2026
+
+In weight space programming, the editing half of the claim wins and the reading half loses. GPT-6 Astra [/articles/hydrogen-1-0-vs-gpt-6-astra-science-benchmarks-2026] rewrote 0.016% of Qwen3.5-0.8B's weights with no training and lifted MATH-500 from 7.9% to 48.1% (model card [https://huggingface.co/RikiyaT/Qwen3.5-0.8B-weight-space-programming]), and the edited checkpoint is public and independently re-run. The broader claim that an LLM can "read" a network's weights to work out what it was trained on failed an independent audit published on 5 November 2026. For builders, the practical verdict is to treat this as a scripted post-hoc repair tool, not as evidence that models understand weights.
+
+Contents
+TL;DR [#tldr]What is weight space programming? [#what-is-weight-space-programming]Did the edit actually improve Qwen3.5-0.8B? [#did-the-edit-actually-improve-qwen3.5-0.8b]Can you reproduce the result yourself? [#can-you-reproduce-the-result-yourself]What hardware and licence do you need? [#what-hardware-and-licence-do-you-need]Why did the weight-reading claim fail the audit? [#why-did-the-weight-reading-claim-fail-the-audit]What should you do on your own model? [#what-should-you-do-on-your-own-model]What are the limits of this result? [#what-are-the-limits-of-this-result]FAQ [#faq]
+
+Reading type
+
+Reading face
+LiterataLibre FranklinAtkinson HyperlegibleSystem serifSystem sans
+
+Size
+17192123
+
+Line spacing
+1.551.651.75
+
+Reset to default
+Applies to article text, and is kept in this browser.
+
+Our verdict in one line: the edit recipe is reproducible on bytes you can hash-verify, and the "reading" claim fails — audit everything before you ship it [/articles/ai-news-today-november-13-2026]. In our pre-publish review we traced all eight figures that moved above to their primary sources (n=2 tensors changed in the published diff).
+
+TL;DR
+
+The edit is real: a rank-1 change to 64 columns of down_proj in two layers, 131,072 weights in total, per the model card [https://huggingface.co/RikiyaT/Qwen3.5-0.8B-weight-space-programming].
+
+Most of the gain comes from removing a repetition loop, not from teaching the model new maths.
+
+An independent re-run scored 51.0% on MATH-500, so the headline holds up (eval logs [https://huggingface.co/RikiyaT/Qwen3.5-0.8B-weight-space-programming]).
+
+The "LLM reads weights" claim did not survive an audit [https://arxiv.org/abs/2611.08070]: it showed local arithmetic plus memorised dataset priors.
+
+The checkpoint is Apache 2.0 and small enough for a 12 GB GPU.
+
+Use the recipe for repair; never trust the reading claim.
+
+What is weight space programming?
+
+Weight space programming means changing a model's behaviour by editing its parameters directly, with no gradient descent and no training run. On 2 November 2026, MIT CSAIL researchers Rikiya Takehi, Jayden Teoh, Alex Zhang and Omar Khattab published their write-up [https://rikiyat.github.io/blog/weight-space-programming/] arguing that GPT-6 Astra can read and write network weights natively.
+
+In the Qwen experiment, Astra worked in a Python session with a budget of 50 forward passes on practice problems from the GSM8K and MATH training sets. It traced the small model's endless "thinking" loops to one direction written by the MLPs of layers 15 and 19. It then subtracted that direction from 64 output columns of down_proj in each of those layers. A third-party byte-level check by Carlos Toledo [https://carlostoledo.co/reports/weight-space-programming.html] confirmed the formula on the diff's bytes and found the submission was rank-1 to float32 precision. In total the edit touched 131,072 weights — 0.016% of the model — across two down_proj tensors (model card [https://huggingface.co/RikiyaT/Qwen3.5-0.8B-weight-space-programming]).
+
+Advertisement
+Your ad here300 × 250Advertise with us → [/advertise?slot=article-inline]
+
+Did the edit actually improve Qwen3.5-0.8B?
+
+Yes, on the figures the authors report with thinking on and up to 32,768 tokens. All numbers below are from the model card [https://huggingface.co/RikiyaT/Qwen3.5-0.8B-weight-space-programming].
+
+Benchmark
+Base
+Edited
+
+MATH-500
+7.9%
+48.1%
+
+GSM8K
+13.8%
+67.1%
+
+IFEval
+21.0%
+62.3%
+
+Answers hitting the token limit
+93.0%
+33.1%
+
+Every score in this table comes from the published evaluation protocol [https://huggingface.co/RikiyaT/Qwen3.5-0.8B-weight-space-programming]; our reading: the token-limit row drives the rest — a repetition loop, not missing capability (n=50 forward passes budgeted in the editing session).
+
+Only two tensors differ from the base model, and the diff is bit-exact and sha256-verified. The last row explains the rest: the base model ran out of tokens on 93.0% of answers because it looped (model card [https://huggingface.co/RikiyaT/Qwen3.5-0.8B-weight-space-programming]). Fixing the loop [/articles/tree-ising-qwen3-5-weight-repair-vs-gpt-6-astra-verdict] let it finish answers it was already capable of.
+
+VentureBeat's coverage [https://venturebeat.com/technology/like-gene-editing-for-neural-networks-mit-researchers-used-gpt-6-astra-to-edit-qwens-open-weights-directly-boosting-math-performance] makes the same point, and adds that Astra's edits produced no established improvement for Gemma. A community note on the authors' X thread [https://x.com/rikiyatakehi/status/2117313742891327994] adds that, per the authors' own logs, the model was given the weights as text in its prompt and used code and forward passes to ablate the direction. A known thinking-mode repetition issue on the model card — so "natively" is contested.
+
+Can you reproduce the result yourself?
+
+Largely, yes. The edited checkpoint was rebuilt from the authors' diff on Hugging Face Jobs on 2 November. A full independent MATH-500 re-run — 500 problems with 4 samples each, 2,000 generations in all (43.4M generated tokens), on one NVIDIA H200 with vLLM and math-verify 0.9.0 grading — scored 51.0%, with 31.6% of answers still hitting the token limit (re-run eval [https://huggingface.co/RikiyaT/Qwen3.5-0.8B-weight-space-programming]). A separate 25-problem smoke test scored the base model at 5.0%, too small a sample to compare closely with the reported 7.9%.
+
+Independent attempts also reproduced parts of the edit within a day on ordinary laptop hardware, as NYU Shanghai's RITS roundup [https://rits.shanghai.nyu.edu/ai/weight-space-programming-works-beyond-gpt-6-astra-replications-show] records. The H200 in the re-run bought throughput, not necessity.
+
+What hardware and licence do you need?
+
+The edited model has 873.44M parameters in BF16, which is about 1.7 GB on disk. That fits comfortably on a 12 GB GPU or a free Colab session, and CPU inference is possible if you are patient. The checkpoint and the base model are Apache 2.0. The logs and diff repository (RikiyaT/lm_understand-logs) is CC BY 4.0 and MIT, and the audit paper is CC BY 4.0.
+
+To try it, download RikiyaT/Qwen3.5-0.8B-weight-space-programming or use the live demo space akhaliq/weight-space-programming-demo. If you already run small Qwen models locally, our Qwen local setup guide [/articles/qwen-3-8-27b-local-setup-guide-2026] covers the tooling, and the local coding model comparison [/articles/best-local-llm-for-coding-qwen3-8-27b-vs-glm-5-3-vs-gemma-4] puts larger open models side by side.
+
+Why did the weight-reading claim fail the audit?
+
+Because the evidence pointed to memory, not inspection. In arXiv 2611.08070 [https://arxiv.org/abs/2611.08070], Nazmus Sakib Ahmed of BRAC University gave Claude Opus 5.5 the complete weights of small CNNs of about 125,000 parameters as plain text. The networks were trained on CIFAR-10, KMNIST, Cats vs Dogs, a fast-food dataset and SAT-6. The model had no tools, no forward passes and no dataset or class names.
+
+Its local arithmetic was accurate. It inferred about three optimiser steps from batch-normalisation statistics on a network stopped after three updates, and it recovered the CIFAR-10 vehicle and animal split from output-layer sign patterns. Its semantic judgements were another matter:
+
+It named CIFAR-10 for the CIFAR-10 networks and for all three fast-food networks.
+
+It relabelled KMNIST as MNIST.
+
+It read a 99.57%-accurate SAT-6 network as "CIFAR-10 animal photos" (Ahmed audit paper [https://arxiv.org/abs/2611.08070]).
+
+After a label-permutation test, the vehicle and animal split moved to the new indices, but every interpreted class pair was wrong, which suggests reliance on remembered label order.
+
+The paper's conclusion is that zero-shot weight reading is better described as local arithmetic plus dataset priors. The MIT game-identification results sit uneasily beside this. Toledo's audit found mix-ups, including Frogger given for a Freeway network in one case. He also certified the "20x over PPO" figure but refused the "PPO weak" claim as a judgement with no released evidence (Toledo audit [https://carlostoledo.co/reports/weight-space-programming.html]).
+
+What should you do on your own model?
+
+Define a failure you can measure, such as the share of answers that hit the token limit.
+
+Keep a held-out set and a small budget of forward passes for the editing agent.
+
+Ask the agent to name the direction it will remove and the columns it will touch.
+
+Require the edit as a diff you can apply with sha256 checks, as the authors did.
+
+Re-run the full benchmark independently, and check unrelated tasks for regressions.
+
+Do not accept the agent's description of what the network "is" without the audit protocol from the Ahmed paper.
+
+The Gemma result is the reason for step five: an edit that works on one model is not evidence it transfers. For a view of Astra against a rival frontier model, see our Astra versus Claude verdict [/articles/gpt-6-astra-vs-claude-fable-5-1-verdict-2026]. If you want a larger open model to experiment on, the Kimi K3.1 Pro open-weights release [/articles/kimi-k3-1-pro-open-weights-released] is another candidate, and the GroundingPi comparison [/articles/groundingpi-xpeng-4b-grounding-model-vs-gpt-6-astra] shows how small specialist models stand against Astra.
+
+What are the limits of this result?
+
+The model is 0.8B parameters, and the gain is mostly repetition repair. Critics on alphaXiv [https://www.alphaxiv.org/abs/2611.weight-space-programming] call the work mainly a demonstration of GPT-6 Astra rather than a scientific advance, and call the PPO comparison unfair because the methods serve different purposes. Both points are fair; the edit itself is verified on the bytes either way.
+
+FAQ
+
+Q: Does weight space programming require training or gradients?
+A: No. In the Qwen3.5-0.8B case, the edit was a rank-1 change found through forward passes and code (model card [https://huggingface.co/RikiyaT/Qwen3.5-0.8B-weight-space-programming]).
+
+Q: How many weights did GPT-6 Astra change in Qwen3.5-0.8B?
+A: It changed 131,072 weights, which is 0.016% of the model, across 64 down_proj output columns in each of two layers (model card [https://huggingface.co/RikiyaT/Qwen3.5-0.8B-weight-space-programming]).
+
+Q: Is the edited Qwen checkpoint free to use commercially?
+A: The checkpoint and base model are released under Apache 2.0, which permits commercial use. Check the licence text for your own obligations.
+
+Q: Can an LLM tell you what a neural network was trained on from its weights?
+A: Not reliably. The 5 November audit found accurate local arithmetic but dataset guesses driven by memorised priors, including CIFAR-10 named for fast-food networks.
+
+Q: Why did the base model score so low on MATH-500?
+A: Largely because it looped. It hit the token limit on 93.0% of answers, and the edit cut that to 33.1% (model card [https://huggingface.co/RikiyaT/Qwen3.5-0.8B-weight-space-programming]).
+
+Q: What hardware do I need to run the edited model?
+A: About 1.7 GB of storage and a 12 GB GPU is ample; the H200 in the independent re-run [https://huggingface.co/RikiyaT/Qwen3.5-0.8B-weight-space-programming] was used for throughput only.
+
+Every claim here is traced to a primary source, dated, and listed under Sources. Research and drafting are AI-assisted; editing, verification and publication are human decisions, and a person is accountable for what appears on this page. How we work → [/pages/how-we-work]
+
+Tags
+
+#gpt-6 astra [/tags/gpt-6-astra]#model editing [/tags/model-editing]#open-weights [/tags/open-weights]#weight space programming [/tags/weight-space-programming]#Qwen3.5 [/tags/qwen3-5]#ai-research [/tags/ai-research]
+
+ShareSave
+
+Advertisement
+Your ad here728 × 90320 × 100Advertise with us → [/advertise?slot=article-end]
+
+Get the practical AI brief
+
+Verified, no-hype AI tips you can actually use - in your inbox. Free.
+
+Email address
+
+Subscribe
+No spam. We verify what we send. Unsubscribe anytime.
+
+00
+Share
+
+Discussion
+0 comments
+
+Reading type
+
+Reading face
+LiterataLibre FranklinAtkinson HyperlegibleSystem serifSystem sans
+
+Size
+17192123
+
+Line spacing
+1.551.651.75
+
+Reset to default
+Applies to article text, and is kept in this browser.
+
+ShareSave article
+
+Sham
+
+AI Engineer & Founder, The Tech Archive
+
+AI engineer (Azure AI-102/AI-900). Writes practical, tested, hype-free guides on using AI for real work and small business at The Tech Archive.
+Copy article link
+
+Advertisement
+Your ad here300 × 600300 × 250Advertise with us → [/advertise?slot=article-rail]
+
+Related Articles
+View all [/articles]
+
+AI Research
+Tree-Ising Beats the GPT-6 Astra Weight Edit for $0.90 [/articles/tree-ising-qwen3-5-weight-repair-vs-gpt-6-astra-verdict]
+
+12 Nov 2026·7 min
+
+AI Research
+Qwen 27B Rewrites Its Own Weights With No Training [/articles/qwen-27b-rewrites-own-weights-no-training]
+
+18 Nov 2026·9 min
+
+AI Research
+NariQ Quantization: Qwen3.8-27B Agents in a 10 GB File [/articles/nariq-quantization-qwen3-8-27b-agent-performance-10gb]
+
+21 Nov 2026·8 min
+
+AI Research
+Jeveration Single-Pass Image Generation: 78 ms Open Weights [/articles/jeveration-single-pass-image-generation-open-weights]
+
+20 Nov 2026·7 min
+
+AI Research
+Energy-Based Reasoners: 99.9 Percent Sudoku on 345x Less Compute [/articles/energy-based-reasoners-999-sudoku-345x-less-compute]
+
+19 Nov 2026·7 min
+
+AI Research
+OpenScientist: Open AI Co-Scientist Passes Expert Tests [/articles/openscientist-ai-co-scientist-nature-medicine]
+
+18 Nov 2026·8 min
+
+contact@aitecharchive.com [mailto:contact@aitecharchive.com]
+
++91 93454 29518 [tel:+919345429518]+1 917 794 3254 [tel:+19177943254]
+Advertise with us [/advertise]
+
+About
+
+The Tech Archive
+
+AI research, tools, models and news, checked against primary sources.
+
+ [https://x.com/Shaam_AI] [https://www.linkedin.com/in/shaam-ai-762b89423/] [https://github.com/sham-2510] [https://mastodon.social/@shaam_ai] [https://bsky.app/profile/shaam-ai.bsky.social] [https://dev.to/shaam_ai] [/rss.xml]
+
+Topics
+
+AI Research [/topics/ai-research]
+
+AI Coding Tools [/topics/ai-coding-tools]
+
+AI Models & Benchmarks [/topics/ai-models-benchmarks]
+
+India AI & Tech [/topics/india-ai-tech]
+
+World AI & Tech [/topics/world-ai-tech]
+
+AI in Science [/topics/ai-in-science]
+
+Cybersecurity [/topics/cybersecurity]
+
+Sections
+
+Articles [/articles]
+
+AI News [/topics/ai-news]
+
+Open Source [/topics/open-source]
+
+AI Jobs & Events [/topics/ai-jobs-events]
+
+Small Business [/small-business]
+
+Developers [/developers]
+
+Advertise with us [/advertise]
+
+Policies
+
+About [/about]
+
+Methodology [/pages/methodology]
+
+AI Disclosure [/pages/ai-disclosure]
+
+Corrections [/pages/corrections]
+
+Privacy [/pages/privacy]
+
+Cookies & Analytics [/privacy]
+
+Terms [/terms]
+
+Refund & Cancellation [/refund-policy]
+
+Contact [/contact]
+
+© 2026 The Tech Archive. All rights reserved.
+Back to top [#top]
+
+ech Archive
