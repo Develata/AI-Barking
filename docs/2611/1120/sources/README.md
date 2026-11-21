@@ -1,6 +1,6 @@
 # 1120 来源与制作状态
 
-期号1120（上期1119+1）；线索为 Develata 回贴的 WorkBuddy HTML 选题扫描 1121-06、ChatGPT 定时任务的 stateful rescan（`AI-Barking_stateful_rescan_20261120T110000Z.md`，扫描终点北京 11-20 19:12，主候选多为 1119 已发）与一份 ChatGPT“公开错误报告调查”。Develata 北京 11-21 约 18:30 定主帖：黎曼猜想（跟进1119速览）与 Qwen 改写自己权重。
+期号1120（上期1119+1）；线索为 Develata 回贴的 WorkBuddy HTML 选题扫描 1121-06、ChatGPT 定时任务的 stateful rescan（`AI-Barking_stateful_rescan_20261120T110000Z.md`，扫描终点北京 11-20 19:12，主候选多为 1119 已发）与一份 ChatGPT“公开错误报告调查”。Develata 北京 11-21 约 18:15（opencli doctor 18:20 之前）定主帖：黎曼猜想（跟进1119速览）与 Qwen 改写自己权重。
 
 派工单 `.handoff/2026-11-21-1120-evidence.md`（`barking handoff` 生成的文件名日期 11-20 与“本机时区为美东”有误，已改为 11-21 与北京时间；本机 macOS、UTC+8）。派工前 `opencli doctor`（北京 18:20）：Browser Bridge 扩展未连接，截图全部走 `barking shot`。A、B、C 组 Sonnet 5.5。
 

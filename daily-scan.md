@@ -90,6 +90,7 @@
 | 1120 | ChatGPT | OpenAI：ChatGPT Space 逐步向18岁以上 Plus 用户开放 |
 | 1120 | METR | METR：其评测中 AI 有一半把握完成的任务，按人类用时约3.6个月翻倍 |
 | 1120 | 开源 | Inkling 2 Mini 以 Apache 2.0 开源，总参数26.4B |
+| 1120 | 模型 | Inkling 2 Mini 以 Apache 2.0 许可开放权重 |
 
 ## 已发过
 

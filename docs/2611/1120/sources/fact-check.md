@@ -46,7 +46,7 @@
 | 文中事实 | 级 | 结果 | 一手来源 | 备注 |
 |---|---|---|---|---|
 | Anthropic 员工等称借 AI 证出 NS 方程无外力也爆破，证书未公开 | L2 | ✅ | NS 论文（`c-ns-pdf.txt`，Alpöge、Buckmaster，79 页，“version of 20 November 2026”）摘要：“for which the solutions of the three-dimensional Navier–Stokes equations without force blow up in finite time. This disproves the statements (A) and (B) of the Millennium Prize problem as formulated by Fefferman, and hence proves the statements (C) and (D)”；“The certificate will be released soon” | 跟进1008（OpenAI 9 月的 NS 证明带外力）。Buckmaster 为纽约大学学者；作者自述用 Claude。Lean 形式化以 certificate 为前提，区间算术“not part of the formalization”（`c-ns-gh-readme.txt`）。Clay 规则要求发表满两年并获普遍接受（`c-clay-rules.txt`） |
-| Inkling 2 Mini 以 Apache 2.0 开源，总参数26.4B | L1 | ✅ | `c-inkling-official.txt`：“a Mixture-of-Experts model with 26.4B total parameters, 3.4B active”；模型卡（`c-inkling-modelcard.txt`）许可 Apache 2.0；“leads every open-weights model with less than 100B total parameters on benchmarks such as DeepSWE v1.1 (48.2%) and Vals Index v2.2 (46.5%)”；“not the strongest small model for multi-turn chat or for instructions with many constraints” | 第 2 轮反向核验：领先说法缺“Evaluation setups vary by model.”限定，卡片改为只写开源与参数；另附 Model Acceptable Use Policy；官方未给时刻（页面 Nov 20）；HN 50581260 997 分 |
+| Inkling 2 Mini 以 Apache 2.0 许可开放权重 | L1 | ✅ | `c-inkling-official.txt`：“Inkling 2 Mini is released with open weights”；模型卡（`c-inkling-modelcard.txt`）许可 “Apache 2.0”；“leads every open-weights model with less than 100B total parameters on benchmarks such as DeepSWE v1.1 (48.2%) and Vals Index v2.2 (46.5%)”；“not the strongest small model for multi-turn chat or for instructions with many constraints” | 第 2 轮反向核验：领先说法缺“Evaluation setups vary by model.”限定，卡片改为只写许可与开放权重（交付前自查：官方写 open weights，“开源”改“开放权重”；26.4B 总参数未上卡）；另附 Model Acceptable Use Policy；官方未给时刻（页面 Nov 20）；HN 50581260 997 分 |
 | 据 Mother Jones 报道，数百名谷歌员工请愿让学校能关掉搜索里的 AI | L4 | ⚠️ | `c-mj-google.txt`：“Hundreds of workers at Google are pushing senior leadership to retract a policy that would block schools who …”；请愿书原文（`c-petition.txt`）：“turn off AI features in Search without disrupting their ability to use search as a whole” | Mother Jones 北京 11-20 20:30；“1000+”是工会会员数，未用；谷歌 11-03 当晚已澄清 Search 可单独开启 |
 | OpenAI：ChatGPT Space 逐步向18岁以上 Plus 用户开放 | L1 | ✅ | OpenAI 发布说明（`c-oa-relnotes.txt`）11-20 条目：Space “rolling out globally to Plus users ages 18 and older”；官方帐号帖：“Space is the new home for pages, slides, images, files, and uploads” | Pro、Business、Enterprise 9-29 已有；共享页对方须有 Space 权限，Free 打不开 |
 | METR：其评测中 AI 有一半把握完成的任务，按人类用时约3.6个月翻倍 | L3 | ✅ | `c-metr-blog.txt`：“doubling roughly every 3.61 months (95% CI 2.08-4.94)”；“increasingly concerned that our easy-to-run, containerized evals could overestimate real-world capabilities” | 指标为 50% time horizon（AI 以 50% 成功率完成的任务，按人类完成用时计）；TH1.1 与 TH2 合并；可验证子集 1.65 个月；METR 另称其容器化评测可能高估真实能力（未上卡）；官方未给时刻（页面 11-20）；HN 仅 2 分，按 AIHOT 精选收录 |
@@ -65,7 +65,7 @@
 
 ## 反向核验
 
-### 第 1 轮（Codex `gpt-6-astra` medium，北京 11-21 约 19:00–19:15；审的是读者稿检查前的初稿与事实清单，卡片尚无批注图、配图说明未写；审查中正文被改，报告引用的行号为当时版本）
+### 第 1 轮（Codex `gpt-6-astra` medium，北京 11-21 18:50–18:54，按提示词与报告文件时间；审的是读者稿检查前的初稿与事实清单，卡片尚无批注图、配图说明未写；审查中正文被改，报告引用的行号为当时版本）
 
 1. BLOCKER 标题、省流、小标题“人没读懂”把“检查不能证明有人理解”写成全称判断——采纳：改为“作者没吃透”“作者自述没吃透”（只指作者本人，依据 remark.pdf 第 2 页）。
 2. BLOCKER METR 条目丢了 50% 成功率与按人类用时的口径——采纳：改为“METR：其评测中 AI 有一半把握完成的任务，按人类用时约3.6个月翻倍”。
@@ -80,7 +80,7 @@
 11. NEEDS_VERIFICATION “作者没公开代码和改后的权重”超出检查范围——采纳：改“项目页没给改过的模型下载”。
 12. NEEDS_VERIFICATION 配图说明缺失——已补 `images/README.md` 与批注图，第 2 轮送审。
 
-### 第 2 轮（Codex `gpt-6-astra` medium，北京 11-21 约 19:20–19:35；审的是第 1 轮修改后的正文、卡片与配图说明，封面节当时未写）
+### 第 2 轮（Codex `gpt-6-astra` medium，北京 11-21 18:59–19:03，按文件时间；审的是第 1 轮修改后的正文、卡片与配图说明，封面节当时未写）
 
 结论 PASS、无 BLOCKER，7 项 SHOULD_FIX：
 1. “没见过的490道题”忽略论文自己说的 8 道改述重复——采纳：改“另留的490道”，清单补 Tab. 7 去重结果。
@@ -93,7 +93,7 @@
 
 ## 视觉复核
 
-### 第 1 轮（Codex `gpt-6-astra` medium，北京 11-21 约 19:20–19:35；附图 22 张：两张封面、全部卡片与 7 张批注底图）
+### 第 1 轮（Codex `gpt-6-astra` medium，北京 11-21 19:01–19:03，按文件时间；附图 22 张：两张封面、全部卡片与 7 张批注底图）
 
 1. BLOCKER 08 底图上下拼接却标“原图未改”——采纳：改为同页 13.3 节标题至页末的连续截图。
 2. BLOCKER 08 译注①“标题之后没有内容”“即零点分布”是本号判断——采纳：译注只留“定理 13.3.1.2（L(s, χ) 的除子）”，判断留在吠点卡。
@@ -104,3 +104,10 @@
 7. NICE_TO_HAVE 11、13 表格字小——未改：截图保留表注与上下文，读者可放大；吠点卡已写出关键数字。
 
 Claude 复看：08、06、01 重渲后逐张打开，高亮位置、译注与正文一致。
+
+### 交付前自查（北京 11-21 19:10 前后）
+
+- Sutherland 复核页北京 19:11:35 重取，转文本与 `a-sutherland.txt` 无差异（lake comparator 与导出重放仍为 running），标题“机器验过”、吠点②“另有检查仍在跑”与 05 卡不变。
+- 速览 Inkling 条：官方原句为 “released with open weights”，模型卡许可 Apache 2.0，“开源”改“开放权重”，删去未上卡的参数；02 重渲。
+- 第 2 轮之后新增、未经跨模型复核的句子：省流首句“几小时内，两份文稿称证明了广义黎曼猜想”、对你“两份都能免费下载”、“另留的490道”、“（70.2%对84.3%）”、Inkling 条；均已对照本清单所列存档。
+- 重渲后的 01–13 卡与两张封面逐张打开核对。
