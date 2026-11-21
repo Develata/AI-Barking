@@ -73,12 +73,6 @@
 
 | 期次 | 标签 | 事实 |
 |---|---|---|
-| 1117 | Gemini | 谷歌称 Gemini 免费版 Tasks 在美日韩等6国逐步推出，高级功能先美国 |
-| 1117 | 谷歌 | Google Wallet 上线美国 iOS，iOS 上暂不支持碰一碰支付 |
-| 1117 | 评测 | Runta 自家评测22种智能体配置：按标价，64.5%的成本花在没通过的尝试上 |
-| 1117 | 安全 | 谷歌与 UCL 测18个模型的网络安全建议，按专家细则平均得分82% |
-| 1117 | 医疗 | OpenAI 称 GPT-6-Astra 做病历任务，325项中99%被评为安全 |
-| 1117 | 制药 | Isomorphic Labs 宣布50亿美元 C 轮融资，新闻稿未写估值 |
 | 1118 | Anthropic | Anthropic IPO 定价每股83美元，发售9.8亿股，含老股东出售部分 |
 | 1118 | 谷歌 | 谷歌 Genie 4 向符合条件的 Ultra 订阅用户开放，Pro 用户可排队 |
 | 1118 | DeepSeek | DeepSeek：调用模型时触发的服务端搜索，11月18日12时起不再按次收费 |
@@ -90,6 +84,12 @@
 | 1119 | 法律 | 美法官：若如原告所称仅凭 AI 人脸比对申请逮捕，警探暂不获豁免 |
 | 1119 | DeepMind | 英国 DeepMind 员工工会称谷歌拒绝自愿承认，已申请法定承认 |
 | 1119 | 数学 | Anthropic 员工称与 Claude 证明黎曼猜想，待独立核验 |
+| 1120 | 数学 | Anthropic 员工等称借 AI 证出 NS 方程无外力也爆破，证书未公开 |
+| 1120 | 开源 | Inkling 2 Mini：官方称部分测试领先总参数100B 以下开放模型 |
+| 1120 | 谷歌 | 据 Mother Jones 报道，数百名谷歌员工请愿让学校能关掉搜索里的 AI |
+| 1120 | ChatGPT | OpenAI：ChatGPT Space 逐步向18岁以上 Plus 用户开放 |
+| 1120 | METR | METR：其评测中 AI 有一半把握完成的任务，按人类用时约3.6个月翻倍 |
+| 1120 | 开源 | Inkling 2 Mini 以 Apache 2.0 开源，总参数26.4B |
 
 ## 已发过
 
@@ -152,3 +152,4 @@
 | 1117 | AI没做成也不说？新GPT测试中22%：OpenAI GPT-6.2-Astra/Sol 系统卡（Published 11/17）的 Blocker Deception 设障测试（删掉要改的文件等）里，GPT-6.2-Astra 有22.28%最终回复没提或说错障碍，GPT-6-Astra 11.09%（Sol 24.08%），OpenAI 写“concerned by this regression”、猜测与“让回答简洁、少加 caveats”有关；吠点：题目为诱发而设、原文写不一定反映真实使用；Codex 里加指令后 Astra 降到8.04%，但该指令不作用于直接 API 请求；ChatGPT 里只进 Work 和 Codex，免费版不在名单。微软 MAI-Code-2（Ignite，北京11/18 02:15）称四项编程测试平均通过率为 GPT-6.1-Sol 的98%、成本40%（每任务 $0.309 对 $0.761）；吠点：Ignite 总览页与苏莱曼写“40% of the price”不提促销，博客脚注才写按50%促销价（GitHub 价目 $0.50/$2.50 至2027-05-17，之后 $1/$5）；“98%”是63.2%对64.1%，MAI 更低的三项正是微软 MSBench 自跑的三项。WorkBuddy“GPT-6.2 长请求比上代还贵”不成立（旧 GPT-6-Astra 同样有 272K 整单加价） |
 | 1118 | AI挖出11年老漏洞，有条件才中招：【NGINX】11/18 发 1.30.7、1.31.9 修两个 HTTP/2 远程代码执行漏洞（CVE-2026-123007、CVE-2026-123633；nginx.org 评级 major、medium，F5 CVSS 3.1 8.1、4.0 9.2）；Wiz 称用自家 AI 扫描工具 Atlas 发现、Gemini-4-Carbon 与 GPT-5.6-Sol 验证，123007 自 1.9.5（2015）就在，称另有 Ikotas、Metnir、Rapid7、Xint 独立发现（F5 致谢逐 CVE 各四方、名单不同；Rapid7 写明研究员发现、无 AI）；前提：都要开 HTTP/2，123633 另需转发请求且 worker 连接数吃紧，ASLR 关闭或被绕过时才能执行代码；吠点：“2.25亿网站”是 Netcraft 使用量，Censys 看板（只追踪 123007）暴露约882万个服务、另约1亿个不显示版本；团子技术日报“从公网直取宿主机根权限”，漏洞本身只到 worker 权限，Xint 另串了一个尚无补丁的 Linux SCTP 内核漏洞才拿到 root；1.31.8 仍受影响、1.30.7 不受影响；CERT-EU、Censys 称未见在野利用。【Gemini-4-Neon】谷歌称默认 high 档每任务比 Carbon 低32%（未写口径）；AA 测得 Neon xhigh $6.44、比 Carbon high（标准价）$7.76 低约17%；Neon $3/$15，Carbon 原价 $4/$20、半价促销 $2/$10 至 11/30，Neon 免费层不可用；吠点：同为 high 档按原价 Neon $3.74、Carbon $7.76，按促销半价折算 Carbon 约 $3.88 与 Neon 相近、比 Neon xhigh 便宜约四成（本号推算）；36氪等“成本只有 Carbon 的60%”出自谷歌博客里 Glean 产品负责人的早期评估 |
 | 1119 | 公司称AI设计CPU能效4.59倍，没造：Architect Labs 博客（11/18）称 AI 智能体从指令集做到版图设计出 CPU 架构 Frostbite，拿四个计算单元（quad+L3，0.792 mm²）比面积相近的一颗双发射顺序执行核（0.895 mm²，型号“因法律原因”不公开），25个自选小程序每瓦性能几何平均4.59倍；吠点：调优用的10个6.02倍、没调过的15个3.83倍（其中5个后加），只到7 nm 最终 GDS、功耗为流片前估算，跟乱序大核与多核比“未来几个月”才做，Notebookcheck 标题“AMD and Intel, move over”（对手可能就是这两家的产品，不能写“没比过”）。Signal（11/20 博文）在 iOS 27 上禁应用内截屏挡 Siri AI，Android 检测到 AI 助手读屏才开“屏幕安全”（设置页写 some AI assistants），据路透默认开启、可在设置-隐私关掉；吠点：The Verge 标题“blocking Gemini and Siri AI from reading your screen”，Signal 自称只拦截屏，读手机已存文件拦不住，macOS 目前做不到；苹果称中国大陆没有 Siri AI。Contra 设计榜（盲选网站设计，17行）：HN 帖称“两个隐身模型都在 Fable 5.2 前面”，实为只有 Gestalt（1931）一个隐身模型，第二是 Contra 请设计师做的参考作品（1739），Fable 5.2 第三（1713）；吠点：据 Contra，Gestalt 胜参考作品是28次二选一选它20次，评分细则 Gestalt 83 低于 Fable 5.2 的84，参考稿经 Contra 反馈修改、方法页没写模型提示词 |
+| 1120 | AI证黎曼猜想？机器验过，作者没吃透：【跟进1119速览】Anthropic 员工 Alpöge（remark.pdf，北京11/20 20:52）称与 Claude 找到 RH 证明、可推到 GRH，只公开 Lean；MIT Sutherland 复核页（11/21 09:30 UTC）称175,187个模块编译通过、#print axioms 只有三条标准公理、leanchecker 全重放，nanoda、con-leche 两个独立内核与 lean4lean 都接受，lake comparator 与导出重放仍在跑，“GRH”只指 Dirichlet L 函数；Lipponen（LUMI）独立编译、哈希一致，称不等于有人读懂。几小时后 Vakil（北京11/21 02:18）公布 Masullo 940页纯人工 GRH 草稿（称覆盖所有数域的酉 Hecke 特征），约8小时后补记多人借 AI 报告问题、不担保思路；稿内30处“Return here”，第522页定理13.3.1.2只有标题、脚注“Insert statement”。吠点：新浪新闻“AI 写出25万页证明”（25万页是作者脚注里的未公开文稿）、检查程序只保证每步推得通、两份“广义”范围不同；扫描把 Aaronson 原话（17 million lines、0=1、my bet）安在 Tao 头上，已更正。Qwen3.5-27B 改写自己权重（arXiv 2611.21885 v2）：另留490题×8答案上57.2%→63.8%；吠点：第二协议8轮各自从原始权重重改、5轮撤回、提交3次57.8%/61.3%/63.8%（智客前沿“8轮持续提升”），改动针对写到长度上限的答案（截断33.6%→26.1%，例题重复549次），摘要“80%以上”修复指图像题70.2%对84.3%、文本33.0%对58.5%；参考文献[25]即1102期 MIT CSAIL 博文。 |
