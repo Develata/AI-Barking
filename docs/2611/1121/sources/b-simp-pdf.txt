@@ -1,0 +1,645 @@
+                                         A simplified proof of polynomial improvements for 3SUM and APSP
+                                                           Sankeerth Rao Karingula                        Shachar Lovett∗
+                                                                 Agentin AI                     University of California, San Diego
+                                                          [EMAIL-REDACTED]                      [EMAIL-REDACTED]
+
+                                                                                       October 14, 2026
+
+
+
+
+arXiv:2610.15663v1 [cs.CC] 11 Oct 2026
+                                                                                             Abstract
+                                                      We give a simplified proof of the polynomial improvements for integer 3SUM and all-pairs
+                                                   shortest paths (APSP) established by Alman and Vassilevska Williams, with weaker exponents.
+                                                   The central ingredient is selected-entry matrix multiplication: computing a prescribed set of
+                                                   entries of a product of dense rectangular matrices. Starting from Schönhage’s inner/outer-
+                                                   product identity, we construct a multiplication rule that shares intermediate products among
+                                                   many outputs. We apply this rule recursively and bound the work by counting the requested
+                                                   entries at each level.
+                                                      Applied to incidence matrices, the algorithm solves Offline Set Disjointness over a small
+                                                   universe. Known deterministic reductions then yield truly subquadratic integer 3SUM and truly
+                                                   subcubic APSP for polynomially bounded integer inputs.
+
+
+                                         1        Introduction
+                                         Alman and Vassilevska Williams [1] established the first truly subquadratic algorithms for integer
+                                         3SUM and truly subcubic algorithms for all-pairs shortest paths with polynomially bounded integer
+                                         inputs. Their main innovation is a matrix multiplication algorithm that exploits sparsity in the set
+                                         of requested outputs, even when the input matrices are dense. We give a simplified proof of these
+                                         qualitative improvements, with weaker exponents.
+                                             We focus on the matrix multiplication argument. To obtain the 3SUM and APSP consequences,
+                                         we first apply it to Offline Set Disjointness, where matrix entries directly encode intersection sizes.
+                                         We then use existing deterministic reductions from 3SUM and APSP to this problem as black boxes.
+
+                                         Selected-entry matrix multiplication. Let X be an n × d matrix and Y a d × m matrix. Each
+                                         entry of XY is a dot product of a row of X and a column of Y . We call the task of computing w
+                                         specified entries of XY selected-entry matrix multiplication. Computing these entries as separate dot
+                                         products uses wd multiplications, while writing down the full product takes Ω(nm) time. When the
+                                         middle dimension d and the number of requested entries w are small enough, sharing intermediate
+                                         computations gives the following bound.
+                                         Theorem 1.1 (Selected-entry matrix multiplication). For every fixed τ ∈ (0, 1], there is an integer
+                                         κ = κ(τ ) = O(τ −2 ) with the following property. Let dκ ≤ min{n, m}. Given integer matrices
+                                         X ∈ Zn×d and Y ∈ Zd×m , with entries of polynomial magnitude in n + m, and w ≥ 1 distinct
+                                         specified positions in XY , those entries can be computed deterministically in time
+                                                                                                √
+                                                                               e (n + m)dκ + dτ nmw .                                    (1)
+                                                                                                       
+                                                                              O
+                                             ∗
+                                                 Supported by Simons Investigator Award #929894 and NSF award CCF-2425349.
+
+
+                                                                                                1
+    The first term pays for preparing linear combinations of the inputs; the second pays for multiplying
+these forms and reconstructing the requested outputs. Reducing τ makes the latter cheaper, at the
+expense of increasing κ and restricting the allowable middle dimension d. Alman and Vassilevska
+Williams [1] call such products thin and the prescribed outputs wanted entries.
+    For example, take τ = 1/4, let κ = κ(1/4), and suppose dκ+1 ≤ n. Computing w = ⌊n2 /d⌋
+specified entries of an n × d by d × n product then takes O(n e 2 /d1/4 ) time. Separate dot products
+would take Θ(n2 ) operations, and the full product has n2 entries. When d is a fixed positive power
+of n, this saves a polynomial factor over both approaches.
+
+Fine grained algorithms. Integer 3SUM asks whether a list of n integers contains three entries
+with distinct indices whose sum is zero. All-pairs shortest paths (APSP) asks for the shortest-path
+distance between every ordered pair of vertices in a directed graph. We allow negative edge weights
+but assume there is no negative cycle. Combining Theorem 1.1 with known reductions gives the
+following corollary.
+
+Corollary 1.2. There are absolute constants δ1 , δ2 > 0 such that integer 3SUM on n polynomially
+bounded integers has a deterministic O(n2−δ1 )-time algorithm, and APSP on an n-vertex directed
+graph with polynomially bounded integer edge weights and no negative cycle has a deterministic
+O(n3−δ2 )-time algorithm.
+
+   We have not tried to optimize the constants; our focus is on simplicity of exposition.
+
+1.1   Proof overview
+Selected-entry matrix multiplication. The algebraic starting point is the inner/outer-product
+identity of Schönhage [2], used by Coppersmith [3] for rectangular matrix multiplication. Alman
+and Vassilevska Williams [1] adapt this approach to exploit the overlap among the computations
+needed by selected entries. We express this sharing through an exact multiplication rule: each
+output is a sum of six products from a common collection, minus one private correction term. The
+common collection is small relative to the number of outputs, and the same intermediate value can
+serve many requested entries. We apply the rule recursively to matrix blocks and count the resulting
+requests, capping each count by the number of available output positions. Our simplification is in
+the explicit rule and this counting argument; the central idea of exploiting sparse output requests
+comes from Alman and Vassilevska Williams [1].
+
+Fine grained algorithms. In Offline Set Disjointness [4, 5], we are given two families of sets
+and a list of pairs, one set from each family, and must determine which pairs are disjoint. The
+product of the families’ incidence matrices records all intersection sizes. When the universe is small,
+Theorem 1.1 computes the requested intersection sizes efficiently. For 3SUM, we use the direct
+deterministic reduction of Fischer, Kaliciak, and Polak [5]. For APSP, we use the standard reduction
+to Exact Triangle, followed by the deterministic reduction to lopsided triangle queries of Alman and
+Vassilevska Williams [1].
+
+Further research. How far can selected-entry matrix multiplication be improved? What is
+the best possible dependence on the middle dimension d when computing w arbitrary entries of
+an n × d by d × n product? Can we reduce the dτ loss in Theorem 1.1 without increasing the
+input-preparation cost or requiring thinner matrices? Can comparable savings hold for larger d? For
+which ranges of d and w can selected-entry algorithms substantially outperform the best rectangular
+
+
+                                                   2
+matrix multiplication algorithms for computing the full product? It would also be valuable to find
+simpler multiplication rules or entirely different algorithms achieving such savings. Progress on these
+questions may also lead to stronger algorithms for 3SUM, APSP, and other fine grained algorithmic
+problems.
+
+AI methodology. Agentin AI coordinated a large research swarm of AI agents to explore
+alternative proof strategies and candidate simplifications, contributing to the development of the
+simplified proof presented here. The authors directed the mathematical investigation, critically
+evaluated the proposed arguments, and developed and refined the proof and exposition through
+iterative work with ChatGPT and Codex. This process included checking calculations, simplifying
+the recursive analysis, separating input-preparation costs from multiplication costs, and improving
+the presentation. The authors take responsibility for the final manuscript.
+
+Acknowledgements.           We thank Virginia Vassilevska Williams for helpful comments.
+
+Organization. After brief preliminaries, Section 2 proves the selected-entry bound, and Section 3
+applies it to set disjointness and derives the 3SUM and APSP consequences using known reductions.
+
+Preliminaries. Throughout, [t] = {1, . . . , t} and logarithms have base two. We write O(f
+                                                                                        e ) for
+O(f ) up to polylogarithmic factors. All integer inputs are polynomially bounded in the relevant
+size parameter, so they have logarithmic bit length. Arithmetic on such integers costs only
+polylogarithmic time, which is absorbed by O.e
+
+
+2    Selected-entry matrix multiplication
+Theorem 1.1 follows from the main theorem, which gives a more precise bound on the runtime of
+the selected-entry matrix multiplication algorithm.
+Theorem 2.1 (Combinatorial bound). Fix an integer k ≥ 81. Let d6k ≤ min{n, m} and t = ⌈log2 d⌉.
+Given integer matrices X ∈ Zn×d and Y ∈ Zd×m with entries of polynomial magnitude in n + m,
+any w ≥ 1 distinct specified entries of XY can be computed deterministically in time
+                                                       t
+                                                                 !                  !
+                                                              t s       nm
+                                                                           
+                                   (n + m)d        +            6 min w, s                                      (2)
+                                                       X
+                                              6k
+                               O
+                               e                                                         .
+                                                       s=0
+                                                              s         k
+    The following convenient corollary simplifies the runtime in terms of a single parameter θ ∈ [0, 1].
+Corollary 2.2 (Density tradeoff). Under the assumptions of Theorem 2.1, the same algorithm runs
+in time                                                    
+                  e (n + m)d6k + (nm)θ w1−θ dlog2 (1+6/kθ )
+                  O                                             (0 ≤ θ ≤ 1).                 (3)
+Proof. Using min{x, y} ≤ x1−θ y θ and the binomial theorem,
+          t                                                  t
+                  !                                                   !
+               t s       nm                                          t
+                                    
+                 6 min w, s              ≤ (nm) w                      (6/k θ )s = (nm)θ w1−θ (1 + 6/k θ )t .
+          X                                                  X
+                                                   θ   1−θ
+
+         s=0
+               s         k                                   s=0
+                                                                     s
+                                                       θ
+Since t = ⌈log2   d⌉, the last factor is O(dlog2 (1+6/k ) ).
+                                                                √
+Proof of Theorem 1.1. Take k = ⌈81/τ 2 ⌉ and κ = 6k. Then 1 + 6/ k ≤ 1 + 2τ /3 < 2τ , so
+Theorem 2.2 with θ = 1/2 gives the claim.
+    We prove Theorem 2.1 in the remainder of this section.
+
+                                                             3
+Proof idea. We first construct a small matrix multiplication rule in which outputs use six products
+from the same shared collection minus one private product per output. We apply this rule recursively
+to blocks of larger matrices, following only the intermediate entries needed for the requested outputs.
+We count these requests by their pattern of private and shared steps. Each shared step generates
+at most six requests per incoming request, but the count is capped by the total number of output
+positions in the corresponding products. The base case is an outer product, whose requested entries
+each require one multiplication. Padding the input dimensions lets us apply this count directly to
+the given matrices.
+
+2.1    The multiplication rule
+For a matrix product U V , call U the left input and V the right input. A product of linear forms
+multiplies an integer linear combination of entries of U by an integer linear combination of entries
+of V . We count the additions and subtractions needed to form these combinations separately from
+their multiplication.
+
+Lemma 2.3 (A shared multiplication rule). Let k ≥ 2 and set R = k2k−1 and S = 3k−1 . We
+construct a multiplication rule for matrices U ∈ ZR×2 and V ∈ Z2×S as follows:
+
+   1. Products: There is a common collection of 6k shared products and one private product for
+      each entry of U V .
+
+   2. Linear forms: Every product multiplies a linear form in U by a linear form in V . Each
+      form is a sum of at most 6k signed entries of its respective matrix.
+
+   3. Reconstruction: Each entry of U V is the sum of six shared products minus its private
+      product.
+
+   We count products by their labels, even if two formulas happen to be identical. The multiplication
+has RS = k6k−1 outputs, but only 6k shared products. Thus
+
+                                  number of shared products   6k  6
+                                                            =    = .
+                                     number of outputs        RS  k
+As k increases, the shared collection becomes small relative to the number of outputs. This is the
+reuse that our recursive algorithm will exploit.
+A cancellation identity. The construction follows the Schönhage-Coppersmith approach used by
+Alman and Vassilevska Williams [1]. We first give a cancellation identity, then construct shared
+linear forms whose restriction to each output has exactly this pattern. The identity is the 2 × 3
+instance of Schönhage’s inner/outer-product cancellation [2].
+    For the desired dot product p1 q1 + p2 q2 , we add a third coordinate with p3 = 0 and q3 = −q1 − q2 .
+The first relation preserves the dot product, while the zero sum of the qj cancels a mixed term. The
+remaining unwanted terms are removed by one private product. Figure 1 illustrates the identity.
+
+Claim 2.4 (Cancellation). Let x1 , x2 , p1 , p2 be left variables and y1 , y2 , y3 , q1 , q2 be right variables.
+Put p3 = 0 and q3 = −q1 − q2 . Then
+            3
+                  (x1 + pj )(yj + qj ) + (x2 − pj )yj − (x1 + x2 )(y1 + y2 + y3 ) = p1 q1 + p2 q2 .         (4)
+            X                                      
+
+            j=1
+
+
+
+
+                                                        4
+                      j=1                                 j=2                                   j=3
+
+   i=1         (x1 + p1 )(y1 + q1 )               (x1 + p2 )(y2 + q2 )                  (x1 + p3 )(y3 + q3 )
+
+   i=2             (x2 − p1 )y1                       (x2 − p2 )y2                          (x2 − p3 )y3
+
+                                                                sum all six
+
+       (x1 + x2 )(y1 + y2 + y3 )        +          x1 (q1 + q2 + q3 )               +             p1 q1 + p2 q2
+
+       Removed by subtracting                         Zero by the                                 The desired
+         one private product                       zero-sum relation                              dot product
+
+
+Figure 1: The six products in equation (4) and their sum, with p3 = 0 and q1 + q2 + q3 = 0.
+Subtracting one private product leaves the desired dot product.
+
+
+Proof. For each j, the expression in brackets is (x1 + x2 )yj + x1 qj + pj qj . Summing over j, the first
+terms cancel the subtracted product, the second sum to zero because q1 + q2 + q3 = 0, and the last
+sum to p1 q1 + p2 q2 because p3 = 0.
+
+   Note that the variables xi , yj can be arbitrary: the identity always recovers the same two-term
+dot product. We will choose them so that the six positive products for different outputs belong to
+one small collection.
+The shared products. Fix the integer k ≥ 2 from Theorem 2.3 for the rest of this construction.
+Recall that R = k2k−1 and S = 3k−1 , and let U ∈ ZR×2 and V ∈ Z2×S . Label the rows of U by
+(h, u), with h ∈ [k] and u ∈ {1, 2}k−1 , and the columns of V by v ∈ {1, 2, 3}k−1 . To match the three
+values of j in Theorem 2.4, extend the entry notation by
+
+                                   U(h,u),3 = 0,          V3,v = −V1,v − V2,v .
+
+These are abbreviations for linear forms in the original entries.
+   For a tuple a of length k, write a−ℓ for the tuple obtained by deleting coordinate ℓ, keeping the
+others in their original order. For example, (a1 , a2 , a3 )−2 = (a1 , a3 ).
+   For each a ∈ {1, 2}k and b ∈ {1, 2, 3}k , define
+                               k                                              k
+                      Aa,b =         (−1)aℓ −1 U(ℓ,a−ℓ ),bℓ ,      Ba,b =                                         (5)
+                               X                                              X
+                                                                                    1aℓ =1 Vbℓ ,b−ℓ .
+                               ℓ=1                                            ℓ=1
+
+Here 1aℓ =1 is 1 if aℓ = 1 and 0 otherwise. Our shared collection consists of the 6k products Aa,b Ba,b .
+Each multiplies a linear form in U by a linear form in V .
+    The output ((h, u), v) uses the six products whose labels satisfy a−h = u and b−h = v. Only the
+pair (ah , bh ) varies, so these labels form a six-point coordinate line. Each label belongs to one such
+line for each h ∈ [k]; thus each shared product serves k outputs. Figure 2 illustrates this pattern for
+k = 2.
+    Along this line, the ℓ = h terms in equation (5) supply the entries of the desired dot product.
+The remaining terms play the roles of xi , yj in Theorem 2.4, so one private product cancels their
+contribution. We verify this next.
+
+
+
+
+                                                           5
+                                        Shared products for k = 2                  A point (a, b) represents the product Aa,b Ba,b .
+                               (2, 3)
+                                                                                          h = 1: output (U V )(1,1),2
+
+
+
+
+Second coordinate (a2 , b2 )
+                               (2, 2)                                                     Fix (a2 , b2 ) = (1, 2); vary (a1 , b1 ).
+
+                               (2, 1)                                                     h = 2: output (U V )(2,2),1
+                                                                                          Fix (a1 , b1 ) = (2, 1); vary (a2 , b2 ).
+                               (1, 3)
+                                                                                          a = (2, 1), b = (1, 2)
+                               (1, 2)                                                     This product is used by both outputs.
+
+                               (1, 1)                                              Each output sums the six products on its line,
+                                    (1, 1) (1, 2) (1, 3) (2, 1) (2, 2) (2, 3)      then subtracts its private product.
+                                          First coordinate (a1 , b1 )
+                                                In k dimensions: six points per line, and k lines through each point.
+
+
+Figure 2: Shared products and outputs for k = 2. Each point is one shared product, and each
+coordinate line selects the six shared products for one output. The highlighted lines reuse the
+product at their intersection.
+
+
+Proof of Theorem 2.3. Fix an output ((h, u), v). Let a(i) be obtained by inserting i ∈ {1, 2} into u
+at position h, and let b(j) be obtained by inserting j ∈ {1, 2, 3} into v at position h. For example,
+for k = 3 and h = 2,
+                               a(i) = (u1 , i, u2 ), b(j) = (v1 , j, v2 ).
+In particular, a(i)−h = u and b(j)−h = v. Use the six shared products with labels (a(i), b(j)), and
+put
+                            pj = U(h,u),j , qj = Vj,v     (1 ≤ j ≤ 3).
+Our extended notation gives p3 = 0 and q3 = −q1 − q2 , as required. In equation (5), the ℓ = h
+terms contribute (−1)i−1 pj to Aa(i),b(j) and 1i=1 qj to Ba(i),b(j) . For ℓ ̸= h, the terms in A are
+independent of j, since only bh varies with j; call their sum xi . Likewise, the remaining terms in B
+are independent of i, since only ah varies with i; call their sum yj . Thus
+
+                                                            Aa(1),b(j) = x1 + pj ,               Aa(2),b(j) = x2 − pj ,
+                                                            Ba(1),b(j) = yj + qj ,               Ba(2),b(j) = yj .
+
+Applying Theorem 2.4 gives
+                                                                   2 X
+                                                                     3
+                                                (U V )(h,u),v =                 Aa(i),b(j) Ba(i),b(j) − (x1 + x2 )(y1 + y2 + y3 ).
+                                                                   X
+
+                                                                   i=1 j=1
+
+The subtracted term is one product of a linear form in U and a linear form in V ; assign it as the
+private product for this output. All six positive terms belong to the fixed collection of 6k shared
+products.
+    For the bound on the linear forms, expand each abbreviation V3,v = −V1,v − V2,v . Each shared
+form and each xi , yj is then a sum of at most 2k signed input entries. Each private factor combines
+at most three such forms, giving the bound 6k.
+
+
+                                                                                            6
+2.2   The recursive computation
+We now use Theorem 2.3 to reduce the middle dimension of a matrix product by a factor of two.
+A subproblem consists of two input matrices and a set of entries of their product that we want
+to compute. The original subproblem is to multiply X ∈ Zn×d by Y ∈ Zd×m at the w specified
+positions.
+    We first explain one reduction step, then bound three costs after iterating it: preparing input
+linear forms, multiplying them, and reconstructing the requested outputs. Padding the input
+dimensions will then give Theorem 2.1. We first count arithmetic operations on matrix values, and
+account for request processing and intermediate magnitudes at the end.
+One reduction step.   Fix an integer k ≥ 2 and let R = k2k−1 and S = 3k−1 , as in Theorem 2.3.
+
+Claim 2.5 (One reduction step). Consider matrices X ∈ ZN ×D and Y ∈ ZD×M , with w distinct
+specified entries of XY . Suppose R | N , S | M , and 2 | D. This subproblem reduces to RS = k6k−1
+private subproblems and 6k shared subproblems. Each multiplies matrices of dimensions
+                                     N   D                 D M
+                                                                
+                                       ×         and         ×         .
+                                     R   2                 2   S
+The private subproblems receive w requested entries in total, and the shared subproblems receive
+at most 6w. Their answers determine the w original entries using at most 6w additions and
+subtractions.
+
+                                      (a) Input preparation
+                                             X
+
+
+                                                            N ×D
+
+                                                            signed block sums
+
+                                                                                N   D
+                        ···                                      ···            R × 2
+
+                 6k shared                                   RS private
+
+                                  (b) Output reconstruction
+                                                  XY
+
+                                                                (r, c)
+
+
+
+
+                                                             shared             private
+
+
+Figure 3: One reduction step in Theorem 2.5. (a) Signed sums of at most 6k parent blocks form
+each child input, shown for X; Y is treated in the same way. (b) One requested parent entry is
+recovered from six shared answers minus one private answer. Dots mark the same local position
+(r, c) in the parent block and child outputs.
+
+
+                                                  7
+Proof. Partition X into blocks Xi,t , with i ∈ [R] and t ∈ {1, 2}, each of size (N/R) × (D/2).
+Partition Y into blocks Yt,j , with j ∈ [S], each of size (D/2) × (M/S). The (i, j) block of the output
+is
+                                      (XY )i,j = Xi,1 Y1,j + Xi,2 Y2,j .
+This is the same R × 2 by 2 × S multiplication as in Theorem 2.3, with matrices in place of scalars.
+The lemma still applies: its formulas use only linear combinations and products of a left input by
+a right input, always in that order. It expresses each output block as six shared products minus
+one private product. Each such product multiplies a linear combination of the X blocks by a linear
+combination of the Y blocks, giving the stated dimensions.
+    To request an entry of XY , locate its output block (i, j) and its position within that block.
+Request that same position in the six shared products and the one private product used by this
+block. The seven returned values recover the original entry with five additions and one subtraction.
+    Each child maintains a set of requested positions, so repeated requests are computed only once.
+Each output block has its own private product, so the w distinct original requests give exactly w
+distinct private requests. The original requests also generate 6w shared requests, so the shared
+children have at most 6w distinct requests in total.
+
+The bounds after t steps. For fixed k, iterating the rule t times gives the basic dimensions Rt × 2t
+and 2t × S t . We also allow multiples of the outer dimensions, so that arbitrary inputs can be handled
+by padding. We iterate the input preparation and output reconstruction steps shown in Figure 3.
+
+Lemma 2.6 (Iterated multiplication rule). Fix k ≥ 81, with R, S as above. For integers t ≥ 0 and
+a, b ≥ 1, write
+                            N = aRt ,      D = 2t ,     M = bS t .
+For 0 ≤ j ≤ t, define the capped request count
+                                         j         !
+                                           j                   NM
+                                                                    
+                                  Bj =             6s min w,                                        (6)
+                                         X
+                                                                         .
+                                         s=0
+                                               s                ks
+
+Given matrices U ∈ ZN ×D and V ∈ ZD×M , any w ≥ 1 distinct specified entries of U V can be
+computed with the following operation bounds:
+
+   1. Input preparation: D3k (N +M ) additions and subtractions to prepare linear forms separately
+      in U and in V .
+
+   2. Scalar multiplication: Bt multiplications of a prepared form in U by one in V .
+
+   3. Output reconstruction: O(tBt ) additions and subtractions to recover the requested entries.
+
+The algorithm generates O(tBt ) request records.
+
+Proof. Apply Theorem 2.5 recursively for t steps. Each step has T = RS + 6k = (k + 6)6k−1 child
+products, so the full recursion has T t leaves, each an a × 1 by 1 × b outer product. We compute the
+a left input values and b right input values at every leaf, whether or not that leaf receives requests.
+We then multiply only the pairs needed for requested leaf entries and reconstruct the requested
+outputs up the recursion tree.
+    Input preparation. By Theorem 2.3, each entry of a child’s left input matrix is a sum of at
+most 6k signed entries of its parent’s left input matrix. The same holds for the right input matrices.
+Substituting these expressions through all t levels writes each left input value at a leaf as a sum of
+
+                                                       8
+at most (6k)t signed entries of the original matrix U , and each right input value as such a sum of
+entries of V . There are a + b input values per leaf. Computing these sums directly from the original
+inputs uses at most
+                             T t (a + b)(6k)t ≤ D3k (a + b) ≤ D3k (N + M )
+additions and subtractions, since 6kT ≤ 23k for k ≥ 81 and D = 2t .
+    Requested computations. A request specifies one entry of the output matrix of one sub-
+problem. Starting with the w specified entries of U V , we pass requests down the recursion tree.
+Each request generates one request in a private child and six requests in shared children, all at the
+same local position. Requests for the same entry of the same child are merged. Let Qj be the total
+number of distinct requests at depth j, counting requests in different subproblems separately. We
+will show that Qj ≤ Bj .
+    Group the subproblems at depth j by their pattern of shared and private steps from the root. A
+pattern specifies the type of child at each step, but not which child is chosen. Fix a pattern with s
+shared steps and j − s private steps. We bound its requests in two ways:
+
+  • Requests generated. Each original request has one continuation at a private step and at most
+    six at a shared step. It therefore generates at most 6s requests with this pattern, or at most
+    6s w over all original requests.
+
+  • Available positions. The full recursion tree has RS choices of private child and 6k choices of
+    shared child at each step. Thus (RS)j−s (6k )s subproblems have this pattern. Each has an
+    output matrix of size (N/Rj ) × (M/S j ), so their total number of output positions is
+
+                                                       NM        NM
+                                     (RS)j−s (6k )s          = 6s s ,
+                                                      (RS) j      k
+
+     using RS = k6k−1 . Merging repeated requests caps the number of distinct requests by this
+     number of positions.
+                                                                          j
+Taking the smaller bound for each pattern, and noting that there are      s patterns with s shared
+steps, gives
+                                  j     !
+                                      j               NM
+                                                         
+                                          min 6s w, 6s s     = Bj .
+                                 X
+                           Qj ≤
+                                 s=0
+                                      s                k
+   At depth t, the middle dimension is one, so each requested entry is computed by multiplying two
+prepared input values. This uses Qt ≤ Bt scalar multiplications. We then work back up the tree:
+each requested parent entry is the sum of its six shared answers minus its private answer, using six
+additions or subtractions. Request generation and reconstruction therefore each cost O( t−1 j=0 Qj ).
+                                                                                          P
+                                                    j
+Finally, Bj ≤ Bt for j ≤ t, since each coefficient s in equation (6) is nondecreasing in j. These
+two costs are thus O(tBt ).
+
+
+Proof of Theorem 2.1. If d = 1, then t = 0 and the sum in equation (2) is w, so compute the entries
+directly. Otherwise, set D = 2t < 2d. Pad the outer dimensions to the least multiples N, M of
+Rt , S t that are at least n, m, respectively, and pad the middle dimension to D. Since R, S ≤ 23k
+and D < 2d ≤ d2 ,
+                                max{Rt , S t } ≤ D3k ≤ d6k ≤ min{n, m}.
+
+
+
+
+                                                 9
+Hence N ≤ 2n and M ≤ 2m. Apply Theorem 2.6. Input preparation costs at most 2(n + m)d6k .
+Since N M ≤ 4nm, the capped count satisfies
+                            t                                   t
+                                  !                                   !
+                                  t s       NM                        t s       nm
+                                                                                    
+                     Bt =           6 min w, s             ≤4           6 min w, s .
+                            X                                   X
+
+                            s=0
+                                  s          k                  s=0
+                                                                      s         k
+
+The extra factor O(t) for reconstruction and request generation, and the cost of sorting and
+deduplicating requests, are absorbed by eO.
+   If the input entries have absolute value at most L ≥ 1, each preparation or reconstruction step
+combines O(k) values. All intermediate values are therefore bounded by (6k)O(t) L2 . Since k is fixed,
+t = O(log d), and L is polynomially bounded, these integers have O(log(n + m)) bits. This proves
+equation (2).
+
+
+3     Applications to fine grained algorithms
+Fine grained algorithms seek to improve the exponent in a problem’s running time. Here our goal is
+to go below quadratic time for integer 3SUM and below cubic time for APSP. We do this through a
+convenient intermediate problem, Offline Set Disjointness, which asks whether specified pairs of sets
+intersect.
+    This problem connects directly to our matrix multiplication algorithm: the product of two
+incidence matrices records the intersection sizes, and we only need the entries corresponding to the
+queried pairs. Known reductions then turn a faster algorithm for this intermediate problem into
+faster algorithms for 3SUM and APSP. We first give the set-disjointness algorithm, then apply these
+reductions.
+
+3.1    Offline Set Disjointness
+An instance of the Offline Set Disjointness problem consists of two families S1 , . . . , Sn , T1 , . . . , Tn ⊆
+[d] and a set W ⊆ [n] × [n] of w requested pairs. For each (i, j) ∈ W , we must determine whether
+Si ∩ Tj = ∅.
+                                                                                                             √
+Lemma 3.1. There is an absolute integer K ≥ 2 such that, whenever dK ≤ n and w ≤ n2 / d,
+                                                                 e 2 /d1/8 ).
+Offline Set Disjointness can be solved deterministically in time O(n
+
+Proof. Take τ = 1/8 in Theorem 1.1, and set K = κ(1/8) + 1. Form the incidence matrices
+X ∈ {0, 1}n×d and Y ∈ {0, 1}d×n . Since (XY )ij = |Si ∩ Tj |, it suffices to compute the entries
+indexed by W . The theorem gives running time
+                                   √ 
+                   e ndK−1 + nd1/8 w ≤ O   e n2 /d + n2 /d1/8 = O(n
+                                                             
+                                                                  e 2 /d1/8 ).
+                  O
+
+Forming the incidence matrices and reading the queries costs O(nd + w), which is absorbed by this
+bound.
+
+3.2    Known reductions
+To identify the offline set disjointness problem with its graph formulation, use one vertex for each Si ,
+one for each Tj , and a middle vertex for each element of [d]. Join sets to their elements and add an
+outer edge for every requested pair. That edge lies in a triangle exactly when the two sets are not
+disjoint. This is the Lopsided All-Edges Sparse Triangle formulation [6, 1], with a small middle part.
+
+
+                                                      10
+   For 3SUM, Fischer, Kaliciak, and Polak [5] derandomized the set-disjointness reduction of
+Kopelowitz, Pettie, and Porat [4]. For Exact Triangle, Vassilevska Williams and Xu [6] gave a
+randomized reduction to the lopsided problem. Chan and Xu [7] gave a deterministic reduction
+to All-Edges Sparse Triangle, but its construction does not ensure the small middle part needed
+here. Alman and Vassilevska Williams [1] obtain the deterministic lopsided reduction by combining
+deterministic hashing with the earlier graph constructions. We use these reductions as black boxes.
+
+Proof of Theorem 1.2. 3SUM. Fischer, Kaliciak, and Polak [5] show that, for every fixed 0 < η < 1,
+a deterministic truly subquadratic algorithm for Offline Set Disjointness with O(n) sets, universe
+size O(n2η ), set size O(nη ), and O(n2−η ) queries gives a deterministic truly subquadratic algorithm
+for 3SUM. Choose η > 0 with 2ηK < 1. After padding    √ the families and universe to sizes Θ(n) and
+d = Θ(n2η ), respectively, the query bound is O(n2 / d). A constant number of query batches allows
+Theorem 3.1 to solve these instances in O(ne 2−η/4 ) time, giving the 3SUM conclusion.
+    APSP. Exact Triangle asks whether an integer-weighted tripartite graph with n vertices per
+part contains a triangle whose edge weights sum to zero. We restrict to weights of magnitude nO(1) .
+Alman and
+        √ Vassilevska Williams [1] reduce it deterministically, for 16 ≤ d ≤ n and √        an integer
+1 ≤ g ≤ d, to O(ng) set-disjointness instances with parameters (n, d) and at most n2 / d queries
+each, with additional time
+                                     e n3 /g + nω+o(1) d3/2 + n2 dg ,
+                                                                   
+                                    O
+where ω < 3 is the square matrix multiplication exponent.
+    Choose d = ⌊nε ⌋ for a sufficiently small fixed ε > 0, and set g = ⌈d1/16 ⌉. By Theorem 3.1,
+the oracle calls cost O(ng
+                      e    · n2 /d1/8 ) = O(n
+                                           e 3 /d1/16 ), as does the first overhead term. Since ω < 3,
+choosing ε small enough also ensures d ≤ n and makes the other two overhead terms smaller than
+                                         K
+
+this bound. Thus Exact Triangle takes O(n  e 3−ρ ) time for some constant ρ > 0.
+    The deterministic reduction of Vassilevska Williams and Williams [8, 9] solves APSP in O(n
+                                                                                             e 3−ρ/3 )
+time, using only the decision version of Exact Triangle. Absorbing logarithmic factors gives the
+claimed polynomial improvement.
+
+
+References
+[1] Josh Alman and Virginia Vassilevska Williams. Truly subquadratic 3SUM and truly subcubic
+    APSP via triangles in sparse lopsided graphs. arXiv preprint arXiv:2610.06783, 2026.
+
+[2] Arnold Schönhage. Partial and total matrix multiplication. SIAM Journal on Computing,
+    10(3):434–455, 1981.
+
+[3] Don Coppersmith. Rapid multiplication of rectangular matrices. SIAM Journal on Computing,
+    11(3):467–471, 1982.
+
+[4] Tsvi Kopelowitz, Seth Pettie, and Ely Porat. Higher lower bounds from the 3SUM conjecture.
+    In Proceedings of the twenty-seventh annual ACM-SIAM symposium on Discrete algorithms,
+    pages 1272–1287. SIAM, 2016.
+
+[5] Nick Fischer, Piotr Kaliciak, and Adam Polak. Deterministic 3SUM-hardness. arXiv preprint
+    arXiv:2310.12913, 2023.
+
+[6] Virginia Vassilevska Williams and Yinzhan Xu. Monochromatic triangles, triangle listing and
+    APSP. In 2020 IEEE 61st Annual Symposium on Foundations of Computer Science (FOCS),
+    pages 786–797. IEEE, 2020.
+
+
+                                                 11
+[7] Timothy M Chan and Yinzhan Xu. Simpler reductions from exact triangle. In 2024 Symposium
+    on Simplicity in Algorithms (SOSA), pages 28–38. SIAM, 2024.
+
+[8] Virginia Vassilevska and Ryan Williams. Finding, minimizing, and counting weighted subgraphs.
+    In Proceedings of the forty-first annual ACM symposium on Theory of computing, pages 455–464,
+    2009.
+
+[9] Virginia Vassilevska Williams and R Ryan Williams. Subcubic equivalences between path,
+    matrix, and triangle problems. Journal of the ACM (JACM), 65(5):1–38, 2018.
+
+
+
+
+                                               12
+

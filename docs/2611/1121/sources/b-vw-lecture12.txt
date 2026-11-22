@@ -1,0 +1,302 @@
+6.1420                                                               All Edge Sparse Triangles, Exact Triangle
+Lecture 12 (notes by V)                                                               Date: October 17, 2024
+
+
+Our goal today is to show that Exact Triangle and Sparse Triangle Listing are hard under both 3SUM and
+APSP.
+   Let’s define the two problems:
+   The Exact Triangle problem (also known as Zero Triangle) is as follows: Given a tripartite graph
+G = (V, E) with node parts A, B, C of size n each and edge weights in [±U ] where U has poly(log n) bits,
+are there a ∈ A, b ∈ B, c ∈ C so that w(a, b) + w(b, c) + w(a, c) = 0?
+
+      Exercise: Convince yourselves that Exact Triangle is equivalent to the following two other versions.
+       Given a not necessarily tripartite graph G with weights in [±U ] where U has poly(log n) bits,
+        determine whether G contains a triangle whose edge weight sum to 0.
+
+       Given a tripartite graph G = (V, E) with node parts A, B, C of size n each and edge weights
+        in [±U ] where U has poly(log n) bits, determine whether there are a ∈ A, b ∈ B, c ∈ C so that
+        w(a, b) + w(b, c) = w(a, c).
+
+
+   The Sparse Triangle Listing problem is as follows: Given an m edge graph G, list m triangles in G
+and if G has < m triangles, list all of its triangles.
+   The brute-force algorithm solves Exact Triangle in O(n3 ) time. We will show that an O(n3−ε ) time
+algorithm for ε > 0 for it would refute both the 3SUM and the APSP Hypotheses.
+   If ω = 2, the fastest known algorithm for Sparse Triangle Listing runs in Õ(m4/3 ) time. We will show
+that an O(m4/3−ε ) time algorithm for ε > 0 would imply an O(n3−δ ) time algorithm for δ > 0 for Exact
+Triangle and hence refute both the APSP and 3SUM Hypotheses.
+
+
+1     APSP to Exact Triangle– your next problem set
+We showed that APSP in n node graphs with weights in [±U ] where U has poly(log n) bits is equivalent
+to the Negative Triangle problem: Given a tripartite graph G = (V, E) with node parts A, B, C of size
+n each and edge weights in [±U ] where U has poly(log n) bits, are there a ∈ A, b ∈ B, c ∈ C so that
+w(a, b) + w(b, c) + w(a, c) < 0?
+    In your next problem set, you will show how to reduce Negative Triangle to poly(log n) calls to Exact
+Triangle.
+    Here’s the setup:
+    For a nonnegative integer w on B bits and i ∈ [B], let prei (x) be the integer consisting of the first i bits
+in the bit representation of x (the prefix of the first i bits). E.g. if x = 001100, pre4 (x) = 0011.
+Claim 1. If a and b have B bits with leading bit 0 and c has B bits, then a + b > c if and only if either
+     there exists some i ∈ [B] for which prei (a) + prei (b) = prei (c) + 1, or
+     there exists some i ∈ [B] for which prei (a) + prei (b) = prei (c) and prei+1 (a) = prei (a)1, prei+1 (b) =
+      prei (b)1 and prei+1 (c) = prei (c)0.
+
+      Exercise: Prove the above claim!
+
+Corollary 1.1. Negative Triangle in tripartite graphs with polylog(n) bit weights can be reduced to polylog(n)
+instances of Exact Triangle with polylog(n) bit weights.
+
+
+                                                        1
+      Exercise: Prove the above corollary!
+
+
+    As a corollary we get that if Exact Triangle is in O(n3−ε ) time for ε > 0, then APSP is in O(n3−δ ) time
+for δ > 0.
+
+
+2     3SUM to Exact Triangle
+We will focus on reductions from 3SUM-Convolution. Recall that the 3SUM-Convolution problem is, given
+an integer array A of length n, are there i, j, i ̸= j so that A[i] + A[j] = A[i + j]?
+    Last time we showed that 3SUM and 3SUM-Convolution are subquadratically equivalent. Now we reduce
+3SUM-Convolution to Exact Triangle.
+    In fact the reduction is a generic (n2 , n3 )-fine-grained reduction from any convolution problem to its
+triangle version.
+Definition 2.1 (f -Convolution, f -Triangle). Let f : Z3 → {0, 1} be any function that takes three integers
+x, y, z to a boolean value f (x, y, z) ∈ {0, 1}. Then
+     The f -Convolution problem is: given an integer array X of length n, determine if there are j, i ∈ [n]
+      j so that f (X[i], X[j − i], X[j]) = 1.
+     The f -Triangle problem is: given a tripartite graph on parts A, B, C on n nodes each and integer edge
+      weights, determine if there are a ∈ A, b ∈ B, c ∈ C with f (w(a, b), w(b, c), w(a, c)) = 1.
+                                                                                              √
+Theorem 2.1.√ For every f , there is an O(n1.5 ) time reduction from f -Convolution to n oracle calls to
+f -Triangle on n node graphs.
+                                                                 3−ε
+    Theorem 2.1 shows that if f -Triangle can be solved in√ O(n √ ) 3−ε
+                                                                      time for ε > 0 in n node graphs, then
+f -Convolution on n length sequences can be solved in O( n × ( n) ) = O(n2−ε/2 ) time.
+    Using the function f (x, y, z) = 1 if x + y = z and f (x, y, z) = 0 otherwise, and using the equivalent
+version of Exact Triangle in which we want a triangle a, b, c with w(a, b) + w(b, c) = w(a, c), we obtain:
+                                   1.5
+                                                                                     √
+Corollary 2.1.
+            √ There is an O(n ) time reduction from 3SUM Convolution to n oracle calls to Exact
+Triangle on n node graphs.
+   Hence if Exact Triangle on N node graphs has an O(N 3−ε ) time algorithm, then 3SUM Convolution can
+be solved in O(n2−ε/2 ) time.
+
+Proof of Theorem 2.1. Suppose we are given an instance of f -Convolution, an array X of length n,
+[X[0], . . . , X[n − 1]].            √
+     For every index i ∈ {0, . . . , n − 1}, we create√a graph Gi as follows. Gi is tripartite with partitions      √
+Ui , Vi , Wi . Ui contains a node t for every t ∈ {0, . . . √
+                                                            , n−1}, Wi contains a node q for every q ∈ {0, . . . , 2 n−
+2}, and Vi contains a node s for every s ∈ {0, . . . , n − 1}.
+     The edges of Gi are as follows.
+                                                         √                                             √
+      For every q ∈ Wi , t ∈ Ui , if q − t ∈ {0, . . . , n − 1}, we add an edge (q, t) with weight X[i n + (q − t)].
+                                                                         √
+      For every s ∈ Vi , t ∈ Ui , add an edge (s, t) with weight X[s n + t].
+                                                                               √
+      For every s ∈ Vi , q ∈ Wi , add an edge (s, q) with weight X[(s + i) n + q].
+                                                                                           √
+Claim 2. X has a f -Convolution solution if and only if for some i ∈ {0, . . . , n − 1}, Gi contains an
+f -Triangle.
+
+
+
+                                                          2
+Proof. Below we will assume that the indices never overflow. √    Suppose that X has a f -Convolution:
+                                                                                                     √      some
+k, j, k√̸= j such that f (X[k], X[j], √X[k + j]) = 1. Now, k = i n + ℓ √  for some i, ℓ ∈ {0, . . . , n − 1}, and
+j = s n + t for some s, t ∈ {0, . . . , n − 1}. Thus also, k + j = (s + i) n + (t + ℓ).
+    Consider
+           √   graph Gi . The nodes t ∈ Ui , s ∈ Vi , (t + ℓ) ∈ Wi in Gi form a triangle (since (t + ℓ) − t ∈
+{0, . . . , n − 1}). The f -weight of this triangle is
+                      √           √                    √
+                f (X[s n + t], X[i n + ℓ], X[(s + i) n + (t + ℓ)]) = f (X[j], X[k], X[k + j]) = 1.
+
+Thus Gi has an f -Triangle.
+    Now, let us assume            √ i, Gi contains an f√-Triangle (q ∈ Wi , s ∈ Vi , t ∈ Ui ). The f -weight of
+                      √ that for some
+the triangle is√f (X[s n + t],
+                             √ X[i n + (q − t)], X[(s +√i) n + q]) = 1.
+    Let a = s n + t, b = i n + (q − t), c = (s + i) n + q. Notice that c = a + b. Also, by the above,
+f (X[a], X[b], X[c]) = 1, and we have a f -Convolution solution.
+                                                                                                             □
+     The first proof of this reduction as far as we know appears in [3]. The reduction there is not presented as
+a general but only in the context in reducing the so called (min, +)-Convolution to (min, +)-Product. The
+reduction appears again in other contexts, for instance in reducing 3-SUM Convolution to Exact Triangle
+[6].
+     Let’s briefly give the application of the theorem to (min, +)-Convolution. The (min, +)-Convolution
+problem is, given arrays A and B of length n, compute an array C s.t. for all j, C[j] = mini A[i] + B[j − i]
+(assuming no index overflows as before).
+
+
+        Exercise: Show that (min, +)-Convolution is (n2 , n2 )-fine-grained equivalent to Negative Convolu-
+    tion: Given three arrays A, B, C, determine if there are i, j s.t. A[i] + B[j] + C[j − i] < 0.
+
+
+   Now, let’s use the function f (x, y, z) = 1 when x + y + z < 0 and f (x, y, z) = 0 otherwise. Using our
+general theorem and this f , we immediately obtain that Negative Convolution can be (n2 , n3 )-reduced to
+Negative Triangle, and thus (min, +)-Convolution can be (n2 , n3 )-reduced to APSP.
+
+
+3      Exact Triangle to Sparse Triangle Listing
+We now want to reduce Exact Triangle to Sparse Triangle Listing. We will do this in two steps: (1) Exact
+Triangle Weight Reduction, (2) Exact Triangle Listing with Small Edge Weights to Sparse Triangle Listing.
+   This section of the notes is based on the proof by Chan and Xu in SOSA [4]. The original proof is by
+Vassilevska W. and Xu [7]. Prior to that, Patrascu [5] showed that 3SUM can be (n2 , m4/3 )-reduced to
+Sparse Triangle Listing but no reduction from APSP was known.
+
+3.1     Weight Reduction for Exact Triangle
+This section is very similar to last lecture’s weight reductions. Let’s assume that we are given an Exact
+Triangle instance G with node partitions A, B, C of n nodes each and edge weights in [±2m ] where m is
+polylog(n).
+   Let’s pick a random prime p from the interval [n3 /(2t), n3 /t] for some parameter t, a small polynomial
+in n. Then, for any x, y, z ∈ [±2m ] with x + y + z ̸= 0, there are O(m) prime divisors of x + y + z. Also,
+there are Θ(n3 /(t log n)) primes in the interval [n3 /(2t), n3 /t]. Thus,
+
+                          P rp [x + y + z = 0   mod p] ≤ O((mt log n)/n3 ) = Õ(t/n3 ).
+
+   Thus if we take G and replace every edge weight with it mod p, obtaining a graph Gp we get that if G
+has L exact triangles, then the expected number of Exact Triangles mod p in Gp is L + Õ(t). By Markov’s
+
+
+                                                        3
+inequality, with probability ≥ 2/3, the number of exact triangles mod p in Gp is at most L + Q for some
+Q ≤ Õ(t). Also, if the number of exact triangles mod p in Gp is at most L + Q and we find Q + 1 exact
+triangles mod p in Gp , then at least one of the triangles we list must be a true exact triangle in G.
+    Thus, we can solve Exact Triangle as follows:
+
+
+  Repeat 10 log3 n times:
+     Pick a random prime p in [n3 /(2t), n3 /t]
+     Form Gp
+     List up to Q + 1 Exact triangles (mod p) in Gp
+     If one of these triangles is a real exact triangle in G, return YES.
+  At the end return NO.
+
+    If G does not have an exact triangle, then the algorithm will always return NO.
+    If in any iteration the number of Exact triangles mod p listed is < Q + 1, this means that ALL exact
+triangles mod p were listed in that iteration. Thus, if no true exact triangle is found in that iteration, then
+G has no exact triangle.
+    The remaining case is that in all 10 log3 n iterations at least Q + 1 exact triangles mod p were found. We
+have that if G has an exact triangle, the probability that we get ≥ Q + 1 false exact triangles in all 10 log3 n
+iterations is at most (1/3)10 log3 n = 1/n10 (since this means that Gp has at least Q + 1 + L exact triangles
+mod p).
+    Combining the above two paragraphs: if G has an exact triangle, then with probability ≥ 1 − 1/n10 we
+will find one.
+    We have thus reduced Exact Triangle to Listing up to Õ(t) Exact Triangles in a graph with weights
+bounded by n3 /t. (Recall that Exact Triangle mod p can be reduced to O(1) instances of Exact Triangle,
+without the mod.)
+
+3.2     Listing Exact Triangles to Sparse Triangle Listing
+From above and via reweighting a bit, we get that Exact Triangle on n nodes can be reduced to the following
+problem: Given a tripartite graph G with node parts A, B, C each of size n and edge weights in [W ], where
+W = Õ(n3 /t), if G contains at most t triangles a ∈ A, b ∈ B, c ∈ C with w(a, b) + w(b, c) = w(a, c), list all
+such triangles in G, and otherwise if it has more than t such triangles, list an arbitrary subset of t of them.
+(We call this “listing up to t” exact triangles.)
+   Now we reduce this problem to Listing m triangles in an O(m)-edge graph.
+
+From Exact Triangle to 3D-Vector Exact triangle. For an integer x ∈ [W ] we can represent it
+uniquely by x = x1 · q 2 + x2 · q + x3 for integer q = Θ(W 1/3 ) and x1 , x2 , x3 ∈ {0, . . . , q − 1}. That is, we
+consider the representation of x in q-ary.
+     Now, x + y = z if and only if (x1 , x2 , x3 ) + (y1 , y2 , y3 ) = (z1 − c1 , z2 − c2 + c1 q, z3 + c2 q) for some choice
+c1 , c2 ∈ {0, 1}; the ci are just the carries when adding x and y in their q-ary representation.
+     Thus, for all 4 choices of c1 , c2 ∈ {0, 1} we can reduce our Exact Triangle listing problem to 4 instances
+of the following 3D-Vector Exact triangle listing problem:
+     Given a tripartite graph G with node parts A, B, C each of size n where each edge (u, v) has a weight
+vector ⃗ w(u, v) := (w1 (u, v), w2 (u, v), w3 (u, v)) ∈ [q]3 , where q = Θ(W 1/3 ) = Õ(n/t1/3 ), if G contains at most
+t triangles a ∈ A, b ∈ B, c ∈ C with ⃗    w(a, b) + ⃗w(b, c) = ⃗ w(a, c) (vector sum!), list all such triangles in G, and
+otherwise if it has more than t such triangles, list an arbitrary subset of t of them.
+     In particular, for every choice c1 , c2 ∈ {0, 1}, create a graph Gc1 ,c2 on the same vertex set as G and for
+every a ∈ A, b ∈ B, c ∈ C,
+
+    if (a, b) is an edge of weight w(a, b) = x1 · q 2 + x2 · q + x3 , add an edge (a, b) to Gc1 ,c2 with weight
+     vector (x1 , x2 , x3 ),
+
+
+                                                             4
+     if (b, c) is an edge of weight w(b, c) = y1 · q 2 + y2 · q + y3 , add an edge (b, c) to Gc1 ,c2 with weight vector
+      (y1 , y2 , y3 ), and
+     if (a, c) is an edge of weight w(a, c) = z1 · q 2 + z2 · q + z3 , add an edge (a, c) to Gc1 ,c2 with weight vector
+      (z1 − c1 , z2 − c2 + c1 q, z3 + c2 q).
+
+    We want to list up to t exact vector triangles in all these instances.
+
+From 3D-Vector Exact triangle listing to Sparse Triangle Listing. Now we are given one of these
+3D-Vector Exact triangle listing instances on a tripartite graph with n node parts A, B, C where the weight
+vectors are in [q]3 where q ≤ Õ(n/t1/3 ) and we want to list up to t triangles a, b, c with ⃗
+                                                                                             w(a, b) + ⃗
+                                                                                                       w(b, c) =
+w(a, c).
+⃗
+   We create a new unweighted tripartite graph H. The node parts of H are A × [q]2 , B × [q]2 , C × [q]2 . We
+add edges as follows:
+     For every a ∈ A, b ∈ B with vector weight (x1 , x2 , x3 ) we add an edge between (a, x1 , z2 ) and (b, y2 , x3 )
+      for every y2 and z2 such that x2 + y2 = z2 .
+     For every b ∈ B, c ∈ C with vector weight (y1 , y2 , y3 ) we add an edge between (b, y2 , x3 ) and (c, z3 , y1 )
+      for every x3 and z3 such that x3 + y3 = z3 .
+     For every a ∈ A, c ∈ c with vector weight (z1 , z2 , z3 ) we add an edge between (a, x1 , z2 ) and (c, z3 , y1 )
+      for every x1 and y1 such that x1 + y1 = z1 .
+     Notice that the procedure takes O(n2 q) = O(n2 W 1/3 ) = Õ(n3 /t1/3 ) time and the number of edges is
+O(n2 q). For every triangle (a, b, c) in the original graph G with weights ⃗               w(a, b) = (x1 , x2 , x3 ), ⃗
+                                                                                                                      w(b, c) =
+(y1 , y2 , y3 ), ⃗
+                 w(a, c) = (z1 , z2 , z3 ) with x1 + y1 = z1 , x2 + y2 = z2 , x3 + y3 = z3 , there is a unique triangle in H
+given by (a, x1 , z2 ), (b, y2 , x3 ), (c, z3 , y1 ). I.e. every triangle in H is in one to one correspondence with every
+vector exact triangle of G. Thus listing up to t triangles in H corresponds to listing up to t triangles in G.
+     We have reduced Exact Triangle to Sparse Triangle Listing on a graph with m = O(n2 q) = Õ(n3 /t1/3 )
+edges and where we want to list t triangles.
+     We set t = n3 /t1/3 and thus t = n9/4 and we have reduced the problem to listing up to m = n9/4 triangles
+in an Õ(m) edge unweighted graph.
+     If this latter problem can be solved in O(m4/3−ε ) time for some ε > 0, then we can solve Exact Triangle
+in time, up to polylogs,
+                                                        (n9/4 )4/3−ε = n3−9ε/4 .
+   In fact, suppose that for some choice of t = mδ for δ < 3/2 one can list t triangles in an m = n3 /t1/3
+edge graph in O((mt1/3 )1−ε ) time for some ε > 0. Then in our reduction, t = mδ = (n3 /t1/3 )δ , so that
+                                                 ′
+t = n3−3δ/(3+δ) . For δ ′ = 3δ/(3 + δ), t = n3−δ .
+   Notice that δ ′ < 3 whenever δ < 3/2.
+   Then Exact Triangle is in
+                                                          1−ε                   !
+                                  n3
+                                            3
+                                             n                       ′
+                                      +            · t1/3      = n2+δ /3 + n3−3ε
+                                 t1/3       t1/3
+
+time, which is subcubic for any ε > 0 and δ < 3/2.
+    Thus if Exact Triangle requires n3−o(1) time, as is implied by both the APSP and the 3SUM Hypotheses,
+then for every δ < 3/2, listing t = mδ triangles requires m1−o(1) t1/3 time.
+    If is easy to show that all triangles of an m edge graph can be listed in O(m3/2 ) time. When a graph has
+  3/2−o(1)
+m           triangles, m3/2−o(1) time is also necessary since we need to write down the triangles. Hence, we
+have that for all t ≥ Ω(m), the known running time for Sparse Triangle Listing (if ω = 2) is conditionally
+optimal.
+
+
+
+                                                              5
+References
+[1] Ilya Baran, Erik D. Demaine, Mihai Patrascu: Subquadratic Algorithms for 3SUM. Algorithmica 50(4):
+    584-596 (2008).
+[2] Andreas Björklund, Rasmus Pagh, Virginia Vassilevska Williams, Uri Zwick: Listing Triangles. ICALP
+    (1) 2014: 223–234.
+[3] David Bremner, Timothy M. Chan, Erik D. Demaine, Jeff Erickson, Ferran Hurtado, John Iacono, Stefan
+    Langerman, Mihai Patrascu, Perouz Taslakian: Necklaces, Convolutions, and X+Y. Algorithmica 69(2):
+    294-314 (2014).
+[4] Timothy M. Chan, Yinzhan Xu: Simpler Reductions from Exact Triangle. SOSA 2024: 28-38.
+[5] Mihai Patrascu: Towards polynomial lower bounds for dynamic problems. STOC 2010: 603–610.
+
+[6] Virginia Vassilevska Williams, Ryan Williams: Finding, Minimizing, and Counting Weighted Subgraphs.
+    SIAM J. Comput. 42(3): 831-854 (2013).
+[7] Virginia Vassilevska Williams, Yinzhan Xu: Monochromatic Triangles, Triangle Listing and APSP.
+    FOCS 2020: 786-797.
+
+
+
+
+                                                  6
+

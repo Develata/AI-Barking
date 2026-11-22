@@ -1,0 +1,1313 @@
+                                                    3SUM Made Simpler (Without Matrix Multiplication),
+                                                         k-SUM Hypothesis Refuted for Odd k,
+                                                         and Real 3SUM/APSP Derandomized
+                                                   Timothy M. Chan*              Reina Itakura∗            Zhiyuan Ma∗             Yuancheng Yu∗
+
+                                                                                        November 17, 2026
+
+
+
+
+arXiv:2610.42012v2 [cs.DS] 14 Nov 2026
+                                                                                                Abstract
+                                                   Recently, a truly subquadratic algorithm for the 3SUM problem and a truly subcubic algorithm for the
+                                               all-pairs shortest paths (APSP) problem were found by Anthropic, as reported by Alman and Vassilevska
+                                               Williams (2026). These algorithms relied on a new subroutine for rectangular matrix multiplication with
+                                               selected output entries, which was obtained by modifying known matrix multiplication techniques of
+                                               Schönhage (1981) and Coppersmith (1982).
+                                                  1. We present a different truly subquadratic randomized algorithm for 3SUM for integer inputs. It
+                                                     completely avoids the use of matrix multiplication but instead modifies known dynamic program-
+                                                     ming algorithms for subset convolution and the zeta transform, which rely only on simple subtrac-
+                                                     tion tricks via inclusion–exclusion (and does not even require fast Fourier transform), and so is
+                                                     conceptually easier to understand (the whole solution is about 5 pages long).
+                                                  2. Following a similar approach, we obtain a randomized algorithm for k-SUM for integer inputs for
+                                                     odd constant k in O(n⌈k/2⌉−εk ) time for some constant εk > 0, disproving the k-SUM Hypothesis
+                                                     for all odd k.
+                                                  3. Existing reductions from 3SUM and APSP to selected-entries rectangular matrix multiplication
+                                                     were randomized in the case of real-valued input. We present new deterministic reductions, yield-
+                                                     ing a truly subquadratic deterministic algorithm for Real 3SUM and a truly subcubic deterministic
+                                                     algorithm for Real APSP.
+
+
+                                         1    Introduction
+                                         Recently, Anthropic found the first truly subcubic algorithm for the all-pairs shortest paths (APSP) problem
+                                         and the first truly subquadratic algorithm for the 3SUM problem, as announced and presented by Alman
+                                         and Vassilevska Williams [AW26]. The key to the breakthrough lies in a faster algorithm for the following
+                                         matrix problem: computing w user-selected (also called “wanted”) entries of the product of an n × d and
+                                         d × n matrix, when w is subquadratic. Let Mselected-entries (n, d, n | w) denote its time complexity. Rephrased
+                                         in graph-theoretical terms, this rectangular matrix problem includes a lopsided version of the “#All-Edges
+                                         (AE) Sparse Triangle” problem: we are given a tripartite graph where the left and right parts VL and VH
+                                         have n vertices and the middle part VM has d vertices, and there are w edges between VL and VH ; we want
+                                            * Siebel School of Computing and Data Science, University of Illinois at Urbana–Champaign, USA ({tmc, itakura3, zm25,
+
+                                         yyu51}@illinois.edu)
+
+
+                                                                                                    1
+to count the number of triangles containing e, for each edge e between VL and VR . Their main subroutine
+established, for any sufficiently small constants q, ε > 0, the existence of some γ = γ(q, ε) such that1
+
+                                                                  O(n2 /dγ + wdq )
+                                Mselected-entries (n, d, n | w) ≤ e
+
+for all d ≤ nε . For example, Mselected-entries (n, d, n | w) ≤ O(n
+                                                                e 2 /d0.063 + wd0.437 ) for all d ≤ n1/18 .
+     The new subroutine was obtained by modifying known matrix multiplication techniques of Schön-
+hage [Sch81] and Coppersmith [Cop82] to achieve output-sensitivity. This is surprising, since matrix mul-
+tiplication is usually used as a black box in algorithmic applications, and there were not many successful
+prior examples when modifying matrix multiplication algorithms helped.
+     Once this matrix problem has been solved, faster algorithms for both APSP and 3SUM—and, more
+strongly, the Exact Triangle problem—follow more or less immediately, by using or adapting existing re-
+ductions from APSP/3SUM/Exact Triangle to AE Sparse Triangle [Păt10, KPP16, VX20, CVX22, CX24,
+FKP24]. There are multiple options, and some of these reductions already hold in the lopsided setting. In
+the integer input case, deterministic reductions were known [CX24, FKP24]; however, in the real case, only
+randomized reductions were known [CVX22]. (See also [SY26] for a more recent reduction from APSP to
+selected-entries matrix multiplication in the integer case.)
+     Several improvements have been found just days after the initial announcement of the breakthrough2
+but in this new era, conceptual understanding and better exposition are perhaps more important than small
+incremental improvements. In this manuscript, we address two themes: 1. simplifying these algorithms, to
+make the ideas more broadly accessible, and 2. derandomizing the algorithms in the real input case.
+
+3SUM simplified. Shortly after the announcement of the breakthrough, Karingula and Lovett [KL26]
+have already presented a simplification (found with the help of swarms of agents) of the main subroutine for
+selected-entries rectangular matrix multiplication (with slightly worse exponents). The original explanation
+of the subroutine [AW26], requiring about 18 pages, has now been cut down to 7 pages (not counting the
+remaining reduction from 3SUM/APSP to lopsided AE Sparse Triangle, which would require at least 2 more
+pages).
+    While the usage of matrix multiplication tools for APSP is inevitable as APSP is equivalent to
+(min, +)-matrix multiplication, an interesting question is whether further simplifications are possible for
+3SUM (to the general public, 3SUM seems to attract even more attention than APSP). Our intuition is
+this: 3SUM and the easier (min, +)-convolution problem are about sequences of numbers, whereas Ex-
+act Triangle and (min, +)-matrix multiplication are their matrix counterparts (see Figure 1). Sequence
+problems are more often solved using convolutions or fast Fourier transform (FFT) instead of matrix
+multiplication. For example, known algorithms for the bounded monotone (min, +)-convolution prob-
+lem [CL15, CDXZ22] mostly used FFT, whereas known algorithms for bounded monotone (min, +)-matrix
+multiplication [BGSV19, CDXZ22] used fast matrix multiplication.
+    A natural thought is to try to modify existing algorithms for standard convolution such as FFT, Karat-
+suba’s, and Toom and Cook’s, which if doable might be easier than modifying matrix multiplication algo-
+rithms such as Schönhage’s and Coppersmith’s, to those who are not experts in matrix multiplication ma-
+chineries. Even if possible, it still seems to require effort to achieve output-sensitivity: for all these recursive
+algorithms, it is nontrivial to analyze which nodes of the recursion tree are necessary for the selected output
+entries (see all the figures needed in the descriptions by both Alman and Vassilevska Williams [AW26] and
+Karingula and Lovett [KL26]).
+   1
+       The Oe notation hides polylogarithmic factors.
+   2
+       For example, see [Maj26] and https://bigospeedrun.com/3sum.
+
+
+                                                         2
+                                                   Exact Triangle
+
+
+
+                                      3SUM                          APSP
+                                                           ≡ (min, +)-Matrix Multiplication
+
+
+
+                                               (min, +)-Convolution
+
+
+Figure 1: Known simple reductions [Păt10, BCD+ 14, VW18, CMWW19]. (The dashed ones are for integer
+input, unless one uses more complicated, recent techniques [FPS26].)
+
+
+    We find a simpler way to obtain a truly subquadratic, Monte-Carlo randomized algorithm for 3SUM for
+polynomially bounded integer inputs. The key idea is to switch to a different but related problem, subset
+convolution (see Problem 2.1). Standard algorithms for subset convolution are based on the so-called zeta
+(or Möbius) transform, which is solved by simple dynamic programming (DP), using just subtraction or
+inclusion–exclusion tricks, and are simpler than FFT. Adapting these subset convolution algorithms to the
+selected-entries setting turns out to be easy, due to the simple DAG or lattice structure of the DP (no messy
+analysis of dependency patterns of “input encoding/preparation” and “output decoding/reconstruction” in
+recursion trees [AW26, KL26]). In fact, this observation was noted explicitly before by Björklund, Husfeldt,
+Kaski, and Koivisto [BHKK10] (for a different application, concerning exponential-time algorithms for
+certain problems in bounded-degree graphs).3 For completeness, we include a description of the selected-
+entries subset convolution algorithm in Section 2.1, which takes just one and a half page. We believe this is
+the simplest way to introduce to a broader audience the possibility of output-sensitivity for selected-entries
+versions of algebraic problems.4
+    While this greatly simplifies the algebraic part of the solution, a bit more work is now required in the
+remaining part, to reduce 3SUM to subset convolution, since subset convolution is farther away from 3SUM
+than standard convolution. Nevertheless, this part is in more familiar territory to algorithm designers in fine-
+grained complexity, and indeed can be solved in under 3 pages using hashing techniques (see Section 2.2).
+Hashing is commonly used in prior work about convolutions and 3SUM-related reductions (e.g., see [CH02,
+BDP08, Păt10, CH20, BFN21, BFN22]), but this reduction requires some nontrivial technical ideas, and
+does not seem to follow directly from any existing work.5
+    The solution here raises some new interesting questions concerning whether the 3SUM algorithm here
+might be considered combinatorial, and more generally what is the meaning of “combinatorial algorithms”.
+See Section 2.3 for discussion. (Spoiler: we, the authors, do not have a definitive answer, and will leave the
+question to the readers to decide for themselves.)
+    By known simple reductions [CMWW19], we also immediately obtain a simpler truly subquadratic
+randomized algorithm for (min, +)-convolution for polynomially bounded integer inputs, which in turn has
+many applications, e.g., see [CMWW19, KPS17, BN21, Bri24, Jin24].
+   3
+      Alman and Vassilevska Williams [AW26] actually cited Björklund, Husfeldt, Kaski, and Mikko Koivisto’s work in a remark
+at the end of their Section 2 on selected-entries matrix multiplication: “The pruned recursion of Section 2.4.2 is an analog of FFT
+pruning [Mar71, SB93] of trimmed Möbius inversion [BHKK10]. . . ” However, their paper did not pursue further the usage of
+[BHKK10] to solve 3SUM more directly and more simply.
+    4
+      We have found that an AI-generated (and Lean-verified) solution posted at https://bigospeedrun.com/3sum by
+c0ldzy17 also appeared to use subset convolution, but there are no accompanying human-written manuscripts explaining the
+ideas.
+    5
+      Jesper Nederlof (personal communication, Nov. 2, 2026) mentioned that he had an unpublished note (circulated to members of
+a 2022 workshop) describing some similar ideas in reducing min-sum subset convolution to min-sum convolution.
+
+
+                                                                3
+k-SUM Hypothesis refuted for all odd k. As an unintended byproduct of this simpler approach, we ob-
+tain an O(n⌈k/2⌉−εk )-time randomized algorithm for the k-SUM problem for polynomially bounded integer
+inputs, for every odd constant k ≥ 5, for some constant εk > 0. This thus refutes the k-SUM Hypothe-
+sis for all odd k (at least for the integer setting, with randomization); see [Eri99, AL13, ABBK17, KN22]
+for conditional lower bounds based on this hypothesis. Alman and Vassilevska Williams [AW26] explicitly
+listed the k-SUM Hypothesis for larger k as one of the remaining open questions, as their approach based on
+selected-entries rectangular matrix multiplication does not seem to generalize. This demonstrates another
+advantage of working with convolution-based approaches instead of matrix multiplication.
+     As is easy to see, k-SUM for odd k reduces to an unbalanced instance of 3SUM, where the first set
+has n⌊k/2⌋ elements, the second set has n elements, and the third (“query”) set has n⌊k/2⌋ elements. As the
+number of queries is large, we need to refine the 3SUM algorithm to achieve lower cost per query. To this
+end, the extra idea is to use convolution where elements are vectors in [r]d instead of subsets (bit vectors),
+for a larger constant base r. This extended problem with selected entries can still be solved by adapting
+standard algorithms for subset convolution. The remaining hashing part proceeds similar to before, and the
+analysis is only slightly more involved. (See Section 3.)
+
+Real 3SUM and APSP derandomized. In the second half of the paper (Sections 4–5, which can be
+read independently of Sections 2–3), we turn to the question of derandomization in the real input case
+(the recent algorithms in the integer input case are already deterministic). The subroutine for selected-
+entries rectangular matrix multiplication or lopsided AE Sparse Triangle was already deterministic [AW26].
+The issue lies in the reduction of APSP/3SUM to AE Sparse Triangle. In the real case, the only known
+reduction was the one by Chan, Vassilevska Williams, and Xu [CVX22], which crucially relied on random
+sampling. (Fischer, Polak, and Schmidt [FPS26] recently gave a reduction from Real 3SUM to Integer
+3SUM, but it was complicated and also used randomization.) In contrast, the previous best slightly subcubic
+real APSP algorithm [Wil18] before the recent breakthrough was successfully derandomized [CW21], while
+the previous best slightly subquadratic real 3SUM algorithm [Cha20] was already deterministic.
+    We describe deterministic reductions from both Real 3SUM and Real APSP to #AE Sparse Triangle.
+The new reductions build on Chan, Vassilevska Williams, and Xu’s approach [CVX22]; the main new
+idea is clever but simple, especially for Real APSP (the details are a bit trickier for Real 3SUM). These
+deterministic reductions lead to the first truly subquadratic and subcubic-time deterministic algorithms for
+Real 3SUM and Real APSP respectively.
+
+
+2     3SUM Simplified
+In this section, we provide a truly subquadratic-time randomized algorithm for the 3SUM problem for
+integer input. Throughout the section, we use the following notation: Let [d] = {0, . . . , d − 1}. Fora set S,
+let 2S denote the set of all subsets of S, and Sk denote the set of all subsets of S of size k, and ≤kS
+                                                                                                          denote
+                                                   S
+                                                     
+the set of all subsets of S of size at most k, and ≥k denote the set of all subsets of S of size at least k. Let
+  n       n             n         n      n           n
+                                                 
+ ≤k = 0 + · · · + k and ≥k = k + · · · + n . Let 1E be the indicator function for the predicate E.
+We use lg for base-2 logarithms when the base matters.
+
+2.1   Selected-Entries Subset Convolution
+In this subsection, we solve a version of the subset convolution problem with selected output entries, for-
+mally defined below. We restrict ourselves to the version where all input sets have size equal to a given
+
+                                                       4
+value t (this is sometimes called the “ranked” version of the problem).
+
+Problem 2.1 (Subset  Convolution with Selected Entries). Let d ≥ 2t. We are given collections A and
+B of subsets in [d]
+                 t , where each subset A ∈ A has weight f (A) ∈ R and each subset B ∈ B has weight
+g(B) ∈ R. By default, let f (A) = 0 if A ̸∈ A and g(B) = 0 if B ̸∈ B. We are also given a collection C of
+“query” subsets in [d]
+                     2t . For each C ∈ C, we want to compute
+                                          X                                        X
+                     (f ⋆ g)(C) :=             f (A)g(C \ A) =                                     f (A)g(B).
+                                         A⊆C                            (A,B): A∩B=∅, A∪B=C
+
+    The standard dynamic programming (DP) algorithm for subset convolution (sometimes called Yates’
+algorithm or the “fast zeta transform”) [BHK09, BHKK07] turns out to be adaptable to the version with
+selected entries and achieves output-sensitive running time, essentially without extra effort! Roughly, the
+computation of the DP forms a DAG or lattice. In the preprocessing phase, we simply simulate DP up to a
+certain level s of the DAG for a trade-off parameter s. When given a query set C, we continue the DP from
+level s up to 2t, restricting ourselves to nodes of the DAG that are “under” C. This “trimmed” variant of the
+fast zeta transform has appeared before in a paper by Björklund, Husfeldt, Kaski, and Koivisto [BHKK10].
+To be self-contained, we give a complete description below:
+
+Theorem 2.2. Let integer s be a parameter with 0 ≤ s ≤ 2t. We can solve Problem 2.1 in total deterministic
+time                                                   
+                                           d            2t
+                                    n+           + |C|         dO(1) .
+                                          ≤s           ≥s
+Proof. We begin with preliminary definitions and facts (see [BHK09, BHKK07] and the references therein
+for more background): Given f : 2[d] → R, the zeta (or Möbius) transform fb : 2[d] → R is defined as
+                                                    X
+                                          fb(X) =        f (S).
+                                                                  S⊆X
+
+
+Given f, g : 2[d] → R, the covering product f ⋆c g : 2[d] → R is defined as
+                                                      X
+                                  (f ⋆c g)(X) =                f (A)g(B).
+                                                             (A,B):A∪B=X
+
+
+Note that for f, g : [d]                     [d]
+                                                
+                      t → R and any C ∈ 2t , we have (f ⋆ g)(C) = (f ⋆c g)(C), since A ∪ B = C,
+|A| = |B| = t, and |C| = 2t together imply A ∩ B = ∅. The covering product satisfies the following known
+“inclusion–exclusion” identity [BHKK07]6 :
+                                                  X
+                                 (f ⋆c g)(X) =      (−1)|X\S| fb(S)b
+                                                                   g (S).
+                                                             S⊆X
+   6
+     It can be viewed as taking the pointwise product of the zeta transforms of f and g, and then taking the inverse zeta trans-
+form
+P (which has a similar definition but with some  P sign changes). A |X\S|quick self-contained proof: the right-hand side expands to
+                 γ A,B f (A)g(B), where γ A,B :=                   (−1)         evaluates to 1 if A ∪ B is X, but is otherwise equal to
+P(A,B):A,B⊆X
+   k        k−i k
+                                                   S:A∪B⊆S⊆X
+                                                                               k
+   i=0 (−1)      i
+                    , where k = |X| − |A ∪  B|, which is identical to (1 −  1)   = 0 by the binomial theorem.
+
+
+
+
+                                                                  5
+Preprocessing algorithm.
+                     [d]                                                        [d] 
+  1. For each X ∈ ≤s       , pre-compute fb(X). More generally, for each X ∈ ≤s        , pre-compute fi (X) :=
+     P
+          S⊆X: S∩[i]=X∩[i]f (S) (noting that fb(X) = f0 (X)). To this end, we can use a standard DP formula:
+      fd (X) = f (X), and fi (X) = fi+1 (X) + 1[i∈X] fi+1 (X \ {i}).
+                     [d]                                                                  [d] 
+      P each X ∈ ≤s , pre-compute gb(X). More generally, for each X ∈
+   2. For                                                                                  ≤s , pre-compute fi (X) :=
+         S⊆X: S∩[i]=X∩[i] f (S). This is similar.
+
+                        [d]                                                                 [d] 
+  3. For each X ∈ ≤s          , pre-compute (f ⋆c g)(X). More generally, for each X ∈ ≤s           , pre-compute
+                                           |X\S|
+                 P
+      hi (X) := S⊆X: S∩[i]=X∩[i] (−1)            f (S)b
+                                                 b    g (S) (noting that h0 (X) = (f ⋆c g)(X)). To this end, we
+      use the following DP formula: hd (X) = f (X)bb     g (X), and hi (X) = hi+1 (X) − 1[i∈X] hi+1 (X \ {i}).
+                                        
+                                        d
+The total time7 for these DPs is O ≤s      d .
+
+
+                       Given a query subset C ∈ [d]
+                                                     
+Query algorithm.                                   2t :
+                          C
+                             
+  1. For each X ∈ ≥s           , compute fb(X). We can use the same DP formula, but using fi (X) for all
+      X ∈ [d]
+               
+             s (which have been pre-computed during preprocessing) as base cases.
+                        C
+                          
+  2. For each X ∈ ≥s        , compute gb(X) similarly.
+                         C
+                           
+  3. For each X ∈ ≥s         , compute (f ⋆c g)(X). We can use the same DP formula, but using hi (X) for
+                 [d]
+                     
+      all X ∈ s (which have been pre-computed during preprocessing) as base cases. In particular, we
+      obtain (f ⋆c g)(C) = (f ⋆ g)(C) in the end.
+                                                       
+The total time per query subset C is O |C|  ≥s d   =  O  2t
+                                                         ≥s d .
+
+
+2.2    Reducing 3SUM to Subset Convolution
+Now we solve integer 3SUM using the new subroutine for selected-entries subset convolution. This uses
+hashing techniques. We first apply linear hashing (taking “mod p” for a prime p) to reduce the size of
+the input numbers and then view the numbers as bit vectors using their binary representations, which then
+correspond to subsets of indices. If the subsets corresponding to two numbers happen to be disjoint, then
+their union corresponds precisely to the sum, and so subset convolution gives us exactly what we want!
+However, usually we do not have disjointness. The idea is to further randomly scramble the input numbers
+(using a family of linear hash functions that achieve 3-wise independence), and with enough repetitions, the
+disjointness property can be shown to hold in at least one of the trials with good probability.
+     The final algorithm for the reduction is still relatively simple, but the analysis requires some technical
+effort. One issue is collision of the hash of sums of pairs (which is why hashing alone does not solve integer
+3SUM very efficiently in prior work, except in shaving logs [BDP08]), but in our case, subset convolution
+filters out pairs that do not satisfy the disjointness property, and this helps to bound the target universe size p.
+The precise details are given below (we state the result more generally when the input sets A and B may not
+have the same size):
+   We assume the standard word RAM model with word size at least d. If not, the time bounds increase by extra dO(1) factors.
+   7
+
+We have ignored cost of dictionary look-up operations for subsets, which is only dO(1) .
+
+
+                                                             6
+Theorem 2.3. Suppose Problem 2.1 can be solved in O(Psubset-conv (n, d, t) + |C|Qsubset-conv (n, d, t)) time.
+   Let t < lg n̂ be a parameter,
+                            p        and d = ⌈t + lg n̂ + lg lg N + 1⌉. Given sets A, B, C ⊆ [N O(1) ] with
+N = |A| + |B| and n̂ = |A||B|, we can determine whether c ∈ A + B for each c ∈ C, with error
+probability O(1/N ), in total time
+                                                                                              !
+                 n̂2                                    n̂        n̂
+             O
+             e
+                  d
+                     (Psubset-conv (N, d, t) + N ) + N t + |C| t (Qsubset-conv (N, d, t) + 1) .
+                  2t
+                                                       2          2
+
+Proof.
+
+Algorithm. Let p0 = 2d . Pick a random prime p in (p0 , 2p0 ]. Let Abad = {a ∈ A : ∃a′ ∈ A with a′ ≡ a
+(mod p) and a′ ̸= a} and Bbad = {b ∈ B : ∃b′ ∈ B with b′ ≡ b (mod p) and b′ ̸= b} (these are elements
+that are in non-singleton buckets when we hash modulo p). For each c ∈ C, if c ∈ Abad +B or c ∈ A+Bbad ,
+then report “yes” for c.
+    Next, we repeat the following µ times, for a parameter µ to be determined:
+
+   1. Pick random numbers ξ, α, β ∈ [p] with ξ ̸= 0. Define functions f, g, h : Z → [p]:
+
+                                                  f (a) = (aξ + α) mod p
+                                                   g(b) = (bξ + β) mod p
+                                                   h(c) = (cξ + α + β) mod p.
+
+          Let π : [2d ] → 2[d] where π(x) is the set of all positions of the 1-bits in the binary representation of x.
+
+   2. Let A∗ = {a ∈ A \ Abad : f (a) < 2d , |π(f (a))| = t} and B ∗ = {b ∈ B \ Bbad : g(b) <
+      2d , |π(g(b))| = t}.
+
+   3. For each c ∈ C with h(c) < 2d and |π(h(c))| = 2t, compute8
+
+                σ(c) = |{(a, b) ∈ A∗ × B ∗ : π(f (a)) ∩ π(g(b)) = ∅, π(f (a)) ∪ π(g(b)) = π(h(c))}|
+                                              X
+                τ (c) =                                                  (a + b − c)2 .
+                             (a,b)∈A∗ ×B ∗ : π(f (a))∩π(g(b))=∅, π(f (a))∪π(g(b))=π(h(c))
+
+          If σ(c) > 0 and τ (c) = 0, then report “yes” for c.
+
+If “yes” has not been reported for c in any of the trials, then report “no”.
+
+Running time analysis. Over a random prime p ∈ (p0 , 2p0 ], for each b, b′ ∈ B, the probability that b ≡ b′
+(mod p) is O((log N )/p0 ), since there are at most O(log N/ log p0 ) prime divisors of b − b′ in (p0 , 2p0 ] and
+                                                         O(|A|2 /p0 ), and similarly, E[|Bbad |] ≤ e
+O(p0 / log p0 ) primes in that range. Thus, E[|Abad |] ≤ e                                         O(|B|2 /p0 ).
+We can pre-sort Abad + B and A + Bbad in expected time O(|A|       2 |B|/p + |A||B|2 /p ) = O(N  e n̂2 /p0 ) =
+                                                                           0              0
+                                                             e
+          t            d          t
+O(N n̂/2 ), as p0 = 2 = Θ(n̂2 ). Afterwards, the checks for c ∈ Abad + B and c ∈ A + Bbad takes O(1)
+ e                          e                                                                               e
+time each.
+    In step 3, computing the values σ(c) corresponds to computing selected entries of the subset con-
+volution of the collection of sets {π(f (a)) : a ∈ A∗ } and {π(g(b)) : b ∈ B ∗ }, each assigned unit
+   8
+       On τ (c), this “second moment” idea has been used in prior work, e.g., on sparse convolutions [BFN21].
+
+
+                                                                 7
+weight. Computing the values τ (c) corresponds to computing selected entries of O(1) similar subset
+convolutions, since (a + b − c)2 expands to a2 + b2 + 2ab − 2ca − 2cb + c2 . For example, to com-
+pute the sum contributed by the 2ab term, we assign weight 2a to the set π(f (a)) and b to the set
+π(g(b)). The selected entries are C ∗ := {c ∈ C : h(c) < 2d , |π(h(c))| = 2t}. For fixed p, c,
+and z ∈ [2d ], we have Pr[h(c) = z] = 1/p (since for fixed p, ξ, α, there is     one  choice of β satisfying
+                                   ∗        d 1          ∗      d 1                 d 1
+                                                                                   
+the condition). Thus, Pr[c ∈ C ] = 2t p . So, E[C ] = 2t p |C| = Θ 2t n̂2t |C| . The total ex-
+                                                                                 
+                e µ · Psubset-conv (N, d, t) + N + |C| d 1 t Qsubset-conv (N, d, t) . Eventually, we will set
+                                                         
+pected cost is O                                       2t n̂2
+          2    d
+                 
+µ = O(n̂ / 2t ) and this will give the time bound stated in the theorem. (Expected time bounds can be
+      e
+made worst-case for Monte Carlo algorithms by standard tricks, namely, reporting error when actual time is
+more than a constant factor times the expectation, and then repeating to lower the error probability.)
+
+Error probability analysis.     From the definitions of f, g, h, π, we have:
+    • h(a + b) ≡ f (a) + g(b) (mod p).
+    • If π(x) ∩ π(y) = ∅, then π(x + y) = π(x) ∪ π(y).
+    • h(c) = h(c′ ) iff c ≡ c′ (mod p).
+    • π(x) = π(y) iff x = y.
+In particular, if f (a), g(b) < 2d and π(f (a)) ∩ π(g(b)) = ∅, then π(f (a)) ∪ π(g(b)) = π(h(c)) iff
+π(f (a) + g(b)) = π(h(c)) iff f (a) + g(b) = h(c) iff h(a + b) = h(c) iff a + b ≡ c (mod p).
+    Fix c ∈ C. Suppose σ(c) > 0 and τ (c) = 0. If a sum of squares with at least one term is equal to 0,
+then one of the terms (in fact, all of the terms) must be 0. Thus, we must have c = a + b for some a ∈ A
+and b ∈ B.
+    Conversely, suppose c = a + b for some a ∈ A and b ∈ B. Assume b ̸∈ Bbad (for otherwise, we would
+have initially reported “yes” for c). We will show that σ(c) > 0 and τ (c) = 0 with good probability. To this
+end, let L = {(a′ , b′ ) ∈ A × B : a′ + b′ ≡ c (mod p), a′ + b′ ̸= c}. Note that the condition a′ + b′ ̸= c
+implies a′ ̸= a, because b ̸∈ Bbad . For a random prime p ∈ (p0 , 2p0 ], for each (a′ , b′ ) ∈ A × B with
+a′ + b′ ̸= c, the probability that a′ + b′ ≡ c (mod p) is O((log N )/p0 ). Thus, Ep [|L|] ≤ O(n̂2 (log N )/p0 ).
+Call p good for c if |L| ≤ (n̂2 lg2 N )/p0 . By Markov’s inequality, the probability that p is not good is at
+most O(1/ log N ). Fix a good prime p for c:
+    • For any fixed a, b and x, y ∈ [2d ], we have Pr[(f (a) = x) ∧ (g(b) = y)] = 1/p2 (since for a fixed ξ,
+      there is one choice of α and β satisfying the condition).
+    • For any fixed a, b, a′ with a ̸= a′ and x, y, z ∈ [2d ], we have Pr[(f (a) = x) ∧ (g(b) = y) ∧ (f (a′ ) =
+      z)] ≤ 1/(p2 (p−1)) (since there is at most one choice of α, β, ξ satisfying the condition). In particular,
+      Pr[f (a′ ) = z | (f (a) = x) ∧ (g(b) = y)] ≤ 1/(p − 1).
+    • Fix x, y ∈ [2d ] with |π(x)| = |π(y)| = t and π(x) ∩ π(y) = ∅. If f (a) = x and g(b) = y, then
+      σ(c) > 0. Conditioned on f (a) = x and g(b) = y, the event that τ (c) > 0 implies the existence
+      of (a′ , b′ ) ∈ L with |π(f (a′ ))| = |π(g(b′ )| = t and π(f   ′          ′
+                                                                  (a )) ∪ π(g(b ))′ = π(h(c)) = π(x  + y) =
+                                                               2t
+      π(x) ∪ π(y). Letting f (a ) = x , there are at most t candidates for x satisfying |π(x′ )| = t and
+                                   ′      ′
+
+      π(x′ ) ⊆ π(x) ∪ π(y). So,
+                                                                                  2 2
+                                                                   2t     1         2t n̂ lg N      1
+                Pr[τ (c) > 0 | (f (a) = x) ∧ (g(b) = y)] ≤ |L|                ≤             2    ≤        (1)
+                                                                    t p−1            t    p0        4
+
+                                                       8
+         by goodness of p and by the choice of p0 = 2d ≈ 2t+1 n̂ lg N (as we have chosen d =
+         ⌈t + lg n̂ + lg lg N + 1⌉).
+                              d 2t                      d
+                                
+       • Summing over all 2t      t choices of x, y ∈ [2 ] with |π(x)| = |π(y)| = t and π(x) ∩ π(y) = ∅, we
+         then obtain
+                                                                                
+                                                           d     2t 1 3              d 1
+                         Pr[(σ(c) > 0) ∧ (τ (c) = 0)] ≥                 · ≥ Ω   e            .           (2)
+                                                           2t     t p2 4             2t n̂2
+
+                                               e 2 / d ), we can guarantee that the error probability is
+                                                          
+By choosing the number of trials to be µ = O(n̂        2t
+at most, say, 0.1, conditioned on a good prime p for c. Unconditionally, the error probability is at most
+0.1 + O(1/ log N ) per c. By repeating the entire algorithm O(log(N |C|)) times, the error probability can
+be made below 1/(N |C|) per c.
+
+    As a sanity check,
+                     if we plug in the standard non-output-sensitive bounds for subset convolution with
+               e d ) and Qsubset-conv = O(1) to the above theorem, we recover the trivial quadratic bound
+Psubset-conv = O( 2t
+for 3SUM. By applying Theorem 2.2 instead, we obtain an overall time bound of
+
+                                2
+                                                                      !
+                              n̂        d               n̂         n̂   2t
+                         Oe
+                               d
+                                            + N + N t + |C| t                 ,
+                                       ≤s                         2 ≥s
+                                 
+                                                        2
+                                      2t
+
+where d = t+lg n̂+O(log log N ). Setting t = γ lg n̂ and d = (1+γ) lg n̂+O(lg lg n̂) and s = (2γ −δ) lg n̂
+for δ < γ < 1/3 yields
+                                                                                       !
+                      n̂2
+                                                                         
+                                    (1 + γ) lg n̂              1−γ        1−γ 2γ lg n̂
+             O
+             e
+                   (1+γ) lg n̂
+                                                    + N + N n̂     + |C|n̂                 .
+                                   (2γ − δ) lg n̂                              δ lg n̂
+                         2γ lg n̂
+
+For a sufficiently small constant δ, this gives a truly subquadratic algorithm. For example, for γ = 0.2 and
+δ = 0.033, we obtain:
+                                                                                 p
+Corollary 2.4. Given sets A, B, C ⊆ [N O(1) ] with N = |A| + |B| and n̂ = |A||B|, we can determine
+whether c ∈ A + B for each c ∈ C, with error probability O(1/N ), in O(n̂1.965 + N n̂0.899 + |C|n̂0.965 )
+total time.
+
+    For |A| = |B| = |C| = n, this gives an O(n1.965 )-time algorithm for 3SUM (or more generally “All-
+Numbers 3SUM” [VW18]) for integer input. Though it is not our intention, this improves over the O(n1.998 )
+randomized time bound originally reported by Alman and Vassilevska Williams [AW26].9
+    In fact, the approach gives a data structure for preprocessing A and B in O(n1.965 ) time and space, so
+that we can determine whether a query number is in A + B in O(n0.965 ) time with low error probability
+(this data structure problem is called “3SUM Indexing” [GKLP17]). It is easy to separate the preprocessing
+and the query parts of the algorithm in Theorem 2.3.
+    It is likely possible to turn this Monte Carlo randomized algorithm into Las Vegas with more effort, but
+we will not elaborate as we aim for the simplest presentation.
+   9
+     The current best (Lean-verified) result reported at https://bigospeedrun.com/3sum as of Oct 21, 2026 is near
+O(n1.921 ), but there is no accompanying human-written manuscript. We reiterate that our main goal is better exposition, to make
+the ideas easier to understand and appreciate.
+
+
+
+
+                                                               9
+2.3     Discussion
+The algorithm here raises some interesting philosophical questions:
+
+Could the breakthrough have been found earlier? To some researchers, the solution reported by Alman
+and Vassilevska Williams [AW26] felt like something that humans could have eventually discovered, or
+could have been discovered earlier had we been luckier. It might be that not many researchers in fine-
+grained complexity are comfortable enough to open up the matrix multiplication black box to seriously try
+solving the selected-entries matrix multiplication problem faster. The approach here completely lowers the
+barrier of entry on the algebraic side (subset convolution is only about inclusion–exclusion formulas), so
+in hindsight, there is even less excuse for researchers to have missed the breakthrough! Experts in subset
+convolution [BHKK10] already knew the idea in Section 2.1, while experts in hashing might be able to
+figure out the details in Section 2.2 on their own, with some effort. However, without the more complicated
+solution in [AW26], we would not have seriously attacked the 3SUM problem via selected-entries subset
+convolution in the first place.
+
+Is the 3SUM algorithm here combinatorial? The answer to this question is subjective, as there is no
+formal definition of “combinatorial algorithms”.
+      • If “combinatorial” means avoiding fast matrix multiplication but allowing FFT, the answer is yes.
+        The motivation for this informal definition is that fast matrix multiplication algorithms are not very
+        practical, but FFT is.
+      • If “combinatorial” means avoiding both fast matrix multiplication and FFT, the answer is still yes.
+        We use the fast zeta transform, which is just dynamic programming with inclusion–exclusion for-
+        mulas. Zeta transforms and inclusion–exclusion have been used before not just in exponential-time
+        algorithms (e.g., [Kar82, BHKK07, BHK09]) but also for some counting problems in fine-grained
+        complexity (e.g., [VW13]). In algorithm design, we often use subtraction tricks without referring
+        to them as non-combinatorial. (In fact, the word “combinatorial” literally refers to counting, and
+        inclusion–exclusion is a standard trick in combinatorics.) However, one could debate why we allow
+        inclusion–exclusion but not, say, Strassen’s matrix multiplication algorithm (or even Schönhage’s),
+        which is also based on “just” subtractions and clever cancellations.
+      • If “combinatorial” means avoiding completely all algebraic techniques, the answer is no. However,
+        one could say that hashing techniques, commonly used in algorithm design (including the reduction
+        in Section 2.2), are also algebraic. Then many algorithms that were considered combinatorial before
+        might not be. It is not clear where one would draw the line. . .
+    If the algorithm here were considered to be combinatorial, then this would also imply a new combi-
+natorial, truly subquadratic algorithm for Boolean convolution of two n-bit vectors, since the latter is a
+special case of All-Numbers 3SUM; but this algorithm would be more complicated (and slower) than, say,
+Karatsuba’s algorithm.
+    If the ultimate goal is just to exclude non-practical algorithms, then the current consensus of combi-
+natorial algorithms does not seem too appropriate: some of the known “combinatorial” algorithms such
+as [AFK+ 24] for Boolean matrix multiplication are far more complicated and probably less practical than
+Strassen’s, for example, and some of the known algorithms for shaving logs [Cha15, Yu18] have large hid-
+den constant factors and would not be competitive in practice. The 3SUM algorithm here in its present form
+may not be too practical either.
+
+                                                      10
+    If the defining characteristic of combinatorial matrix multiplication algorithms is generalizability to
+(min, +)-matrix multiplication (which would successfully exclude Strassen’s but include some log-shaving
+algorithms [Cha19]), then the recent breakthrough on APSP/(min, +)-matrix multiplication has turned the
+question upside-down.
+    Here is another alternative, informal, and imprecise way to characterize combinatorial algorithms: in-
+termediate values maintained by the algorithm should be describable “naturally”. For example, Strassen’s
+matrix multiplication algorithm and Karatsuba’s convolution algorithm do not seem to fulfill this require-
+ment, since intermediate values arising during recursion seem “magical” and do not have clear “meanings”.
+On the other hand, the 3SUM algorithm here arguably satisfies this criterion: the intermediate values main-
+tained by the DP are the zeta transforms and the covering products of subsets, which have relatively simple
+definitions.
+
+
+3     More on 3SUM, and k-SUM for Odd k
+The 3SUM algorithm in the previous section has query cost O(n0.965 ), which cannot be lowered to below
+n2/3 even if we allow larger preprocessing. In this section, we describe a variant of the algorithm, which
+can make the query cost an arbitrarily small polynomial, while still supporting the unbalanced case when
+the sets A and B have different sizes. As a consequence, this leads to a faster algorithm for k-SUM for any
+constant odd k for integer input.
+
+3.1   Selected-Entries Convolution in [r]d for Small r
+The main additional idea is to use a larger base r > 2. This requires a generalization of the subset con-
+volution problem where elements are vectors in [r]d . The r = 2 or bit-vector case corresponds precisely
+to subset convolution. This is essentially standard d-dimensional convolution with coordinate values in [r],
+which is known to be reducible to standard one-dimensional convolution over [O(r)d ] when d is a constant
+and r is a variable. However, we need the opposite regime when r is a constant and d is a variable, and we
+need the version with selected entries.
+Problem 3.1. Let Hr,d,t = {x ∈ [r]d : ∥x∥1 = t}. We are given two functions f : Hr,d,t1 → R and
+g : Hr,d,t2 → R with O(n) nonzero entries and a subset C ⊆ Hr,d,t with t = t1 + t2 . For each c ∈ C, we
+want to compute                                     X
+                               (f ⋆r g)(c) :=               f (a)g(b),
+                                                     a,b∈[r]d : c=a+b
+
+where a + b denotes vector addition over Zd .
+    This version of the problem for vectors in [r]d can be viewed as selected-entries subset convolution
+for multisets with multiplicities bounded by r. We can reduce it to standard subset convolution for sets, by
+reinterpreting multisets in [d] as sets in [dr], as follows. Given a set A ⊆ [dr], let µj,A = |A ∩ [jr, (j + 1)r)|;
+we call this the multiplicity of j. Two sets A, A′ ⊆ [dr] are multiplicity-equivalent if µj,A = µj,A′ for all
+j ∈ [d]. A collection A of sets in [dr] with weight function f is multiplicity-invariant if for every A ∈ A and
+every A′ that is multiplicity-equivalent to A, we have A′ ∈ A and f (A′ ) = f (A). A multiplicity-invariant
+collection can be represented implicitly: it suffices to store one representative set in each equivalence class,
+and for each such set A, store just the multiplicities of each of its elements. The subset convolution of two
+multiplicity-invariant collections is multiplicity-invariant, and the zeta transform of a multiplicity-invariant
+collection is multiplicity-invariant.
+
+                                                        11
+Lemma 3.2. Let s ≤ t. Given two multiplicity-invariant, weighted collections A and B of sets in [dr] with
+O(n) multiplicity-equivalence classes, where sets in A have size t1 and sets in B have size t2 , and given a
+collection C of sets in [dr] of size t = t1 + t2 , we can compute the subset convolution output of each set in
+C in total deterministic time
+
+                                           (n + Hr (d, ≤ s) + |C|Hr (d, t, ≥ s)) (dr)O(1) ,
+
+where Hr (d, ≤ s) denotes the number of vectors in [r]d with L1 norm at most s, and Hr (d, t, ≥ s) denotes
+the maximum number of vectors in [r]d with L1 norm at least s that is dominated10 by a vector of L1 norm
+t.
+
+Proof. We use the same algorithm as in the proof of Theorem 2.2 , with straightforward changes:
+    In step 1 of the preprocessing algorithm, it suffices to compute and store fb(X) for just one representative
+set X per equivalence class (since fb is multiplicity-invariant), and store fi (X) for O(r) representative sets
+X (since the value depends on the multiplicity vector, along with the cardinality of X ∩ [jr, (j + 1)r) for the
+unique j with i ∈ [jr, (j + 1)r)). Steps 2 and 3 are similar. The number of table entries is O(drHr (d, ≤ s)),
+since Hr (d, ≤ s) bounds the number of equivalence classes of sets of size at most s.
+    The query algorithm is similar. Here, the number of table entries is O(drHr (d, t, ≥ s)), since Hr (d, t, ≥
+s) bounds the number of equivalence classes of sets of size at least s contained in the query set C.
+
+Theorem 3.3. Let s        ≤      t.     Problem 3.1 can be solved in total deterministic time
+(n + Hr (d, ≤ s) + |C|Hr (d, t, ≥ s)) (dr)O(1) .
+
+Proof. For each vector a = (a0 , . . . , ad−1 ) ∈ [r]d with a nonzero f (a), additionally define f ′ (A) = f (a) ·
+(a0 ! · · · ad−1 !) for all sets A ⊆ [dr] with µj,A = aj for each j ∈ [d]. For each vector b = (b0 , . . . , bd−1 ) ∈
+[r]d with a nonzero g(b), define g ′ (B) = g(b) · (b0 ! · · · bd−1 !) for all sets B ⊆ [dr] with µj,B = bj for each
+j ∈ [d]. Then f ′ and g ′ are multiplicity-invariant. For c = (c0 , . . . , cd−1 ) ∈ [r]d , we have (f ⋆r g)(c) =
+(f ′ ⋆ g ′ )(c)/(c0 ! · · · cd−1 !).
+
+3.2       Reducing 3SUM to Convolution in [r]d
+Now we modify the algorithm in Section 2.2 using convolution over [r]d . When working in base r, we no
+longer seek disjointness of subsets corresponding to two numbers. Instead, we just want the two numbers to
+be summable without carries, so that summing the two numbers is equivalent to summing their correspond-
+ing vectors. With a larger base r, this turns out to happen with greater probability.
+
+Theorem 3.4. Suppose Problem 3.1 can be solved in O(Pvec-conv (n, d, t, r) + |C|Qvec-convp   (n, d, t, r)) time.
+    Let r be a constant. Given sets A, B, C ⊆ [n       O(1) ] with N = |A| + |B| and n̂ = |A||B|, we can
+determine whether c ∈ A + B for each c ∈ C, with error probability O(1/N ), in
+                                                                                            
+              Oe n̂2(1−logρ r) · Pvec-conv (N, d, t, r) + N + |C|(Qvec-conv (N, d, t, r) + 1)
+
+where t = (r − 1)d/2, and d = 2 logρ n̂ + O(log log N ) for ρ := r2 /(r!)1/r . Note that ρ = Θ(r), and so
+1 − logρ r = O(1/ log r).
+
+Proof. Assume d is divisible by r. We modify the proof of Theorem 2.3.
+  10
+       (x0 , . . . , xd−1 ) is dominated by (y0 , . . . , yd−1 ) if xj ≤ yj for all j ∈ [d].
+
+
+
+                                                                          12
+Algorithm. Let p0 = rd . Pick a random prime p in (p0 , 2p0 ]. Let Abad = {a ∈ A : ∃a′ ∈ A with a′ ≡ a
+(mod p) and a′ ̸= a} and Bbad = {b ∈ B : ∃b′ ∈ B with b′ ≡ b (mod p) and b′ ̸= b} (these are elements
+that are in non-singleton buckets when we hash modulo p). For each c ∈ C, if c ∈ Abad +B or c ∈ A+Bbad ,
+then report “yes” for c.
+    Next, we repeat the following µ times, for a parameter µ to be determined:
+
+   1. Pick random numbers ξ, α, β ∈ [p] with ξ ̸= 0. Define functions f, g, h : Z → [p]:
+
+                                          f (a) = (aξ + α) mod p
+                                          g(b) = (bξ + β) mod p
+                                          h(c) = (cξ + α + β) mod p.
+
+      Let π : [rd ] → [r]d where π(x) is the vector formed by the base-r representation of x.
+
+   2. Let A∗ = {a ∈ A \ Abad : f (a) < rd } and B ∗ = {b ∈ B \ Bbad : g(b) < rd }.
+
+   3. For each c ∈ C such that h(c) < rd and π(h(c)) is perfectly balanced, i.e., each number in [r] occurs
+      exactly d/r times in the vector, compute
+
+                         σ(c) = |{(a, b) ∈ A∗ × B ∗ : π(f (a)) + π(g(b)) = π(h(c))}|
+                                               X
+                         τ (c) =                                  (a + b − c)2 .
+                                    (a,b)∈A∗ ×B ∗ : π(f (a))+π(g(b))=π(h(c))
+
+      If σ(c) > 0 and τ (c) = 0, then report “yes” for c.
+
+If “yes” has not been reported for c in any of the trials, then report “no”.
+
+Running time analysis. The analysis of the algorithm is similar, so we will only point out the differences.
+    Initially, sorting Abad + B and A + Bbad takes O(N  e n̂2 /p0 ) = O(Ne n̂2(1−logρ r) ) time, as p0 = rd and
+d = 2 logρ n̂ + O(log log N ).
+    In step 3, for the convolutions, we have to loop through all combinations of t1 , t2 with t1 + t2 = t, but
+this only increases the running time by an O(t) factor.
+    Note that a perfectly balanced vector has L1 norm (d/r) r−1
+                                                                    P
+                                                                      i=0 i = (r − 1)d/2, and the number of
+                                                                             d!         d Θ(r) = Θ(re d ). The
+perfectly balanced vectors is equal to the multinomial coefficient ((d/r)!)     r = r /d
+                                                                                                d
+selected entries are C ∗ are the vectors in C that are perfectly balanced, and so E[C ∗ ] = e
+                                                                                            Θ( r |C|) = e
+                                                                                              p         Θ(|C|).
+So, the running time now becomes O   e (µ · (Pvec-conv (N, d, t, r) + N + |C|Qvec-conv (N, d, t, r))). Eventually
+                        2(1−logρ r)
+we will choose µ = O(n̂
+                     e              ), and this will give the time bound stated in the theorem.
+
+Error probability analysis. The mapping π satisfies the property: if π(x) + π(y) ∈ [r]d , then π(x + y) =
+π(x) + π(y) (this corresponds to “no-carry” addition of base-r numbers).
+    ObserveQthat if z ∈ [r]d is a perfectly balanced vector, the number of vectors x′ ∈ [r]d dominated by z
+             r−1
+is equal to i=0 (i + 1)d/r = (r!)d/r . Equation (1) then becomes
+
+                                                                        1              n̂2 lg2 N   1
+         Pr[τ (c) > 0 | (f (a) = x) ∧ (g(b) = y)] ≤ |L| · (r!)d/r          ≤ (r!)d/r ·       2   ≤
+                                                                        p0                 p0      4
+
+
+
+                                                        13
+by choosing d so that p20 = r2d ≈ 4(n̂2 lg2 N )(r!)d/r . This implies that (r2 /(r!)1/r )d = eΘ(n̂2 ). So,
+d = 2 logρ n̂ + O(log log N ) where ρ = r2 /(r!)1/r .
+   Equation (2) becomes
+                                                                                            d
+                                         d!           d/r 1  3            d!       1           r
+     Pr[(σ(c) > 0) ∧ (τ (c) = 0)] ≥             (r!)        · ≥ Ωe              ·       ≥ Ωe         .
+                                      ((d/r)!)r          p2 4         ((d/r)!)r n̂2            n̂2
+                         
+We now choose µ = O  e n̂d2 = O(n̂
+                                e 2(1−logρ r) ). Remaining parts of the proof are similar.
+                         r
+
+    Applying Theorem 3.3, we obtain an overall time bound of
+                                                                                  
+               e n̂2(1−logρ r) · Hr (d, ≤ s) + N + |C|(Hr (d, ≥ s, (r − 1)d/2) + 1)
+               O
+
+for d = 2 logρ n̂ + O(log log N ).
+    Let s = (1 − δ)(r − 1)d/2 for a sufficiently small constant δ > 0. Observe that Hr (d, ≤ s) ≤
+        2                       2
+rd 2−Θ(δ d) = e Θ(n̂2 logρ r−Θ(δ / log ρ) ) (since the probability that a sum of d independent, uniform random
+                                                                    2
+variables in [r] is at most (1 − δ)(r − 1)d/2 is at most 2−Θ(δ d) by a Chernoff bound). On the other hand,
+Hr (d, ≥ s, (r − 1)d/2) is bounded by (r−1)d/2         ≤ (r−1)d/2     = (1/δ)O(δrd) = n̂O(δr log(1/δ)/ log ρ) . Thus,
+                                                                   
+                                                ≥s          O(δrd)
+the time bound becomes
+                                     2
+                                                                                       
+                         O n̂2−Θ(δ / log r) + (N + |C|)n̂O(1/ log r+δr log(1/δ)/ log r) .
+
+For example, setting δ = ε0.49 and r = 1/ε0.48 implies:
+                                                                            p
+Corollary 3.5. Given sets A, B, C ⊆ [N O(1) ] with N = |A| + |B| and n̂ = |A||B|, we can determine
+whether c ∈ A + B for each c ∈ C, with error probability O(1/N ), in O(n̂2−ε + (N + |C|)n̂O(1/ log(1/ε)) )
+time for a sufficiently small constant ε > 0.
+    The (2k + 1)-SUM problem reduces to 3SUM in the unbalanced case when |A| = nk , |B| = n, and
+|C| = nk (with N = O(nk ) and n̂ = O(n(k+1)/2 )), and so we immediately obtain:
+Corollary 3.6. For any constant k ≥ 1, the (2k + 1)-SUM problem for polynomially bounded integers can
+be solved in O(nk+1−εk ) for some constant εk = 2−Θ(k) by a Monte Carlo randomized algorithm.
+
+
+4    Real APSP Derandomized
+In this section, we present a truly subcubic-time deterministic algorithm for APSP for real input.
+    It is well known (by repeated squaring) that the real APSP problem reduces to computing the (min, +)-
+product of two n × n real matrices, which in turn reduces to n/d instances of (min, +)-product of n × d
+and d × n matrices:
+Problem 4.1 (Rectangular (min, +) matrix multiplication). Given an n × d real matrix A and a d × n
+matrix B, compute C[i, j] = mink∈[d] (A[i, k] + B[k, j]) for each i, j ∈ [n].
+    For simplicity of presentation, we assume that there are no degeneracies (no two pairs of input numbers
+have equal sum); degenerate cases can be addressed by perturbation or by straightforward modifications.
+    Chan, Vassilevska Williams, and Xu’s previous approach [CVX22] considered an intermediate “verifi-
+cation” problem:
+
+                                                         14
+Problem 4.2 (Verification). We are given an n × d real matrix A and a d × n matrix B and indices pij ∈ [d]
+for each i, j ∈ [n]. For each i, j ∈ [n], we want to decide whether there exists an index p′ij ∈ [d] satisfying
+
+                                       A[i, p′ij ] + A[p′ij , j] < A[i, pij ] + A[pij , j],
+
+and if yes, report one such p′ij .
+     If the answer is no, then pij is indeed the correct index for the (min, +)-product entry C[i, j].
+     Chan, Vassilevska Williams, and Xu showed that this verification problem can be reduced to Lopsided
+AE Sparse Triangle (and thus to selected-entries rectangular matrix multiplication), by adapting simple
+ideas found in previous slightly subcubic APSP algorithms such as [Fre76, Cha08, Cha10, Wil18] (notably,
+“Fredman’s trick”).
+     To reduce the original problem to this verification problem, they applied a well-known random sampling
+approach: take a random subset R ⊆ [d] of a certain size r, compute arg mink∈R (A[i, k] + B[k, j]) for each
+i, j (by brute force or by recursion). This gives us good candidates pij for verification, since for each i, j,
+the number of p′ with a smaller A[i, p′ ] + B[p′ , j] is expected to be around d/r.
+     Unfortunately, we do not see a good way to derandomize this sampling approach. (Essentially, we want
+a small hitting set R for a certain set system which we cannot afford to generate explicitly.) We have un-
+successfully tried various sophisticated ideas, such as the method of conditional probabilities, or limited
+independence. In the integer case, Chan and Xu [CX24] suggested halving the input values, and recur-
+sively solving the problem in a smaller integer universe; this then gives us good candidates for verification.
+However, this approach inherently does not work for real input.
+
+4.1    New Counting Problem
+We describe a simple approach that gives a deterministic reduction. We first define the following “halving”
+problem, which is stronger than the verification problem:
+Problem 4.3 (Halving). We are given an n × d real matrix A and a d × n matrix B and indices pij ∈ [d]
+for each i, j ∈ [n] with d ≤ n. For each i, j ∈ [n], we want to compute a new index p′ij ∈ [d] satisfying
+
+                                              rankij (p′ij ) ≤ ⌈rankij (pij )/2⌉ ,
+
+where rankij (p) denotes the rank of A[i, p] + B[p, j] in {A[i, k] + B[k, j] : k ∈ [d]}.
+   By iterating log d times, we can immediately reduce the rectangular (min, +) matrix multiplication
+problem to the halving problem:
+Lemma 4.4. If Problem 4.3 can be solved in Thalve (n, d) time, then Problem 4.1 can be solved in
+O(Thalve (n, d) log d) time.
+   To find an element with low rank, the key new idea is to find an interval with low average rank. This
+motivates the following “counting” problem:
+Problem 4.5 (Counting). We are given an n × d real matrix A and a d × n matrix B, indices pij ∈ [d] for
+each i, j ∈ [n], and dyadic11 intervals Iij ⊆ [d] of length at least d1−δ for a given parameter δ > 0. Let
+
+                           Lij (p, I) := {k ∈ I : A[i, k] + B[k, j] < A[i, p] + B[p, j]}.
+  11
+     A dyadic interval is an interval of the form (a2i , (a + 1)2i ] for integers a and i. Without loss of generality, we may assume
+that d is a power of 2.
+
+
+                                                                15
+For each i, j ∈ [n], we want to compute the following counts:
+
+     sizeij (pij , Iij ) := |Lij (pij , Iij )|
+                                 X
+sum-rankij (pij , Iij ) :=                   rankij (k)
+                              k∈Lij (pij ,Iij )
+
+                         =    |{(k, k ) ∈ Iij × [d] : A[i, k ′ ] + B[k ′ , j] ≤ A[i, k] + B[k, j] < A[i, pij ] + B[pij , j]}|.
+                                      ′
+
+
+    Note subtly that in the definition of sum-rankij (pij , Iij ), we are summing the “global” ranks rankij (k)
+relative to [d], not ranks relative to Iij (and thus the index k ′ runs over [d], not Iij ). From the above counts,
+we can then get:
+                         avg-rankij (pij , Iij ) := sum-rankij (pij , Iij )/sizeij (pij , Iij ).
+   We now show how to reduce the halving problem to the counting problem by a simple binary search:
+we just repeatedly shrink intervals while maintaining low average rank.
+Lemma 4.6. For any constant δ > 0, if Problem 4.5 can be solved in Tcount (n, d, δ) time, then Problem 4.3
+can be solved in Thalve (n, d) = O(Tcount (n, d, δ) log d + d1−δ n2 ) time.
+Proof. Let rij = rankij (pij ). Observe that sizeij (pij , [d]) = rij , and sum-rankij (pij , [d]) = rij (rij − 1)/2,
+and so avg-rankij (pij , [d]) ≤ rij /2, assuming rij ≥ 1.
+    For each i, j ∈ [n], we maintain a dyadic interval Iij such that sizeij (pij , Iij ) ≥ 1 and
+avg-rankij (pij , Iij ) ≤ rij /2. At the beginning, we can set Iij = [d] for all i, j.
+    In each round, we divide the dyadic interval Iij into its left half Iij− and its right half Iij+ . Since
+sizeij (pij , Iij ) = sizeij (pij , Iij− ) + sizeij (pij , Iij+ ) and sum-rankij (pij , Iij ) = sum-rankij (pij , Iij− ) +
+sum-rankij (pij , Iij+ )), we must have sizeij (pij , Iij− ) > 0 and avg-rankij (pij , Iij− ) ≤ rij /2, or
+sizeij (pij , Iij+ ) > 0 and avg-rankij (pij , Iij+ ) ≤ rij /2. We can tell which is the case by invoking an algorithm
+for Problem 4.5. We then reset Iij to Iij− in the former case, or Iij+ in the latter.
+    The total number of rounds is O(log d). When the length of Iij drops below d1−δ , we can return the
+index p′ij ∈ Iij minimizing A[i, p′ij ] + B[p′ij , j], which satisfies rankij (p′ij ) ≤ avg-rankij (pij , Iij ) ≤ rij /2.
+Each such index can be found in O(d1−δ ) time by a brute-force search. The total time is O(d1−δ n2 ).
+
+4.2    Reducing the Counting Problem to Selected-Entries Matrix Multiplication
+We now describe how to solve our counting problem by using Lopsided #AE Sparse Triangle. This part will
+be similar to previous reductions by Chan, Vassilevska Williams, and Xu [CVX22].
+                                                           e 1+δ Mselected-entries (n, d4+2δ , n | n2 /d1+δ )+
+Lemma 4.7. Problem 4.5 can be solved in Tcount (n, d, δ) = O(d
+ 1−δ 2
+d n ) time.
+Proof. Fix an index p ∈ [d] and a dyadic interval I of length at least d1−δ . Let W be a batch of up to
+n2 /d1+δ pairs from {(i, j) ∈ [n]2 : pij = p, Iij = I}.
+     We concentrate on computing cij := sum-rankij (pij , Iij ) for all (i, j) ∈ W . Computing sizeij (pij , Iij )
+is similar (and easier).
+     Sort L = {A[i, k]−A[i, k ′ ] : i ∈ [n], k, k ′ ∈ [d]}∪{B[k, j]−B[k ′ , j] : j ∈ [n], k, k ′ ∈ [d]}, which has
+O(d2 n) elements, in O(d2 n log n) time. Let αi,k,k′ denote the rank of A[i, k] − A[i, k ′ ] and βk,k′ ,j denote
+the rank of B[k, j] − B[k ′ , j] in the sorted list L. Note that
+
+                        cij = |{(k, k ′ ) ∈ I × [d] : αi,k′ ,k ≤ βk,k′ ,j and αi,k,p < βp,k,j }|
+
+                                                           16
+by the definition of sum-rankij (pij , Iij ) and Fredman’s trick [Fre76, CVX22, CVX23] (i.e., the obvious
+equivalence of a + b ≤ a′ + b′ with a − a′ ≤ b′ − b).
+    Define a tripartite graph G:
+
+     • The left vertex set is [n], the right vertex set is [n], and the middle vertex set consists of tuples
+       (k, k ′ , I1 , I2 ) where k ∈ I, k ′ ∈ [d], and I1 and I2 are dyadic intervals in [O(d2 n)] (we do not
+       list all middle vertices exhaustively but generate only those incident to edges).
+
+     • There is an edge between the left vertex i ∈ [n] and the middle vertex (k, k ′ , I1 , I2 ) iff αi,k′ ,k is in the
+       left half of I1 and αi,k,p is in the left half of I2 .
+
+     • There is an edge between the right vertex j ∈ [n] and the middle vertex (k, k ′ , I1 , I2 ) iff βk,k′ ,j + 1 is
+       in the right half of I1 and βp,k,j is in the right half of I2 .
+
+     • There is an edge between the left vertex i ∈ [n] and the right vertex j ∈ [n] iff (i, j) ∈ W .
+
+Since any point belongs to at most O(log n) dyadic intervals, there are a total of O(d2 n log2 n) edges
+between the left part and the middle part, and between the right part and the middle part. Let VH denote
+the middle vertices of degree more than ∆ := n/d2+2δ is e      O(d2 n/∆) = eO(d4+2δ ). Let cH   ij be the number
+                                                                 L
+of triangles containing i and j through vertices in VH . Let cij be the number of triangles between i and j
+not through vertices in VH . We compute cH  ij for all (i, j) ∈ W in O(Mselected-entries (n, d
+                                                                                              4+2δ , n | n2 /d1+δ ))
+                                                                        2
+time. We compute cL                                                2                       e 2 2δ
+                     ij for all (i, j) ∈ W by brute force in O((d n log (dn)) · ∆) = O(n /d ) time. Then
+cij = cL      H
+        ij + cij .
+    We repeat the above for all d choices of p and O(dδ ) choices of I, and a total of O(d1+δ ) batches for W .
+The total number of iterations is O(d1+δ ).
+
+     Combining all the preceding lemmas, we conclude:
+
+                                                                O(dδ nMselected-entries (n, d4+2δ , n |
+Theorem 4.8. For any constant δ > 0, Real APSP can be solved in e
+n2 /d1+δ ) + n3 /dδ ) deterministic time.
+
+                                                                                                O(n2 /d0.0112 +
+    For example, using the fact [AW26, Table 2 in p. 40] that Mselected-entries (n, d, n | w) ≤ e
+wd0.10 ) for d ≤ n0.056 , the above bound becomes O(d e δ n · (n2 /d(4+2δ)0.0112 + (n2 /d1+δ )d(4+2δ)0.10 ) +
+  3  δ
+n /d ) for d ≤ n  0.056/(4+2δ) . Setting δ = 0.0226537 and d = n0.013843 yields the following (we did not try
+to optimize the exponent):
+
+Corollary 4.9. Real APSP can be solved in O(n2.9997 ) deterministic time.
+
+
+5     Real 3SUM Derandomized
+In this section, we present a truly subquadratic-time deterministic algorithm for Real 3SUM. We use ideas
+similar to those in the previous section, in combination with Chan, Vassilevska Williams, and Xu’s previous
+randomized reduction [CVX22], though the details become a bit more involved for 3SUM.
+    Given sets A, B, C of O(n) elements, we solve the following slight extension of the 3SUM problem:
+for each c ∈ C, find the predecessor and successor12 of c in the sumset A + B. To this end, we first sort A
+   12
+      Here, the predecessor of c in a set S is the largest element in S strictly less than than c, and the successor is the smallest element
+in S greater than or equal to c.
+
+
+
+                                                                    17
+and B and divide the sorted lists of A and B into sublists A1 , . . . , An/d and B1 , . . . , Bn/d of size d, for a
+given parameter d ≤ n. Let A[i, k] denote the k-th element of Ai for each i ∈ [n/d] and k ∈ [d], and B[j, ℓ]
+denote the ℓ-th element of Bj for each j ∈ [n/d] and ℓ ∈ [d]. By ideas from known slightly subquadratic
+real 3SUM algorithms (originally due to Grønlund and Pettie [GP18], and continued by Chan [Cha20]),
+Chan, Vassilevska Williams, and Xu [CVX22] observed that the original problem reduces to the following
+problem (roughly, because for each c ∈ C, it suffices to search for c in Ai + Bj for O(n/d) pairs (i, j) that
+form a monotone “staircase” in the [n/d] × [n/d] grid):
+
+Problem 5.1 (Real-3SUM Variant). We are given an (n/d) × d real matrixPA and an (n/d) × d real matrix
+B. For each i, j ∈ [n/d], we are also given a set Cij of real numbers with i,j |Cij | = O(n2 /d).
+   For each i, j ∈ [n/d] and each c ∈ Cij , we want to find the predecessor and successor of the value c
+among the elements in {A[i, k] + B[j, ℓ] : k, ℓ ∈ [d]}.
+
+   For simplicity of presentation, we again assume that there are no degeneracies (no two pairs have equal
+sum).
+
+5.1    A New Counting Problem
+Similar to the halving problem for Real APSP, we define an approximate halving problem for Real 3SUM,
+which shrinks the search space by some constant factor:
+
+Problem 5.2 (Approximate Halving). We are given an (n/d)×d real matrix A and an              P(n/d)×d real matrix
+B. For each i, j ∈ [n/d], we are also given a set Qij of quintuples in R × [d]4 with i,j |Qij | = O(n2 /d).
+    For each i, j ∈ [n/d] and each (c, p− , q − , p+ , q + ) ∈ Qij satisfying A[i, p− ]+B[j, q − ] < c ≤ A[i, p+ ]+
+B[j, q + ], we want to find a new quadruple (p′− , q ′− , p′+ , q ′+ ) ∈ [d]4 satisfying A[i, p′− ] + B[j, q ′+ ] < c ≤
+A[i, p′+ ] + B[j, q ′+ ], such that
+
+                  diff-rankij (p′− ′− ′+ ′+                             − − + +
+                                , q , p , q ) ≤ max{0.8 · diff-rankij (p , q , p , q ), 1},
+
+where diff-rankij (p− , q − , p+ , q + ) = rankij (p+ , q + )−rankij (p− , q − ) and rankij (p, q) is the rank of A[i, p]+
+B[j, q] in {A[i, k] + B[j, ℓ] : j, ℓ ∈ [d]}.
+
+   By iterating O(log d) times, we can immediately reduce Problem 5.1 to the approximate halving prob-
+lem.
+
+Lemma 5.3. If Problem 5.2 can be solved in Thalve (n, d) time, then Problem 5.1 can be solved in
+O(Thalve (n, d) log d) time.
+
+    To solve Problem 5.2, we want to find a good “pivot” (k, ℓ) for which both diff-rankij (p′− ′−
+                                                                                             , q , k, ℓ) and
+diff-rankij (k, ℓ, p′+ , q ′+ ) are small, i.e., its rank is close to
+
+                    mid-rankij (p− , q − , p+ , q + ) := (rankij (p− , q − ) + rankij (p+ , q + ))/2,
+
+i.e., the following “potential” value is small:
+
+                 Φij (k, ℓ, p− , q − , p+ , q + ) := (rankij (k, ℓ) − mid-rankij (p− , q − , p+ , q + ))2 .
+
+Inspired by the earlier average rank idea, we will maintain an interval with low average potential value
+instead, which motivates the following new version of the counting problem:
+
+                                                            18
+Problem 5.4 (Counting). We are given an (n/d) × d real matrix A and an (n/d) × d real matrix B.
+For each i, j ∈ [n/d], we are also given a set Qij of quintuples, where each quintuple is of the form
+(p− , q − , p+ , q + , I) for some p−P
+                                     , q − , p+ , q + ∈ [d] and I is a dyadic interval in [d] of length at least d1−δ for
+a given parameter δ > 0, with i,j |Qij | = O(n2 /d). Let
+
+Lij (p− , q − , p+ , q + , I) := {(k, ℓ) ∈ I × [d] : A[i, p− ] + B[j, q − ] < A[i, k] + B[j, ℓ] < A[i, p+ ] + B[j, q + ]}.
+
+    For each i, j ∈ [n/d] and each (p− , q − , p+ , q + , I) ∈ Qij , we want to compute:
+
+                sizeij (p− , q − , p+ , q + , I) := |Lij (p− , q − , p+ , q + , I)|
+                                                               X
+              sum-Φij (p− , q − , p+ , q + , I) :=                               Φij (k, ℓ, p− , q − , p+ , q + ).
+                                                         (k,ℓ)∈Lij (p− ,q − ,p+ ,q + ,I)
+
+    From these values, we can then get:
+
+            avg-Φij (p− , q − , p+ , q + , I) := sum-Φij (p− , q − , p+ , q + , I)/sizeij (p− , q − , p+ , q + , I).
+
+Lemma 5.5. For any constant δ > 0, if Problem 5.4 can be solved in Tcount (n, d, δ) time, then Problem 5.2
+can be solved in Thalve (n, d) = O(Tcount (n, d, δ) log d + n2 /dδ ) time.
+Proof. Consider a quintuple (c, p− , q − , p+ , q + ) ∈ Qij . Let a = rankij (p− , q − ) and b = rankij (p+ , q + ),
+and λ = diff-rankij (p− , q − , p+ , q + ) = b − a. Observe that sizeij (p− , q − , p+ , q + , [d]) = λ − 1, and
+sum-Φij (p− , q − , p+ , q + , [d]) = b−1              a+b 2
+                                         P
+                                           t=a+1 (t − 2 ) = λ(λ − 1)(λ − 2)/12 by straightforward calculations,
+                       −   −     +    +          2
+and so avg-Φij (p , q , p , q , [d]) ≤ λ /12, assuming λ > 1.
+     For the quintuple (c, p− , q − , p+ , q + ) ∈ Qij , we maintain a dyadic interval I such that
+sizeij (p− , q − , p+ , q + , I) ≥ 1 and avg-Φij (p− , q − , p+ , q + , I) ≤ λ2 /12. At the beginning, we can set
+I = [d].
+     In each round, we divide the dyadic interval I into its left half I − and its right half I + . Similar to before,
+sizeij (p− , q − , p+ , q + , I − ) ≥ 1 and avg-Φij (p− , q − , p+ , q + , I − ) ≤ λ2 /12, or sizeij (p− , q − , p+ , q + , I − ) ≥
+1 and avg-Φij (p− , q − , p+ , q + , I + ) ≤ λ2 /12. We can tell which is the case by invoking an algorithm for
+Problem 4.5. We then reset I to I − in the former case, or I + in the latter.
+     The total number of rounds is O(log d). When the length of I drops below d1−δ for a quintuple
+(c, p− , q − , p+ , q + ) ∈ Qij , we find the predecessor A[i, p′− ] + B[j, q ′− ] and successor A[i, p′+ ] + B[j, q ′+ ]
+of c in {A[i, k] + B[j, ℓ] : (k, ℓ) ∈ (I × [d]) ∪ {(p− , q − ), (p+ , q + )}}, and return (p′− , q ′− , p′+ , q ′+ ) for c.
+This can be done by a binary search over ℓ for each k ∈ I, in time e                  O(d1−δ ) per quintuple in Qij . The
+total time over a round is O(n       e 2 /d · d1−δ ) = O(n  e 2 /dδ ). To show correctness, note that there exists
+(k, ℓ) ∈ Lij (p− , q − , p+ , q + , I) with (rankij (k, ℓ) − a+b        2                 − − + +
+                                                                   2 ) ≤ avg-Φij (p , q , p , q , I)√≤ λ /12, im-
+                                                                                                                       2
+                                −    −                                +     +
+plying that diff-rankij (p , q , k, ℓ) and diff-rankij (k, ℓ, p , q ) are both at most λ/2 + λ/ 12 < 0.8λ. It
+follows that diff-rankij (p′− , q ′− , p′+ , q ′+ ) < 0.8λ.
+
+    The above counting problem can be simplified:
+Problem 5.6 (Counting, Simplified). Let s ∈ {0, 1, 2} and ≺ be either ≤ or <. We are given an (n/d) × d
+real matrix A and an (n/d) × d real matrix B. For each i, j ∈ [n/d], we are also given a set Qij of triples,
+                                           for some p, q ∈ [d] and I is a dyadic interval in [d] of length at least
+where each triple is of the form (p, q, I) P
+d1−δ for a given parameter δ > 0, with i,j |Qij | = O(n2 /d). Let
+
+                     L≺
+                      ij (p, q, I) := {(k, ℓ) ∈ I × [d] : A[i, k] + B[j, ℓ] ≺ A[i, p] + B[j, q]}.
+
+
+                                                                19
+      For each i, j ∈ [n/d] and each (p, q, I) ∈ Qij , we want to compute:
+                                                 (s,≺)
+                                                                                 X
+                             sum-rank-powerij            (p, q, I) :=                          rankij (k, ℓ)s .
+                                                                           (k,ℓ)∈Lij (p,q,I)
+
+                                             ′
+Lemma 5.7. If Problem 5.6 can be solved in Tcount (n, d, δ) time, then Problem 5.4 can be solved in
+                      ′
+Tcount (n, d, δ) = O(Tcount (n, d, δ)) time.
+
+Proof. Computing rankij (p− , q − ) and rankij (p+ , q + ), and thus mid-rankij (p− , q − , p+ , q + ), reduces to
+                          (0,≤)                                     (0,≤)
+computing sum-rank-powerij (p− , q − , [d]) and sum-rank-powerij (p+ , q + , [d]).
+                                                                                                                  (0,<)
+      Computing sizeij (p− , q − , p+ , q + , I) reduces to computing sum-rank-powerij                                    (p+ , q + , I) and
+                     (0,≤)
+sum-rank-powerij (p− , q − , I) by subtraction.
+    Given m = mid-rankij (p− , q − , p+ , q + ), computing sum-Φij (p− , q − , p+ , q + , I) reduces to computing
+sum-rank-power(s,<) (p+ , q + , I) and sum-rank-power(s,≤) (p− , q − , I) by subtraction, for all s ∈ {0, 1, 2},
+since (x − m)2 expands to x2 − 2mx + m2 .
+
+5.2     Reducing the Counting Problem to Selected-Entries Matrix Multiplication
+We now solve this simplified counting problem using Lopsided #AE Sparse Triangle, by adapting previous
+reductions by Chan, Vassilevska Williams, and Xu [CVX22].
+                                         ′
+Lemma 5.8. Problem 5.6 can be solved in Tcount             O(dδ Mselected-entries (n, d12+2δ , n | n/d1+δ ) +
+                                               (n, d, δ) = e
+n2 /dδ ) time.
+
+Proof. Fix a dyadic interval I of length at least d1−δ . Let W be a batch of up to n2 /d1+δ pairs from
+{(i, p, j, q) ∈ [n/d] × [d] × [n/d] × [d] : (p, q, I) ∈ Qij }.
+    We concentrate on the case s = 2, since the cases s = 0 and s = 1 are easier. W.l.o.g., say ≺ is <. Then
+                                                (2,<)
+        c(i,p),(j,q) := sum-rank-powerij                (p, q, I)
+                             ′   ′   ′′   ′′
+           = |{(k, ℓ, k , ℓ , k , ℓ ) ∈ I × [d]5 : A[i, k] + B[j, ℓ] < A[i, p] + B[j, q] and
+                       A[i, k ′ ] + B[j, ℓ′ ] ≤ A[i, k] + B[j, ℓ] and A[i, k ′′ ] + B[j, ℓ′′ ] ≤ A[i, k] + B[j, ℓ]}|.
+
+   Sort L = {A[i, k] − A[i, k ′ ] : i ∈ [n/d], k, k ′ ∈ [d]} ∪ {B[j, ℓ] − B[j, ℓ′ ] : j ∈ [n/d], ℓ, ℓ′ ∈ [d]},
+which has O(dn) elements, in O(dn log n) time. Let αi,k,k′ denote the rank of A[i, k] − A[i, k ′ ] and βj,ℓ,ℓ′
+denote the rank of B[j, ℓ] − B[j, ℓ′ ] in the sorted list L. By Fredman’s trick,
+
+c(i,p),(j,q) = |{(k, ℓ, k ′ , ℓ′ , k ′′ , ℓ′′ ) ∈ I × [d]5 : αi,k,p < βj,q,ℓ and αi,k′ ,k ≤ βj,ℓ,ℓ′ and αi,k′′ ,k ≤ βj,ℓ,ℓ′′ }|.
+
+      Define a tripartite graph G:
+
+      • The left vertex set is [n/d] × [d], the right vertex set is [n/d] × [d], and the middle vertex set consists
+        of tuples (k, ℓ, k ′ , ℓ′ , k ′′ , ℓ′′ , I1 , I2 , I3 ) where (k, ℓ, k ′ , ℓ′ , k ′′ , ℓ′ ) ∈ I × [d]5 and I1 , I2 , I3 are dyadic
+        intervals in [O(dn)] (we do not list all middle vertices exhaustively but generate only those incident
+        to edges).
+
+      • There is an edge between the left vertex (i, p) and the middle vertex (k, ℓ, k ′ , ℓ′ , k ′′ , ℓ′′ , I1 , I2 , I3 ) iff
+        αi,k,p is in the left half of I1 , αi,k′ ,k is in the left half of I2 , and αi,k′′ ,k is in the left half of I3 .
+
+
+                                                                    20
+    • There is an edge between the right vertex (j, q) and the middle vertex (k, ℓ, k ′ , ℓ′ , k ′′ , ℓ′′ , I1 , I2 , I3 ) iff
+      βj,q,ℓ is in the right half of I1 , βj,ℓ,ℓ′ + 1 is in the right half of I2 , and βj,ℓ,ℓ′′ + 1 is in the right half of
+      I3 .
+
+    • There is an edge between the left vertex (i, p) and the right vertex (j, q) iff (i, p, j, q) ∈ W .
+
+Since any point belongs to at most O(log n) dyadic intervals, there are a total of O((n/d) · d · d6 log3 n) =
+ e 6 n) edges between the left part and the middle part, and between the right part and the middle part.
+O(d
+Let VH denote the middle vertices of degree more than ∆ := n/d6+2δ is O(d      e 6 n/∆) = O(d  e 12+2δ ). Let
+c(i,p),(j,q) be the number of triangles containing (i, p) and (j, q) through vertices in VH . Let cL
+ H
+                                                                                                   (i,p),(j,q) be
+the number of triangles containing (i, p) and (j, q) not through vertices in VH . We compute cH        (i,p),(j,q)
+for all (i, p, j, q) ∈ W in O(Mselected-entries (n, d12+2δ        2  1+δ                       L
+                                                           , n | n /d )) time. We compute c(i,p),(j,q) for all
+(i, p, j, q) ∈ W by brute force in O(d n · ∆) = O(n /d2δ ) time. Then c(i,p),(j,q) = cL
+                                    e   6             e  2                                       + cH
+                                                                                                   (i,p),(j,q)  . (i,p),(j,q)
+    We repeat the above for all O(dδ ) choices of I, and a total of O(dδ ) batches for W . The total number of
+iterations is O(dδ ).
+
+    Combining all the preceding lemmas, we conclude:
+                                                                e δ Mselected-entries (n, d12+2δ , n |
+Theorem 5.9. For any constant δ > 0, Real 3SUM can be solved in O(d
+ 2  1+δ     2  δ
+n /d ) + n /d ) deterministic time.
+
+   For example, using the fact [AW26, Corollary 31 with c = 21 and θ = 0.0145] that
+Mselected-entries (n, d, n | w) ≤ O(n  e 2 /d0.008352 + wd0.077647 ) for d ≤ n0.056853 , the above bound be-
+comes e      δ
+       O(d · (n /d  2   (12+2δ)0.008352 + (n2 /d1+δ )d(12+2δ)0.077647 ) + n2 /dδ ) for d ≤ n0.056853/(12+2δ) . Setting
+δ = 0.050534 and d = n0.0046983 yields the following (we did not try to optimize the exponent):
+
+Corollary 5.10. Real 3SUM can be solved in O(n1.9998 ) deterministic time.
+
+    The only primitive operations used on the input real numbers are comparisons of sums of pairs with a
+third number, and comparisons of sums/differences of two pairs.
+    We can also obtain a truly subcubic deterministic algorithm for Real Exact Triangle by using the same
+strategy, in combination with the previous reduction [CVX22] (in fact, Exact Triangle is a little easier to
+work with than 3SUM).
+
+AI Disclosure
+The results in this paper were obtained using ChatGPT Sol 6.1. Initial proofs were complicated and difficult
+to digest. This manuscript is completely human-written: we (the authors) rewrote the proofs from scratch,
+simplified many parts, and presented the solutions in our own way. We have verified the correctness and
+originality of all content, including references.
+
+
+References
+[ABBK17]      Amir Abboud, Arturs Backurs, Karl Bringmann, and Marvin Künnemann. Fine-grained complexity
+              of analyzing compressed data: Quantifying improvements over decompress-and-solve. In Proc. 58th
+              IEEE Annual Symposium on Foundations of Computer Science (FOCS), pages 192–203, 2017. doi:
+              10.1109/FOCS.2017.26.
+
+
+
+                                                             21
+[AFK+ 24]   Amir Abboud, Nick Fischer, Zander Kelley, Shachar Lovett, and Raghu Meka. New graph decomposi-
+            tions and combinatorial Boolean matrix multiplication algorithms. In Proc. 56th Annual ACM Sympo-
+            sium on Theory of Computing (STOC), pages 935–943, 2024. doi:10.1145/3618260.3649696.
+[AL13]      Amir Abboud and Kevin Lewi. Exact weight subgraphs and the k-Sum conjecture. In Proc. International
+            Colloquium on Automata, Languages, and Programming (ICALP), volume 7965, pages 1–12, 2013.
+            doi:10.1007/978-3-642-39206-1\_1.
+[AW26]      Josh Alman and Virginia Vassilevska Williams. Truly subquadratic 3SUM and truly subcubic APSP via
+            triangles in sparse lopsided graphs, 2026. arXiv:2610.06783.
+[BCD+ 14]   David Bremner, Timothy M. Chan, Erik D. Demaine, Jeff Erickson, Ferran Hurtado, John Iacono, Stefan
+            Langerman, Mihai Pătraşcu, and Perouz Taslakian. Necklaces, convolutions, and X + Y . Algorithmica,
+            69(2):294–314, 2014. doi:10.1007/S00453-012-9734-3.
+[BDP08]     Ilya Baran, Erik D. Demaine, and Mihai Pătraşcu. Subquadratic algorithms for 3SUM. Algorithmica,
+            50(4):584–596, 2008. doi:10.1007/S00453-007-9036-3.
+[BFN21]     Karl Bringmann, Nick Fischer, and Vasileios Nakos. Sparse nonnegative convolution is equivalent
+            to dense nonnegative convolution. In Proc. 53rd Annual ACM Symposium on Theory of Computing
+            (STOC), pages 1711–1724, 2021. doi:10.1145/3406325.3451090.
+[BFN22]     Karl Bringmann, Nick Fischer, and Vasileios Nakos. Deterministic and Las Vegas algorithms for sparse
+            nonnegative convolution. In Proc. ACM-SIAM Symposium on Discrete Algorithms (SODA), pages 3069–
+            3090, 2022. doi:10.1137/1.9781611977073.119.
+[BGSV19]    Karl Bringmann, Fabrizio Grandoni, Barna Saha, and Virginia Vassilevska Williams. Truly subcubic
+            algorithms for language edit distance and RNA folding via fast bounded-difference min-plus product.
+            SIAM J. Comput., 48(2):481–512, 2019. doi:10.1137/17M112720X.
+[BHK09]     Andreas Björklund, Thore Husfeldt, and Mikko Koivisto. Set partitioning via inclusion–exclusion.
+            SIAM J. Comput., 39(2):546–563, 2009. doi:10.1137/070683933.
+[BHKK07]    Andreas Björklund, Thore Husfeldt, Petteri Kaski, and Mikko Koivisto. Fourier meets Möbius: Fast
+            subset convolution. In Proc. 39th Annual ACM Symposium on Theory of Computing (STOC), pages
+            67–74. ACM, 2007. doi:10.1145/1250790.1250801.
+[BHKK10]    Andreas Björklund, Thore Husfeldt, Petteri Kaski, and Mikko Koivisto. Trimmed Moebius inver-
+            sion and graphs of bounded degree. Theory Comput. Syst., 47(3):637–654, 2010. doi:10.1007/
+            S00224-009-9185-7.
+[BN21]      Karl Bringmann and Vasileios Nakos. A fine-grained perspective on approximating subset sum and
+            partition. In Proc. ACM-SIAM Symposium on Discrete Algorithms (SODA), pages 1797–1815, 2021.
+            doi:10.1137/1.9781611976465.108.
+[Bri24]     Karl Bringmann. Knapsack with small items in near-quadratic time. In Proc. 56th Annual ACM Sympo-
+            sium on Theory of Computing (STOC), pages 259–270, 2024. doi:10.1145/3618260.3649719.
+[CDXZ22]    Shucheng Chi, Ran Duan, Tianle Xie, and Tianyi Zhang. Faster min-plus product for monotone in-
+            stances. In Proc. 54th ACM Symposium on Theory of Computing (STOC), pages 1529–1542, 2022.
+            doi:10.1145/3519935.3520057.
+[CH02]      Richard Cole and Ramesh Hariharan. Verifying candidate matches in sparse and wildcard matching.
+            In Proc. 34th Annual ACM Symposium on Theory of Computing (STOC), pages 592–601, 2002. doi:
+            10.1145/509907.509992.
+[CH20]      Timothy M. Chan and Qizheng He. Reducing 3SUM to convolution-3SUM. In Proc. 3rd Symposium
+            on Simplicity in Algorithms (SOSA), pages 1–7, 2020. doi:10.1137/1.9781611976014.1.
+
+
+
+                                                      22
+[Cha08]     Timothy M. Chan. All-pairs shortest paths with real weights in O(n3 / log n) time. Algorithmica,
+            50(2):236–243, 2008. doi:10.1007/S00453-007-9062-1.
+[Cha10]     Timothy M. Chan. More algorithms for all-pairs shortest paths in weighted graphs. SIAM J. Comput.,
+            39(5):2075–2089, 2010. doi:10.1137/08071990X.
+[Cha15]     Timothy M. Chan. Speeding up the Four Russians algorithm by about one more logarithmic factor.
+            In Proc. 26th Annual ACM-SIAM Symposium on Discrete Algorithms (SODA), pages 212–217, 2015.
+            doi:10.1137/1.9781611973730.16.
+[Cha19]     Timothy M. Chan. Orthogonal range searching in moderate dimensions: k-d trees and range trees strike
+            back. Discret. Comput. Geom., 61(4):899–922, 2019. doi:10.1007/S00454-019-00062-5.
+[Cha20]     Timothy M. Chan. More logarithmic-factor speedups for 3SUM, (median, +)-convolution, and some
+            geometric 3SUM-hard problems. ACM Trans. Algorithms, 16(1):7:1–7:23, 2020. doi:10.1145/
+            3363541.
+[CL15]      Timothy M. Chan and Moshe Lewenstein. Clustered integer 3SUM via additive combinatorics. In
+            Proc. 47th ACM Symposium on Theory of Computing (STOC), pages 31–40, 2015. doi:10.1145/
+            2746539.2746568.
+[CMWW19] Marek Cygan, Marcin Mucha, Karol W˛egrzycki, and Michał Włodarczyk. On problems equivalent to
+         (min, +)-convolution. ACM Trans. Algorithms, 15(1):14:1–14:25, 2019. doi:10.1145/3293465.
+[Cop82]     Don Coppersmith. Rapid multiplication of rectangular matrices. SIAM J. Comput., 11(3):467–471,
+            1982. doi:10.1137/0211037.
+[CVX22]     Timothy M. Chan, Virginia Vassilevska Williams, and Yinzhan Xu. Hardness for triangle problems
+            under even more believable hypotheses: reductions from real APSP, real 3SUM, and OV. In Proc. 54th
+            Annual ACM Symposium on Theory of Computing (STOC), pages 1501–1514, 2022. doi:10.1145/
+            3519935.3520032.
+[CVX23]     Timothy M. Chan, Virginia Vassilevska Williams, and Yinzhan Xu. Fredman’s trick meets dominance
+            product: Fine-grained complexity of unweighted APSP, 3SUM counting, and more. In Proc. 55th
+            Annual ACM Symposium on Theory of Computing (STOC), pages 419–432, 2023. doi:10.1145/
+            3564246.3585237.
+[CW21]      Timothy M. Chan and R. Ryan Williams. Deterministic APSP, orthogonal vectors, and more: Quickly
+            derandomizing Razborov-Smolensky. ACM Trans. Algorithms, 17(1):2:1–2:14, 2021. doi:10.1145/
+            3402926.
+[CX24]      Timothy M. Chan and Yinzhan Xu. Simpler reductions from Exact Triangle. In Proc. ACM-
+            SIAM Symposium on Simplicity in Algorithms (SOSA), pages 28–38, 2024. doi:10.1137/1.
+            9781611977936.4.
+[Eri99]     Jeff Erickson. New lower bounds for convex hull problems in odd dimensions. SIAM J. Comput.,
+            28(4):1198–1214, 1999. doi:10.1137/S0097539797315410.
+[FKP24]     Nick Fischer, Piotr Kaliciak, and Adam Polak. Deterministic 3SUM-hardness. In Proc. 15th Innova-
+            tions in Theoretical Computer Science Conference (ITCS), pages 49:1–49:24, 2024. doi:10.4230/
+            LIPICS.ITCS.2024.49.
+[FPS26]     Nick Fischer, Adam Polak, and Jonas Schmidt. 3SUM is really hard: A real-to-integer reduction, 2026.
+            FOCS 2026, to appear. arXiv:2610.10153.
+[Fre76]     Michael L. Fredman. New bounds on the complexity of the shortest path problem. SIAM J. Comput.,
+            5(1):83–89, 1976. doi:10.1137/0205006.
+[GKLP17]    Isaac Goldstein, Tsvi Kopelowitz, Moshe Lewenstein, and Ely Porat. Conditional lower bounds for
+            space/time tradeoffs. In Proc. 15th International Symposium on Algorithms and Data Structures
+            (WADS), pages 421–436, 2017. doi:10.1007/978-3-319-62127-2\_36.
+
+
+                                                     23
+[GP18]     Allan Grønlund and Seth Pettie. Threesomes, degenerates, and love triangles. J. ACM, 65(4):22:1–
+           22:25, 2018. doi:10.1145/3185378.
+[Jin24]    Ce Jin. 0-1 knapsack in nearly quadratic time. In Proc. 56th Annual ACM Symposium on Theory of
+           Computing (STOC), pages 271–282. ACM, 2024. doi:10.1145/3618260.3649618.
+[Kar82]    Richard M. Karp. Dynamic programming meets the principle of inclusion and exclusion. Oper. Res.
+           Lett., 1(2):49–51, 1982. doi:10.1016/0167-6377(82)90044-X.
+[KL26]     Sankeerth Rao Karingula and Shachar Lovett. A simplified proof of polynomial improvements for
+           3SUM and APSP, 2026. arXiv:2610.15663.
+[KN22]     Marvin Künnemann and André Nusser. Polygon placement revisited: (Degree of Freedom + 1)-SUM
+           hardness and an improvement via offline dynamic rectangle union. In Proc. ACM-SIAM Symposium on
+           Discrete Algorithms (SODA), pages 3181–3201, 2022. doi:10.1137/1.9781611977073.124.
+[KPP16]    Tsvi Kopelowitz, Seth Pettie, and Ely Porat. Higher lower bounds from the 3SUM conjecture. In
+           Proc. 27th Annual ACM-SIAM Symposium on Discrete Algorithms (SODA), pages 1272–1287, 2016.
+           doi:10.1137/1.9781611974331.CH89.
+[KPS17]    Marvin Künnemann, Ramamohan Paturi, and Stefan Schneider. On the fine-grained complexity of one-
+           dimensional dynamic programming. In Proc. 44th International Colloquium on Automata, Languages,
+           and Programming (ICALP), pages 21:1–21:15, 2017. doi:10.4230/LIPICS.ICALP.2017.21.
+[Maj26]    Ruhollah Majdoddin. Thin matrix products up to d ≤ n0.172 and lossless reductions for 3SUM, Exact
+           Triangle and APSP, with 3SUM over abelian groups and a dichotomy for coordinatewise problems,
+           2026. arXiv:2610.17420.
+[Mar71]    John D. Markel. FFT pruning. IEEE Transactions on Audio and Electroacoustics, 19(4):305–311, 1971.
+[Păt10]   Mihai Pătraşcu. Towards polynomial lower bounds for dynamic problems. In Proc. 42nd ACM Sympo-
+           sium on Theory of Computing (STOC), pages 603–610, 2010. doi:10.1145/1806689.1806772.
+[SB93]     Henrik V. Sorensen and C. Sidney Burrus. Efficient computation of the DFT with only a subset of input
+           or output points. IEEE Trans. Signal Process., 41(3):1184–1200, 1993. doi:10.1109/78.205723.
+[Sch81]    Arnold Schönhage. Partial and total matrix multiplication. SIAM J. Comput., 10(3):434–455, 1981.
+           doi:10.1137/0210032.
+[SY26]     Barna Saha and Christopher Ye. Simple, faster (min, +) matrix multiplication and APSP, 2026. arXiv:
+           2610.20297.
+[VW13]     Virginia Vassilevska Williams and Ryan Williams. Finding, minimizing, and counting weighted sub-
+           graphs. SIAM J. Comput., 42(3):831–854, 2013. doi:10.1137/09076619X.
+[VW18]     Virginia Vassilevska Williams and R. Ryan Williams. Subcubic equivalences between path, matrix, and
+           triangle problems. J. ACM, 65(5):27:1–27:38, 2018. doi:10.1145/3186893.
+[VX20]     Virginia Vassilevska Williams and Yinzhan Xu. Monochromatic triangles, triangle listing and APSP.
+           In Proc. 61st IEEE Annual Symposium on Foundations of Computer Science (FOCS), pages 786–797,
+           2020. doi:10.1109/FOCS46700.2020.00078.
+[Wil18]    R. Ryan Williams. Faster all-pairs shortest paths via circuit complexity. SIAM J. Comput., 47(5):1965–
+           1985, 2018. doi:10.1137/15M1024524.
+[Yu18]     Huacheng Yu. An improved combinatorial algorithm for Boolean matrix multiplication. Inf. Comput.,
+           261:240–247, 2018. doi:10.1016/J.IC.2018.02.006.
+
+
+
+
+                                                     24
+

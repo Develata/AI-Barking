@@ -1,0 +1,222 @@
+Columbia 与 MIT 论文展示 Claude 发现的算法突破 3SUM 与 APSP 长期速度上限 | AI万址
+跳到主内容 [#main-content]
+
+ [/]
+
+首页 [/]AI工具 [/category/ai-tools]开源项目 [/category/open-source]MCP库 [/category/mcp-library]新闻资讯 [/news-category]
+
+推荐
+
+热门推荐
+
+发现最受欢迎的AI工具和项目
+ [/category/illustration-generation]
+
+首页 [/]行业动态 [/news-category/industry-news11]Columbia 与 MIT 论文展示 Claude 发现的算法突破 3SUM 与 APSP 长期速度上限
+
+Columbia 与 MIT 论文展示 Claude 发现的算法突破 3SUM 与 APSP 长期速度上限
+
+AI 资讯助手·2026-11-22 04:35:58·1 次浏览
+
+哥伦比亚大学 Josh Alman 与 MIT Virginia Vassilevska Williams 的预印本报告，Claude 在一次 1600 万输出 token、无人类输入的会话中发现瘦矩阵乘积算法，使 3SUM 降至 O(n^1.9992)、APSP 降至 O(n^2.9995)，主要定理已用 Lean 4 形式化验证，但成果尚未经过同行评议。
+
+分享
+
+论文报告了什么
+
+哥伦比亚大学 Josh Alman 与麻省理工学院 Virginia Vassilevska Williams 合作的论文《Truly Subquadratic 3SUM and Truly Subcubic APSP via Triangles in Sparse Lopsided Graphs》于 2026 年 10 月 5 日提交至 arXiv，编号 2610.06783，全文 76 页。论文称，这是首次对 3SUM 与全对最短路径（APSP）两个经典问题的教科书算法给出多项式级改进：在 n 个多项式大小的整数上确定性地求解 3SUM 需要 O(n^1.9992) 时间；在边权为多项式界整数的 n 顶点有向图上求解 APSP 需要 O(n^2.9995) 时间。研究者据此认为，长期成立的 3SUM 猜想与 APSP 猜想被推翻。
+
+需要强调的是，指数上的改进幅度很小：3SUM 从二次降到 1.9992 次方，差值约 0.0008。但在细粒度复杂度领域，只要是多项式级改进，就足以否定相应猜想，并不要求幅度大。
+
+两个被当作下界基石的问题
+
+3SUM 问的是：给定一个列表，其中是否存在三个数相加等于零。APSP 则要求算出图中每一对节点之间的最短距离。几十年来，这两个问题的算法效率几乎停留在教科书水平：3SUM 的 O(n²) 算法后来只被改进了对数多项式因子（Grønlund–Pettie 2014 及后续工作），APSP 的 O(n³) 算法也仅被改进了次多项式因子（Williams 2018）。
+
+正因如此，学界把“3SUM 需要约 n² 时间”“APSP 需要约 n³ 时间”当作猜想，不少条件性下界结果以它们为前提。论文指出，借助已知归约，新结果还推翻了这两个猜想的实数版本、Exact Triangle 猜想、Zero-Weight k-Clique 猜想，以及 van den Brand、Nanongkai 与 Saranurak 提出的三个矩形提示在线矩阵—向量（OMv）猜想，并给其他一系列问题带来多项式加速。
+
+突破口：只算矩阵里需要的那些元素
+
+所有结果都来自同一个关于“瘦矩阵乘积”的新算法。设 X 是 N×D 整数矩阵、Y 是 D×N 整数矩阵，D ≤ N^(1/18)；W 是任意不超过 N²/√D 个位置的集合。新算法可在 O(N²/D^0.063) 次运算内算出所有 (I,J)∈W 对应的乘积元素 (XY)[I,J]，这比把整个 XY 写出来、或逐个计算 N²/√D 个内积要少一个多项式因子。
+
+方法上，研究者修改了 Coppersmith 矩形矩阵乘法的一个变体——它建立在 Schönhage 的十次乘法恒等式之上——使其只执行 W 中元素所需的运算。换成图算法语言，这相当于在稀疏偏斜三部图上以真正的次二次时间求解 All-Edges Sparse Triangle 问题：其中两部分各有 n 个顶点，第三部分只有 n^ε 个顶点（ε<0.12）。论文还给出了数据结构版本，可以回答事先未知的单个矩阵元素查询。
+
+矩阵与稀疏图示意图
+
+Claude 在一次会话中找到方法
+
+论文的方法来源部分写明：一位 Anthropic 员工当时用内部研究模型探索理论密码学中的开放问题，考察基于 Zero-k-Clique 平均情况难度的构造；Claude 原本被要求验证并改进这些构造，却转而自己给出了算法——先在平均情形下成立，随后推广到最坏情形。论文原话称，这次会话用了 1600 万输出 token，且没有人类输入。
+
+按论文记述，Anthropic 在 2026 年 9 月以保密协议形式把算法交给两位作者，并提供补偿；作者随后对方法做了简化、加强和扩展，数据结构版本与 Hinted OMv 的联系由他们完成。
+
+Lean 4 验证与尚未解决的问题
+
+论文写完后，Anthropic 用内部模型在 Lean 4 + Mathlib 中认证了定理 19、定理 22 以及推论 39 的 Zero-Weight 情形，连同它们依赖的引理；相关代码位于 anthropics/formal-math 代码库的 3sum-apsp 目录，并用 Comparator 工具检查，只使用标准公理。论文也明确列出未形式化的部分：实数输入下的 Las Vegas 算法、定理 33、矩阵乘法指数取值，以及第 5.1 节的运行时间。
+
+因此，这项成果目前的定位是预印本加主要定理的机器检查证明，尚未经过同行评议。研究者也提醒，对 AI 找到的证明应做形式化检查，本论文正是通过 Lean 4 完成这一步。
+
+一点启示
+
+Rohan Paul 于 2026 年 11 月 21 日在 X 平台发布的帖子对这项研究作了概括，并提出两点：把算法领域“公认很难突破”的界限视为 AI 搜索的开放目标；对 AI 给出的证明进行形式化校验。论文本身显示，AI 在这里扮演的并非验证者，而是新方法的提出者——不过该方法最终仍由人类研究者理解、简化和扩展，其正确性由形式化工具确认。
+
+参考来源
+
+1Rohan Paul 的 X 帖子（2026-11-21）：https://x.com/rohanpaul_ai/status/2124213113583174076
+
+2arXiv:2610.06783，论文原文与摘要：https://arxiv.org/abs/2610.06783
+
+3postcutoff 事件条目（含论文方法来源与验证状态）：https://postcutoff.com/e/2026-10-05-claude-refutes-3sum-apsp-hypotheses
+
+4anthropics/formal-math 的 3sum-apsp Lean 形式化代码：https://github.com/anthropics/formal-math/tree/main/3sum-apsp
+
+5中文报道（IT 时代网，经微博转载）：https://weibo.com/1840271251/5367910961776034
+
+资源信息
+
+1 次浏览
+
+发布于 2026-11-22 04:35:58
+
+行业动态
+
+相关推荐
+
+Anthropic 数学家称与 Claude 完成黎曼猜想证明，斯坦福数小时后发布纯人类竞争草稿
+
+AI 资讯助手 · 2026-11-22 04:42:34
+
+ [/news/1358]
+
+Together AI 通报 2026 年 6-7 月 serverless 推理服务提示词泄露事件
+
+AI 资讯助手 · 2026-11-22 04:33:02
+
+ [/news/1356]
+
+Qwen4 Max 上线 Together AI，单次调用修复 Tornado 整仓 bug
+
+AI 资讯助手 · 2026-11-22 04:31:54
+
+ [/news/1355]
+
+Anthropic 登陆纳斯达克，开盘价 111 美元较发行价高出 33%
+
+AI 资讯助手 · 2026-11-20 01:12:59
+
+ [/news/1354]
+
+Anthropic CEO Dario Amodei 就公司 IPO 发表声明
+
+AI 资讯助手 · 2026-11-20 01:06:23
+
+ [/news/1353]
+
+OpenAI 详解 Codex 驱动的 Performance Factory 如何自动保持 ChatGPT 高性能
+
+AI 资讯助手 · 2026-11-20 01:02:06
+
+ [/news/1352]
+
+热门推荐
+
+1
+
+剪映
+
+字节跳动旗下、抖音官方剪辑工具，覆盖手机端、桌面端与网页版，主打免费基础剪辑与专业版进阶创作。
+
+ [https://ai-wz.com/jianying]2
+
+文心快码
+
+文心快码 Comate 是百度基于文心大模型的 AI 编程助手，个人版永久免费，支持私有化部署、Zulu 多智能体、单元测试生成与安全扫描，IDC 评测 9 项 8 项满分。本文详解功能、价格、竞品对比与适用场景。
+
+ [https://ai-wz.com/comate]3
+
+妙呀（Miaoyaai）
+
+大麦娱乐×阿里通义联合出品，基于Wan2.7大模型的全球首个AI潮玩设计平台，输入一句话灵感即可生成可调节细节的潮玩IP形象。
+
+ [https://ai-wz.com/miaoya]4
+
+百度搭子（DuMate）
+
+百度搭子（DuMate）是百度推出的通用办公智能体，"真干活，用搭子"：跨应用、跨文件一句话执行办公任务，支持网页版、Windows 客户端、安卓 App 与企业版，个人可免费体验。
+
+ [https://ai-wz.com/dumate]5
+
+豆包
+
+工作新习惯，你说豆包干
+
+ [https://ai-wz.com/doubao]
+
+热门文章
+
+Anthropic 数学家称与 Claude 完成黎曼猜想证明，斯坦福数小时后发布纯人类竞争草稿
+
+AI 资讯助手 · 2026-11-22 04:42:34
+ [https://ai-wz.com/news/1358]
+Columbia 与 MIT 论文展示 Claude 发现的算法突破 3SUM 与 APSP 长期速度上限
+
+AI 资讯助手 · 2026-11-22 04:35:58
+ [https://ai-wz.com/news/1357]
+Together AI 通报 2026 年 6-7 月 serverless 推理服务提示词泄露事件
+
+AI 资讯助手 · 2026-11-22 04:33:02
+ [https://ai-wz.com/news/1356]
+Qwen4 Max 上线 Together AI，单次调用修复 Tornado 整仓 bug
+
+AI 资讯助手 · 2026-11-22 04:31:54
+ [https://ai-wz.com/news/1355]
+Anthropic 登陆纳斯达克，开盘价 111 美元较发行价高出 33%
+
+AI 资讯助手 · 2026-11-20 01:12:59
+ [https://ai-wz.com/news/1354]
+
+热门标签
+
+订阅更新
+
+订阅获取最新AI工具和资讯
+立即订阅
+
+ [/]
+AI万址是发现最优质AI工具的导航平台，收录AI编程、AI写作、AI绘画、AI视频、AI办公等500+款工具，提供详细评测与对比，助你快速找到最适合的AI效率工具。
+
+ [#] [#] [#]
+
+产品
+
+首页 [/]
+
+AI工具 [/category/ai-tools]
+
+开源项目 [/category/open-source]
+
+MCP库 [/category/mcp-library]
+
+资源
+
+新闻资讯 [/news-category]
+
+热门推荐 [/category/ai-tools]
+
+提交工具 [/]
+
+关于
+
+关于我们 [/]
+
+联系方式 [/]
+
+隐私政策 [/]
+
+使用条款 [/]
+
+友情链接
+
+AI工具箱网 [https://ai-tab.cn]Coding Plan比价站 [https://agent-plan.cn]浮灯记 [https://fudengji.cn/]观微录 [https://guanweilu.cn/]
+
+© 2026 AI万址 版权所有 llms.txt [https://ai-wz.com/llms.txt]
+
+湘ICP备2021012131号-6 [https://beian.miit.gov.cn/]

@@ -1,0 +1,584 @@
+Runway News | Building a Software Factory
+
+Runway app for iPhoneRunway app for Android
+
+Create anything, anytime.
+
+Try app [https://apps.apple.com/app/runway-ai-video-photo-maker/id1665024375]Try app [https://play.google.com/store/apps/details?id=com.runwayml.prod]
+
+ [/]
+
+Creative [/product]
+
+Dev [https://dev.runwayml.com/]
+
+Robotics [/product/robotics]
+
+Research [/research]
+
+Resources [/resources]
+
+Enterprise [/enterprise]
+
+Pricing [/pricing]
+
+Enterprise Sales [/enterprise-contact]Login [https://app.runwayml.com/login]Try Runway [https://app.runwayml.com]
+
+Enterprises get up to 2 months of usage free. Sign by 12/31. See terms [/code-terms/enterprise-bonus-terms]Enterprises get up to 2 months of usage free. Sign by 12/31. See terms [/code-terms/enterprise-bonus-terms]
+Contact sales [/enterprise-contact?utm_source=runway&utm_medium=homepagebanner&utm_campaign=twomonthsentfree]
+
+Engineering
+
+Building a Software Factory
+
+AI made writing code fast, but reviewing it became a bottleneck for our engineers. This is how we handed our delivery line to agents one step at a time, and what the numbers say.
+
+November 20, 2026
+
+by Alejandro Alvarez, Technical Staff
+
+Contents
+
+Every Step Needed an Engineer [#every-step-needed-an-engineer]
+
+Let Agents Get to Green [#let-agents-get-to-green]
+
+Let Agents Review [#let-agents-review]
+
+Let Agents Approve [#let-agents-approve]
+
+Let Agents Run QA [#let-agents-run-qa]
+
+Let Agents Watch Main [#let-agents-watch-main]
+
+Let Agents Run the Factory [#let-agents-run-the-factory]
+
+Where Each Station Stands Today [#where-each-station-stands-today]
+
+The Engineer’s Role [#the-engineers-role]
+
+What's Next [#whats-next]
+
+Every month, agents write an increasing share of our code, and the queue of pull request reviews grows as a result. Review bots catch problems, but each finding sends the change back for another round of reviews, and in the end, the pull request still waits for a person to approve it.
+
+Over the summer, the share of human reviews in our core API repository spent on agent-written code more than tripled, to about one in five, and the number of pull requests awaiting human approval doubled.
+
+Anthropic engineer Felix Rieseberg’s “How to be more ambitious [https://felixrieseberg.com/how-to-be-more-ambitious-a-tutorial-for-humans-with-models/]” inspired us to think ahead. Instead of asking agents for better changes, we tested if they could take over each stage of software delivery and decided how we would judge each handover before looking at its results. OpenAI has described [https://openai.com/index/harness-engineering/] a similar shift on a product built from an empty repository.
+
+Cloud agents drove 38% of the pull requests we merged in October, up from 0.1% in June. Between September and mid-November, the median wait for a first approval fell from over two hours to about five minutes and the number of pull requests we merged each week more than doubled. Changes approved by an agent were reverted no more often than those approved by people.
+
+Where we began
+
+Every Step Needed an Engineer
+
+1Write
+
+2Pass CI
+
+3Review
+
+4Approve
+
+5QA
+
+6Fix breaks
+
+7Run the line
+
+Seven jobs between a task and production. Review means reading the change and asking for fixes; approval is the sign-off that lets it merge. Agents already helped with the first; each step below hands the next job to them.
+
+At the start of the year, an engineer picked a task, prompted an agent to write it and opened a pull request, then waited for CI and handed issues back to the agent. Then they found a colleague to review it. Once a change merged, main could break, and whoever noticed first had to find the cause and fix forward or roll it back. QA was also done by hand. Every handoff between these steps was a person’s job, so the more changes agents wrote, the more work was passed to engineers.
+
+Agents, with a person at their side. An engineer walks every change through every station and tests it by hand at QA. Review is the slowest stop: the engineer has to find a colleague, pull them off their own work and bring them over while pull requests pile up at the door.
+
+Step 1 · Write and pass CI
+
+Let Agents Get to Green
+
+1Write
+
+2Pass CI
+
+3Review
+
+4Approve
+
+5QA
+
+6Fix breaks
+
+7Run the line
+
+The problem: An agent writing a change might save us an hour of typing, but it leaves an afternoon of cleanup fixing flaky tests, lint failures, merge conflicts and review comments.
+
+What we built: An internal service that runs coding agents in the cloud and stays with each pull request until it's green. You give it a task and approve the plan, and then the agent writes the change, opens the pull request, reruns CI, fixes tests, answers review comments and rebases.
+
+How we knew it worked: The service was handling 38% of our pull requests by its third month, and our agents also needed minimal intervention. In a sample of 100 of their pull requests merged in the first half of November, 78 had no commits from a person.
+
+Agent-driven pull requests merged per month
+
+2026. Dashed: November, projected
+
+From two pull requests in June to over 3,000 a month. Seven repositories. November is projected from its daily average so far. Agent-driven merges were 38% of all merges in October and 30% so far in November. This is a floor: we only count pull requests we can attribute to an agent.
+
+The same road, without the walk. A person hands the agent the task once, and the agent carries it to a green pull request on its own. The handoff counter stays at zero until review, where the change waits for a person.
+
+Where the bottleneck moved
+
+Agents produced review-ready pull requests faster than people could read them, so review became the next station to hand over.
+
+Step 2 · Review
+
+Let Agents Review
+
+✓Write
+
+✓Pass CI
+
+3Review
+
+4Approve
+
+5QA
+
+6Fix breaks
+
+7Run the line
+
+The problem: Our third-party review bot lacked context, so engineers learned to skim past it and still read every change themselves.
+
+What we built: An AI reviewer with the same context as the agents writing the code, including the plan, the diff and the code around it. Usually, the author is another agent, so a change goes back and forth between the coding agent and the AI reviewer until it’s clean.
+
+How we knew it worked: In our core API repository, 93% of the AI reviewer’s comment threads were resolved or led to a code change in the first half of November, up from 84% in September. A rebuild in late September cut the cost of each review to about a third, while weekly review volume increased.
+
+Review loops back to code. The AI reviewer sends flawed changes back to the coding agent until they pass. Clean changes still queue for a person to approve.
+
+Pull requests reviewed per week
+
+All repositories with AI review
+
+Cost per review, core API repository
+
+Index, average of Sep 7–21 = 100
+
+Over ten times August’s weekly reviews, each at about a third of the cost. Weekly, Aug 10–Nov 9. Volume includes two repositories switched on in October. The cost drop in the week of Sep 28 is the rebuilt reviewer.
+
+Where the bottleneck moved
+
+Pull requests came out of AI review ready to merge, but still waited hours for a person to click approve.
+
+Step 3 · Approve
+
+Let Agents Approve
+
+✓Write
+
+✓Pass CI
+
+✓Review
+
+4Approve
+
+5QA
+
+6Fix breaks
+
+7Run the line
+
+The problem: Letting the AI reviewer approve would clear the queue, but that meant code would merge without a person reading it. We needed proof that AI approvals matched the judgment of our engineers before taking this step.
+
+What we built: Risk-based approval. A separate agent rates each pull request low, medium or high risk, rounding up when unsure, and the rating decides who can approve it. At first we let AI approve low-risk changes on its own and medium-risk changes where a repository allows it. High-risk changes go to a person, and code owners still sign off on critical areas of our codebases like database migrations, secrets and authentication.
+
+We started by having the reviewer approve alongside people and tracking how often a person disagreed. In mid-October, we let pull requests merge on AI approval alone. Across September and October, a person objected to only 15 of the 977 pull requests it approved, about 1.5%, at about the same rate before and after that date.
+
+Low risk
+
+AI approvesIts approval alone is enough to merge.
+
+Medium risk
+
+AI approvesUp to the repository's ceiling. Specific paths can lower it.
+
+Repo ceiling: medium by default
+High risk
+
+A person approvesAfter a deeper verification pass.
+
+Any risk
+
+An owner always approvesDatabase migrations, CI and deploy configuration, secrets, authentication.
+
+Who approves a pull request. Below the dashed line, AI approval is enough to merge.
+
+Risk decides who approves. Low risk goes through on AI approval, medium joins it once the repository allows it and high risk takes the branch to a person.
+
+How we knew it worked: The median wait for a first approval fell from over two hours in September to about five minutes in mid-November, and about seven in ten merges the AI reviews in our core API repository go through on its approval alone. Of all pull requests merged on AI approval alone from October to November, only one in a thousand was reverted, compared with about one in two hundred for those people approved. Given the majority of AI approvals were for low-risk changes less likely to be reverted, we compared across risk levels and found AI approvals hold comparable to that of humans.
+
+Reviewed merges on AI approval alone
+
+5 min
+
+Median wait for approval
+
+was 2.3 h
+
+78%
+
+Approved within an hour
+
+was 43%
+
+11 h
+
+Slowest 1 in 10 waits
+
+was 79 h
+
+0.10%
+
+Revert rate
+
+AI-only approvals, October to November
+
+Before and after: approval waits fell. Weekly, Oct 5–Nov 9. Waits run from "ready for review" to first approval by any reviewer, September against the week of Nov 9.
+
+Where the bottleneck moved
+
+In our core API repository, the median time from ready for review to merge fell from about 11 hours to under two, but people still tested the product by hand.
+
+Step 4 · QA
+
+Let Agents Run QA
+
+✓Write
+
+✓Pass CI
+
+✓Review
+
+✓Approve
+
+5QA
+
+6Fix breaks
+
+7Run the line
+
+The problem: We launched a new product called App Studio [/product/app-studio], and unit tests weren’t enough to build confidence. We needed something to use it like a person would, signing up and testing all features and changes.
+
+What we built: A QA loop that tests the product like a user. Agents drive browsers through the live product in parallel, flagging anything that doesn’t run as expected. Before reporting a bug, the agent rules out any issues with its own setup and finds the code that caused it. Confirmed bugs become a task for agents to fix, and the loop reruns the scenario to verify it.
+
+How we knew it worked: In its first four days, the QA loop found 86 confirmed bugs, and agents fixed all of them. Since early November, every change merged has to pass a verification run on its own preview environment first.
+
+86
+
+Bugs found
+
+in the loop’s first four days
+
+74
+
+Fixed in those four days
+
+67 verified by rerun
+
+68 / 71
+
+Fix PRs written
+
+entirely by agents
+
+4.6 h
+
+Median time to fix
+
+first seen to merged
+
+The QA loop’s first four days. Only bugs the loop found itself. Time to fix is measured to merge, not to production.
+
+Where the bottleneck moved
+
+More changes landing meant more chances to break main, and an engineer still had to uncover the break, find the underlying cause and undo it.
+
+Step 5 · Fix breaks
+
+Let Agents Watch Main
+
+✓Write
+
+✓Pass CI
+
+✓Review
+
+✓Approve
+
+✓QA
+
+6Fix breaks
+
+7Run the line
+
+The problem: At this volume, we can't wait for someone to spot or report issues. Every hour the main codebase stays broken, more changes pile on top of the break.
+
+What we built: When an alert fires, agents work through a set of steps: retry the checks, diagnose the failure, apply a known fix if one exists and call a person if none of that works. A coordinator, which we describe more below, runs these steps and holds its own merges until main is green. After each release, our release system monitors production and automatically undoes the release if a health check fails.
+
+How we knew it worked: In its first two weeks it saw about 140 alerts. All but one were fixed without the coordinator having to call anyone in, with a median of 23 minutes from red to green. Automatic rollback has fired in production.
+
+Where the bottleneck moved
+
+Every station now had an agent, but an engineer still decided what each one worked on and in what order.
+
+Step 6 · Run the line
+
+Let Agents Run the Factory
+
+✓Write
+
+✓Pass CI
+
+✓Review
+
+✓Approve
+
+✓QA
+
+✓Fix breaks
+
+7Run the line
+
+The problem: Engineers were the line’s coordinators, responsible for starting agents, ordering merges and babysitting the runs that stalled.
+
+What we built: A coordinator that runs the software factory. It reads the issue tracker, hands work to agents and orders merges. It brings in a person when our rules require one or when a step gets stuck.
+
+The coordinator runs the line. Work comes in from people’s specs and from alerts, and shipped changes come out the other end, through the same steps as before. When policy says a person decides, the change loops out to people and comes back.
+
+How we knew it worked: We earned trust in the coordinator the same way we did for AI approval. First it ran read-only, only tracking its decisions. Before production, a person judged every action it proposed in short test runs. In the first two weeks after the coordinator went live, it dispatched over 14,000 agent tasks, from diagnosis and planning to review and fixes, which led to about 1,900 pull requests.
+
+Read-only shadow mode before any writes
+Without it: The bug from the read-only run would have gone live and re-run work that had already finished.
+
+Gates re-checked at the exact commit being merged
+Without it: A pull request was merged by override after its checks had refused it, and agents kept pushing commits after a reviewer had signed off.
+
+External actions safe to repeat
+Without it: Agents raced on the same task and cancelled each other's copies, a few times leaving none running.
+
+People step in by policy, not by accident
+Without it: Our earlier merge tooling stalled three times on a prompt waiting at someone's keyboard and blocked every merge, once for over an hour.
+
+Rollback in one call
+Without it: The release train pulled a release off every production pool on a noisy error signal, and undoing an unwanted rollback took more than one step.
+
+Safety rails. Each one answers a failure we hit in our earlier tooling or in the coordinator's own testing.
+
+Where the bottleneck moved
+
+With the line running itself where our rules allow, more of the wait is now upstream, in deciding what to build and answering agents’ questions.
+
+Where the line is now
+
+Where Each Station Stands Today
+
+The line is furthest along in the codebase behind App Studio. Nearly every pull request merged there in October and November was written by agents, and our agent service drove about seven in ten of them in October.
+
+By late October, we saw about 2.5 times as many weekly merged pull requests across our main repositories compared to September. The median approval wait fell from over two hours to about five minutes.
+
+Merged pull requests per week
+
+Median wait for a first approval
+
+Volume more than doubled while the wait fell to minutes. Three-week moving averages, Aug 31–Nov 9: merges across the six repositories that existed in both periods, and the wait in our core API repository. Merges averaged 929 a week in September and 2,235 since mid-October, 2.4 times higher. The wait counts any approver, including the AI reviewer’s approvals from its trial in late September, before they counted toward merge.
+
+StationBeforeNow
+
+Getting a change to greenEngineers did it by handAgents drive 30% to 40% of merges
+
+ReviewPeople reviewed every pull request, about 200 a week in our core API repositoryAI reviews every pull request, about 1,000 a week in our core API repository and 3,000 across six repositories. People still approve the high-risk ones
+
+ApprovalThe median pull request waited 2.3 hours for its first approvalMedian wait of about five minutes; about seven in ten reviewed merges go through on AI approval alone
+
+Testing the productPeople clicked through manuallyAgents test like users, with a median of 4.6 hours to a merged fix
+
+After the mergeSomeone noticed an alert or got pagedAgents react to all alerts within seconds and rollback production if needed
+
+CoordinationEngineers14,000+ agent tasks, about 1,900 pull requests opened and 442 merges ordered by the coordinator in its first two weeks
+
+Before and after, by station.
+
+The new job
+
+The Engineer’s Role
+
+Our engineers now read a smaller share of the diffs. They decide what gets built, answer agents’ questions about architecture, set the rules for what ships and fix the places where agents stall. That last job has four parts:
+
+Find where agents waste effort: We look for runs that stall and for the parts of the codebase where agents’ changes keep needing rework.
+
+Remove the blockers: Many of our biggest wins have been access and infrastructure fixes. If an agent can’t reach a test environment, credential or preview deploy, this stalls everything behind it.
+
+Make the path agent-friendly: We organize codebases so agents can find their way around them, write playbooks for failures we’ve already seen and set up better patterns and core systems so agents can use them safely.
+
+Keep the measures honest: We decide how each station will be judged before we look at its results.
+
+Working on the factory. Agents carry every change from station to station. Engineers work on the road between them: paving the rough stretch, clearing what blocks it and adding the check that catches what slipped through. Watch the shipped count climb as they do.
+
+To find where agents waste effort, we built a tool that measures friction from the AI agent’s record on every pull request, including how long it takes to implement the change, how many problems the reviewer finds, how serious they are, whether a problem comes back after an agent’s fix and how long a change takes to come clean. It compares each area of a codebase with what’s typical for a pull request of the same size and draws the result as a map, so the areas where agents struggle most stand out.
+
+Mapping a codebase by friction
+
+Every area, folder and file is shaded by how much review effort agents’ changes cost there. Hot spots get a targeted fix.
+
+LowHigh friction
+
+1Cleanup
+Agents keep re-implementing a helper that already exists. Reuse it, delete the dead copies and add a reuse check to CI.
+
+2Documentation
+Reviews keep flagging the same convention. Write it down where agents look before they start.
+
+3Guardrail
+The same race condition comes back after each fix. Pin it with a test so it can’t return.
+
+Illustrative. The map is drawn automatically, with each area compared against a typical pull request of the same size. It points us at where a cleanup, a doc or a guardrail will pay off, and each fix is tracked to see whether the friction stays down.
+
+Each area on the map comes with a brief an agent can act on: the evidence, a likely cause, a bounded change and a test that keeps it fixed. In our first cleanup, 23 pull requests in one internal service reused existing helpers, removed dead code and added reuse checks to CI, and duplicated lines in the files they touched fell by 16%.
+
+What's Next
+
+Automating software delivery shifts the bottleneck upstream, to deciding what to build in the first place. Our long-term goal is a system that takes a description of an outcome and ships it, bringing in people at defined points where human judgment is required.
+
+If you want to help build the next factory, we're hiring [/careers].
+
+Creative
+
+Overview [/product]
+
+Agent [/product/agent]
+
+Android app ↗ [https://play.google.com/store/apps/details?id=com.runwayml.prod]
+
+iOS app ↗ [https://apps.apple.com/us/app/runwayml/id1665024375]
+
+ChatGPT Plugin [/mcp/chatgpt]
+
+MCP [/mcp]
+
+Use Cases [/use-cases]
+
+Pricing [/pricing]
+
+Team Plan [/team-plan]
+
+Login [https://app.runwayml.com/login]
+
+Dev
+
+Platform ↗ [https://dev.runwayml.com/]
+
+Models ↗ [https://dev.runwayml.com/models]
+
+Model Router ↗ [https://docs.dev.runwayml.com/model-routers/]
+
+Workflows [/workflows]
+
+Recipes ↗ [https://dev.runwayml.com/recipes/product_ad]
+
+Characters [/product/characters]
+
+Documentation ↗ [https://docs.dev.runwayml.com/]
+
+Pricing [/pricing?tab=dev]
+
+Robotics
+
+Overview [/product/robotics]
+
+Get Access [/product/robotics/contact]
+
+Praxis-1 [/product/praxis]
+
+Enterprise
+
+Overview [/enterprise]
+
+Data Security [/data-security]
+
+Customer Stories [/news/customers]
+
+For Education [/educators]
+
+Contact Sales [/enterprise-contact]
+
+Research
+
+Research Hub [/research]
+
+Research News [/news/research]
+
+Publications [/research/publications]
+
+Gen-4.5 [/research/introducing-runway-gen-4.5]
+
+Aleph 2.0 [/product/aleph-2]
+
+Ruby [/product/ruby]
+
+Act-Two [/research/introducing-act-one]
+
+Solaris [/news/research/introducing-solaris]
+
+Robotics [/product/robotics]
+
+World Simulation [/research/introducing-gwm-worlds-2]
+
+Resources
+
+Academy ↗ [https://academy.runwayml.com/]
+
+Help Center ↗ [https://help.runwayml.com/hc/en-us]
+
+Resource Hub [/resources]
+
+News [/news]
+
+Changelog [/changelog]
+
+Meetups ↗ [https://academy.runwayml.com/meetups]
+
+Events & Programs
+
+AI Festival ↗ [https://aif.runwayml.com/]
+
+AI Summit 2026 ↗ [https://summit.runwayml.com/]
+
+Gen:48 [https://gen48.runwayml.com/]
+
+Studios [/studios]
+
+Creative Partners Program [/creative-partners-program]
+
+Runway Builders [/product/builders]
+
+Runway Rewards [/rewards]
+
+Talent Network ↗ [https://talent.runwayml.com/]
+
+Company
+
+About Us [/about]
+
+Careers [/careers]
+
+Safety [/safety]
+
+Verify Content Credentials [/safety/verify]
+
+Brand Guidelines [/brand-guidelines]
+
+Press [mailto:press@runwayml.com]
+
+Partnerships [mailto:partnerships@runwayml.com]
+
+© 2026 Runway AI, Inc. / Terms of Use [/terms-of-use] / Privacy Policy [/privacy-policy] / California Notices [/privacy-policy#residents-of-california] / Your Privacy Choices / Cookie Settings
+ Code of Conduct [/coc] / System Status [https://status.runwayml.com/]
+
+ [https://twitter.com/runwayml] [https://instagram.com/runwayapp] [https://youtube.com/runwayml] [http://discord.gg/invite/runwayml]

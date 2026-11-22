@@ -1,0 +1,215 @@
+browser-use 1.0: Why We Replaced 24 Agent Tools With One
+
+Browser Use [/]
+Agents [/web-agents]Browsers [/stealth-browsers]Harness [/browser-harness]
+
+Resources
+
+Learn
+Cloud docs [https://docs.browser-use.com/cloud/quickstart]Open source docs [https://docs.browser-use.com/open-source/introduction]
+
+See it run
+Showcase [/showcase]What people run [/showcase/landscape]Case studies [/case-studies]
+
+Build
+Developers [/developers]Custom models [/custom-models]Changelog [/changelog]
+
+Company
+Blog [/posts]Status [https://status.browser-use.com]
+
+From the blog
+BU Ultrafast is live
+ [/posts/bu-ultrafast-is-live]
+
+Benchmarks
+Which agent wins, tested in public
+ [/benchmarks]
+
+Pricing [/pricing]
+
+122k [https://github.com/browser-use/browser-use]
+Talk to sales [/enterprise]Start for free [https://cloud.browser-use.com/signup]Dashboard [https://cloud.browser-use.com]
+
+Start for free [https://cloud.browser-use.com/signup]Dashboard [https://cloud.browser-use.com]
+
+All articles [/posts]
+
+Engineering
+/November 20, 2026
+
+browser-use 1.0: Why We Replaced 24 Agent Tools With One
+
+browser-use 1.0 gives the model one main tool, python, instead of 24 browser actions. The same models scored 14 to 33 points higher, and the agent started doing things we never built.
+
+Magnus Müller [/team/magnus-muller?from=blog]
+Co-Founder, CEO
+
+Copy link
+
+In this article
+
+What changed in browser-use 1.0 [#what-changed-in-browser-use-10]
+
+How browser-use grew to 29 tools [#how-browser-use-grew-to-29-tools]
+
+Half our helpers were dead within 50 minutes [#half-our-helpers-were-dead-within-50-minutes]
+
+What the agent does with raw CDP [#what-the-agent-does-with-raw-cdp]
+
+When a dedicated tool still wins [#when-a-dedicated-tool-still-wins]
+
+How to try browser-use 1.0 [#how-to-try-browser-use-10]
+
+In this article
+
+What changed in browser-use 1.0 [#what-changed-in-browser-use-10]
+
+How browser-use grew to 29 tools [#how-browser-use-grew-to-29-tools]
+
+Half our helpers were dead within 50 minutes [#half-our-helpers-were-dead-within-50-minutes]
+
+What the agent does with raw CDP [#what-the-agent-does-with-raw-cdp]
+
+When a dedicated tool still wins [#when-a-dedicated-tool-still-wins]
+
+How to try browser-use 1.0 [#how-to-try-browser-use-10]
+
+TL;DR: browser-use 1.0 (November 10, 2026) replaces the 24 browser actions of 0.x with one main tool, python: a persistent REPL with raw Chrome DevTools Protocol access. On BU Bench v2.1 the same three models scored 14 to 33 points higher than on 0.x and cost 2.7x to 5.2x less. That covers the whole release, one run per model, so the tool change can't take all the credit. With code instead of a menu, the agent started unblocking hung pages and calling private APIs that none of our actions covered.
+
+For two years we fixed browser-use the same way. When the agent got stuck, we gave it a new action, and by June 2025 it picked from 29 of them. browser-use 1.0 throws that menu away. The model now gets one main tool, python, plus two ways to finish.
+
+The release deleted 136,905 lines and added 29,601 across 554 files, and 178 Python files became 43. It also changed the defaults, which is why I won't pin the score jump on the tool change alone.
+
+What changed in browser-use 1.0 [#what-changed-in-browser-use-10]
+
+The model gets a persistent REPL with the browser-harness helpers and raw cdp() already imported:
+
+async def python(ctx: RunContext[Session], code: str) -> list[Any]:
+ """Run Python in the persistent REPL (browser-harness helpers and raw cdp() pre-imported)."""
+ ...
+
+tools=[Tool(python, max_retries=TOOL_RETRIES, sequential=True), *tools]
+
+Your own tools still register next to it. Hello world is three lines again, because the model and the browser default to Browser Use Cloud:
+
+from browser_use import Agent
+
+result = Agent('Find the number of stars of the browser-use repo').run_sync()
+print(result.final_result())
+
+The benchmark chart is in the release notes [https://github.com/browser-use/browser-use/releases/tag/1.0.0]: 200 tasks run on November 8, 2026, with the frozen 180-task set scored.
+
+The library on the way up and back down. 6 of the 29 tools at the peak were Google Sheets actions.
+
+How browser-use grew to 29 tools [#how-browser-use-grew-to-29-tools]
+
+The first commit landed on October 31, 2024 with 8 files, 670 lines and 10 actions. After that, every bug became an action. Dropdowns that click couldn't open got two of their own, scrolling to a phrase got scroll_to_text, and Google Sheets got six. By version 0.3.3 in June 2025 the model was choosing from 29.
+
+Each action costs you twice. Its schema sits in every prompt, and when the page needs something the menu doesn't have, the agent is stuck, because the menu is its only way to touch the browser. We moved from Playwright to raw CDP [/posts/playwright-to-cdp] in August 2025 and added a JavaScript tool (The Bitter Lesson of Browser Agents [/posts/bitter-lesson-browser-agents] tells that part), but the library still had 24 actions in October 2026.
+
+Half our helpers were dead within 50 minutes [#half-our-helpers-were-dead-within-50-minutes]
+
+What changed our minds was a side project. On April 16, 2026, Gregor committed harnesless, 404 lines of Python. A daemon holds one CDP websocket to Chrome, the agent writes Python, and cdp("Domain.method", ...) reaches anything Chrome can do:
+
+import sys
+from helpers import * # noqa: F401,F403
+exec(sys.stdin.read())
+
+That first version still shipped 32 helpers, including our indexed-DOM ones like get_dom, click_element and type_in. Gregor ran 7 real tasks on it (Upwork, X, Google Flights, Hacker News, Netflix and an iPhone comparison), and the model never called any of them. The commit 50 minutes later says why:
+
+every DOM interaction went through js() + a bespoke selector, never through the indexed-DOM helpers.
+
+16 helpers went out and 4 came in, so 32 became 20. The model was happier writing its own selectors.
+
+Since then we keep a helper only if the model couldn't rewrite it after reading it once. The core has grown to 2,176 lines anyway, and the helpers file has 26 helpers. The Bitter Lesson of Agent Harnesses [/posts/bitter-lesson-agent-harnesses] makes the full argument. One correction, because people (us included) get this wrong: the library kept its 24 tools until November. The harness proved the idea first and the library caught up months later.
+
+What the agent does with raw CDP [#what-the-agent-does-with-raw-cdp]
+
+Give the model one code tool and raw CDP, and you can count what it reaches for. We did that on 199 traces from a BU Bench v2.1 run on November 13, 2026: 12,976 code calls and about 47 distinct CDP commands. The top five are what our helpers already wrap. Nobody designed the rest.
+
+9 of about 47 command names, counted by regex over the code calls.
+
+One task wanted two years of daily data from a stock exchange statistics page, and the page hung on load. The agent called Page.stopLoading, saw an empty body, and then blocked the script that was stuck:
+
+cdp('Network.enable')
+cdp('Network.setBlockedURLs', urls=['*<stuck-script>*'])
+goto_url('https://<exchange-stats-page>/')
+
+The reload took 1.3 seconds. Then it read the site's own JavaScript, found the JSONP endpoint behind the table and called it directly for 730 dates in batches of 30. When 30 of them timed out, it retried only those. It came back with 4,720 rows in three and a half minutes and a judge score of 0.92. We never built anything for that.
+
+One trace from that run. Times are minutes since the task started.
+
+Other traces, which scored between 0.58 and 0.76, show the same habit. On a task marked "observation only" about a site impersonating a software brand, the agent turned off JavaScript, blocked two tracker hosts and logged every redirect before it navigated. On an ad library task it set Animation.setPlaybackRate to 100 so dialogs stopped costing time, collected 140 IDs, set the rate back to 1 and printed "restored animation rate". We never wrote a cleanup rule for that.
+
+When a dedicated tool still wins [#when-a-dedicated-tool-still-wins]
+
+Captchas are where code and prose lost. On our Ultrafast agent on staging, a prompt that explained captchas went 0 for 3 on hCaptcha, and our solve_captcha tool [/posts/browser-agent-blocked] went 6 for 6. That's a small test with one vendor. We think the tool wins because it flips a solver switch inside the browser with a custom CDP command that the agent can't reach from the page.
+
+So our rule is simple. If the agent already has the primitive, write prose and let it use it. If it doesn't, build the tool.
+
+How to try browser-use 1.0 [#how-to-try-browser-use-10]
+
+Run uv add browser-use, set BROWSER_USE_API_KEY (or pass your own model with llm=), and use the three lines above.
+
+Then log which helpers your own agent actually calls and delete the rest. It took us 7 tasks and 50 minutes to learn that half of ours were dead.
+
+Published November 20, 2026
+Copy link
+
+Keep reading
+
+All articles [/posts]
+
+Engineering
+/Nov 20, 2026
+
+Browser Agent Blocked? How to Tell Which Wall You Hit and Get Past It
+
+We paid $100 for every site that blocked our browser agent. Of 82 we could test, 7 blocked it every time and 6 more only blocked US traffic. Here is what fixes each kind of block.
+
+Magnus Müller
+
+ [/posts/browser-agent-blocked]
+
+Engineering
+/Nov 20, 2026
+
+How to Make a Browser Agent Faster: Six Causes We Found
+
+One Google Flights task took our browser agent 30.7 seconds. Six causes explained most of it, and two config flags alone brought it to 20.7 seconds.
+
+Magnus Müller
+
+ [/posts/faster-browser-agent]
+
+Engineering
+/Nov 20, 2026
+
+LLM-as-a-Judge Bug: Our Judge Read a Fifth of Each Answer
+
+A fix scored +5.1 points on our agent eval. Up to half of that came from a bug: our LLM judge only saw the end of each answer. How rejudging saved runs caught it.
+
+Magnus Müller
+
+ [/posts/llm-as-a-judge-eval-bug]
+
+Product
+
+Web agents [/web-agents]Stealth browsers [/stealth-browsers]Browser Harness [/browser-harness]Pricing [/pricing]
+
+Developers
+
+Docs [https://docs.browser-use.com/cloud/quickstart]GitHub [https://github.com/browser-use/browser-use]Benchmarks [/benchmarks/agents]Blog [/posts]
+
+Popular
+
+Codex browser [/codex-browser]Claude in Chrome [/claude-in-chrome]CAPTCHA solving [/captcha-solving]Free tools [/tools]
+
+Company
+
+Careers [/careers]Case studies [/case-studies]Security [/security]Trust center [https://app.vanta.com/browser-use.com/trust/663ixwje3dj0nrvd17sfs]Status [https://status.browser-use.com]
+
+© 2026 Browser UseTerms [/legal/terms-of-service]Privacy [/privacy]DPA [/dpa]Cookie Settings
+
+llms.txt [/llms.txt]View as MarkdownCurrent view: website.
+LightDark

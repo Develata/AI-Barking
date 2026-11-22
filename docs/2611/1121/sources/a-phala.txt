@@ -1,0 +1,432 @@
+Phala November Preliminary Incident Report | Phala
+
+Products [https://cloud.phala.com]
+
+Confidential VM [/confidential-vm]
+
+GPU TEE [/gpu-tee]
+
+Confidential AI Models [/confidential-ai-models]
+
+Verify private inference [/confidential-ai-models/verification]
+
+Private AI Proxy app [/private-ai-proxy]
+
+Model Catalog [/models]
+
+dstack [/dstack]
+
+GPU Marketplace [/gpu-tee]
+
+H100 [/gpu-tee/h100]
+
+H200 [/gpu-tee/h200]
+
+B300 [/gpu-tee/b300]
+
+Solutions [/confidential-ai-models]
+
+AI Agents [/solutions/ai-agents]
+
+Private AI Inference [/solutions/private-ai-inference]
+
+Private AI Training [/solutions/private-training]
+
+Private AI Data [/solutions/private-ai-data]
+
+Phala vs AWS Nitro [/compare/phala-vs-aws-nitro]
+
+Phala vs GCP Confidential VM [/compare/phala-vs-gcp]
+
+Phala vs Tinfoil [/compare/phala-vs-tinfoil]
+
+Financial Services [/success-stories/financial-services]
+
+Healthcare Research [/success-stories/healthcare-research]
+
+AI SaaS Platform [/success-stories/ai-saas-platform]
+
+Decentralized AI [/success-stories/decentralized-ai]
+
+Legal AI [/success-stories/legal]
+
+All use cases [/success-stories]
+
+Developers [https://docs.phala.com/]
+
+Docs [https://docs.phala.com/]
+
+Quickstart [https://docs.phala.com/phala-cloud/phala-cloud-cli/start-from-cloud-cli]
+
+CLI [https://docs.phala.com/phala-cloud/phala-cloud-cli/overview]
+
+Templates [https://cloud.phala.com/templates]
+
+Deploy CVM [/confidential-vm]
+
+Deploy dstack [/dstack]
+
+Run GPU TEE [/gpu-tee]
+
+Verify Attestation [/trust]
+
+API Reference [https://docs.phala.com/]
+
+Research [/research]
+
+GitHub [https://github.com/Phala-Network]
+
+DeepWiki [https://deepwiki.com/Phala-Network]
+
+Service Status [https://status.phala.network/]
+
+Resources [/learn]
+
+Blog [/blog]
+
+Research [/research]
+
+Learn [/learn]
+
+Tags [/tags/Intel%20TDX]
+
+By use case [/success-stories]
+
+Trust Center [https://trust.phala.com]
+
+Security [/trust#security]
+
+Subprocessors [/trust#subprocessors]
+
+Startups [/startup-program]
+
+Enterprise AI [/contact]
+
+GPU Providers [https://docs.phala.com/network/compute-providers/run-GPU-on-phala/gpu-deployment-guide]
+
+Partnerships [/partnerships]
+
+About Us [/about]
+
+About Phala [/about]
+
+Build History [/about#history]
+
+Contact [/contact]
+
+Wallet, Stake, Bridge [https://app.phala.network/]
+
+About Phala Network [https://docs.phala.com/network]
+
+Careers [https://wellfound.com/company/phala-network]
+
+Pricing [/pricing]
+
+Contact [/contact]
+
+Sign in [https://cloud.phala.com/login]
+
+Start building [https://cloud.phala.com/register]
+
+ [/]
+
+Products 
+
+Solutions 
+
+Developers 
+
+Resources 
+
+About Us 
+
+Pricing [/pricing]
+
+Languageenzhfrdenltr
+Contact [/contact]Sign in [https://cloud.phala.com/login]Start building [https://cloud.phala.com/register]
+
+Blog [/blog]
+Phala Cloud [/tags/Phala%20Cloud]Reports [/tags/Reports]post-mortem [/tags/post-mortem]
+
+Phala November Preliminary Incident Report
+
+Nov 10, 20265 min readCopy for AI
+
+Phala Cloud [/tags/Phala%20Cloud]Reports [/tags/Reports]post-mortem [/tags/post-mortem]
+
+We are publishing preliminary findings from a security incident affecting Phala infrastructure. Two groups of users may need to take action:
+
+Users whose DeepSeek V4 Flash 0731 requests were routed to Phala by OpenRouter. For requests sent between October 21, 2026 at 00:00 UTC and November 8, 2026 at 05:35 UTC, treat request contents as exposed. Rotate any API keys, tokens, passwords, or other secrets included in those requests.
+
+Owners of affected confidential virtual machines (CVMs). The attacker obtained application credentials. Affected CVMs may also have had secrets derived from Phala's key management system (KMS) exposed. We have contacted the affected tenant directly with rotation guidance.
+
+We contained the incident on November 8. The affected model service has been restored with additional protections and monitoring. The attacker made further attempts after our KMS root key rotation on November 6, and we have observed no successful unauthorized access since containment.
+
+Our investigation and comprehensive verification of the remediation remain in progress. We are limiting exploit-specific details until this work is complete. We will then publish a full root cause analysis (RCA).
+
+We are sorry this happened, and we appreciate the patience of everyone checking their systems and rotating credentials.
+
+What happened
+
+On November 5, we detected unauthorized activity on one server. The attacker chained a legacy internet-facing service with management interfaces that relied on loopback access for trust and did not independently authenticate callers. This allowed the attacker to create unauthorized CVMs and obtain application credentials. We blocked the identified access paths that day. On November 6, we rotated the KMS root key used to derive application secrets.
+
+On November 8 UTC, a third-party security researcher provided evidence that request data sent to DeepSeek V4 Flash 0731 had been exposed. We traced this evidence to an inference deployment on a new GPU server. It was serving production traffic without our full production security hardening. The attacker used a similar access pattern to take control of the inference VM, making in-flight request data visible during processing. We took the deployment and its model offline.
+
+The attack sequences and associated infrastructure overlap. Our current assessment is that a single actor conducted both intrusions, and we are treating them as one incident.
+
+Timeline
+
+All times are UTC. This is a condensed operational timeline, not an exhaustive forensic log.
+
+Oct 21, 00:00 — Start of the precautionary exposure window for DeepSeek V4 Flash 0731 request data. The attacker reached internal management interfaces on one server and inserted malware.
+
+Oct 21–22 — Requests subsequently confirmed as exposed were sent during this period.
+
+Oct 22, 05:41 — Earliest observed misuse of data obtained in the attack.
+
+Nov 4–5 — Another server was tampered with and an unauthorized CVM was created.
+
+Nov 5, 08:15–17:55 — Initial intrusion contained: attacker-created CVMs stopped, vulnerable services disabled, network controls deployed, and attacker infrastructure blocked. No subsequent successful unauthorized access was observed.
+
+Nov 6, 05:02 — KMS root key rotation completed.
+
+Nov 8, 04:12 — Researcher evidence received and traced to the compromised inference deployment.
+
+Nov 8, 04:12–05:35 — Compromised server and associated deployment infrastructure taken offline; model service stopped; gateway notified.
+
+Nov 8, 05:35 — Containment completed. No subsequent unauthorized access has been observed.
+
+Nov 9 — Most recent observed misuse of data obtained in the attack.
+
+Nov 10 — Preliminary report published.
+
+Impact and recommended actions
+
+Users of DeepSeek V4 Flash 0731
+
+In-flight request contents may have been exposed for requests sent to Phala's deployment of this model during the window above. Treat any credentials or other sensitive information in those requests as compromised.
+
+From July 1 through November 7, the researcher regularly included unique, per-request canary credentials in requests to Phala and monitored them for subsequent use. Only canary credentials from requests sent on October 21 and 22 were subsequently misused. No misuse was observed for canary credentials sent before or after those dates.
+
+These tests sampled requests and detected credential misuse. They did not provide visibility into every request or every possible data-access event, so we retain the wider precautionary window for user guidance.
+
+If your requests fall within that window:
+
+Rotate all API keys, tokens, passwords, and other secrets included in request contents.
+
+Review those accounts for unauthorized activity and contact the relevant provider if you identify any.
+
+Phala served this model only through the affected route. The gateway is notifying affected users and distributing this report.
+
+CVM owners
+
+The attacker created unauthorized CVMs on two servers and obtained application credentials. Affected CVMs may have had KMS-derived secrets exposed. We confirmed subsequent misuse of some stolen credentials belonging to one tenant.
+
+We have contacted the affected tenant directly with system-specific rotation guidance. If you received this notice:
+
+Rotate the identified KMS-derived secrets and other affected credentials.
+
+Review their use and report any unrecognized activity to us.
+
+If you did not receive a notice, no action is required based on our current findings.
+
+Other Phala models and products
+
+We completed an audit of the full platform. Beyond the systems described above, we found no evidence of compromise affecting other models or products. No other customer workloads were interrupted.
+
+We have included practical credential-rotation and misuse-response guidance in our emails to affected users.
+
+Containment and remediation
+
+Stopped attacker-created CVMs and blocked identified attacker infrastructure on November 5.
+
+Disabled vulnerable legacy services and deployed additional network controls.
+
+Completed KMS root key rotation on November 6.
+
+Took the compromised GPU server and associated deployment infrastructure offline.
+
+Restored the affected model service with additional protections and monitoring.
+
+Detected further attacker attempts after the KMS root key rotation, with no successful unauthorized access observed.
+
+Notified the affected tenant and the gateway and shared relevant attack indicators with them.
+
+Implemented additional security measures that remain undisclosed while the investigation is active.
+
+Frequently asked questions
+
+Are other Phala models or products affected?
+
+We have found no evidence of additional impact. Phala served this model only through the route described above, and the full-platform audit identified no other compromised systems.
+
+Why use a wider exposure window when only October 21 and 22 requests were confirmed exposed?
+
+Those dates are established by canary evidence. The tests sampled requests rather than monitoring every request, and we cannot yet bound the attacker's access to those two days. The precautionary window reduces the risk of leaving an affected user unaware.
+
+How do I know whether my CVM was affected?
+
+We have contacted the affected tenant directly with system and credential guidance. If you did not receive a notice, no action is required based on our current findings.
+
+Has the incident been contained?
+
+Yes. We have closed the identified attack paths, removed the affected deployments, and observed no unauthorized access since November 8 at 05:35 UTC. Investigation and additional hardening continue. Service has been restored with additional protections and monitoring. Further attacker attempts since containment have not resulted in successful unauthorized access.
+
+Next steps
+
+The investigation remains active. We will publish a full RCA with the complete attack timeline, root causes, and corrective actions. We will update this report if our understanding of the scope changes.
+
+We thank the third-party security researcher who alerted us and the gateway that carried this traffic for their coordination. For questions or potentially relevant suspicious activity, contact [email protected] [/cdn-cgi/l/email-protection#99fafcebedd9e9f1f8f5f8b7f7fcedeef6ebf2].
+
+The Phala CERT Team
+
+On this page
+
+What happened [#what-happened]
+
+Timeline [#timeline]
+
+Impact and recommended actions [#impact-and-recommended-actions]
+
+Containment and remediation [#containment-and-remediation]
+
+Frequently asked questions [#frequently-asked-questions]
+
+Next steps [#next-steps]
+
+Read Next
+
+ [/]
+Private execution. Verifiable results.
+
+Newsletter
+
+Subscribe
+
+Build
+
+Documentation [https://docs.phala.com/?utm_source=phala.network&utm_medium=site-footer]
+
+dStack SDK [/dstack]
+
+CLI [https://docs.phala.com/phala-cloud/phala-cloud-cli/overview]
+
+GitHub [https://phala.com/github]
+
+Community [https://github.com/Phala-Network/phala-cloud-community/?utm_source=phala.network&utm_medium=site-footer]
+
+Platform
+
+Confidential AI Models [/confidential-ai-models]
+
+Model Catalog [/models]
+
+Verify Private Inference [/confidential-ai-models/verification]
+
+Private AI Proxy [/private-ai-proxy]
+
+GPU TEE [/gpu-tee]
+
+Confidential VM [/confidential-vm]
+
+H100 GPU [/gpu-tee/h100]
+
+H200 GPU [/gpu-tee/h200]
+
+B300 GPU [/gpu-tee/b300]
+
+Solutions
+
+Private AI Data [/solutions/private-ai-data]
+
+Private AI Inference [/solutions/private-ai-inference]
+
+Private Training [/solutions/private-training]
+
+AI Agents [/solutions/ai-agents]
+
+Proof
+
+By use case [/success-stories]
+
+Financial Services [/success-stories/financial-services]
+
+Healthcare [/success-stories/healthcare-research]
+
+AI SaaS [/success-stories/ai-saas-platform]
+
+Decentralized AI [/success-stories/decentralized-ai]
+
+Learn
+
+Explore Learn [/learn]
+
+Research [/research]
+
+Blog [/blog]
+
+vs AWS Nitro [/compare/phala-vs-aws-nitro]
+
+vs Google Cloud [/compare/phala-vs-gcp]
+
+vs Tinfoil [/compare/phala-vs-tinfoil]
+
+What is Confidential AI? [/learn/what-is-confidential-ai]
+
+What is TEE? [/learn/what-is-tee]
+
+Company
+
+About [/about]
+
+Partnerships [/partnerships]
+
+Pricing [/pricing]
+
+Contact [/contact]
+
+Careers [https://wellfound.com/company/phala-network]
+
+Responsible Disclosure [https://github.com/Phala-Network/phala-cloud/security/policy]
+
+ [https://phala.com/x] [https://phala.com/discord] [https://phala.com/telegram] [https://phala.com/youtube] [https://phala.com/linkedin] [/rss.xml]
+
+© 2026 Hashforest Technology. All rights reserved. Privacy [/privacy] • Terms [/terms]
+
+PreviousPost-mortem: October 2026 dstack guest-agent vulnerability and host isolation fixes [/posts/2026-10-post-mortem-dstack-guest-agent-vulnerability]
+
+Read Next
+
+ [/posts/2026-10-post-mortem-dstack-guest-agent-vulnerability]
+
+Phala Cloud [/tags/Phala%20Cloud]
+
+post-mortem [/tags/post-mortem]
+
+Post-mortem: October 2026 dstack guest-agent vulnerability and host isolation fixes
+
+Oct 19, 2026
+
+ [/posts/solrouter-private-ai-device-to-gpu-case-study]
+
+Confidential AI [/tags/Confidential%20AI]
+
+TEE [/tags/TEE]
+
+Intel TDX [/tags/Intel%20TDX]
+
+Case Study: How Solrouter Protects AI Prompts from Device to GPU
+
+Oct 13, 2026
+
+ [/posts/saygmprivacyfirstaiinferencegateway]
+
+AI [/tags/AI]
+
+LLM [/tags/LLM]
+
+AI Agent [/tags/AI%20Agent]
+
+Phala x SayGM: Privacy-first AI inference gateway built on Phala Cloud
+
+Sep 22, 2026
