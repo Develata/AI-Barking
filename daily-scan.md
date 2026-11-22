@@ -73,11 +73,6 @@
 
 | 期次 | 标签 | 事实 |
 |---|---|---|
-| 1118 | Anthropic | Anthropic IPO 定价每股83美元，发售9.8亿股，含老股东出售部分 |
-| 1118 | 谷歌 | 谷歌 Genie 4 向符合条件的 Ultra 订阅用户开放，Pro 用户可排队 |
-| 1118 | DeepSeek | DeepSeek：调用模型时触发的服务端搜索，11月18日12时起不再按次收费 |
-| 1118 | 安全 | 研究者称接管了语音模型 Kokoro 的发布账号，在本地改过权重但未上传 |
-| 1118 | OpenAI | OpenAI 自报：估计人做2–4小时的内部研发任务，无人干预估计成功率达46% |
 | 1119 | 芯片 | 美众院：截至5月11日，对华 H200、MI325X 获批约88万颗，均未出货 |
 | 1119 | Anthropic | Anthropic 招股书：创始人捐出个人股权80%的承诺自愿、可撤销 |
 | 1119 | Claude | Anthropic：Claude 解的黑洞一题，证明一半沿用 OpenAI 思路 |
@@ -91,6 +86,11 @@
 | 1120 | METR | METR：其评测中 AI 有一半把握完成的任务，按人类用时约3.6个月翻倍 |
 | 1120 | 开源 | Inkling 2 Mini 以 Apache 2.0 开源，总参数26.4B |
 | 1120 | 模型 | Inkling 2 Mini 以 Apache 2.0 许可开放权重 |
+| 1121 | Anthropic | Anthropic IPO 交割：含超额配售共11.27亿股，每股83美元 |
+| 1121 | OpenAI | OpenAI 自家药化基准：GPT-6.2-Astra xhigh 得84.5% |
+| 1121 | 腾讯 | 腾讯 Hy4 开放权重；年营收超5000万美元的模型托管商对外服务须另获许可 |
+| 1121 | 数学 | 数学家 Sutherland：黎曼猜想 Lean 证明重建，导出文件逐字节一致 |
+| 1121 | Runway | Runway 自报：10月合并的 PR 中38%由云端智能体驱动，6月为0.1% |
 
 ## 已发过
 
@@ -154,3 +154,4 @@
 | 1118 | AI挖出11年老漏洞，有条件才中招：【NGINX】11/18 发 1.30.7、1.31.9 修两个 HTTP/2 远程代码执行漏洞（CVE-2026-123007、CVE-2026-123633；nginx.org 评级 major、medium，F5 CVSS 3.1 8.1、4.0 9.2）；Wiz 称用自家 AI 扫描工具 Atlas 发现、Gemini-4-Carbon 与 GPT-5.6-Sol 验证，123007 自 1.9.5（2015）就在，称另有 Ikotas、Metnir、Rapid7、Xint 独立发现（F5 致谢逐 CVE 各四方、名单不同；Rapid7 写明研究员发现、无 AI）；前提：都要开 HTTP/2，123633 另需转发请求且 worker 连接数吃紧，ASLR 关闭或被绕过时才能执行代码；吠点：“2.25亿网站”是 Netcraft 使用量，Censys 看板（只追踪 123007）暴露约882万个服务、另约1亿个不显示版本；团子技术日报“从公网直取宿主机根权限”，漏洞本身只到 worker 权限，Xint 另串了一个尚无补丁的 Linux SCTP 内核漏洞才拿到 root；1.31.8 仍受影响、1.30.7 不受影响；CERT-EU、Censys 称未见在野利用。【Gemini-4-Neon】谷歌称默认 high 档每任务比 Carbon 低32%（未写口径）；AA 测得 Neon xhigh $6.44、比 Carbon high（标准价）$7.76 低约17%；Neon $3/$15，Carbon 原价 $4/$20、半价促销 $2/$10 至 11/30，Neon 免费层不可用；吠点：同为 high 档按原价 Neon $3.74、Carbon $7.76，按促销半价折算 Carbon 约 $3.88 与 Neon 相近、比 Neon xhigh 便宜约四成（本号推算）；36氪等“成本只有 Carbon 的60%”出自谷歌博客里 Glean 产品负责人的早期评估 |
 | 1119 | 公司称AI设计CPU能效4.59倍，没造：Architect Labs 博客（11/18）称 AI 智能体从指令集做到版图设计出 CPU 架构 Frostbite，拿四个计算单元（quad+L3，0.792 mm²）比面积相近的一颗双发射顺序执行核（0.895 mm²，型号“因法律原因”不公开），25个自选小程序每瓦性能几何平均4.59倍；吠点：调优用的10个6.02倍、没调过的15个3.83倍（其中5个后加），只到7 nm 最终 GDS、功耗为流片前估算，跟乱序大核与多核比“未来几个月”才做，Notebookcheck 标题“AMD and Intel, move over”（对手可能就是这两家的产品，不能写“没比过”）。Signal（11/20 博文）在 iOS 27 上禁应用内截屏挡 Siri AI，Android 检测到 AI 助手读屏才开“屏幕安全”（设置页写 some AI assistants），据路透默认开启、可在设置-隐私关掉；吠点：The Verge 标题“blocking Gemini and Siri AI from reading your screen”，Signal 自称只拦截屏，读手机已存文件拦不住，macOS 目前做不到；苹果称中国大陆没有 Siri AI。Contra 设计榜（盲选网站设计，17行）：HN 帖称“两个隐身模型都在 Fable 5.2 前面”，实为只有 Gestalt（1931）一个隐身模型，第二是 Contra 请设计师做的参考作品（1739），Fable 5.2 第三（1713）；吠点：据 Contra，Gestalt 胜参考作品是28次二选一选它20次，评分细则 Gestalt 83 低于 Fable 5.2 的84，参考稿经 Contra 反馈修改、方法页没写模型提示词 |
 | 1120 | AI证黎曼猜想？机器验过，作者没吃透：【跟进1119速览】Anthropic 员工 Alpöge（remark.pdf，北京11/20 20:52）称与 Claude 找到 RH 证明、可推到 GRH，只公开 Lean；MIT Sutherland 复核页（11/21 09:30 UTC）称175,187个模块编译通过、#print axioms 只有三条标准公理、leanchecker 全重放，nanoda、con-leche 两个独立内核与 lean4lean 都接受，lake comparator 与导出重放仍在跑，“GRH”只指 Dirichlet L 函数；Lipponen（LUMI）独立编译、哈希一致，称不等于有人读懂。几小时后 Vakil（北京11/21 02:18）公布 Masullo 940页纯人工 GRH 草稿（称覆盖所有数域的酉 Hecke 特征），约8小时后补记多人借 AI 报告问题、不担保思路；稿内30处“Return here”，第522页定理13.3.1.2只有标题、脚注“Insert statement”。吠点：新浪新闻“AI 写出25万页证明”（25万页是作者脚注里的未公开文稿）、检查程序只保证每步推得通、两份“广义”范围不同；扫描把 Aaronson 原话（17 million lines、0=1、my bet）安在 Tao 头上，已更正。Qwen3.5-27B 改写自己权重（arXiv 2611.21885 v2）：另留490题×8答案上57.2%→63.8%；吠点：第二协议8轮各自从原始权重重改、5轮撤回、提交3次57.8%/61.3%/63.8%（智客前沿“8轮持续提升”），改动针对写到长度上限的答案（截断33.6%→26.1%，例题重复549次），摘要“80%以上”修复指图像题70.2%对84.3%、文本33.0%对58.5%；参考文献[25]即1102期 MIT CSAIL 博文。 |
+| 1121 | AI写代码漏了密钥，用户提示词被下载：【AI 推理供应链】Dragos 往各家 AI 服务发约200万条带假密钥与秘密链接的提示词（11/19）；OpenRouter 11/22 称据此清退3家提供商（未点名）、撤125个端点的零数据留存资格（含预防性撤下）；Together 11/21 称 AI 编码助手往公开仓库 xorl 提交了能读私有 HF 仓库的凭证，6–7月测试样本被下载，新账户改为默认零留存；Dragos 称隐私标记只约束第一跳；Novita/MiniMax 与“中国实验室”段风控不写。【3SUM】arXiv 2610.06783（v1 北京10/6，Alman、Vassilevska Williams）首页称算法由 Claude 发现，3SUM 指数2→1.9992（多项式大小整数）、作者称可能不实用；11/22 中文转载把发表日写成11/22；Vassilevska Williams 个人页称内部模型不必要，给公开版 Claude 学生2023年笔记两条提示即成，不给笔记各试三次未成 |
