@@ -1,0 +1,140 @@
+[https://status.openai.com/]
+
+Subscribe to updates
+
+Powered by [https://incident.io?utm_source=openai-1&utm_medium=status-pages]
+
+Availability metrics are reported at an aggregate level across all tiers, models and error types. Individual customer availability may vary depending on their subscription tier as well as the specific model and API features in use.
+
+ [/]Elevated Errors on API and ChatGPT
+
+Resolved·Partial outage
+
+We’ve published a write-up of this incidentRead the write-up
+Read it here [/incidents/01JMYB602A6H2E04Y1497J434X/write-up]
+
+Affected components
+
+Nov 21, 2023, 05:09 PM
+
+08:30 PM
+
+APIs
+
+9 affected components
+
+Chat Completions
+
+Fine-tuning
+
+Embeddings
+
+Images
+
+Batch
+
+Audio
+
+Moderations
+
+Realtime
+
+Files
+
+ChatGPT
+
+5 affected components
+
+Conversations
+
+Login
+
+Search
+
+File uploads
+
+Voice mode
+
+Updates
+
+Write-up published
+
+Read it here [/incidents/01JMYB602A6H2E04Y1497J434X/write-up]
+
+Resolved
+
+On November 21st, between 1:48 - 5:21 PT a large portion of requests to OpenAI failed. This peaked at a 75% failure rate on paid and free ChatGPT.
+
+This outage was triggered by maintenance on a PostgresDB service used by OpenAI’s Primary API service that caused both read replicas to fail at the same time. Although only the read replicas for this database were affected, they are load-bearing, causing request paths dependent on them to fail. The Primary API service provides user authentication and service-to-service authentication across the entire OpenAI stack.
+
+After multiple unsuccessful attempts to both revive either of the failed replicas, as well as to bring up replacements in other regions, the issue was ultimately mitigated by working with our service provider to bring two new replicas in the same region into service.
+
+‌
+
+As part of the incident response, we have already implemented the following measures:
+
+A moratorium on similar maintenance activities till further notice.
+
+Adjusted configuration settings to reduce connection churn.
+
+Added a feature flag which lets us shift traffic away from replicas on a percentage based rollout
+
+We have tested directing 100% of the queries to the primary instance and verified our hypothesis of why the primary failed.
+
+‌
+
+Additionally, we will be implementing the following changes to prevent future similar incidents altogether:
+
+Fundamentally OpenAI needs to ensure that maintenance windows do not result in widespread service outages. To that end we will:
+
+Establish a pre-maintenance review process to review all upcoming maintenance activities to ensure that in the event of an unexpected outage, a plan to rapidly recover is in place.
+
+Ensure adequate buffer capacity is available as “hot” standbys during maintenance activity.
+
+Ensure adequate buffer capacity is available in regions where critical services are hosted.
+
+The DB maintenance caused the replicas to go offline/out of sync which led to replica lag increasing unboundedly. Develop \(short term\) strategy / automation for rapidly recovering from replica lag and \(long term\) architectural changes to eliminate this factor.
+
+Examine our entire infrastructure and services stack to ensure we add more redundancy and fail safe mechanisms for greater resilience.
+
+We know that extended API outages affect our customers’ products and business, and outages of this magnitude are particularly damaging. While we came up short here, we are committed to preventing such incidents in the future and improving our service reliability.
+
+Fri, Dec 1, 2023, 06:24 PM
+
+Resolved
+
+We are back up and everything should be working as expected. We are monitoring closely to ensure you have full service. We plan to publish a public postmortem to explain what happened and how we'll prevent similar issues in the future.
+
+Tue, Nov 21, 2023, 08:46 PM(1 week earlier)
+
+Monitoring
+
+We are back up and everything should be working as expected. We are monitoring closely to ensure you have full service. We plan to publish a public postmortem to explain what happened and how we'll prevent similar issues in the future.
+
+Tue, Nov 21, 2023, 08:30 PM(15 minutes earlier)
+
+Identified
+
+We are continuing to work on a fix; we have several improvements in-flight to help restore full access, and will keep you updated here.
+
+Tue, Nov 21, 2023, 07:33 PM(56 minutes earlier)
+
+Identified
+
+We're continuing to work on a fix. The underlying issue is due to an issue with our database replicas. ChatGPT and non-completion API endpoints are partially impacted, while completion API endpoints including chat completions are only minimally impacted. We will post as we have more updates.
+
+Tue, Nov 21, 2023, 06:29 PM(1 hour earlier)
+
+Identified
+
+The issue has been identified and a fix is being implemented.
+
+Tue, Nov 21, 2023, 05:14 PM(1 hour earlier)
+
+Investigating
+
+We're experiencing an elevated level of API errors and are currently looking into the issue.
+
+Tue, Nov 21, 2023, 05:09 PM
+
+Elevated Errors on API and ChatGPT - OpenAI Status

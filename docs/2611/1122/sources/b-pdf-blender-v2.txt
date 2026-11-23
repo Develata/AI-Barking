@@ -1,0 +1,1472 @@
+    Collision and Preimage Cryptanalysis of Blender
+                                              MiniMax
+
+                                           November 2026
+
+
+                                               Abstract
+         Blender is an addition-rotation-XOR cryptographic hash function family submitted by
+     Bradbury to the first round of the NIST SHA-3 competition in 2008. Spanning the four stan-
+     dard digest sizes from 224 to 512 bits, the algorithm pairs a carry-coupled working register
+     and persistent carry flags with a write-only modular-sum accumulator. To resist local dif-
+     ferentials and state-collision attacks, the design incorporates 13-byte cyclic prefix padding,
+     dual modular message checksums, and a minimum 32-round block-alignment rule before
+     discarding the working register to output the accumulator. Prior cryptanalysis required at
+     least 2107.3 operations for preimages, lacked a practical standard-IV collision generator, and
+     left the odd-word variant Blender-224 unbroken below the 2112 birthday bound.
+         We present a unified collision and preimage cryptanalysis of the full Blender family by ex-
+     ploiting the decoupling between its carry-driven working register and its write-only modular
+     accumulator. First, we establish a global shifted subspace collapse that locks periodic reg-
+     ister differences whenever the per-round mask count divides the state length. This reduces
+     the 258-bit working state of Blender-256 to a 38-bit invariant graph and yields standard-IV
+     cycle-swap collisions in under one second alongside zero-cost multicollisions. Second, we
+     construct a local two-step differential that hides a message perturbation inside a symmetric
+     carry transition and heals it in the next round via bitwise-complement inputs. Combined
+     with carry-free polynomial prefix inversion and byte-lattice contraction, this trail produces
+     constant-time semi-free-start collisions across all four NIST variants, breaks Blender-224 in
+     269.56 evaluations, and yields 24-byte standard-IV and 36-byte identical-prefix collisions on
+     Blender-256. Third, we combine multi-shifted closed-walk steering with 2-adic lattice invari-
+     ants and generalized birthday trees over the modular accumulator ring. This reduces full
+     first- and second-preimage complexities on Blender-256, Blender-384, and Blender-512 to
+     235.93 , 266.34 , and 267.64 evaluations, showing that write-only modular accumulators cannot
+     compensate for low-rank mask broadcasting.
+
+
+1    Introduction
+Submitted by Colin Bradbury in October 2008 and selected by NIST among the 51 first-round
+SHA-3 candidates [1], Blender was designed to achieve high software throughput across 16-, 32-,
+and 64-bit processors without lookup tables or S-boxes. A Blender instance is parameterized
+by a word width w ∈ {16, 32, 64} in bits and a working-state length m ∈ {6, 7, 8, 9, 10} in
+words. These parameters define a digest length n = mw in bits and a per-round mask count
+t ∈ {2, 3}. The four official NIST SHA-3 variants are Blender-224 (w = 32, m = 7), Blender-256
+(w = 32, m = 8), Blender-384 (w = 64, m = 6), and Blender-512 (w = 64, m = 8). All four
+official variants operate with t = 2 masks per round.
+    Whereas earlier stream-oriented hashes such as PANAMA [3] continually feed an auxiliary
+buffer back into the active state during absorption, Blender—like fellow first-round candidate
+Waterfall [5]—separates its internal state into an active m-word working register (augmented
+with t persistent 1-bit carry flags) and a strictly write-only m-word accumulator. However,
+Blender’s concrete compression and finalization primitives depart substantially from LFSR and
+S-box constructions:
+
+
+                                                   1
+ 1. Carry-Coupled ARX Compression: At each message word, Blender evaluates t mod-
+    ular integer additions that incorporate the persistent carry flags from the preceding step.
+    The newly generated carry bits select a data-dependent rotation count, and the rotated
+    sums are XORed alternately into the cyclically shifted working register.
+
+ 2. Modular-Sum Accumulation with Working-State Truncation: After every com-
+    pression step, each updated working word is added modulo 2w into the corresponding word
+    of the write-only accumulator. The accumulator never feeds back into the working register
+    or carry flags. At the end of finalization, the working register and carry flags are discarded,
+    and the accumulator words are serialized to form the n-bit digest.
+
+ 3. Cyclic Prefix Padding, Block Alignment, and Dual Checksums: To counter local
+    differentials and length-extension attacks, Blender buffers the first 13 bytes of the message
+    and replays them cyclically after the message body so that the message, padding, bit-length
+    encoding, and two running modulo-2w message checksums (accumulating the absorbed
+    words and their bitwise complements) execute at least 32 compression rounds and end on
+    a 16-word block boundary before extracting the digest.
+
+1.1   Prior Cryptanalysis
+After NIST accepted Blender among the 51 first-round SHA-3 candidates in December 2008 [15],
+six public cryptanalytic works examined the design in 2008–2009:
+
+  • Newbold (2008 [13]): Newbold chained n+w             2 + 1 Joux working-state collisions [6] with a
+    birthday search over the accumulator and primary checksum (n + w bits). This yielded full-
+    state collisions in 2(n+w)/2 compression rounds per stage (2128 , 2144 , 2224 , and 2288 across
+    Blender-224/256/384/512—above the 2n/2 birthday bound for a single collision, but yield-
+    ing 2k -multicollisions in k · 2(n+w)/2 rounds with O(n)-word segments). Applying the
+    Gauravaram–Kelsey additive-checksum framework [4] yielded preimages in n · 2(n+w)/2
+    rounds (2135.8 , 2152.0 , 2232.6 , and 2297.0 , with O(n2 )-word messages) using cycle-finding.
+
+  • Mendel (2008 [11]) and Lamberger–Mendel (ISC 2009 [10]): These works treated
+    the compression round as a black box. By varying four message words (4w ≥ n/2 bits)
+    and adjusting a fifth word modulo 2w to hold the five-word modular sum constant, each
+    five-word Joux stage collides the working state and both checksums in 2n/2 evaluations (or
+    2n/2+1 when accounting for the two carry flags omitted in [10]). Repeating n stages (5n + 1
+    words including a padding-adjustment word) builds a 2n -multicollision in published time
+    n · 2n/2 (2119.8 , 2136.0 , 2200.6 , and 2265.0 ; twice as high with carry matching). A Quisquater–
+    Delescaille memoryless meet-in-the-middle search [14] on the accumulator then recovers
+    preimages across all four variants with O(n) memory.
+
+  • Xu and Li (IACR ePrint 2008/532 [19]): Xu and Li exhibited a 24-byte (6-word)
+    colliding message pair (04 ∥0∥ffffffff versus 04 ∥ffffffff∥0) exclusively for the single all-
+    zero initial working state and zero carries. In that state, all modular additions degenerate
+    into carry-free XORs. Because reaching the all-zero state from the standard initialization
+    vector (IV) costs 2256 operations, no semi-free-start (SFS) generator for non-zero states or
+    standard-IV short collision was obtained.
+
+  • Klı́ma (2008 [8] and IACR ePrint 2009/006 [9]): Klı́ma first reported a 927-bit versus
+    926-bit near-collision matching 225 of 256 digest bits on Blender-256 [8]. In [9], Klı́ma
+    zeroed one mask per round in alternating order so that the m/2 odd-indexed working lanes
+    repeat every n = mw rounds. This left n/2 + 2 unconstrained bits and located 10 working-
+    state fixpoints in 10 · n · 2n/4+1 compression rounds (276.3 , 2108.9 , and 2141.3 on Blender-
+    256/384/512). Auditing [9] against the Blender specification uncovers three fundamental
+
+                                                  2
+Table 1: Cryptanalytic comparison across the four official NIST Blender variants (w = 32 for
+224/256, w = 64 for 384/512; w = words, B = bytes, b = bits; Newbold’s preimage bounds
+appear in Table 2). Measured runtimes are verified against the official NIST C reference [1].
+  Goal        Work                      Setting / Mechanism               Var. Length Complexity Runtime
+              Newbold [13]              Full-state multicoll. stage       224    O(n) w             2128.0         —
+              Newbold [13]              Full-state multicoll. stage       256    O(n) w             2144.0         —
+              Newbold [13]              Full-state multicoll. stage       384    O(n) w             2224.0         —
+              Newbold [13]              Full-state multicoll. stage       512    O(n) w             2288.0         —
+              Klı́ma [9]                Odd-lane fixpoint winding         256    2178.0 w         ≥ 2178.0         —
+              Klı́ma [9]                Odd-lane fixpoint winding         384    2275.0 w         ≥ 2275.0         —
+  Collision
+              Klı́ma [9]                Odd-lane fixpoint winding         512    2340.0 w         ≥ 2340.0         —
+              Ours (§4)                 Silent carry healing              224        6w            269.56          —
+              Ours (§3)                 Clean-subspace cycle swap         256    4,000 w            222.60     0.73 s
+              Ours (§4)                 Global-min carry healing          256        6w                —       34.6 s
+                                                                                                         a
+              Ours (§3)                 Clean-subspace cycle swap         384    4,096 w          257.60           —
+                                                                                                   58.00 a
+              Ours (§3)                 Clean-subspace cycle swap         512    4,096 w          2                —
+              Klı́ma [8]                225/256-bit near-collision        256       927 b               —          —
+              Xu–Li [19]                Zero-state SFS only               256        24 B             O(1)         —
+              Ours (§4)                 Closed-form arbitrary SFS         224       113 B             O(1)   0.027 µs
+  SFS /       Ours (§4)                 Closed-form arbitrary SFS         256       113 B             O(1)   0.006 µs
+  Short       Ours (§4)                 Closed-form arbitrary SFS         384       229 B             O(1)   0.054 µs
+              Ours (§4)                 Closed-form arbitrary SFS         512       229 B             O(1)   0.014 µs
+              Ours (§4)                 Identical-prefix (3R steer)       256        36 B               —         —b
+              Ours (§4)                 Identical-prefix (4R lattice)     256        40 B               —     145.5 s
+           Lamberger–Mendel [10]        5-word sum-fixed Joux       224          1,121 w           2119.81        —
+           Lamberger–Mendel [10]        5-word sum-fixed Joux       256          1,281 w           2136.00        —
+           Klı́ma [9]                   Multipreimage winding       256          2107.3 w        ≥ 2107.32        —
+           Ours (§5)                    Multi-shifted Wagner k-tree 256          227.46 w          235.93         —
+           Lamberger–Mendel [10]        5-word sum-fixed Joux       384          1,921 w           2200.58        —
+  Preimage
+           Klı́ma [9]                   Multipreimage winding       384          2171.9 w        ≥ 2171.90        —
+           Ours (§5)                    Multi-shifted Wagner k-tree 384          238.91 w          266.34         —
+           Lamberger–Mendel [10]        5-word sum-fixed Joux       512          2,561 w           2265.00        —
+           Klı́ma [9]                   Multipreimage winding       512          2204.3 w        ≥ 2204.32        —
+           Ours (§5)                    Multi-shifted Wagner k-tree 512          239.25 w          267.64         —
+  a At 4,096-word cap (≈ 234.8 rounds unconstrained).   b Explicit 36-byte witness verified in Table 3.
+
+
+
+
+     barriers. First, although the abstract of [9] claims applicability to n = 224, for odd m = 7
+     the cyclic register wrap-around mixes odd and even lanes and breaks periodicity completely.
+     Second, the two-fixpoint collision construction in [9, Sec. 4] winds its first cycle 2w times
+     the second cycle length, producing colliding messages of roughly 2178 words on Blender-256
+     that require at least 2178 rounds to hash (slower than generic 2128 birthday search). Third,
+     the multipreimage attack in [9, Sec. 5] prescribes messages of 2171.3 , 2267.3 , and 2331.3 words
+     on Blender-256/384/512. Even a minimal single-winding variant emits at least 2107.3 , 2171.9 ,
+     and 2204.3 words, imposing an unavoidable message-hashing floor of at least 2107.3 rounds
+     on Blender-256.
+
+    Prior to our work, four major cryptanalytic gaps remained open across the Blender family.
+First, once message-hashing costs are accounted for, no valid standard-IV collision construc-
+tion faster than the 2n/2 generic birthday bound—let alone a practical sub-second collision
+generator—was known. Second, no collision attack faster than the 2112 birthday bound was
+known for odd-word Blender-224 (m = 7). Third, no short (< 100-byte) standard-IV collision,
+identical-prefix collision for arbitrary prefixes, or arbitrary-state SFS generator was known for
+any variant. Fourth, no preimage attack broke the 2107 barrier on Blender-256 or the 2171
+barrier on Blender-384 and Blender-512.
+
+                                                           3
+1.2   Our Contributions and Technical Overview
+Table 1 summarizes our results across the Blender family. Our analysis develops three core
+techniques:
+
+ 1. Shifted Clean Subspace Collapse, Parity Obstruction, and Sub-Second Cycle-
+    Swap Collisions (Section 3): Across all 15 variants in Bradbury’s specification, we
+    prove a general divisibility criterion for subspace closure. Constraining the leading updated
+    working word to a constant word or its bitwise complement makes all m − t stride-t register
+    XOR differences message-independent if and only if t divides m. This criterion holds for
+    9 of the 15 variants (including Blender-256, Blender-384, and Blender-512) and explains
+    why odd-lane periodicity fails on 7-word Blender-224. On Blender-256, our construction
+    collapses Klı́ma’s 130-bit alternating state [9] to a 38-bit period-8 clean subspace (292 times
+    smaller). We also establish a Parity Obstruction Theorem proving that the unshifted zero-
+    difference fixed point is unreachable from the standard Blender-256 IV for any message. In
+    addition, we prove that the carry-coupled branching graph on the clean subspace has an
+    exact mean out-degree of 2.000. Pairing two overlapping ancestor cycles on a single depth-
+    first search (DFS) tree yieldsw standard-IV Blender-256 collisions in 0.045–0.73 s, zero-cost
+      2r
+      r multicollisions, and Θ(2 /ℓ) collisions on Blender-384 and Blender-512.
+
+ 2. Two-Step Silent Carry Healing, All-Variant O(1) SFS, and Solver-Free 24-Byte
+    Collisions (Section 4): Bypassing the t | m divisibility barrier via a two-step local
+    perturbation-and-correction trail [2], we introduce a carry-coupled ARX differential. The
+    first step injects a silent carry perturbation that leaves the working register and accumula-
+    tor unchanged while flipping both carry flags from (0, 0) to (1, 1). The second step applies
+    bitwise-complement message words that lock the adder inputs to mid-point constants, si-
+    multaneously healing the carry difference and preserving both modular message checksums.
+    We establish an unordered state validity density of 2−69.56 across Blender-224 and 2−69.58
+    across Blender-256, breaking Blender-224 in 269.56 ≪ 2112 state evaluations. We also de-
+    rive deterministic zero-retry O(1) closed-form SFS collisions for all four NIST variants
+    via circulant polynomial inversion. Finally, we build a solver-free 4-round lane-invariant
+    and 2-round byte-lattice contraction solver (0.11–0.29 ms per target) that finds 24-byte
+    standard-IV and 40-byte identical-prefix collisions in pure C.
+
+ 3. Multi-Shifted Closed-Walk Steering and Preimage Cryptanalysis (Section 5):
+    Building on multi-block internal-state collisions [6] and generalized birthday checksum can-
+    cellation [17, 4, 12], we develop a multi-shifted closed-walk preimage attack over the modu-
+    lar ring of Blender’s accumulator. Because Blender discards its working state immediately
+    after the checksum rounds, equal-length, equal-checksum closed walks require no finaliza-
+    tion inversion. Using 2-adic Smith Normal Form (SNF) analysis, we show that unshifted
+    clean walks suffer a 12-bit subgroup rank defect that starves the leading accumulator lane.
+    We prove that chaining closed walks across multiple shifted clean subspaces injects odd 2-
+    adic units into the leading lane and saturates the maximal parity subgroup of index 2m−2 .
+    Combining 8-anchor reverse-reachable DAG [7] slot generation with a joint checksum-and-
+    accumulator generalized birthday tree [17] reduces full first- and second-preimage complex-
+    ities to 235.93 on Blender-256, 266.34 on Blender-384, and 267.64 on Blender-512. We also
+    verify the exact 2-adic SNF subgroup ranks and the closed-walk modular superposition
+    identity empirically on Bradbury’s unmodified NIST C reference implementation.
+
+1.3   Paper Organization
+Section 2 establishes our algebraic notation, circulant polynomial and 2-adic lattice prelimi-
+naries, and the complete mathematical specification of the Blender family. Section 3 develops
+
+
+                                                4
+our shifted clean subspace collapse, the Parity Obstruction Theorem, and the single-stage over-
+lapping cycle-swap collision and multicollision attacks. Section 4 presents our two-step silent
+carry injection and complement healing trail, closed-form SFS generators for all four NIST
+variants, and solver-free 24-byte standard-IV and identical-prefix collision attacks. Section 5
+introduces multi-shifted modular-sum steering, proves the 2-adic SNF subgroup hierarchy, and
+derives our full first- and second-preimage attacks. Section 6 summarizes the root architectural
+vulnerabilities and reports experimental verification benchmarks and concrete witnesses.
+
+
+2     Preliminaries and Specification
+2.1    Notation and Algebraic Preliminaries
+Throughout this paper, w ∈ {16, 32, 64} denotes the word bit-width and b = w/8 ∈ {2, 4, 8}
+denotes the byte length of a word. We write F2 = Z/2Z for the binary field and Z/2w Z for the
+residue ring of integers modulo 2w .
+
+Bitwise and Modular Word Operations. We identify the set of w-bit words P             {0, 1}w with
+the integer interval {0, 1, . . . , 2w − 1} via the little-endian binary expansion z = w−1    z[j] 2j ,
+                                                                                     Lw−1j=0
+where z[j] ∈ F2 denotes bit j of z. For any w-bit word z, its bit-parity is par(z) := j=0 z[j] ∈ F2 ,
+and its j-th little-endian byte (0 ≤ j < b) is bytej (z) := ⌊z/28j ⌋ mod 28 . We write 0 for the
+all-zero word (or all-zero tuple), 1 := 2w − 1 for the all-ones word, x ⊕ y for bitwise XOR, and
+¬x := x⊕1 = (2w −1)−x for bitwise complement. For any integer k, rork (x) and rolk (x) denote
+w-bit right and left cyclic rotations by k mod w bit positions. We write x ⊞ y = (x + y) mod 2w
+and x ⊟ y = (x − y) mod 2w for addition and subtraction in Z/2w Z, extended componentwise
+to the m-word abelian group G := (Z/2w Z)m . For a byte or word sequence U , we denote its
+length by |U | (or ℓ(U )), write U ∥V for concatenation, and write 1[E] ∈ {0, 1} for the indicator
+of event E.
+
+Circulant Polynomial Representation. Each w-bit word z ∈ Fw               2 with bits (z[0] , . . . , z[w−1] )
+                                                        Pw−1          j in the quotient ring R
+corresponds bijectively to the polynomial z(X) =                z
+                                                           j=0 [j]  X                                   w :=
+           w                w
+F2 [X]/(X + 1). Since X = 1 in Rw , cyclic left rotation rolk (z) acts as multiplication by
+X k mod w , and cyclic right rotation rork (z) acts
+                                               L as multiplication by X
+                                                                                (w−k) mod w . Any F -
+                                                                                                           2
+linear combination of cyclic rotations L(z)  =     k∈S rolk (z) corresponds  to  multiplication       by the
+circulant polynomial f (X) = k∈S X k ∈ Rw . Because w = 2e is a power of two, (X w + 1) =
+                               P
+         e
+(X + 1)2 over F2 , so f (X) is invertible in Rw if and only if f (1) ≡ |S| ≡ 1 (mod 2) (odd
+                                                             e          e
+Hamming weight). Whenever f (1)Q= 1, we have f (X)2 = f (X 2 ) = f (1) = 1 in Rw , giving
+                                                 j
+the closed-form inverse f (X)−1 = e−1 j=0 f (X)
+                                                2 in R via e = log w squarings.
+                                                        w              2
+
+
+Two-Adic Valuation and Smith Normal Form. For any integer z ∈ Z, the 2-adic val-
+uation ν2 (z) is the largest exponent v ≥ 0 such that 2v divides z, with ν2 (0) := w on Z/2w Z.
+An element u ∈ Z/2w Z is a 2-adic unit (invertible modulo 2w ) if and only if ν2 (u) = 0, that
+is, u is odd. Over the local principal ideal ring Z/2w Z, any subgroup (Z/2w Z-submodule)
+H ≤ G = (Z/2w Z)m generated by a family of difference vectors admits a 2-adic Smith Normal
+Form (SNF) decomposition via unimodular row and column operations. Its invariant factors
+take the form (d0 , d1 , . . . , dm−1 ) = (2v0 , 2v1 , . . . , 2vm−1 ) with
+                                                                          Lnon-decreasing    2-adic valuations
+0 ≤ v0 ≤ v1 ≤ · · · ≤ vm−1 ≤ w. Consequently, H ∼                      =
+                                                                              m−1 vi
+                                                                              i=0 2  (Z/2w Z) has finite index
+                         Pm−1
+[G : H] = m−1
+                                                                 Pm−1
+                             i=0 vi and bit codimension                            (Z/2w Z)m .
+          Q
+            i=0   di = 2                                           i=0  v i inside
+
+
+
+
+                                                      5
+2.2    State Layout and Initialization
+We follow the official NIST SHA-3 Round-1 specification and C/C++ reference submission [1].
+Blender defines 15 hash instances indexed by word width w ∈ {16, 32, 64} and state word count
+m ∈ {6, 7, 8, 9, 10}, producing an n = mw-bit digest. The per-round mask count is t = 2 for
+m ∈ {6, 7, 8} (the x2 family, which encompasses all four required NIST SHA-3 output sizes)
+and t = 3 for m ∈ {9, 10} (the x3 family):
+
+              Blender-224 : (w=32, m=7, t=2),         Blender-256 : (w=32, m=8, t=2),
+
+              Blender-384 : (w=64, m=6, t=2),         Blender-512 : (w=64, m=8, t=2).
+Each Blender instance maintains six state components. The active trunk consists of working
+words W = (W0 , . . . , Wm−1 ) ∈ ({0, 1}w )m and persistent carry flags c1 , c2 ∈ {0, 1} (plus c3 ∈
+{0, 1} when t = 3). The output and schedule state consists of modular-sum accumulators
+Sum = (Sum[0], . . . , Sum[m − 1]) ∈ (Z/2w Z)m , running word checksums C1 , C2 ∈ Z/2w Z, a 13-
+byte prefix buffer F [0 . . . 12], and a fragment-alignment counter enforcing the 32-round minimum
+and 16-fragment block alignment.
+    At initialization, Sum = (0, . . . , 0), c1 = c2 = 0, and C1 = C2 = 0. The initial working
+words W IV are derived from fractional square roots of primes (matching the standard initial
+words of SHA-224, SHA-256, and SHA-512 for Blender-224, Blender-256, and Blender-512).
+In Bradbury’s official NIST C/C++ reference implementation [1], the Blender-384 (m = 6)
+initialization loop loads five 64-bit words and leaves W5IV = 0 rather than loading a sixth table
+entry (whereas Blender-224 copies eight entries from an 18-word table whose first seven entries
+match SHA-224, leaving the eighth slot unused). All structural theorems, closed-form SFS
+generators, out-degree laws, and preimage bounds in this paper hold identically under both the
+written specification IVs and the official C reference IVs. All concrete digests and test witnesses
+are verified directly against the unmodified NIST C reference.
+
+2.3    Compression Round and Carry Coupling
+Message bytes are absorbed in little-endian w-bit fragments fk = b−1              8j ∈ {0, 1}w .
+                                                                 P
+                                                                   j=0 bytebk+j 2
+For each absorbed fragment fk during message, prefix-pad, and length absorption (prior to the
+checksum words), the running checksums update via
+
+                     C1 ← (C1 + fk ) mod 2w ,         C2 ← (C2 + ¬fk ) mod 2w .                     (1)
+
+After L absorbed fragments, the two checksums satisfy C1 + C2 ≡ L (2w − 1) ≡ −L (mod 2w ).
+For any two messages of equal fragment count L, we therefore have C1 (M ) = C1 (M ′ ) if and
+only if C2 (M ) = C2 (M ′ ).
+    In the x2 family (m ∈ {6, 7, 8}, t = 2), one compression round Step(W, c1 , c2 , fk ) computes
+two (w + 1)-bit integer sums over Z:
+
+  s2 = ror8 (fk ) ⊕ W0 + ror8 (W2 ) ⊕ W4 + c2 , T̂2 = s2 mod 2w , c′2 = ⌊s2 /2w ⌋ ∈ {0, 1}, (2)
+                                          
+
+                                                   T̂1 = s1 mod 2w , c′1 = ⌊s1 /2w ⌋ ∈ {0, 1}. (3)
+                                    
+  s1 = fk ⊕ W5 + rol8 (W3 ) ⊕ W1 + c1 ,
+
+The carry pair (c′1 , c′2 ) produced by (2)–(3) selects a joint rotation amount r(c′1 , c′2 ) and forms
+the rotated masks (T1 , T2 ) according to
+                                       
+                                                 ′   ′
+                                       8, if (c1 , c2 ) = (0, 0),
+                                       
+     r(c′1 , c′2 ) = 8 − (c′1 + c′2 ) = 7, if c′1 ⊕ c′2 = 1,       T1 = rolr (T̂1 ), T2 = rorr (T̂2 ).
+                                       
+                                                ′   ′
+                                        6, if (c1 , c2 ) = (1, 1),
+
+
+
+                                                  6
+Denoting (M0 , M1 ) = (T2 , T1 ) (and generally M0 , . . . , Mt−1 in the xt family), the working words
+shift cyclically by one position with alternating mask injection and a ror7 wrap-around on W0 :
+
+        Wi′ = Wi+1 ⊕ Mi mod t     (0 ≤ i ≤ m − 2),        ′
+                                                         Wm−1 = ror7 (W0 ) ⊕ M(m−1) mod t .        (4)
+
+Immediately after updating W ← W ′ and (c1 , c2 ) ← (c′1 , c′2 ), each accumulator word updates
+modulo 2w :
+                     Sum[i] ← (Sum[i] + Wi′ ) mod 2w         (0 ≤ i < m).
+
+2.4   Prefix Repetition, Checksums, and Finalization
+Given an ℓ-byte message M with 16-fragment block byte-size Bblk = 16b (64 B for w = 32;
+128 B for w = 64) and an ℓL -byte little-endian bit-length encoding L(8ℓ) (ℓL ≥ 1 minimal
+byte width of 8ℓ), finalization proceeds in three deterministic stages before output extraction
+(Figure 1):
+ 1. Cyclic 13-Byte Prefix Padding and Block Alignment: Let F [0 . . . flen − 1] store the
+    first flen = min(ℓ, 13) bytes of M (or 13 zero bytes if ℓ = 0). Blender appends k ≥ 1 cyclic
+    prefix bytes F [i mod flen ] (0 ≤ i < k), where k is the smallest positive integer such that
+    ℓ + k + (ℓL + 1) + 2b is at least 2Bblk (32 compression rounds) and is an exact multiple of
+    Bblk (16 fragments). In particular, k = (2Bblk − 2b − 1) − ℓ − ℓL when ℓ + ℓL + 2b + 1 < 2Bblk
+    (replaying all of F ), and k = Bblk − ((ℓ + ℓL + 2b + 1) mod Bblk ) ∈ {1, . . . , Bblk } otherwise
+    (replaying only the first min(k, flen ) bytes when k < 13).
+
+ 2. Bit-Length Encoding: Immediately after the k cyclic prefix-pad bytes, Blender appends
+    the ℓL -byte little-endian bit-length 8ℓ followed by the 1-byte descriptor ℓL . This aligns the
+    byte stream to an exact b-byte word boundary and updates C1 , C2 , W , and Sum on every
+    absorbed fragment.
+
+ 3. Dual Checksum Absorption and Digest Extraction: Two final compression rounds
+    are executed with message-word inputs f = ¬C1 and f = C2 (accumulating the updated W ′
+    into Sum). Immediately thereafter, (W, c1 , c2 ) is discarded and Sum[0 . . . m − 1] is serialized
+    in big-endian byte order.
+
+
+3     Subspace Collapse and Closed-Walk Collisions
+Our first collision attack targets the macro-structure of the working-state transition graph.
+Suppose two distinct messages M1 ̸= M2 of equal byte length ℓ ≥ 13 share the same 13-
+byte prefix. If both messages arrive at the end of message absorption with identical working
+states (W, c1 , c2 ), identical accumulators Sum, and identical checksums (C1 , C2 ), then all three
+finalization stages receive identical inputs and states. This guarantees an exact full-digest
+collision.
+
+3.1   Shifted Clean Subspace Collapse
+On Blender-256, a full working state (W, c1 , c2 ) has 8 × 32 + 2 = 258 bits, placing naive cycle
+search at 2129 steps. Consider instead the m − t stride-t XOR difference variables:
+
+                       Xi := Wi ⊕ Wi+t ∈ {0, 1}w ,        0 ≤ i ≤ m − t − 1.
+
+Because indices i and i + t receive the exact same mask Mi mod t in (4), the non-linear ARX
+masks cancel identically across the first m − t − 1 difference coordinates for every fragment fk :
+
+        Xi′ = (Wi+1 ⊕ Mi mod t ) ⊕ (Wi+t+1 ⊕ Mi mod t ) = Xi+1         (0 ≤ i ≤ m − t − 2).        (5)
+
+                                                  7
+   (a) Single-Step x2-Family ARX Compression Circuit Step(W, c1 , c2 , fk ) and Write-Only Accumulator
+                                  W0                 c2
+                                                                                           T̂2                            T2 = M0
+                      ror8         +                 ⊞                                                       rorr
+                                                          c′2
+                             ror8 (W2 ) ⊕ W4                                                                    r
+                                                                          Carry Selector
+      fk
+                                                                            r = 8 − c′1 − c′2
+                             rol8 (W3 ) ⊕ W1                                                                    r
+                                                          c′1
+    w-bit LE
+                                   +                 ⊞                                                       rolr
+                                                                                           T̂1                            T1 = M1
+                                  W5                 c1
+
+
+                                                                                                                        M(m−1) mod 2
+                  +                    +                        +                      +                            +
+
+
+                W0                     W1                  W2                         W3            ···         Wm−1
+
+                                                                                                     ror7
+
+                  ⊞                     ⊞                       ⊞                      ⊞                            ⊞
+
+
+               Sum[0]                Sum[1]               Sum[2]                     Sum[3]         ···        Sum[m−1]
+
+
+
+   (b) Post-Message Block-Aligned Prefix Padding, Dual Checksums, and Working-State Discard
+
+
+                                                                                                                         ⊗ Discard (W, c1,2 )
+     Message M                    Prefix Pad                    Bit Length                       Checksums
+        ℓ bytes                    F [0 . . . k−1]                  L(8ℓ) ∥ ℓL                    ¬C1 , C2
+                                                                                                                          Sum → Digestn
+
+
+
+Figure 1: Cryptographic circuit of the x2-family Blender hash function (m ∈ {6, 7, 8}, t = 2,
+where M(m−1) mod 2 is T1 for even m and T2 for odd m). (a) Each step updates (W, c1 , c2 ) via
+two carry-coupled modular additions and accumulates Wi′ into Sum[i] (mod 2w ). (b) Final-
+ization pads with k cyclic 13-byte prefix bytes (enforcing ≥ 32 total rounds and 16-fragment
+block alignment), appends L(8ℓ)∥ℓL , and absorbs ¬C1 and C2 before discarding (W, c1 , c2 ) and
+outputting Sum in big-endian order.
+
+
+Meanwhile, the boundary coordinate i = m − t − 1 satisfies
+       ′
+      Xm−t−1 = Wm−t ⊕ ror7 (W0 ) ⊕ M(m−t−1) mod t ⊕ M(m−1) mod t = Wm−t ⊕ ror7 (W0 ).                                                           (6)
+
+Now write m = qt + ρ with 0 ≤ ρ < t. Iterating Wj = Wj+t ⊕ Xj from j = 0 in steps of t yields
+Wqt = W0 ⊕ q−1
+           L
+             j=0 Xjt . Comparing qt with m − t = (q − 1)t + ρ gives our first general structural
+theorem.
+
+Theorem 1 (Shifted Clean Subspace Divisibility Criterion). Fix any constant word x ∈ {0, 1}w ,
+and say that a step is x-clean if the absorbed fragment fk steers W0′ ∈ {x, ¬x}. Once W0 ∈
+{x, ¬x}, the self-XOR quantity
+
+                                               κ(x) := W0 ⊕ ror7 (W0 ) = x ⊕ ror7 (x)                                                           (7)
+
+is invariant across both choices W0 = x and W0 = ¬x because ¬x ⊕ ror7 (¬x) = (x ⊕ 1) ⊕
+ror7 (x) ⊕ 1 = x ⊕ ror7 (x). Under consecutive x-clean transitions, two regimes arise:
+
+  1. Exact Collapse when t | m (ρ = 0): Here m − t = (q − 1)t, so Wm−t = W0 ⊕ q−2
+                                                                                       L
+                                                                                        j=0 Xjt .
+      Equation (6) then closes into the purely affine, message-independent recurrence
+                                                                                                                         q−2
+                                                                                                                         M
+                             Xi′ = Xi+1         (0 ≤ i ≤ m − t − 2),                              ′
+                                                                                                 Xm−t−1 = κ(x) ⊕               Xjt .            (8)
+                                                                                                                         j=0
+
+
+                                                                                 8
+      Over F2 [Z], the linear companion operator of (8) has characteristic polynomial (Z m +
+      1)/(Z t + 1), which divides Z m + 1. Thus, the trajectory of X (r) is strictly periodic with
+      period dividing m (P = 8 for m = 8, t = 2; P = 6 for m = 6, t = 2; P = 9 for m = 9, t = 3).
+      At each phase ϕ ∈ ZP , this collapses the (mw+t)-bit working state to an invariant manifold
+       (ϕ)
+      Cx of dimension
+                                 dimbits Cx(ϕ) = 1 + (t − 1)w + t bits,
+                                              
+
+      parameterized solely by the complement bit e ∈ {0, 1} (W0 = x ⊕ e1), the unconstrained
+      base lanes (W1 , . . . , Wt−1 ) ∈ ({0, 1}w )t−1 , and the t carry bits.
+
+   2. Obstruction when t ∤ m (ρ ̸= 0): Here m − t ≡ ρ ̸≡ 0 (mod t), so Wm−t = Wρ ⊕
+       Lq−2                                                                                    ′
+          j=0 Xρ+jt . This injects the unconstrained lane Wρ (ρ ∈ {1, . . . , t − 1}) into Xm−t−1 at
+       every step and prevents message-independent subspace closure.
+
+Proof. Equations (5)–(8) follow directly by substituting Wm−t = W0 ⊕ q−2
+                                                                                 L
+                                                                                    j=0 Xjt when ρ = 0,
+where W0 ⊕ ror7 (W0 ) = κ(x) by (7). Let A denote the (m − t) × (m − t) companion matrix
+of (8), and let em−t−1 denote the final standard basis vector. Applying A to standard basis
+polynomials yields the characteristic polynomial 1+Z t +Z 2t +· · ·+Z (q−1)t = (Z qt +1)/(Z t +1) =
+(Z m + 1)/(Z t + 1) over F2 , so Am = I. Summing the affine offset κ(x) around one m-step
+cycle contributes (1 + A + · · · + Am−1 )em−t−1 κ(x) = 0 over F2 whenever q = m/t is even
+(m = 8, t = 2). The same sum also vanishes via period-6 cancellation on m = 6, t = 2, since
+(Z 6 +1)/(Z 2 +1) = Z 4 +Z 2 +1 divides Z 6 +1 and 1+A+· · ·+A5 = 0. Once X (r) is fixed by phase
+                                                                                             (ϕ)
+ϕ = r mod P , every Wi (0 ≤ i < m) is uniquely reconstructed as Wi = Wi mod t ⊕ Di , where
+   (ϕ)
+Di is a deterministic XOR sum of components of X (ϕ) . This leaves 1 bit for W0 ∈ {x, ¬x},
+(t − 1)w bits for (W1 , . . . , Wt−1 ), and t bits for the carries. When ρ ̸= 0 (such as m = 7, t = 2 in
+Blender-224, and m = 10, t = 3), Wρ varies freely with Mρ at every step, so Xm−t−1       ′       depends
+on all subsequent message fragments.
+
+    Across the 15 parameterizations in Bradbury’s specification, Theorem 1 partitions the family
+into 9 collapsible instances (n ∈ {96, 128, 144, 192, 256, 288, 384, 512, 576}) and 6 obstructed
+instances (n ∈ {112, 160, 224, 320, 448, 640}). In particular, for Blender-256 (w = 32, m = 8, t =
+2), each phase ϕ ∈ Z8 has 1 + 32 + 2 = 35 free bits. The full 8-phase invariant clean graph
+              (ϕ)
+Cx = 7ϕ=0 Cx therefore contains 8 × 235 = 238 states, compared to 2258 unrestricted states (a
+       F
+
+2220 -fold reduction). Similarly, Blender-384 (m = 6, P = 6) and Blender-512 (m = 8, P = 8)
+collapse from 386 and 514 bits to 6 × 267 = 269.58 and 8 × 267 = 270 clean states, respectively.
+On Blender-512, the subspace can be reduced further to 2 × 267 = 268 states by first steering
+X into its period-2 eigenspace ker(Z 2 + 1).
+
+3.2     The Parity Obstruction Theorem
+Whereas Klı́ma [9] zeroed only one mask per step (T2 = 0 then T1 = 0, leaving a 130-bit state
+across 256-round macro-steps), Theorem 1 locks all six differences X0 , . . . , X5 at every step
+(238 states). One might ask whether the remaining phase factor P = 8 on Blender-256 can be
+eliminated by steering the state into the unshifted zero-chain fixed point X = (0, 0, 0, 0, 0, 0),
+where W0 = W2 = W4 = W6 and W1 = W3 = W5 = W7 . Such a fixed point would cut
+the subspace by another factor of 8 to 235 states. However, this fixed point is mathematically
+unreachable from the standard Blender-256 IV for any message sequence, even using unrestricted
+message words.
+
+Theorem 2 (Word-Parity Obstruction on Blender-256). For any state W ∈ ({0, 1}32 )8 , define
+the 6-bit chain-parity vector p(W ) := (par(X0 ), . . . , par(X5 )) ∈ F62 , where Xi = Wi ⊕ Wi+2 .
+Under arbitrary message fragments fk ∈ {0, 1}32 and arbitrary carries (c1 , c2 ), the following
+properties hold:
+
+                                                   9
+  1. The parity vector p(W ′ ) = Φ p(W ) evolves strictly linearly and independently of the message,
+     where Φ(p0 , p1 , p2 , p3 , p4 , p5 ) = (p1 , p2 , p3 , p4 , p5 , p0 ⊕ p2 ⊕ p4 ).
+
+  2. On the standard Blender-256 initial state W IV , we have p(W IV ) = (1, 0, 1, 0, 0, 1) ̸= 0. Its
+     orbit {Φr p(W IV )}r≥0 consists of 8 pairwise-distinct non-zero vectors in F62 satisfying the
+     permanent invariants p4 = p0 ⊕ 1 and p5 = p1 ⊕ 1 at every step r ≥ 0.
+
+Therefore, no message of any length can reach X = 0 (or even W0 = W2 = W4 = W6 ) from
+W IV , and the minimal clean-subspace period from W IV is strictly P = 8.
+
+Proof. Since cyclic rotation permutes bit positions, par(ror7 (W0 )) = par(W0 ). Thus par(W0 ⊕
+ror7 (W0 )) = par(W0 ) ⊕ par(ror7 (W0 )) = 0 holds identically for every W0 ∈ {0, 1}32 without
+assuming W0 ∈ {x, ¬x}. Applying par(·) to (5) and (6) for m = 8, t = 2 gives par(Xi′ ) =
+par(Xi+1 ) for 0 ≤ i ≤ 4, and
+
+    par(X5′ ) = par W6 ⊕ ror7 (W0 ) = par W0 ⊕ X0 ⊕ X2 ⊕ X4 ⊕ ror7 (W0 ) = p0 ⊕ p2 ⊕ p4 .
+                                                                          
+
+
+From the initial state W IV of Blender-256, direct bit-popcount modulo 2 gives par(W0..7                     IV ) =
+                                        IV                                               6
+(0, 1, 1, 1, 0, 1, 0, 0), whence p(W ) = (1, 0, 1, 0, 0, 1). For any vector p ∈ F2 satisfying p4 = p0 ⊕1
+and p5 = p1 ⊕ 1, its image p′ = Φ(p) satisfies p′4 = p5 = p1 ⊕ 1 = p′0 ⊕ 1. Similarly, the last coor-
+dinate satisfies p′5 = p0 ⊕ p2 ⊕ p4 = p0 ⊕ p2 ⊕ (p0 ⊕ 1) = p2 ⊕ 1 = p′1 ⊕ 1. Because p(W IV ) satisfies
+(p4 , p5 ) = (0, 1) = (p0 ⊕1, p1 ⊕1), induction guarantees (p4 , p5 ) = (p0 ⊕1, p1 ⊕1) at every step r ≥
+0. This invariant excludes (0, 0, 0, 0, 0, 0) because (p0 , p1 ) = (0, 0) forces (p4 , p5 ) = (1, 1). Iterat-
+ing Φ produces the 8-cycle (1, 0, 1, 0, 0, 1) → (0, 1, 0, 0, 1, 0) → (1, 0, 0, 1, 0, 1) → (0, 0, 1, 0, 1, 1) →
+(0, 1, 0, 1, 1, 0) → (1, 0, 1, 1, 0, 1) → (0, 1, 1, 0, 1, 0) → (1, 1, 0, 1, 0, 0) → (1, 0, 1, 0, 0, 1) of 8 distinct
+non-zero vectors.
+
+3.3     Supercritical Out-Degree and Overlapping Cycle Swap
+Having established that Cx has period P = 8 and size 238 on Blender-256, we count the number
+deg+ (s) of valid x-clean outgoing edges leaving a state s = (W, c1 , c2 ) ∈ Cx . To achieve W0′ =
+W1 ⊕T2 = y for a target y ∈ {x, ¬x}, we require T2 = W1 ⊕y. Since T2 = rorr (T̂2 ) depends on the
+                                                                                  (r)
+post-addition rotation r ∈ {6, 7, 8}, there are three candidate unrotated sums T̂2 = rolr (W1 ⊕y)
+for r ∈ {6, 7, 8}. Defining K2 = ror8 (W2 ) ⊕ W4 , (2) uniquely determines a candidate message
+fragment for each pair (y, r) ∈ {x, ¬x} × {6, 7, 8}:
+                                                                            
+                    f (y,r) = rol8 (rolr (W1 ⊕ y) − K2 − c2 ) mod 2w ⊕ W0 .
+                                                                     
+
+
+Candidate f (y,r) is valid if and only if running Step(W, c1 , c2 , f (y,r) ) produces carry pair (c′1 , c′2 )
+whose selected rotation 8 − (c′1 + c′2 ) equals the guessed r.
+
+Proposition 3 (Exact Supercritical Mean Out-Degree). For uniformly distributed clean states
+in Cx (with w ≥ 16), the expected number of valid x-clean outgoing transitions across (y, r) ∈
+{x, ¬x} × {6, 7, 8} is
+                                                
+                                         1 1 1
+                           +
+                      E[deg (s)] = 2 ×    + +      = 2.000 (1 + O(2−w )).
+                                         4 2 4
+
+If at most one valid rotation r is retained per target y ∈ {x, ¬x}, the resulting binary-branching
+subgraph has mean out-degree 1.57–1.61 > 1 (supercritical). Conversely, restricting carries to
+c1 = c2 = 0 (r = 8 only) collapses the mean out-degree below 0.64 < 1, causing search trees to
+die out within O(1) steps.
+
+
+
+
+                                                        10
+     (a) Stride-2 Mask Cancellation and 38-Bit Clean Subspace (m = 8, t = 2)
+
+       T2 broadcast (X0 , X2 , X4 )                                 T1 broadcast (X1 , X3 , X5 )
+                                                                                                               Full Trunk
+                                                                                                         258 bits (2129 birthday)
+
+
+
+          W0          W1        W2         W3           W4       W5         W6          W7
+        {x, ¬x}                W0 ⊕X0     W1 ⊕X1       W2 ⊕X2   W3 ⊕X3     W4 ⊕X4      W5 ⊕X5            Alternating Mask [9]
+                   free 32b
+                                                                                                           130 bits (P =256)
+
+
+
+                   X0          X1          X2           X3          X4          X5                        Clean Subspace Cx
+                                                                                                        38 bits (P =8, E[deg+ ]=2)
+       Period-8 recurrence: Xi′ = Xi+1 ,    X5′ = κ(x) ⊕ X0 ⊕ X2 ⊕ X4
+
+
+     (b) Overlapping-Cycle Walk Swap (M1 ̸= M2 )
+
+                           Cycle 1: sb1 = sa1
+                                                                             M1 :    P (≥ 13 B)     U (s∗ → s∗ )         V (s∗ → s∗ )
+
+
+
+       IV           sa 1            s∗          sb 1         sb 2            M2 :    P (≥ 13 B)    V (s∗ → s∗ )         U (s∗ → s∗ )
+             8 w
+
+
+                                                                                        ∆(W, c1,2 ) = 0, ∆C1,2 = 0, ∆Sum = 0
+                                         Cycle 2: sb2 = s∗
+
+
+
+
+Figure 2: Shifted clean-subspace collision mechanism on Blender-256. (a) Constraining W0′ ∈
+{x, ¬x} cancels (T2 , T1 ) across all six stride-2 differences X0 , . . . , X5 simultaneously, collapsing
+Klı́ma’s 130-bit alternating state to the 38-bit period-8 clean graph Cx . (b) Re-rooting any two
+overlapping ancestor back-edges along a single DFS stack yields commuting closed walks U ̸= V
+at s∗ that collide on the full state and digest.
+
+                                                                                                                  (r)
+Proof. Fix y ∈ {x, ¬x} and r ∈ {6, 7, 8}. In (2), α2 = ror8 (f (y,r) )⊕W0 = (T̂2 −K2 −c2 ) mod 2w .
+                               (r)
+For uniform (W1 , c1 , c2 ), T̂2 and K2 behave as independent uniform w-bit integers. When c2 =
+             (r)                                                                                   (r)
+0, c′2 = 1[T̂2 < K2 ] has mean (2w − 1)/(2 · 2w ) = 21 − 2−w−1 . When c2 = 1, c′2 = 1[T̂2 ≤ K2 ]
+has mean 21 + 2−w−1 . Averaging over c2 ∈ {0, 1} gives Pr[c′2 = 1] = 12 exactly. Meanwhile, f (y,r)
+enters adder 1 XORed with W5 and added to rol8 (W3 )⊕W1 +c1 , yielding Pr[c′1 = 1] = 21 +O(2−w )
+independently of c′2 . Hence (c′1 , c′2 ) hits (1, 1) (r = 6) with probability 14 , (0, 1) or (1, 0) (r = 7)
+with probability 21 , and (0, 0) (r = 8) with probability 14 . These probabilities sum to 14 + 21 + 14 = 1
+per target y ∈ {x, ¬x}, and to 2 × 1 = 2 over both targets.
+
+
+Single-Stage Overlapping Cycle-Swap Construction. Starting from W IV , we use an
+eight-word entry prefix with W0′ ∈ {x, ¬x} at each step to enter Cx . Inside Cx , suppose we find
+two distinct directed closed walks U ̸= V based at the same anchor state s∗ = (W ∗ , c∗1 , c∗2 , ϕ∗ ) ∈
+                                                                                                    U                     V
+Cx after a shared prefix P of byte length at least 13. Because s∗ −
+                                                                  → s∗ and s∗ −
+                                                                              → s∗ both start
+             ∗
+and end at s , three invariants hold simultaneously:
+
+ 1. Both walk lengths satisfy |U | ≡ |V | ≡ 0 (mod 8). Because (|U | + |V |) − (|V | + |U |) = 0, the
+    swapped messages M1 = P ∥U ∥V and M2 = P ∥V ∥U have identical byte length, identical
+    13-byte prefix, and identical 16-fragment block alignment.
+
+ 2. Every word of U and V appears once in M1 and once in M2 , so C1 (M1 ) = C1 (M2 ) and
+    C2 (M1 ) = C2 (M2 ) hold identically by commutativity of (Z/2w Z, +).
+
+ 3. Both M1 and M2 leave the working state at s∗ . Meanwhile, during U and V the accumulator
+    Sum undergoes pure modular translations Sum 7→ Sum ⊞ ∆Sum(s∗ , U ) and Sum 7→ Sum ⊞
+
+
+
+
+                                                                      11
+      ∆Sum(s∗ , V ) that commute over (Z/2w Z)m :
+
+                    Sum(M1 ) = Sum(P ) ⊞ ∆Sum(s∗ , U ) ⊞ ∆Sum(s∗ , V )
+                               = Sum(P ) ⊞ ∆Sum(s∗ , V ) ⊞ ∆Sum(s∗ , U ) = Sum(M2 ).
+
+One does not need two sequential birthday stages to make two cycles intersect at a common
+vertex s∗ . Instead, we run a single DFS on Cx that checks whether the current vertex repeats
+an ancestor on the active DFS stack of depth D (Figure 2(b)). Any two ancestor back-edges
+[a1 , b1 ) (sb1 = sa1 ) and [a2 , b2 ) (sb2 = sa2 ) whose intervals overlap (max(a1 , a2 ) < min(b1 , b2 ))
+automatically share every vertex in [max(a1 , a2 ), min(b1 , b2 )). Re-rooting both cycles at s∗ =
+smax(a1 ,a2 ) immediately produces commuting closed walks U ̸= V in expected work O(|Cx |/D)
+               p           p
+when D ≤ |Cx |, or O( |Cx |) = O(219 ) overall. Using 8 threads sharing a short common trunk
+prefix, our pure-C solver finds verified 16,000-byte standard-IV Blender-256 collisions in 0.045 s
+(fast seed) and 0.73 s mean across 10 cold seeds (0.18 s min, 1.42 s max).
+
+3.4    Multicollisions and Higher-Digest Scaling
+Once a single (P, U, V ) tuple at s∗ is found (in under 1 s on Blender-256), we can concatenate r
+copies of U and r copies of V in any balanced arrangement. Each arrangement P ∥W1 ∥ . . . ∥W2r
+chooses Wj ∈ {U, V } with #{j : Wj = U } = r. This yields 2r                r √
+                                                                     r ≈ 4 / πr pairwise-distinct
+messages of identical byte length that all hash to the exact same   Blender-256 digest with zero
+additional search work. In our experiments, we verified all 63 = 20 colliding messages on the
+official C reference at r = 3, and the same witness generates 96           92.4 colliding messages at
+                                                                      
+                                                                    48 ≈ 2
+r = 48.
+    For the 64-bit variants Blender-384 (|Cx | = 6 · 267 ≈ 269.58 ) and Blender-512 (|Cx | = 8 · 267 =
+2 , or 268 on the period-2 chain eigenspace), capping the DFS path length at ℓ words yields
+ 70
+
+overlapping ancestor cycles in Θ(|Cx |/ℓ) evaluations. At a practical message budget of 32 KB
+(ℓ = 212 words), this requires 257.6 rounds on Blender-384 and 256 –258   p rounds on Blender-512
+with O(ℓ) memory. Unrestricted path lengths reach the birthday knee |Cx | ≈ 234.8 and 234 –235
+rounds, improving over the 2192 and 2256 birthday bounds and avoiding Klı́ma’s ≥ 2275 - and
+2340 -word wound messages [9].
+
+
+4     Silent Carry Injection and Short Collisions
+Although the closed-walk subspace attack achieves sub-second collisions on Blender-256, it has
+two structural limitations. First, it requires message lengths of several thousand words to close
+a cycle in Cx . Second, by Theorem 1, it is algebraically obstructed on odd-word Blender-224
+(m = 7, t = 2). We now construct a local two-step ARX differential trail that overcomes both
+barriers simultaneously.
+
+4.1    Silent Carry Injection and Complement Healing
+Following the local perturbation-and-correction paradigm [2], suppose two trajectories agree on
+                              (p) (p)
+the entire state (W (p) , c1 , c2 , Sum(p) ) entering step p. They absorb two distinct word pairs
+                                                                                (p+2) (p+2)
+(wp , wp+1 ) ̸= (wp′ , wp+1
+                        ′   ) at steps p and p + 1, and re-merge on (W (p+2) , c1    , c2   , Sum(p+2) )
+while preserving both modular checksums C1 and C2 .
+
+Step p: Silent Carry Injection. For distinct message words wp ̸= wp′ to produce zero
+difference in W (p+1) (and hence zero difference in Sum(p+1) ), (4) requires ∆W (p+1) = 0 ⇐⇒
+(T1′ , T2′ ) = (T1 , T2 ). If (c′1 , c′2 ) remained equal across both branches, equal rotations r′ = r would
+force T̂1′ = T̂1 , whence wp′ = wp . Thus, the only viable differential transition flips both output
+
+                                                    12
+carries between (0, 0) (rotation r = 8) and (1, 1) (rotation r′ = 6) while compensating the 2-bit
+rotation shift inside the pre-rotation modular sums. Let the state-dependent second addends
+at step p be
+                                (p)           (p)          (p)                           (p)               (p)       (p)
+                K1 = rol8 (W3 ) ⊕ W1                  + c1 ,              K2 = ror8 (W2 ) ⊕ W4                      + c2 .
+                      (p)                             (p)                                                                    (p)
+Put x = wp ⊕ W5             and x′ = wp′ ⊕ W5                in adder 1, and put y = ror8 (wp ) ⊕ W0                               and y ′ =
+                (p)                                                                                                    (p+1)        (p+1)
+ror8 (wp′ )⊕W0 in adder 2, so that x⊕x′ = ∆x and y⊕y ′ = ror8 (∆x ). Requiring (c1 , c2 )=
+(0, 0) on branch M (x + K1 = u < 2w , y + K2 = v < 2w , r = 8) and (1, 1) on branch M ′
+(x′ + K1 = 2w + rol2 (u), y ′ + K2 = 2w + ror2 (v), r′ = 6) yields
+
+             T1 = rol8 (u) = rol6 (rol2 (u)) = T1′ ,                      T2 = ror8 (v) = ror6 (ror2 (v)) = T2′ .
+
+Both W (p+1) and Sum(p+1) therefore remain bit-for-bit identical across the two branches, and
+the entire perturbation is hidden inside the 2-bit carry differential (0, 0) ↔ (1, 1).
+
+Theorem 4 (Step-(p+1) Complement Healing Rigidity). Suppose two executions enter step p+
+1 with identical working words W (p+1) and opposite symmetric carry pairs (c1 , c2 ) = (0, 0)
+on branch M versus (c′1 , c′2 ) = (1, 1) on branch M ′ . Step p + 1 achieves ∆W (p+2) = 0,
+   (p+2) (p+2)
+∆(c1    , c2   ) = (0, 0), and ∆(C1 , C2 ) = (0, 0) if and only if all three conditions hold:
+
+  1. Exact Bitwise-Complement Message Words: The second-step message words satisfy
+      ′
+     wp+1 = ¬wp+1 , so that ∆wp+1 = 2w − 1.
+
+  2. Mid-Point Input Locking and Register Alignment: The active adder inputs equal
+             (p+1)    ′     (p+1)                                         (p+1)          ′
+     (wp+1 ⊕W5     , wp+1 ⊕W5     ) = (2w−1 , 2w−1 −1) and (ror8 (wp+1 )⊕W0     , ror8 (wp+1 )⊕
+        (p+1)                                                                              (p+1)
+     W0     ) = (2w−1 , 2w−1 − 1). This uniquely fixes wp+1 = W5                                    ⊕ 2w−1 and imposes the
+     w-bit register alignment condition
+                                      (p+1)                       (p+1)
+                                 W0           = ror8 (W5                  ) ⊕ 2w−1 ⊕ ror8 (2w−1 ),                                          (9)
+                                (p+1)                   (p+1)
+     which simplifies to W0             = ror8 (W5                 ) ⊕ 0x80800000 when w = 32.
+
+  3. Dual Modular Checksum Cancellation: Both C1 and C2 match after step p + 1 if and
+     only if (wp′ − wp ) is odd and the low w − 1 bits of wp+1 satisfy the (w − 1)-bit congruence
+
+                                         2 wp+1 ≡ wp′ − wp − 1                   (mod 2w ).                                             (10)
+
+Proof. Equal next carries (c′′1 , c′′2 ) across both branches force equal rotations r′′ = 8 − (c′′1 + c′′2 ).
+Requiring ∆W (p+2) = 0 then forces equal unrotated sums T̂1′′ , T̂2′′ and equal carries (c′′1 , c′′2 ), so
+                                                                                           (p+1)
+the exact integer sums over Z in both adders must match. Let A = wp+1 ⊕ W5                       , A′ =
+  ′        (p+1)                              (p+1)                            (p+1)
+wp+1 ⊕ W5         , D = ror8 (wp+1 ) ⊕ W0           , and D′ = ror8 (wp+1
+                                                                      ′   ) ⊕ W0     . Integer equality
+against (c1 , c2 ) = (0, 0) versus (c1 , c2 ) = (1, 1) requires A − A = 1 and D − D′ = 1 over Z,
+                                         ′  ′                           ′
+
+while bitwise XOR satisfies D ⊕ D′ = ror8 (A ⊕ A′ ) = ror8 (∆wp+1 ). Subtracting 1 from A in
+binary flips a contiguous low-bit suffix of length k ≥ 1 (A ⊕ A′ = 2k − 1). For 1 ≤ k ≤ w and
+w ≥ 16, the mask 2k − 1 is invariant under ror8 if and only if k = w. Thus A ⊕ A′ = D ⊕ D′ =
+2w − 1, which uniquely forces (A, A′ ) = (D, D′ ) = (2w−1 , 2w−1 − 1). Hence wp+1        ′   = ¬wp+1 ,
+             (p+1)
+wp+1 = W5         ⊕ 2w−1 , and substituting wp+1 into D = 2w−1 gives (9). Conversely, for any
+state addends B1 , B2 ∈ {0, . . . , 2w − 1}, 2w−1 + Bi + 0 = (2w−1 − 1) + Bi + 1 holds identically
+over Z, producing identical (T̂1′′ , T̂2′′ ) and identical (c′′1 , c′′2 ). Finally, by (1), equal length reduces
+∆(C1 , C2 ) = (0, 0) to wp + wp+1 ≡ wp′ + (2w − 1 − wp+1 ) (mod 2w ). This rearranges to (10),
+                                                                                                (p+1)
+requires wp′ − wp odd, and fixes the low w − 1 bits of wp+1 and W5                                      .
+
+                                                                   13
+4.2    Healing Probability Across Word Counts
+Every equation in Section 4.1 and Theorem 4 at steps p and p + 1 accesses only working
+words W0 , W1 , W2 , W3 , W4 , W5 and carries (c1 , c2 ), without touching W6 , . . . , Wm−1 . Therefore,
+the local two-step silent-carry healing mechanism applies identically to every x2-family variant
+m ∈ {6, 7, 8}, bypassing the t ∤ m obstruction on 7-word Blender-224.
+                                                                                              (p) (p)
+    We now compute the exact probability that a random reachable state (W (p) , c1 , c2 ) at
+w = 32 admits an unordered colliding pair {(wp , wp+1 ), (wp′ , wp+1 ′   )}. In a single 32-bit adder,
+x + K1 = u < 2 and x + K1 = 2 + rol2 (u) hold if and only if d1 = x′ − x > 0 satisfies
+                  32       ′           32
+
+d1 = 232 + rol2 (u) − u. Writing u = 230 q + r (q ∈ {0, 1, 2, 3}, 0 ≤ r < 230 ) gives rol2 (u) − u =
+3r − (232 − 1)q, so d1 ≡ 0 (mod 3). Summing exact valid ranges over q ∈ {0, 1, 2, 3} with
+M = (230 − 1)/3 gives the single-adder validity ratio
+                       N1    21M 2 + 9M                             7
+                        64
+                           =        64
+                                           = 0.145833333236 · · · ≈    = 2−2.7776 .
+                       2          2                                 48
+Across both adders simultaneously (coupled by y ⊕ y ′ = ror8 (x ⊕ x′ )), independent XOR align-
+ment predicts (7/48)2 = 2−5.555 unordered silent step-p pairs per state. Requiring wp′ − wp odd
+( 21 ), the 32-bit alignment (9) (2−32 ), and the 31-bit checksum congruence (10) (2−31 ) yields the
+analytical prediction
+                                                       7 2 −1 −32 −31
+                                                                                   = 2−69.555 ,
+          
+        E #unordered valid healing pairs per state =            ·2 ·2     ·2                    (11)
+                                                           48
+corresponding to 2−68.555 ordered transitions (since swapping (M, M ′ ) and (M ′ , M ) represents
+the same colliding pair). Across 107 -state parallel Monte Carlo audits using a complete 6-step
+algebraic contraction cross-checked against exact bit-level DFS, we measure 2−69.558±0.004 on
+7-word Blender-224 and 2−69.579±0.005 on 8-word Blender-256, matching (11). Because each
+random reachable state yields an unordered colliding pair with probability 2−69.558 , this two-
+step trail breaks standard-IV Blender-224 in 269.56 state evaluations (≪ 2112 birthday bound)
+using 24-byte (6-word) messages.
+
+4.3    Closed-Form Semi-Free-Start Collisions
+Before inverting from the fixed standard IV, we characterize semi-free-start (SFS) collisions, in
+which the attacker selects an initial working register W (0) ∈ ({0, 1}w )m (keeping standard initial
+         (0)   (0)
+carries c1 = c2 = 0 and Sum(0) = 0) and distinct messages M1 ̸= M2 .
+
+Provable 1-Round Prefix Minimum and Prefix-Pad Truncation. With p = 0 shared
+prefix words, the active pair (w0 , w1 ) ̸= (w0′ , w1′ ) occupies bytes 0 . . . 2b − 1. Even k = 1
+cyclic prefix-pad byte during finalization then replays differing message bytes without healing
+                   (0)   (0)
+alignment, while c1 = c2 = 0 precludes borrow absorption. Instead, take p = 1 shared prefix
+word w0 (b bytes) followed by active words (w1 , w2 ) ̸= (w1′ , w2′ ). We pad with trailing zero bytes
+up to ℓ = 113 bytes for w = 32 (Bblk = 64, ℓL = 2, 2b = 8) or ℓ = 229 bytes for w = 64
+(Bblk = 128, ℓL = 2, 2b = 16). The cyclic prefix-pad count then equals
+k32 = 64 − ((113 + 2 + 8 + 1) mod 64) = 4 B,         k64 = 128 − ((229 + 2 + 16 + 1) mod 128) = 8 B.
+Thus k = b bytes exactly, so finalization replays only the single shared prefix word w0 =
+F [0 . . . b − 1] and never touches (w1 , w2 ).
+                                                                                                   (0)
+Theorem 5 (Deterministic O(1) Closed-Form SFS Across All Four NIST Variants). Fix c1 =
+ (0)
+c2 = 0. Across all four official NIST Blender instances (Blender-224, Blender-256, Blender-
+384, and Blender-512), valid SFS colliding triples (W (0) , M1 , M2 ) of length 113 B (w = 32) and
+229 B (w = 64) can be generated in deterministic O(1) closed form with zero trial loops and
+zero retries:
+
+                                                   14
+  1. Even 8-Word Variants (m = 8: Blender-256 and Blender-512): Choosing x′ =
+     y ′ = 0 and 2w − x = 3 fixes constant step-1 masks (T1 , T2 ) and step-1 state targets
+         (1) (1)  (1)  (1)             (1)
+     W0 , W1 , W3 , W6 for any seed W5 ∈ {0, 1}w . Setting prefix-round mask t1 = 0 leaves
+         (1) (1)  (1)
+     W2 , W4 , W7 unconstrained, solving the single prefix round by direct substitution.
+
+  2. Odd 7-Word Variant (m = 7: Blender-224): Because m = 7 lacks W7 and wraps via
+         (1)            (0)
+     W6 = ror7 (W0 ) ⊕ t2 , setting t1 = 0 overconstrains the prefix round. Instead, choosing
+                              (1)               (1)
+     t1 (t2 ) = rol16 (rol7 (W6 ⊕ t2 ) ⊕ ror8 (W4 ⊕ t2 )) annihilates the first summand of prefix
+                               (0)
+     adder 2 (ror8 (w0 ) ⊕ W0 = 0). This eliminates all integer addition carries and reduces the
+     remaining consistency condition to the carry-free F2 -circulant equation
+
+           M224 (X) t2 (X) = R(X)      (mod X 32 + 1),        M224 (X) = X 15 (1 + X + X 8 ).        (12)
+
+      Since M224 (1) = 3 ≡ 1 (mod 2) has odd weight and (X 32 +1) = (X +1)32 over F2 , M224 (X)
+      is an exact bijection on F2 [X]/(X 32 + 1), inverted in 5 XOR-shift squaring steps for every
+                     (1)
+      32-bit seed W5 .
+                                                                              (1)         (1)
+  3. Short 6-Word Variant (m = 6: Blender-384): Here both W6 and W7 are absent
+         (1)           (0)
+     (W5 = ror7 (W0 )⊕t1 ). Choosing sparse ∆x = 0x8000000000000041 and aligning the low
+                (1)
+     byte of W5 so y ′ < 255 decouples ror8 (∆x ) from y ′ without carry interaction. Enforcing
+     the 1-bit parity invariant of (1 + X 41 ) via a deterministic borrow-preserving bit-8 toggle on
+        (1)
+     W5 reduces prefix inversion over F2 [X]/(X 64 +1) to a single 64-bit carryless multiplication
+     by the circulant inverse L384 (X)−1 = 0xbbbbdddeeeef7777.
+
+Proof. In all four constructions, (w1 , w2 ) and (w1′ , w2′ = ¬w2 ) satisfy the step-1 silent carry
+equations (u < 2w , v < 2w versus 2w + rol2 (u), 2w + ror2 (v)) and Theorem 4 at step 2 by
+              (1)        (1)
+choice of (W0 , . . . , W5 ). For m = 8, direct substitution into Step(W (0) , 0, 0, w0 ) yields s1 = 0
+                                                                                                    (0)
+(c′1 = 0), s2 < 2w (c′2 = 0), r = 8, and W (1) . For m = 7, annihilating ror8 (w0 ) ⊕ W0 = 0
+                           (0)      (0)
+sets prefix s2 = ror8 (W2 ) ⊕ W4 < 232 (c′2 = 0), and s1 = rol8 (t1 ) < 232 (c′1 = 0, r = 8).
+Substituting   W (0) in terms of (W (1) , t1 , t2 ) collapses t̂2 = rol8 (t2 ) to (12), where M224 (X)−1 =
+                 2j
+Q4                           32
+    j=0 M224 (X) mod (X +1) as established in Section 2.1. For m = 6, we eliminate t1 modulo
+(1+X 41 ). Since gcd(41, 64) = 1, im(1+X 41 ) is the codimension-1 even-weight hyperplane, which
+                                   (1)
+is matched by toggling bit 8 of W5 (y ′ = · · · 102 ↔ · · · 112 preserves the popcount of t−y ′ ). This
+yields an odd-weight circulant operator L384 (X) with unique inverse 0xbbbbdddeeeef7777 in
+F2 [X]/(X 64 + 1), after which t1 is recovered uniquely along the 64-cycle of stride 41 mod 64.
+
+4.4    Short Standard-IV and Identical-Prefix Collisions
+Table 3 gives a 24-byte collision on Blender-256 under its standard initialization vector W IV .
+
+Solver-Free 4-Round Lane-Invariant and Byte-Lattice Inversion. Feeding a 4-round
+ARX prefix (w0 , w1 , w2 , w3 ) directly to general-purpose SMT solvers fails to scale. In controlled
+benchmarks, Z3 times out (> 90 s) on 7/7 unconstrained and partially constrained 4-round
+instances. Adapting algebraic message modification [18] to Blender’s carry-coupled ARX round,
+we eliminate SAT/SMT solvers by exploiting two algebraic decompositions of 4 consecutive x2-
+                 w0 ,w1     w2 ,w3
+family rounds I −−−−→ S −−−−→ W (4) (Figure 3):
+
+  1. Four-Round Parity-Lane Invariants: Consider 4 rounds from any starting state I,
+     which is either W IV for 24-byte standard-IV collisions or the post-prefix state W (Pip ) af-
+     ter an arbitrary 16-byte shared prefix Pip for 40-byte identical-prefix collisions (as distinct
+
+
+
+                                                   15
+      from two-prefix chosen-prefix collisions [16]). Tracking odd and even register lanes can-
+      cels intermediate masks and yields two 8-bit byte-XOR invariants on the step-4 addends
+      (K1 , K2 ):
+           3
+           M                                             3
+                                                         M
+                                                                                                
+                  bytej K1 ⊕ I5 ⊕ rol8 (I7 ) = 0,              bytej K2 ⊕ ror7 (I0 ) ⊕ ror8 (I6 ) = 0.
+            j=0                                          j=0
+
+                                                                                (4)                      (4)
+      In addition, we obtain im(id ⊕ ror7 ) even-popcount filters on (W5 ⊕ Q ⊕ I1 ) and (W6 ⊕
+                                                                     (4)     (4)        (4)      (4)
+      P ⊕ I2 ), where id denotes the 32-bit identity map, P = W0 ⊕ W2 , and Q = W1 ⊕ W3 .
+      Inverting (id ⊕ ror7 ) along the single 32-cycle of stride 7 mod 32 (gcd(7, 32) = 1) fixes 12
+                                                  w2 ,w3
+      exact 2-round bridge targets (S, e1 , e2 ) −−−−→ (P ∗ , Q∗ ) per outer candidate.
+
+ 2. Two-Round r = 8 Byte-Lattice Nibble Contraction (131,072× Speedup): On the
+                                                                            (2)         (2)        (3)
+    r2 = r3 = 8 branch (c′1 = c′2 = 0 across steps 2 and 3), let ua = T̂1 , va = T̂2 , ub = T̂1 ,
+                 (3)
+    and vb = T̂2 . The target conditions rol8 (ua )⊕ror8 (vb ) = ∆∗P and ror8 (va )⊕rol8 (ub ) = ∆∗Q
+    express (ub , vb ) directly in terms of (va , ua ), while eliminating w3 between step-3 adders
+    couples ua and va byte-by-byte. Splitting each byte of w2 into a 6-bit low slice Lj and a 2-bit
+    top crumb zj (4 × 2 = 8 bits across all four bytes) decouples inter-byte carries. Denoting by
+        (4)
+    rol2 the 2-bit cyclic crumb shift across the 8-bit top-crumb vector znib = (z0 , z1 , z2 , z3 ) ∈
+                                                                  (4)
+    F82 , we obtain the 4-cycle linear nibble equation znib ⊕ rol2 (znib ) = Rnib , which reduces 256
+    guesses to 4. Meanwhile, the four 6-bit low slices Lj lie in independent intervals of width
+    at most 16, shrinking the search space from 232 to 215 operations (131,072× reduction,
+    0.11–0.29 ms per 2-round call in pure C).
+
+
+5     Modular-Sum Steering and Preimage Cryptanalysis
+We now examine first- and second-preimage resistance across the full Blender family. Given
+an arbitrary target digest D∗ = (D0∗ , . . . , Dm−1
+                                                ∗   ) ∈ (Z/2w Z)m (or a second-preimage target
+   ∗
+D = Blender(Morig )), we seek a message M starting from the fixed standard IV whose post-
+finalization accumulator Sum equals D∗ .
+
+5.1     Abelian Accumulator Dynamics and Zero Finalization Cost
+Classical preimage attacks on hash functions with checksums or accumulators chain multi-block
+internal-state collisions [6] and cancel the remaining checksum or accumulator constraints via
+generalized birthday trees [17, 4, 12]. On a binary XOR accumulator, toggling independent
+closed walks yields an F2 -linear system solvable by Gaussian elimination.
+    Applying F2 Gaussian elimination directly to Blender fails because Sum[i] updates via ad-
+dition modulo 2w , where integer carries introduce dense non-linearity over F2 . Across 100
+empirical slot pairs on Blender-256, the second-order XOR derivative Sum(0, 0) ⊕ Sum(1, 0) ⊕
+Sum(0, 1)⊕Sum(1, 1) is non-zero 100% of the time. Over the finite abelian group G = (Z/2w Z)m ,
+however, modular addition is associative and commutative, so the second-order modular deriva-
+tive vanishes identically (100%). Because Blender discards (W, c1 , c2 ) immediately after absorb-
+ing (¬C1 , C2 ), post-message finalization is also transparent to equal-length closed walks.
+
+Proposition 6 (Exact Modular Superposition Without Finalization Inversion). Let M (b) =
+      (b )               (b )
+P0 ∥Z1 1 ∥B1 ∥ . . . ∥ZK K ∥Ssuf (b ∈ {0, 1}K , |P0 | ≥ 13 B) be a family of 2K messages. Each
+                                                                            (0)  (1)
+slot j ∈ {1, . . . , K} selects between two equal-word-length closed walks Zj , Zj based at anchor
+              (0)         (1)                            (1)                  (0)
+state s∗j (ℓ(Zj ) = ℓ(Zj )). Let vj := ∆Sum(s∗j , Zj ) ⊟ ∆Sum(s∗j , Zj ) ∈ (Z/2w Z)m denote the
+
+
+                                                    16
+     (a) Two-Step ARX Differential Trail: Silent Carry Injection (Step p) and Healing (Step p+1)
+                                                       ′                                                          ′
+                Step p: Silent Carry Injection (wp ̸= wp )                            Step p+1: Complement Heal (wp+1 =¬wp+1 )
+
+
+
+                ∆wp
+                                    ror8 (v) = ror6 (ror2 (v))
+                        ⊞                                              ∆W (p+1) =0               Adder 2: ∆T̂2′′ = 0, ∆c′′
+                                                                                                                        2 = 0
+                                            ∆T2 = 0
+                                                                                                                                      t=p+2
+      t=p
+                                                                                                                                      ∆W =0
+     ∆W =0                         Carry (0, 0) ↔ (1, 1)                   ∆c=(1, 1)         Mid-Point Complement Lock                ∆c=0
+      ∆c=0                           r = 8 ↔ r′ = 6
+                                                                                                                                     ∆Sum=0
+     ∆Sum=0
+                                                                                                                                     ∆C1,2 =0
+                                     rol8 (u) = rol6 (rol2 (u))
+                        ⊞                                             ∆Sum(p+1) =0               Adder 1: ∆T̂1′′ = 0, ∆c′′
+                                                                                                                        1 = 0
+                ∆wp                          ∆T1 = 0
+
+
+
+
+     (b) Solver-Free 4-Round Pre-Steering and r = 8 Byte-Lattice Contraction (131,072× Speedup)
+
+                                                                                Word w2 : 4 Bytes × (2-Bit Crumb zj + 6-Bit Slice Lj )
+              w0,1                 w2,3                     w4,5
+       IV            Bridge S             Manifold W (4)           24 B          z3    L3 (6b)   z2   L2 (6b)   z1   L1 (6b)    z0   L0 (6b)
+     or Pip          12 targets            63-bit lock             Coll.
+
+
+
+
+                     4-Round Parity-Lane Filter                                         Top Crumbs (zj )              Low Slices (Lj )
+                (id ⊕ ror7 )−1 → 12 targets (P ∗ , Q∗ )                                 256 → 4 solutions            232 → 215 (0.11 ms)
+
+
+
+
+Figure 3: Two-step local differential trail and solver-free 4-round pre-steering on Blender-256.
+(a) Step p hides a non-zero word difference ∆wp entirely inside (c′1 , c′2 ) = (0, 0) ↔ (1, 1) via
+rotation-sum compensation (∆W (p+1) = ∆Sum(p+1) = 0), and step p + 1 heals both carries and
+                      ′
+both checksums via wp+1   = ¬wp+1 . (b) Splitting each byte of w2 into a 2-bit top crumb zj and
+6-bit low slice Lj decouples inter-byte carries, shrinking each 2-round bridge solve from 232 to
+≈ 215 operations without SAT/SMT solvers.
+
+                                                                       (1)                 (0)
+modular accumulator deposit and δj := C1 (Zj ) − C1 (Zj ) mod 2w denote the word-checksum
+shift of slot j. Then:
+
+  1. Every choice b ∈ {0, 1}K arrives at the end of Ssuf in the exact same working state
+     (Wend , c1,end , c2,end ), with the exact same byte length ℓ and 13-byte prefix F [0 . . . 12].
+
+  2. Whenever K                              w
+                  P
+                      j=1 bj δj ≡ 0 (mod 2 ), both checksums (C1 , C2 ) match M (0) identically. All
+     three finalization stages (cyclic prefix padding, bit-length encoding, and dual checksum
+     rounds) then execute the exact same sequence of working states Wtail and add the same
+     constant offset ∆Sumtail to Sum. The final output digest therefore satisfies the affine iden-
+     tity
+                                                                K
+                                                            X
+                                                                   bj vj (mod 2w )
+                                           
+                             Digest M (b) ≡ Digest M (0) +                                           (13)
+                                                                                           j=1
+
+     without requiring finalization inversion.
+                             (0)                         (1)
+                            Zj                         Zj
+Proof. Because s∗j −−→ s∗j and s∗j −−→ s∗j have equal word length and return to s∗j , induction
+across j = 1, . . . , K shows that (W, c1 , c2 ) and the fragment count at the start of every
+                                                                                          P subse-
+quent segment (and after Ssuf ) are independent of b. Meanwhile, Sum accumulates K          j=1 bj vj
+        w
+                      PK                      w
+(mod 2 ). When j=1 bj δj ≡ 0 (mod 2 ), we have C1 (M (b)) = C1 (M (0)), and equal word
+count gives C2 (M (b)) = C2 (M (0)) by (1). Because all post-message inputs (F , length bytes,
+¬C1 , and C2 ) and the state (Wend , c1,end , c2,end ) entering finalization match those of M (0),
+finalization adds the exact same ∆Sumtail ∈ (Z/2w Z)m to Sum, proving (13).
+
+
+
+                                                                           17
+5.2    Two-Adic Smith Normal Form Subgroup Hierarchy
+Proposition 6 reduces preimage recovery to generating deposits vj ∈ (Z/2w Z)m inside fast clean
+subspaces Cx (Section 3) that span (Z/2w Z)m . Analyzing the generated subgroup H = ⟨vj ⟩ ≤
+(Z/2w Z)m over Z/2w Z via 2-adic Smith Normal Form (SNF) reveals two algebraic obstructions
+in unshifted walks and shows how multi-shifted subspaces overcome them.
+Theorem 7 (Two-Adic Smith Normal Form Subgroup Hierarchy). Let m ∈ {6, 8}, t = 2,
+and w ∈ {32, 64}. For equal-word-length closed walks inside shifted clean subspaces Cx (W0′ ∈
+{x, ¬x}), the deposit subgroup obeys three structural laws:
+  1. Universal (m − 2)-Bit Lane-Parity Invariant: For every shift x ∈ {0, 1}w and every
+     equal-length closed-walk pair (Z (0) , Z (1) ), the deposit v = (v0 , . . . , vm−1 ) ∈ (Z/2w Z)m lies
+     in the index-2m−2 subgroup
+
+      Hpar := v ∈ (Z/2w Z)m : v2k ≡ v0 (mod 2) and v2k+1 ≡ v1 (mod 2) ∀ 1 ≤ k < m/2 .
+               
+
+                                                                                                     (14)
+     The 2-adic Smith Normal Form of Hpar has invariant factors (1, 1, 2, 2, . . . , 2), correspond-
+     ing to 2-adic valuations (0, 0, 1, . . . , 1) and codimension m − 2 bits (6 bits for m = 8, 4 bits
+     for m = 6).
+
+  2. Rank Collapse and Sum[0] Starvation in Unshifted Subspaces (x = 0): In the
+     unshifted zero-chain limit (X (ϕ) = 0), W2k = W0 and W2k+1 = W1 hold identically. This
+     forces v2k = v0 and v2k+1 = v1 (mod 2w ) and collapses the span to 2w bits (codimension
+     (m − 2)w = 192 bits on Blender-256). Even for equal-checksum closed walks (∆C1 ≡ 0
+     (mod 2w )) on the reachable standard-W IV coset of C0 (W0′ ∈ {0, ¬0}) on Blender-256,
+     the 2-adic SNF invariant factors freeze at (1, 1, 2, 2, 4, 4, 8, 8) (index 212 ). Because W0′ ∈
+     {0, −1 mod 2w }, every ℓslot -word slot suffers severe Sum[0] amplitude starvation:
+
+                                             and empirically ≤ ℓslot /8 ≪ 2w−1 .
+                                                                                  
+                       ∆Sum[0] ≤ ℓslot
+
+  3. Exact Saturation of Hpar via Multi-Shifted Clean Subspaces: Along an x-clean
+     step with W0′ = x ⊕ e1 (e ∈ {0, 1}), switching e : 0 7→ 1 deposits (¬x) − x ≡ −(2x + 1)
+     (mod 2w ) into Sum[0]. Because ν2 (−(2x + 1)) = 0, this deposit is an odd 2-adic unit
+     for every x. Chaining slots across at least 4 distinct odd shifts {a0 , . . . , aJ−1 } ⊂ {0, 1}w
+     (W0′ ∈ {aj , ¬aj }) lifts |∆Sum[0]| to full Θ(2w ) scale and collapses the 2-adic SNF invariant
+     factors to (1, 1, 2, 2, . . . , 2), spanning Hpar completely.
+                                          (ϕ)                             (ϕ)                           (ϕ)
+Proof. At phase ϕ, every state in Cx            satisfies W2k = W0 ⊕ D2k and W2k+1 = W1 ⊕ D2k+1
+                  (ϕ)    (ϕ)       (ϕ)
+for constants Di (D0 = D1 = 0). Modulo 2, integer addition and bitwise XOR coincide
+                                        ′ −W′                  ′     (ϕ′ )       ′       (ϕ′ )    ′     ′
+(u + v ≡ u ⊕ v (mod 2)). Thus W2k               2k,alt ≡ (W0 ⊕ D2k ) ⊕ (W0,alt ⊕ D2k ) = W0 ⊕ W0,alt ≡
+   ′        ′
+W0 − W0,alt (mod 2) at every step of two equal-phase walks, and likewise W2k+1 − W2k+1,alt ≡  ′      ′
+
+W1′ −W1,alt
+          ′      (mod 2). Summing over ℓslot steps proves v2k ≡ v0 (mod 2) and v2k+1 ≡ v1 (mod 2),
+establishing H ⊆ Hpar .
+   PWhen       x = 0, we have W0′ ∈ {0, 2w − 1} = {0, −1 mod 2w }, so across ℓslot steps ∆Sum[0] =
+− (e − e(0) ) satisfies |∆Sum[0]| ≤ ℓslot . On W IV , the even-lane generator vectors (−1, −1 −
+         (1)
+     (ϕ)            (ϕ)         (ϕ)
+2D2 , −1 − 2D4 , −1 − 2D6 ) (ϕ ∈ Z8 ) have 2-adic valuations (0, 1, 2, 3). The odd-lane bit-
+                                  (ϕ)                (ϕ)                 (ϕ)
+flip generators (2r , 2r (1 − 2D3,[r] ), 2r (1 − 2D5,[r] ), 2r (1 − 2D7,[r] )) likewise have 2-adic valuations
+(0, 1, 2, 3), giving combined SNF valuations (0, 0, 1, 1, 2, 2, 3, 3) and subgroup index 212 . Replac-
+ing x = 0 by multiple constants aj replaces −1 on lane 0 by −(2aj + 1) mod 2w and replaces
+             (ϕ)              (ϕ)                          (ϕ)
+−1 − 2D2k (0) by (aj ⊕ D2k (aj ) ⊕ 1) − (aj ⊕ D2k (aj )). Across 4 random shifts aj , the 2-adic
+valuations drop to (0, 1, 1, 1) on both even and odd lanes, yielding (0, 0, 1, 1, 1, 1, 1, 1) of index
+26 = |G/Hpar | and proving H = Hpar .
+
+                                                     18
+5.3   Generalized Birthday Steering and Preimage Complexity
+Theorem 7 and Proposition 6 yield two preimage algorithms across Blender-256, Blender-384,
+and Blender-512 (Figure 4 and Table 2):
+
+ 1. Multi-Shifted Reverse-Reachable DAG and Joint (∆C1 , ∆Sum) Wagner k-Tree:
+    Across J = 8 shifted constants a0 , . . . , a7 connected by 1-word unconstrained bridges, we
+    first locate an initial short cycle of length at most L0 at anchor Bj ∈ Caj in O(|C|/L0 )
+    rounds. We then iteratively grow a reverse-reachable DAG [7] of Sdag vertices directed into
+                                                  (0)  (1)
+    Bj , harvesting equal-length slot pairs (Zi , Zi ) in O(|C|/Sdag ) rounds per walk. Next,
+    we test 2m−2 random 1-word suffixes Ssuf (64 trials on Blender-256 and Blender-512, or
+    16 trials on Blender-384) until the target residual t = D∗ ⊟ Digest(M (0)) lies in Hpar
+    from (14). After applying the unimodular basis transformation (v0 , v1 , (v2 − v0 )/2, . . . ) on
+    Hpar and folding (0, −t) into the final leaf list, we embed ∆C1 ∈ Z/2w Z directly as an extra
+    coordinate alongside ∆Sum ∈ Hpar in a group of bit-order B = w + (mw − (m − 2)). We
+    then apply Wagner’s generalized birthday k-tree algorithm [17] with k = 2ℓ lists of size 2s ,
+    where s = B/(ℓ + 1). This tree uses Nslots = k⌈s⌉ binary slots interleaved across anchors
+    i mod 8 and list-merge join operators ▷◁s that cancel s bits at each tree level. Summing slot
+    generation, k-tree merges (2ℓ+s ), and message evaluation (Nslots L0 ) gives the complexities
+    summarized in Table 2:
+
+      • Blender-256 (B = 282 bits, ℓ = 12, L0 = 211 ): Total time 235.93 compressions,
+        single-list size 221.69 , and message length 227.46 words (≈ 738 MB). This improves over
+        Lamberger–Mendel’s 2136 [10] by a factor above 2100 and over Klı́ma’s ≥ 2107.3 message-
+        hashing floor [9] by a factor above 271 .
+      • Blender-384 (B = 444 bits, ℓ = 14, L0 = 220 ): Total time 266.34 , single-list size 229.60 ,
+        and message length 238.91 words, compared to 2200.58 in [10] and ≥ 2171.9 in [9].
+      • Blender-512 (B = 570 bits, ℓ = 14, L0 = 220 ): Total time 267.64 , single-list size 238.00 ,
+        and message length 239.25 words, compared to 2265.00 in [10] and ≥ 2204.3 in [9].
+
+ 2. Low-Memory Fixed-Length 2-Adic Cycle Winding: Adapting fixed-length cycle
+    winding [9] across our 8 shifted anchors, r = m + 3 equal-length slots (Ui , Vi ) (|Ui | = |Vi | ≤
+                                                                                      (2w −1)−mi
+    L0 ) suffice when minimal memory is desired. Formatting slot i as Vimi ∥Ui                      for
+                 w
+    0 ≤ mi < 2 keeps the total byte length invariant for all (m1 , . . . , mr ) while contributing
+    mi (∆Sum(Vi ) ⊟ ∆Sum(Ui )) and mi δi modulo 2w . Solving the resulting (m + 1) × (m + 3)
+    2-adic linear system over Z/2w Z in O(1) arithmetic and hashing the single fixed-length
+    winning message requires time 245.46 with 218 memory on Blender-256, and time 289.17 and
+    289.46 with 234 memory on Blender-384 and Blender-512.
+
+
+
+6     Architectural Diagnosis and Experimental Evaluation
+6.1   Diagnosis of Structural Weaknesses
+Our three attacks trace back to three interacting architectural flaws in Blender’s ARX-plus-
+accumulator design, each pointing to a concrete design principle:
+
+ 1. Uniform Stride-t Mask Broadcasting Across m Lanes: Injecting only t = 2 masks
+    alternately across m ∈ {6, 8} words creates m − t linear mask-free XOR chains Xi =
+    Wi ⊕ Wi+t that close periodically whenever t | m and W0 ∈ {x, ¬x} (Theorem 1). Breaking
+    this symmetry requires either distinct round-dependent rotations per lane or coprime tap
+    schedules coupled with wide non-linear state diffusion.
+
+
+                                                 19
+      (a) Multi-Shifted Closed-Walk Excursions and (Z/2w Z)m Superposition
+
+
+                     Slot 1 (Ca0 )        ∆W =0   Slot 2 (Ca1 )                    Slot K (Ca7 )     Ssuf                         ⊗ Discard
+       IV                                                                                                    Wend , cend
+       P0               (0)  (1)                      (0)  (1)               ···     (0)  (1)                                     (W, c1,2 )
+                      Z 1 , Z1                      Z 2 , Z2                        ZK , ZK                    fixed
+
+
+
+                               b1 (δ1 , v1 )                 b2 (δ2 , v2 )                  bK (δK , vK )     ∆Sumtail
+
+
+      (C1 , Sum)                                                                                                                 Sum ≡ D ∗
+       at M (0)            ⊞                             ⊞                   ···        ⊞                         ⊞
+                                                                                                                                 ∆C1 ≡ 0
+
+
+
+      (b) Two-Adic SNF Subgroup Ladder and Joint (∆C1 , ∆Sum) Generalized Birthday k-Tree
+
+                                                                                   L0          L1                     Lk−2          Lk−1
+               Zero-Chain X=0: span 2w b (unreachable)
+                                                                                   2s          2s
+                                                                                                            ···        2s            2s
+
+
+
+                   Unshifted C0 : SNF (1, 1, 2, 2, 4, 4, 8, 8)                     ▷◁s (−s bits)            ···            ▷◁s (−s bits)
+
+
+
+        Multi-Shifted {Caj }: SNF (1, 1, 2, 2, 2, 2, 2, 2) = Hpar                           Root Join: (∆C1 , ∆Sum) = (0, t)
+
+
+
+
+Figure 4: Multi-shifted closed-walk preimage architecture over (Z/2w Z)m . (a) Equal-length
+                      (0)    (1)
+closed-walk pairs (Zj , Zj ) across 8 shifted clean subspaces re-merge on (W, c1 , c2 ) at every
+anchor so (Wend , cend ) and the post-message padding and checksum rounds add a fixed constant
+∆Sumtail before (W, c1 , c2 ) is discarded. (b) Odd 2-adic units −(2aj + 1) collapse the SNF defect
+to Hpar , and a joint (∆C1 , ∆Sum) Wagner k-tree hits D∗ .
+
+
+ 2. Rotation-Sum Compensation Across Discrete Carry-Selected Rotations: Cou-
+    pling (c′1 , c′2 ) to r = 8 − (c′1 + c′2 ) ∈ {6, 7, 8} allows a 2-bit carry jump (0, 0) ↔ (1, 1)
+    at step p to be canceled inside the pre-rotation sum (rol2 (u) and ror2 (v)) with probabil-
+    ity (7/48)2 ≈ 2−5.56 . That carry difference is then healed deterministically at step p + 1
+    via (2w−1 , 2w−1 − 1) complement inputs (Theorem 4). Mixing carries back into multiple
+    non-aligned bit positions and applying at least 4 rounds of feed-forward state mixing per
+    absorbed message word prevents 2-step local healing.
+
+ 3. Unidirectional Accumulator Without Working-State Feed-Forward at Output:
+    Updating Sum without feeding Sum back into W , and discarding (W, c1 , c2 ) immediately
+    after the checksum rounds, makes finalization an invariant affine translation (Proposition 6).
+    Every closed walk on (W, c1 , c2 ) then acts as an exact abelian translation in (Z/2w Z)m .
+    Bijectively mixing Sum and W during finalization and absorbing step counters into every
+    compression round eliminates commuting closed walks and forces non-linear finalization
+    inversion.
+
+6.2     Experimental Verification and Benchmarks
+All solvers and witnesses were implemented in portable C (POSIX threads) and Python 3 with-
+out external SAT/SMT or third-party library dependencies. Every output witness was verified
+byte-for-byte against Bradbury’s unmodified NIST SHA-3 Round-1 C reference implementa-
+tion [1] on an Apple Silicon workstation:
+
+ 1. Subspace Cycle-Swap Standard-IV Collisions and Multicollisions: Our 8-thread
+    overlapping ancestor cycle-swap solver finds verified 16,000-byte (4,000-word) standard-
+    IV Blender-256 collisions in 0.045 s on a fast seed and 0.731 s mean (0.774 s median,
+    0.181 s min, 1.422 s max) across 10 independent cold seeds,                         22.6
+                                                              6
+                                                                exploring a mean of 2
+    clean DFS nodes. From a single (P, U, V ) witness, all 3 = 20 balanced 40,896-byte
+
+
+                                                                              20
+Table 2: First- and second-preimage complexity comparison across all four NIST Blender vari-
+ants: Blender-224 (w=32, m=7), Blender-256 (w=32, m=8), Blender-384 (w=64, m=6), and
+Blender-512 (w=64, m=8).
+    Variant       Method                          Time Memory Words Mechanism
+    Blender-224 Newbold [13]                      2135.81       O(n2 )     O(n2 ) Joux + checksum birthday
+    Blender-224 Lamberger–Mendel [11, 10]        2119.81        O(n)a      1,121 5-word sum-fixed Joux
+    Blender-256   Newbold [13]                2152.00          O(n2 )      O(n2 )    Joux + checksum birthday
+    Blender-256   Lamberger–Mendel [11, 10]   2136.00          O(n)a        1,281    5-word sum-fixed Joux
+    Blender-256   Klı́ma (single) [9]       ≥ 2107.32           265.00     2107.32   Odd-lane fixpoint winding
+                           2n
+    Blender-256   Klı́ma (2 -multi) [9]     ≥ 2171.30           265.00     2171.30   Odd-lane fixpoint winding
+    Blender-256   Ours (Winding)               245.46           218.00      245.46   8-shifted Hpar + 2-adic solve
+    Blender-256   Ours (k-Tree)               235.93           221.69b      227.46   8-shifted Hpar + Wagner 212
+    Blender-384   Newbold [13]                2232.58          O(n2 )      O(n2 )    Joux + checksum birthday
+    Blender-384   Lamberger–Mendel [11, 10]   2200.58          O(n)a        1,921    5-word sum-fixed Joux
+    Blender-384   Klı́ma (single) [9]       ≥ 2171.90           297.00     2171.90   Odd-lane fixpoint winding
+    Blender-384   Klı́ma (22n -multi) [9]   ≥ 2267.30           297.00     2267.30   Odd-lane fixpoint winding
+    Blender-384   Ours (Winding)               289.17           234.00      289.17   8-shifted Hpar + 2-adic solve
+    Blender-384   Ours (k-Tree)               266.34           229.60b      238.91   8-shifted Hpar + Wagner 214
+    Blender-512   Newbold [13]                2297.00          O(n2 )      O(n2 )    Joux + checksum birthday
+    Blender-512   Lamberger–Mendel [11, 10]   2265.00          O(n)a        2,561    5-word sum-fixed Joux
+    Blender-512   Klı́ma (single) [9]       ≥ 2204.32          2129.00     2204.32   Odd-lane fixpoint winding
+                           2n
+    Blender-512   Klı́ma (2 -multi) [9]     ≥ 2331.30          2129.00     2331.30   Odd-lane fixpoint winding
+    Blender-512   Ours (Winding)               289.46           234.00      289.46   8-shifted Hpar + 2-adic solve
+    Blender-512   Ours (k-Tree)               267.64           238.00b      239.25   8-shifted Hpar + Wagner 214
+    a Memoryless MITM [14] (2n/2 with table lookup).   b Single-list size 2s = 2B/(ℓ+1) .
+
+
+
+
+    multicollisions were hashed through the official C reference, all producing the identical di-
+    gest 8b07ac88b949ef7d3e946af12c79c651c2b7b33d7f1dd09cb7ea0c3836b3b71b. Empir-
+    ical out-degree audits across 2,000 uniform clean states per variant measured 2.016, 2.006,
+    and 2.010 on Blender-256, −384, and −512, matching Proposition 3 (2.000).
+ 2. All-Variant Closed-Form SFS (80,000/80,000 Verified): Across 20,000 random seeds
+    per variant (80,000 pairs in total), our deterministic closed-form SFS generator (Theorem 5)
+    succeeded on 100% of seeds with zero retries. It generated pairs in 0.027 µs (Blender-224,
+    113 B), 0.006 µs (Blender-256, 113 B), 0.054 µs (Blender-384, 229 B), and 0.014 µs (Blender-
+    512, 229 B), all verified against the official C reference.
+ 3. 24-Byte Standard-IV and 36/40-Byte Identical-Prefix Collisions: Table 3 lists our
+    verified short colliding message pairs on full Blender-256. Our pure-C 4-round lane-invariant
+    and 2-round byte-lattice solver (0.11–0.29 ms per 2-round inversion) solved 10/10 cold seeds
+    for 24-byte standard-IV collisions in 34.58 s mean on 10 threads (1.63 s min; 0.057 s single-
+    thread best). It also solved a 40-byte identical-prefix collision for the 16-byte ASCII prefix
+    "Dear Bob, wire $" in 145.5 s on 10 threads (42 two-round targets), alongside a 36-byte
+    (3-round steered) identical-prefix witness for the same prefix.
+ 4. Verification of 2-Adic SNF Ranks and Closed-Walk Modular Superposition:
+    Across 500 independent closed-walk slots per configuration on the official C reference, em-
+    pirical 2-adic Smith Normal Form decomposition confirmed the exact subgroup invariant
+    factors (1, 1, 2, 2, 4, 4, 8, 8) (index 212 ) in the unshifted subspace C0 and (1, 1, 2, 2, 2, 2, 2, 2)
+    (index 26 , matching Hpar ) across 4 and 8 shifted subspaces Caj (Theorem 7). We also con-
+    firmed 100% exact modular superposition and post-message finalization invariance (Propo-
+    sition 6) across end-to-end 8-anchor closed-walk families satisfying ∆C1 ≡ 0 (mod 232 ) on
+    the unmodified NIST C reference.
+
+                                                        21
+Table 3: Verified standard-IV (24 B) and identical-prefix (36 B and 40 B, ASCII prefix “Dear
+Bob, wire $”) colliding pairs for full Blender-256 on the official NIST C reference [1].
+        Item    Verified Hexadecimal Value
+        24-Byte (6-Word) Standard-IV Collision Pair A
+        M1     66b2d21e26d2d06c6eb3e7e2f5e97fe5e367af98dfff7fc1
+        M2     66b2d21e26d2d06c6eb3e7e2f5e97fe5a267af1b2000803e
+        Digest 3dab8fdaf25bc778e60ea5c22b332f57875003724fb29615aedbf749fde750ee
+        24-Byte (6-Word) Standard-IV Collision Pair B
+        M1     2d0f9baed58c8332feaed2c6274dfa3eccca0d99b31c8466
+        M2     2d0f9baed58c8332feaed2c6274dfa3e330416664ce37b99
+        Digest 4dbdaf9d59fbdac4f0721cfd96a6eaa6cf7da4b0e72ef6d7516c931233c03ff5
+        36-Byte (9-Word) Identical-Prefix Collision Paira
+        M1     4465617220426f622c207769726520243b3b0c1861f200be53811121852bbf00efd219c2
+        M2     4465617220426f622c207769726520243b3b0c1861f200be5381112164d1f284102de63d
+        Digest 6b6c36da8ad5f932d384394af95eadf64de470977245367e3fa168ac835fd2b2
+        40-Byte (10-Word) Identical-Prefix Collision Paira
+        M1     4465617220426f622c20776972652024b89c419ad38fd20e65c9a79c84bd45f046bb10bae0fef7bf
+        M2     4465617220426f622c20776972652024b89c419ad38fd20e65c9a79c84bd45f007b9003a1f010840
+        Digest 8d5ee26f516017afe572029ec9fa75ee9b242a9a27cc73a2e4cec873578da3f8
+    a Both pairs start with the 16-byte ASCII prefix "Dear   Bob, wire $" (4465617220426f622c20776972652024).
+
+
+
+Use of AI. The cryptanalytic results and artifacts were initially developed through an au-
+tonomous agent system powered by a MiniMax internal model. We validated the key technical
+claims and refined the presentation of the manuscript.
+
+
+References
+ [1] C. Bradbury, “BLENDER: A Proposed New Family of Cryptographic Hash Algorithms,”
+     Algorithm Specification and Supporting Documentation, Submission to the NIST SHA-3
+     Competition (Round 1), Oct. 2008.
+
+ [2] F. Chabaud and A. Joux, “Differential Collisions in SHA-0,” in Advances in Cryptology –
+     CRYPTO’98, LNCS, vol. 1462, pp. 56–71, Springer, 1998.
+
+ [3] J. Daemen and C. Clapp, “Fast Hashing and Stream Encryption with PANAMA,” in Fast
+     Software Encryption – FSE’98, LNCS, vol. 1372, pp. 60–74, Springer, 1998.
+
+ [4] P. Gauravaram and J. Kelsey, “Linear-XOR and Additive Checksums Don’t Protect
+     Damgård–Merkle Hashes from Generic Attacks,” in Topics in Cryptology – CT-RSA 2008,
+     LNCS, vol. 4964, pp. 36–51, Springer, 2008.
+
+ [5] B. Hattersley, “Waterfall Hash — Algorithm Specification and Analysis,” Version 1.0, Sub-
+     mission to the NIST SHA-3 Competition (Round 1), Oct. 2008.
+
+ [6] A. Joux, “Multicollisions in Iterated Hash Functions. Application to Cascaded Construc-
+     tions,” in Advances in Cryptology – CRYPTO 2004, LNCS, vol. 3152, pp. 306–316, Springer,
+     2004.
+
+ [7] J. Kelsey and T. Kohno, “Herding Hash Functions and the Nostradamus Attack,” in Ad-
+     vances in Cryptology – EUROCRYPT 2006, LNCS, vol. 4004, pp. 183–200, Springer, 2006.
+
+ [8] V. Klı́ma, “A Near-Collision Attack on BLENDER-256,” Public Comment to the NIST
+     SHA-3 Competition (Round 1), Dec. 2008.
+
+ [9] V. Klı́ma, “Huge Multicollisions and Multipreimages of Hash Functions BLENDER-n,”
+     Cryptology ePrint Archive, Paper 2009/006, Jan. 2009.
+
+                                                        22
+[10] M. Lamberger and F. Mendel, “Structural Attacks on Two SHA-3 Candidates: Blender-n
+     and DCH-n,” in Information Security – ISC 2009, LNCS, vol. 5735, pp. 68–78, Springer,
+     2009.
+
+[11] F. Mendel, “Preimage Attack on Blender,” Unpublished note, ECRYPT SHA-3 Zoo,
+     Dec. 2008. https://ehash.isec.tugraz.at/uploads/4/48/Blender-preimage.pdf.
+
+[12] F. Mendel, N. Pramstaller, C. Rechberger, M. Kontak, and J. Szmidt, “Cryptanalysis of
+     the GOST Hash Function,” in Advances in Cryptology – CRYPTO 2008, LNCS, vol. 5157,
+     pp. 162–178, Springer, 2008.
+
+[13] C. Newbold, “Observations and Attacks On The SHA-3 Candidate Blender,” Unpublished
+     note, ECRYPT SHA-3 Zoo, Dec. 2008. https://ehash.isec.tugraz.at/uploads/2/20/
+     Observations_on_Blender.pdf.
+
+[14] J.-J. Quisquater and J.-P. Delescaille, “How Easy is Collision Search? New Results and
+     Applications to DES,” in Advances in Cryptology – CRYPTO’89, LNCS, vol. 435, pp. 408–
+     413, Springer, 1990.
+
+[15] A. Regenscheid, R. Perlner, S.-j. Chang, J. Kelsey, M. Nandi, and S. Paul, “Status Report
+     on the First Round of the SHA-3 Cryptographic Hash Algorithm Competition,” NIST Inter-
+     agency Report (NISTIR) 7620, National Institute of Standards and Technology, Sept. 2009.
+
+[16] M. Stevens, A. K. Lenstra, and B. de Weger, “Chosen-Prefix Collisions for MD5 and
+     Colliding X.509 Certificates for Different Identities,” in Advances in Cryptology – EURO-
+     CRYPT 2007, LNCS, vol. 4515, pp. 1–22, Springer, 2007.
+
+[17] D. Wagner, “A Generalized Birthday Problem,” in Advances in Cryptology –
+     CRYPTO 2002, LNCS, vol. 2442, pp. 288–304, Springer, 2002.
+
+[18] X. Wang and H. Yu, “How to Break MD5 and Other Hash Functions,” in Advances in
+     Cryptology – EUROCRYPT 2005, LNCS, vol. 3494, pp. 19–35, Springer, 2005.
+
+[19] L. Xu and J. Li, “Semi-free start collision attack on Blender,” Cryptology ePrint Archive,
+     Paper 2008/532, Dec. 2008.
+
+
+
+
+                                              23
+

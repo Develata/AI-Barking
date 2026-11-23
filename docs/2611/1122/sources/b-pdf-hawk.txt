@@ -1,0 +1,1076 @@
+       Improved Practical Key Recovery on HAWK
+                                              MiniMax
+
+                                          November 2026
+
+
+                                              Abstract
+         HAWK is a lattice-based digital signature scheme introduced at ASIACRYPT 2022 that
+     bases its security on the module lattice isomorphism problem over power-of-two cyclotomic
+     rings. Its secret key is a unimodular two-by-two basis over the ring of integers of degree n,
+     while the public key is the associated Hermitian Gram matrix. For the challenge parameter
+     set HAWK-256 at ring degree n = 256, the specification claims 64 bits of security against key
+     recovery. Recently, Straznickas and Weis (ePrint 2026/1593) reduced HAWK-n key recovery
+     to shortest vector computation in a public rank-n cocycle lattice associated with the half-
+     period Galois involution, followed by an intertwiner sublattice separation and a tower descent
+     over nested subfields. Their released HAWK-256 pipeline requires progressive lattice sieving
+     up to dimension 118 and consumes approximately 1.28 × 106 CPU-core-seconds across 96
+     cores (3 h 42 min wall-clock).
+         In this paper, we present an improved end-to-end key recovery attack against HAWK-256
+     driven solely from a genuine 450-byte reference public key on a single CPU core in 1,851.8
+     CPU-core-seconds (30.9 minutes). First, rather than applying modulo-two parity only as
+     a post-hoc filter, we close the parity congruence into a public sublattice Λ′ ⊂ Λτ of index
+     2n−1 . While Λ′ preserves both the ambient rank n and the provable two-block SVP oracle
+     dimension n/2 + 1, its covolume sparsification isolates the secret cocycle element as the
+     unique shortest vector up to sign with gap λ2 /λ1 = 2, eliminates the intertwiner stage, and
+     lowers the expected BKZ block size by ∆β(n) = ln22 n/ ln n + O(n/ ln2 n) (from 92 → 58
+     at HAWK-256, 205 → 156 at HAWK-512, and 432 → 351 at HAWK-1024). Second, we
+     show that the root Hermite factor required to reach λ1 (Λ′ ) at n = 256 is strictly less than
+     unity, and we overcome severe condition-number squaring in Gram-mode basis reduction
+     via an exact high-precision Cholesky embedding coupled with fast integer lattice reduction.
+     This basis preconditioning lowers the required maximum sieve dimension from 118 to 80,
+     yielding a 690× end-to-end speedup verified by the reference implementation and reducing
+     the heuristic gate security of HAWK-256, HAWK-512, and HAWK-1024 by 9.28, 11.15, and
+     23.74 bits, respectively.
+
+
+1    Introduction
+Lattice-based cryptography provides versatile foundations for post-quantum digital signatures,
+most notably through the hash-and-sign paradigm pioneered by GPV [14] and realized over
+NTRU lattices in FALCON [19]. While FALCON achieves compact signatures and public keys,
+its signing algorithm relies on floating-point fast Fourier orthogonalization and variable-time
+Gaussian sampling over cyclotomic fields, which complicates constant-time implementation and
+side-channel protection.
+    To address these implementation challenges, Ducas, Postlethwaite, Pulles, and van Woer-
+den introduced HAWK at ASIACRYPT 2022 [9], basing its security on the Module Lattice
+Isomorphism Problem (Module-LIP) [11, 9]. Instead of hiding a secret basis of a specific NTRU
+module, HAWK fixes the canonical module lattice Z2n —viewed as the rank-two free module
+Rn2 over the power-of-two cyclotomic ring Rn = Z[ζ2ℓ ] of degree n = 2ℓ−1 —and selects a short
+unimodular basis B ∈ SL2 (Rn ) as the secret key. The public key is the Hermitian Gram matrix
+Q = B ∗ B ∈ M2 (Rn ), where B ∗ denotes the conjugate transpose under the complex conjugation
+
+                                                   1
+involution of Rn . Because the secret geometry is isomorphic to the trivial orthogonal lattice
+Z2n , Gaussian sampling during signing reduces to simple integer sampling in the secret frame
+followed by multiplication by B −1 , avoiding floating-point arithmetic altogether.
+    The HAWK NIST specification [10] defines three parameter sets: HAWK-256 (n = 256,
+ℓ = 9), which serves as a cryptanalytic challenge instance claiming 64 bits of classical security,
+and the NIST Round 3 standardization candidates HAWK-512 (n = 512, ℓ = 10, NIST Level I)
+and HAWK-1024 (n = 1024, ℓ = 11, NIST Level V). Following the τ -cocycle cryptanalysis of
+Straznickas and Weis [23], the HAWK specification was withdrawn from the NIST post-quantum
+standardization process on July 29, 2026 [10].
+
+1.1   Prior Cryptanalysis
+Direct lattice reduction attacks against HAWK embed the public Gram matrix Q into a rank-
+2n Euclidean lattice and search for any unit-norm vector of the quadratic form defined by Q,
+corresponding to a secret basis column. Under standard lattice reduction heuristics, solving
+this search problem in dimension 2n requires prohibitively large block sizes even at n = 256.
+Subsequent algebraic analyses investigated symplectic automorphisms for the one-more-SVP
+problem [16], subfield-guessing attacks and their super-polynomial complexity [17, 21], and a
+conditional reduction from rank 2n to rank n given a nontrivial automorphism [13].
+     A major breakthrough was achieved by Straznickas and Weis [23], who made the rank-n
+descent unconditional by exploiting the Galois tower of power-of-two cyclotomic fields. Let
+τ : ζ2ℓ 7→ −ζ2ℓ denote the Galois involution fixing the subfield of degree n/2. Rather than
+recovering B directly, they targeted the multiplicative τ -cocycle element Vτ = B −1 τ (B) ∈
+SL2 (Rn ). Because Q = B ∗ B is public, Vτ satisfies two public Q-linear matrix constraints (an
+adjoint symmetry condition and a Gram intertwining relation, defined formally in Section 3).
+The integer matrices satisfying both constraints form a public rank-n lattice Λτ , termed the
+τ -cocycle lattice.
+     Straznickas and Weis proved that the isometry class of Λτpunder its trace-determinant form
+is completely√independent of the secret key: up to scaling by n/4, it decomposes orthogonally
+as Zn/2+1 ⊕ 2 Zn/2−1 . As ap  result, Λτ possesses n/2 + 1 pairs of mutually orthogonal shortest
+vectors of Euclidean length n/4, only one pair of which is ±Vτ . Their attack pipeline finds
+short vectors in Λτ via progressive lattice sieving, isolates ±Vτ using an auxiliary intertwiner
+sublattice construction [23, Remark 6.2] or post-hoc parity filtering, and finally descends the
+cyclotomic tower ℓ → ℓ − 1 → · · · → 3 to recover an equivalent secret key Brec satisfying
+   ∗ B
+Brec   rec = Q. At n = 256, their released pipeline drives a progressive multi-core sieve [24] up
+to maximum sieving dimension 118, taking 3 hours and 42 minutes on a 96-core Intel Sapphire
+Rapids server (≈ 1.28 × 106 allocated CPU-core-seconds, or ≈ 1.11 × 106 active thread-seconds).
+
+1.2   Our Contributions and Technical Overview
+In this work, we demonstrate that end-to-end key recovery against HAWK-256 at its full ring
+degree n = 256 can be executed on a single CPU core in 1,851.8 CPU-core-seconds (30.9 minutes
+CPU, 31.0 minutes wall-clock)—7.2× faster in wall-clock time on 1/96 of the cores and a factor
+of 690× lower in allocated core-seconds (601× in active thread-seconds) than the previously
+published pipeline [23]. Our attack takes only the 450-byte reference public key as input and
+outputs a 592-byte secret key accepted by the authors’ unmodified reference signer and verifier.
+We establish three results that account for this improvement:
+
+1. Lattice Dimension Invariance vs. Lattice Quality Optimization in Λ′ . Because
+   the involution τ acts as the identity modulo 2 on Rn , the secret cocycle element always
+   satisfies Vτ ≡ I (mod 2). Whereas prior work [23] treated this congruence as an O(n) post-
+   hoc filter applied after sieving, we close the congruence coset 2Λτ ∪ (2Λτ + I) into a public
+
+
+                                                2
+   sublattice Λ′ = 2Λτ + Zw0 ⊂ Λτ of index 2n−1 by solving a single public linear system over
+   F2 . Passing from Λτ to Λ′ does not reduce the lattice dimension: Λ′ retains full Z-rank
+   n, preserves the provable two-block SVP oracle dimension n/2 + 1, and shares the leading
+   asymptotic GSA block-size ratio limn→∞ β(n)/n = 1/2. Instead, Λ′ substantially improves
+   the
+   p lattice quality: multiplying the covolume     by 2n−1 at unchanged target norm λ1 (Λ′ ) =
+                                          1/n
+     n/4 halves the Hermite ratio λ1 / vol    from ≈ 2−1/4 = 0.8409 to ≈ 2−5/4 = 0.4204 (0.4222
+   at n = 256), isolates ±Vτ as the unique shortest vector pair with gap λ2 (Λ′ )/λ1 (Λ′ ) = 2,
+   and eliminates the intertwiner stage. Asymptotically, this reduces the GSA block size by
+   ∆β(n) = ln22 n/ ln n + O(n/ ln2 n); concretely, it lowers the expected BKZ block size β from
+   92 → 58 at HAWK-256, 205 → 156 at HAWK-512, and 432 → 351 at HAWK-1024.
+
+2. Structural Limit Analysis and Exact Cholesky Preconditioning. We show that
+   for Λ′ at rank n = 256, the Hermite ratio λ1 (Λ′ )/ vol(Λ′ )1/256 = 0.4222 implies a required
+   root Hermite factor of 0.996624 < 1. Because any basis reduction algorithm governed by the
+   Geometric Series Assumption enforces a root Hermite factor at least 1, pure profile flattening
+   can never reach λ1 (Λ′ ); recovery can succeed only when a block-SVP or sieving oracle detects
+   the tail projection of Vτ . In addition, we show that what forces prior pipelines to sieve up
+   to dimension 118 is not the intrinsic geometry of the lattice, but severe ill-conditioning of
+   its natural integer basis (≈ 241 basis condition number), which is squared when processed
+   in Gram mode. By computing an exact high-precision Cholesky factorization of the Gram
+   matrix, embedding it into an integer basis, reducing it with flatter [20], and recovering
+   the exact unimodular transformation via triangular backward substitution, we compress the
+   Gram matrix from 40–41-bit entries to 27-bit entries with a Gram diagonal ratio of 2.2–3.0
+   and a 4× better post-LLL starting norm.
+
+3. Sieve Dimension Reduction from 118 to 80 and Security Impact on HAWK-
+   512/1024. Alongside pre-sieving conditioning ablations (δ = 0.75 LLL at 12.9× speedup
+   over δ = 0.99 and BKZ-20 profile equilibration), feeding our Cholesky-preconditioned basis
+   directly into the General Sieve Kernel (g6k) [2] progressive pump-and-jump tour recovers
+   ±Vτ on a single core at sieve dimension d = 80 rather than d = 118 in 1,469.5 s (1,851.8 s
+   end-to-end). Because the sieve database scales as 20.2075d and runtime scales as database1.13 ,
+   dropping the maximum sieve dimension by 38 predicts a 481× reduction in sieve work,
+   matching our measured 690× end-to-end speedup. Across the full HAWK family, our sub-
+   lattice construction reduces heuristic AGPS20 gate complexity by 9.28 bits on HAWK-256
+   (250.83 → 241.56 ), 11.15 bits on HAWK-512 (280.79 → 269.64 ), and 23.74 bits on HAWK-1024
+   (2146.48 → 2122.73 ).
+
+
+1.3   Paper Organization
+Section 2 establishes our notation for power-of-two cyclotomic fields, Galois involutions, Hermi-
+tian forms, and Euclidean lattice reduction invariants. Section 3 reviews the HAWK signature
+specification and the construction of the τ -cocycle lattice Λτ . Section 4 introduces the modulo-
+two sublattice Λ′ , proves its index, isometry class, and unique-SVP gap, and explains how it
+eliminates the intertwiner stage. Section 5 analyzes the structural Hermite limit at n = 256
+and details our exact Cholesky basis preconditioning and conditioning schedule. Section 6 de-
+scribes the progressive sieving tour, exact coordinate recovery, and τ -tower descent. Section 7
+presents our sieve dimension scaling analysis, experimental measurements, and extrapolations
+to HAWK-512 and HAWK-1024. Section 8 discusses the scope and limitations of our results.
+
+
+
+
+                                                3
+Table 1: Comparison of end-to-end key recovery attacks against HAWK-256 (n = 256, ℓ = 9).
+       Metric                                    Straznickas–Weis [23]                          This Work
+                                                                                            ′
+       Target lattice                                Λτ (rank 256)                       Λ ⊂ Λτ (rank 256)
+       Sublattice index [Λτ : Λ′ ]                          1                                    2255
+       Minimal vector pairs at λ1                          129                                 1 (±Vτ )
+       Spectral gap (λ2 /λ1 )                               1                                      2
+       Intertwiner stage                               Required                              Eliminated
+       Expected BKZ block size β                           92                                      58
+       Basis preconditioning                      Gram-mode LLL/BKZ                   Exact Cholesky + flatter
+       Maximum sieve dimension dmax                        118                                     80
+       Sieve database sizea                           ≈ 2.35 × 107                          ≈ 9.93 × 104
+       Allocated CPU cores                                  96                                      1
+       Total CPU timeb                                ≈ 1,278,720 s                           1,851.8 s
+       End-to-end speedup factorb                         1.0×                                  690×
+                                                                                                 ∗
+       Reference C verification                           Pass                           Pass (Brec  Brec = Q)
+a Heuristic database size (4/3)d/2 ≈ 20.2075d at maximum sieve dimension d.         b Baseline: 3 h 42 min wall-clock across 96
+
+Sapphire Rapids cores (≈ 1.28 × 106 allocated core-s, or ≈ 1.11 × 106 active thread-s giving 601×). This work: 30.9 min
+                                              CPU (31.0 min wall) on 1 core.
+
+
+2     Preliminaries
+We first summarize the algebraic properties of power-of-two cyclotomic fields, their Galois in-
+volutions, and the Euclidean lattice reduction invariants used throughout this paper.
+
+2.1    Cyclotomic Fields and Rings of Integers
+Let ℓ ≥ 2 be an integer and set n = 2ℓ−1 . We denote by L = Q(ζ2ℓ ) the 2ℓ -th cyclotomic field
+generated by a primitive 2ℓ -th root of unity ζ = ζ2ℓ satisfying ζ n + 1 = 0. The field L is a
+totally complex Galois extension of Q of degree [L : Q] = n. Its ring of integers is the monogenic
+polynomial ring
+                              Rn = OL = Z[ζ] ∼             = Z[X]/(X n + 1).
+Every element f ∈ L expands uniquely in the power basis {1, ζ, . . . , ζ n−1 } as f = n−1                   j
+                                                                                                 P
+                                                                                                   j=0 fj ζ
+with rational coefficients fj ∈ Q, and f ∈ Rn if and only if fj ∈ Z for all 0 ≤ j < n. We identify
+f ∈ L with its coefficient vector (f0 , f1 , . . . , fn−1 )T ∈ Qn . The absolute field trace TrL/Q : L → Q
+satisfies TrL/Q (1) = n and TrL/Q (ζ j ) = 0 for all 1 ≤ j < n, so that TrL/Q (f ) = nf0 .
+
+2.2    Galois Automorphisms and Fixed Subfields
+The Galois group Gal(L/Q) ∼= (Z/2ℓ Z)× ∼= Z/2Z × Z/2ℓ−2 Z acts on L by sending ζ 7→ ζ k for
+odd integers k. Three commuting involutions play a central role in the cryptanalysis of HAWK:
+1. Complex conjugation c: defined by c(ζ) = ζ −1 = −ζ n−1 . Its fixed subfield is the maximal
+   totally real subfield L+ = Q(ζ + ζ −1 ) of degree n/2.
+2. The half-period involution τ : defined by τ (ζ) = ζ 1+n = −ζ. In the power basis, τ acts
+   diagonally by negating odd-indexed coordinates:
+                                               n−1
+                                              X                     n−1
+                                                                      X
+                                          τ          fj ζ j       =      (−1)j fj ζ j .
+                                               j=0                    j=0
+
+    Its fixed subfield is the previous cyclotomic field in the power-of-two tower,
+                                       K = L⟨τ ⟩ = Q(ζ 2 ) = Q(ζ2ℓ−1 ),
+    which has degree [K : Q] = n/2 and ring of integers Rn/2 = Z[ζ 2 ].
+
+                                                                  4
+3. The composite involution σ = cτ = τ c: defined by σ(ζ) = −ζ −1 = ζ n−1 .
+
+The subgroup ⟨c, τ ⟩ ∼
+                     = (Z/2Z)2 fixes the totally real subfield F = L⟨c,τ ⟩ = K + = Q(ζ 2 + ζ −2 )
+of degree [F : Q] = n/4. All three involutions preserve the ring of integers Rn and extend
+entrywise to matrices over L and Rn .
+
+2.3    Matrix Operations and Hermitian Gram Forms
+For any 2 × 2 matrix Y = ( yy00 y01
+                             10 y11 ) ∈ M2 (L), its classical adjoint (adjugate) is
+
+                                                              
+                                                  y11 −y01
+                                    adj(Y ) =                    ,
+                                                 −y10 y00
+
+which is a Q-linear involution on M2 (L) satisfying Y adj(Y ) = adj(Y )Y = (det Y )I2 . When
+Y ∈ SL2 (Rn ), we have det Y = 1 and hence Y −1 = adj(Y ) ∈ M2 (Rn ). We write Y ∗ = c(Y )T
+for the Hermitian conjugate transpose of Y . A matrix Q ∈ M2 (L) is Hermitian if Q∗ = Q,
+and totally positive definite if x∗ Qx is totally positive in L+ for every nonzero x ∈ L2 . For
+any basis matrix B ∈ SL2 (Rn ), its Hermitian Gram matrix Q = B ∗ B is Hermitian, unimodular
+(det Q = 1), and totally positive definite.
+
+2.4    Euclidean Lattices and Reduction Heuristics
+A full-rank Euclidean lattice Λ of rank d is a discrete additive subgroup Λ = Zb          p1 ⊕ · · · ⊕ Zbd
+equipped with a positive definite symmetric bilinear form ⟨·, ·⟩ and norm ∥v∥ = ⟨v, v⟩. Given
+                                 , bd ), its Gram matrix is G = (⟨bi , bj ⟩)1≤i,j≤d ∈ Md (R). The volume
+an ordered basis B = (b1 , . . . √
+(covolume) of Λ is vol(Λ) = det G, which is an invariant independent of the choice of basis; if
+B′ = U B for a unimodular transformation U ∈ GLd (Z), then G′ = U GU T and det G′ = det G.
+For a full-rank sublattice Λ′ ⊂ Λ of finite index [Λ : Λ′ ], their volumes and Gram determinants
+satisfy
+             vol(Λ′ ) = [Λ : Λ′ ] vol(Λ),         det Gram(Λ′ ) = [Λ : Λ′ ]2 det Gram(Λ).
+    The i-th successive minimum λi (Λ) is the smallest radius r > 0 such that the closed ball
+of radius r contains i linearly independent vectors of Λ. The Gaussian Heuristic   p      predicts that
+the shortest nonzero vector of a random rank-d lattice has norm GH(Λ) ≈ d/(2πe) vol(Λ)1/d .
+A basis reduction algorithm such as LLL [15] or BKZ [22, 5] with root Hermite factor δ0 ≥ 1
+produces a first basis vector b1 satisfying ∥b1 ∥ ≤ δ0d−1 vol(Λ)1/d . Under the Geometric Series
+Assumption (GSA) [5, 1], the Gram–Schmidt orthogonalized vectors b∗i of a BKZ-β reduced
+                                                                      1/(2(β−1))
+basis satisfy ∥b∗i ∥/∥b∗i−1 ∥ ≈ δβ−2 , where δβ = (πβ)1/β β/(2πe)                 > 1 for β ≥ 36. In a
+unique-SVP (uSVP) instance where λ1 (Λ) ≪ GH(Λ), BKZ-β or a progressive sieve of dimension
+dsieve recovers the unique shortest vector ±vmin once the orthogonal projection of vmin onto the
+tail subspace span(b∗d−β+1 , . . . , b∗d ) becomes shorter than the local Gaussian heuristic of that tail
+block [1].
+
+The ×8 Integer Gram Convention. Following the convention in the HAWK cryptanalysis
+pipeline [23], quadratic forms defined via normalized field traces over F are scaled by 8 so
+that all Gram matrices
+                 p       have exact integer entries. In this convention, a vector of theoretical
+Euclidean norm n/4 has integer Gram norm squared 8 · (n/4) = 2n. At n = 256, the target
+integer squared norm of ±Vτ is therefore 2n = 512, and the integer Gram determinant shifts by
+8n = 23n relative to the unscaled trace form.
+
+
+
+
+                                                    5
+             L9 = Q(ζ512 ) (n = 256)                                        Public Key Q = B ∗ B
+
+                             τ : ζ 7→ −ζ                                               Z-kernel
+                      ⟨τ ⟩
+              L8 = L9        (n = 128)       Vτ                              Cocycle Lattice Λτ
+                                                  =
+                                                      B −1
+                                                          τ(
+                             BKZ-13                         B)                         Y ≡ 0, I (mod 2)
+
+            ℓ = 7, 6, 5, 4 (LLL, β = 0)                              Mod-2 Sublattice Λ′ = 2Λτ + Zw0
+
+                             tower descent                                             uSVP (d = 80) → ±Vτ
+
+                                                                                            ∗
+               L3 = Q(ζ8 ) (n = 4)                                   Recovered Basis Brec (Brec Brec = Q)
+                                                      lift
+
+
+Figure 1: Algebraic structure of HAWK-256 key recovery: the cyclotomic field tower L9 ⊃ L8 ⊃
+· · · ⊃ L3 on the left and our cocycle sublattice reduction pipeline pk → Λτ → Λ′ → Vτ → Brec
+on the right.
+
+
+3     Specification of HAWK and the Cocycle Lattice
+This section reviews the key generation procedure and Module-LIP security formulation of
+HAWK [9, 10], followed by the algebraic construction and key-independent geometry of the
+τ -cocycle lattice Λτ introduced by Straznickas and Weis [23].
+
+3.1   HAWK Key Generation and the Module-LIP Problem
+                                                                                 
+In HAWK-n [9, 10], key generation samples a secret unimodular matrix B = fg G   F
+                                                                                    ∈ SL2 (Rn )
+whose entries have small coefficients in the power basis of Rn and satisfy f G − gF = 1. The
+secret key encodes B (a compact 592-byte decoded secret key layout at n = 256 containing
+(f, g, F, G) and precomputed signing data), while the public key is a compressed encoding of
+the Hermitian Gram matrix
+                                                     
+                                     ∗        q00 q01
+                            Q = B B =                   ∈ M2 (Rn ),
+                                              q10 q11
+
+where q00 , q11 ∈ Rn ∩ L+ are self-conjugate and q10 = c(q01 ). At n = 256, the compressed public
+key occupies exactly 450 bytes.
+   Recovering a valid signing key from the public key Q is an instance of the search Module-LIP
+problem over Rn : given Q, find any secret basis Brec ∈ SL2 (Rn ) such that
+                                                        ∗
+                                                       Brec Brec = Q.                                        (1)
+
+Any two solutions Brec and B of (1) are related by Brec = U B, where U ∈ SL2 (Rn ) is a unitary
+matrix satisfying U ∗ U = I2 . By Kronecker’s theorem on roots of unity in Rn , any such unitary
+transformation U is signed-permutation equivalent to I2 up to powers of ζ [11, 9], meaning that
+Brec has the exact same Euclidean geometry and signing capability as B. Thus, any equivalent
+basis Brec satisfying (1) is a fully functional secret key accepted by the reference implementation.
+
+3.2   The τ -Cocycle Lattice Λτ
+Rather than attacking Q = B ∗ B in dimension 2n, Straznickas and Weis [23] observed that
+applying the half-period involution τ to Q = B ∗ B yields τ (Q) = τ (B)∗ τ (B). Eliminating the
+unknown secret basis B in favor of the multiplicative τ -cocycle element
+
+                                           Vτ = B −1 τ (B) ∈ SL2 (Rn )                                       (2)
+
+
+                                                                 6
+exposes linear algebraic relations that Vτ must obey. First, because τ is an involution and
+det Vτ = 1, we have τ (Vτ ) = τ (B)−1 B = Vτ−1 = adj(Vτ ). Second, substituting τ (B) = BVτ into
+τ (Q) = τ (B)∗ τ (B) gives
+                       τ (Q) = (BVτ )∗ (BVτ ) = Vτ∗ B ∗ BVτ = Vτ∗ QVτ .
+Multiplying on the left by (Vτ∗ )−1 = (adj(Vτ ))T = c(τ (Vτ ))T = σ(Vτ )T turns this quadratic
+relation into a linear intertwining equation in Vτ . Figure 1 illustrates the resulting algebraic
+hierarchy.
+Definition 1 (The τ -Cocycle Lattice Λτ [23]). For a public Gram matrix Q ∈ M2 (Rn ), the
+τ -cocycle lattice Λτ ⊂ M2 (Rn ) is the Z-module of integral matrices satisfying the two linear
+constraints             n                                                    o
+                  Λτ = Y ∈ M2 (Rn ) τ (Y ) = adj(Y ), QY = σ(Y )T τ (Q) .                   (3)
+                                         |    {z      } |         {z       }
+                                               (C1)                (C2)
+
+    Direct public computation of Λτ from the public key relies on the fact that both (C1) and
+(C2) are homogeneous Q-linear equations in the 4n integer coordinates of Y ∈ M2 (Rn ) ∼    = Z4n .
+Constraint (C1) imposes τ (y00 ) = y11 , τ (y01 ) = −y01 , and τ (y10 ) = −y10 , which immediately
+halves the ambient dimension from 4n to 2n. Constraint (C2) then imposes n independent
+linear equations determined by the public entries of Q and τ (Q), cutting the rank down to n.
+Proposition 2 (Rank, Quadratic Form, and Key-Independent Isometry Class of Λτ [23]). Let
+Q = B ∗ B for any B ∈ SL2 (Rn ). Then Λτ is a saturated public Z-submodule of M2 (Rn ) of rank
+n. Equipped with the bilinear form induced by the trace-determinant quadratic form
+                                    qτ (Y ) = TrF/Q (det Y ),
+the Euclidean lattice (Λτ , qτ ) has the key-independent isometry class [23, Lemmas 4.3–4.4 and
+Proposition 4.5]
+                                                        √
+                                       r 
+                                    ∼     n                       
+                                Λτ =          Z n/2+1 ⊕ 2 Z n/2−1 .                          (4)
+                                          4
+                         p
+In particular, λ1 (Λτ ) = n/4 is attained by exactly n/2+1 pairs of mutually orthogonal shortest
+vectors, one pair of which is ±Vτ = ±B −1 τ (B).
+    Proposition 2 reveals both the power and the bottleneck of working directly in Λτ . On
+the one hand, conjugation by B maps Λτ isometrically onto the canonical cocycle lattice of the
+identity Gram matrix Q = I2 , which explains why the geometry of Λτ is completely independent
+of the secret key B. In the ×8 integer Gram convention at n = 256, Proposition 2 predicts the
+exact log-determinant
+                                               n     
+           log2 det Gram(Λτ ) = n log2 (2n) +     − 1 = 256 × 9 + 127 = 2431.00,              (5)
+                                                2
+providing a bit-exact certificate that an extracted integer basisp
+                                                                 spans the full saturated kernel
+Λτ . On the other hand, because Λτ contains Z   n/2+1  scaled by n/4, there are n/2 + 1 = 129
+pairs of shortest vectors tied at the exact same minimum norm λ1 (Λτ ), corresponding to 128
+spurious norm-one units alongside the single target ±Vτ . Any shortest vector solver operating
+on Λτ is confronted with a 129-fold degenerate minimum, forcing the pipeline of [23] to collect a
+large pool of minimal vectors via high-dimension sieving and subsequently separate ±Vτ using
+an auxiliary intertwiner sublattice.
+
+
+4    The Modulo-Two Sublattice and Unique-SVP Reduction
+We now construct the modulo-two cocycle sublattice Λ′ ⊂ Λτ , determine its index and key-
+independent isometry class, and prove that it isolates the secret cocycle element ±Vτ as the
+unique shortest vector pair while lowering the expected BKZ block size.
+
+                                                7
+4.1   Modulo-Two Parity of the Secret Cocycle Element
+To break the (n/2+1)-fold shortest-vector degeneracy of Λτ before invoking any lattice reduction
+algorithm, we exploit the action of the half-period involution τ modulo 2. In the ring of integers
+Rn =   Z[ζ], we have τ (ζ) = −ζ = ζ − 2ζ ≡ ζ (mod 2Rn ). By Z-linearity, every element
+    Pn−1
+x = j=0 xj ζ j ∈ Rn satisfies
+                               n−1
+                               X                      n−1
+                                                      X
+                     τ (x) =         (−1)j xj ζ j ≡         xj ζ j = x   (mod 2Rn ).           (6)
+                               j=0                    j=0
+
+Applying (6) entrywise to the secret basis B ∈ SL2 (Rn ) yields τ (B) ≡ B (mod 2M2 (Rn )).
+Because det B = 1, the inverse B −1 = adj(B) also has integral entries in Rn , and multiplying
+on the left by B −1 gives the exact modulo-two identity congruence
+
+                      Vτ = B −1 τ (B) ≡ B −1 B = I2               (mod 2M2 (Rn )).             (7)
+
+    In the pipeline of Straznickas and Weis [23, Appendix D], the congruence (7) is used solely
+as an O(n) post-hoc parity filter on short vectors that the sieve has already paid to find inside
+Λτ . While post-hoc filtering identifies ±Vτ once it appears in the sieve output, it does nothing
+to simplify the geometry of the lattice during reduction: the sieve must still contend with all
+n/2 + 1 minimal vector pairs of Λτ .
+
+4.2   Closing the Congruence Coset into Λ′
+Our first key modification is to incorporate the parity constraint (7) directly into the lattice
+definition before preconditioning or sieving, in the spirit of modular hint integration via sublat-
+tice sparsification [6]. The set of elements Y ∈ Λτ satisfying Y ≡ I2 (mod 2) is an affine coset
+of 2Λτ , not a subgroup. However, taking the union of the zero coset 2Λτ and the identity coset
+2Λτ + I2 closes this affine constraint into a full-rank sublattice of Λτ (note that our symbol
+Λ′ denotes this index-2n−1 modulo-two sublattice, distinct from the rescaled lattice denoted Λ′
+in [23, Corollary 4.6]).
+Definition 3 (The Modulo-Two Sublattice Λ′ ). Let Λτ ⊂ M2 (Rn ) be the τ -cocycle lattice of Q,
+and let w0 ∈ Λτ be any element satisfying w0 ≡ I2 (mod 2M2 (Rn )). The modulo-two cocycle
+sublattice Λ′ ⊂ Λτ is defined by
+
+            Λ′ = 2Λτ + Z w0 = Y ∈ Λτ Y ≡ 0 or Y ≡ I2 (mod 2M2 (Rn )) .
+                                 
+                                                                                            (8)
+
+    Constructing an explicit Z-basis of Λ′ from any Z-basis {b1 , . . . , bn } of Λτ requires only
+elementary linear
+                Pn algebra over F2 . Reducing the basisn elements b1 , . . . , bn modulo 2 yields a
+linear system      i=1 ci (bi mod 2) = I2 mod 2 in c ∈ F2 . Because Vτ ∈ Λτ satisfies Vτ ≡ I2
+(mod 2), this F2 -system is guaranteed to bePconsistent. Selecting any solution c ∈ Fn2 with
+ci0 = 1, lifting ci ∈ {0, 1} ⊂ Z to form w0 = ni=1 ci bi ∈ Λτ , and replacing the single generator
+bi0 by w0 while doubling all remaining generators 2bi (i ̸= i0 ) produces a Z-basis of Λ′ .
+
+4.3   Index, Isometry Class, and Unique-SVP Gap of Λ′
+We now prove that passing from Λτ to Λ′ isolates ±Vτ as the unique shortest vector pair with
+a factor-of-two Euclidean norm gap.
+Theorem 4 (Isometry Class, Unique Minimum, and Index of Λ′ ). Let Q = B ∗ B for B ∈
+SL2 (Rn ) with n = 2ℓ−1 ≥ 4. Then the modulo-two sublattice Λ′ ⊂ Λτ satisfies the following
+properties:
+  (i) The sublattice index is [Λτ : Λ′ ] = 2n−1 , so that det Gram(Λ′ ) = 22(n−1) det Gram(Λτ ).
+
+                                                      8
+  (ii) Equipped with the quadratic form qτ , the Euclidean lattice (Λ′ , qτ ) has the key-independent
+       isometry class
+                                                             √
+                                     r 
+                                ′ ∼    n                                   
+                               Λ =          Z ⊕ 2Z n/2 ⊕ 2 2 Z n/2−1 .                            (9)
+                                       4
+ (iii) The first successive minimum λ1 (Λ′ ) = n/4 is attainedpuniquely at ±Vτ = ±B −1 τ (B),
+                                                p
+
+       and the second successive minimum satisfies λ2 (Λ′ ) = 2 n/4, giving an exact Euclidean
+       gap
+                                               λ2 (Λ′ )
+                                                        = 2.                                     (10)
+                                               λ1 (Λ′ )
+Proof. Twisted conjugation by the unimodular secret basis B ∈ SL2 (Rn ) defines a Z-linear
+bijection ΦB : Y 7→ BY τ (B)−1 from Λτ (Q) onto the canonical cocycle lattice Λτ (I2 ) associated
+with the identity Gram matrix Q = I2 [23, Proposition 4.5]. Since det(ΦB (Y )) = det Y ,
+ΦB is an isometry with respect to qτ . Because τ (B) ≡ B (mod 2), reducing modulo 2 gives
+ΦB (Y ) ≡ BY B −1 (mod 2), so ΦB (Y ) ≡ 0 or I2 (mod 2) if and only if Y ≡ 0 or I2 (mod 2)
+(where {Y ∈ Λτ : Y ≡ 0 (mod 2)} = 2Λτ by saturation of Λτ in M2 (Rn )). Thus ΦB maps
+Λ′ (Q) isometrically onto Λ′ (I2 ), and maps Vτ = B −1 τ (B)                    τ (B)−1 √
+                                                                       pto BVτn/2+1      = I2 .
+    In Λτ (I2 ), the orthogonal decomposition Λτ (I2 ) = n/4 (Z     ∼                 ⊕ 2 Zn/2−1 ) of Propo-
+sition 2 has an explicit orthogonal Z-basis {e0 , e1 , . . . , en/2 , f1 , . . . , fn/2−1 }, where e0 = I2 has
+        p
+norm n/4, the vectors e1 , . . . , en/2 are mutually orthogonal off-diagonal/monomial units of
+       p                                                 p
+norm n/4, and f1 , . . . , fn/2−1 have norm n/2. Here e0 = I2 is the sole basis element congru-
+ent to I2 modulo 2: every other basis generator ej (1 ≤ j ≤ n/2) and fk (1 ≤ k ≤ n/2 − 1) has
+support disjoint from the identity diagonal modulo 2, and no nontrivial F2 -linear combination
+of {e1 , . . . , en/2 , f1 , . . . , fn/2−1 } is congruent to 0 or I2 modulo 2.
+                                      Pn/2          Pn/2−1
+    A vector Y = α0 e0 + j=1 αj ej + k=1 βk fk ∈ Λτ (I2 ) with integer coordinates αj , βk ∈ Z
+therefore satisfies Y ≡ 0 or I2 (mod 2) if and only if αj ≡ 0 (mod 2) for all 1 ≤ j ≤ n/2 and
+βk ≡ 0 (mod 2) for all 1 ≤ k ≤ n/2−1, while α0 ∈ Z is arbitrary (α0 even gives Y ≡ 0 (mod 2),
+and α0 odd gives Y ≡ I2 (mod 2)). Therefore,
+                                                 n/2               n/2−1
+                                                 M                 M
+                              ′
+                            Λ (I2 ) = Ze0 ⊕            Z(2ej ) ⊕           Z(2fk ),
+                                                 j=1               k=1
+
+which establishes the index [Λτ : Λ′ ] = 2n/2+(n/2−1)
+                                             p        = 2n−1 in
+                                                              p(i) and the orthogonal
+                                                                                    √ decom-
+                                                                                       p
+position (9) in (ii). Finally, since ∥e0 ∥ = n/4, ∥2ej ∥ = 2 n/4, and ∥2f    k ∥ = 2  2 n/4,
+the unique shortest nonzero vectors of Λ′ (I2 ) are ±e0 of norm λ1 (Λ′ ) = n/4, correspond-
+                                                                          p
+            −1
+ing under Φ B to ±Vτ , while the next shortest linearly independent vectors are ±2ej of norm
+     ′
+           p
+λ2 (Λ ) = 2 n/4. This proves (iii).
+
+
+4.4    Determinant Certificate and Intertwiner Elimination
+Figure 2 illustrates the geometric transformation proved in Theorem 4. At n = 256, Theo-
+rem 4(i) and (5) yield a second bit-exact algebraic certificate for our implementation: in the ×8
+integer Gram convention, the Gram matrix of Λ′ satisfies
+  log2 det Gram(Λ′ ) = log2 det Gram(Λτ ) + 2(n − 1) = 2431.00 + 2 × 255 = 2941.00.                      (11)
+Any bug in the F2 solve or sublattice construction would alter this integer determinant; verifying
+log2 det Gram(Λ′ ) = 2941.00 certifies that [Λτ : Λ′ ] = 2255 holds exactly.
+    Equally important, Theorem 4(iii) removes the intertwiner separation stage of Straznickas
+and Weis [23, Remark 6.2]. Because ±Vτ is the unique shortest vector of Λ′ with a factor-of-two
+gap to all linearly independent vectors, any basis reduction or sieving tour that reaches the
+minimum of Λ′ outputs ±Vτ directly as its first basis vector.
+
+                                                       9
+                Cocycle Lattice Λτ                               Mod-2 Sublattice Λ′
+                          Vτ
+                 en/2                                                             2en/2
+                                  e2
+                                                                           Vτ
+
+               −e1                     e1                       −2e1                2e1
+
+                                                                          −Vτ
+                  −e2             −en/2                         −2en/2
+                         −Vτ
+
+             129 minimal pairs (λ2 /λ1 = 1)                   Unique pair ±Vτ (λ2 /λ1 = 2)
+
+
+
+Figure 2: p
+          Geometric effect√of closingthe modulo-two       parity constraint
+                                                                          √  into Λ′ ⊂ Λτ , transform-
+        ∼                                         ′ ∼
+                  n/2+1         n/2−1
+                                                       p            n/2         n/2−1
+ing Λτ = n/4 Z          ⊕ 2Z                into Λ = n/4 Z ⊕ 2Z ⊕ 2 2 Z                : the n/2 = 128
+spurious shortest vector pairs e1 , . . . , en/2 fail Y ≡ I2 (mod 2) and are doubled to norm 2λ1 ,
+isolating ±Vτ as the unique shortest vector pair with gap λ2 (Λ′ )/λ1 (Λ′ ) = 2.
+
+
+4.5    Lattice Dimension Invariance vs. Quality Optimization
+To situate Λ′ relative to the complexity bounds of Straznickas and Weis [23], it is essential to
+separate lattice dimension from lattice quality:
+
+1. Invariance of Ambient Rank n and Provable SVP Dimension n/2 + 1: Because
+   Λ′ = 2Λτ + Zw0 has finite index [Λτ : Λ′ ] = 2n−1 inside Λτ , its ambient Z-rank remains n,
+   and the provable two-block SVP oracle dimension n/2 + 1 of [8, 23] is unchanged. Moreover,
+   although Λτ is a free rank-4 module over OF = Z[ζ 2 +ζ −2 ] ([F : Q] = n/4), its F -discriminant
+   2 + ζ 2 + ζ −2 = (ζ + ζ −1 )2 is a non-square in F , which obstructs exterior-square module
+   reductions from lowering the Z-rank below n. Under the Geometric Series Assumption (GSA)
+   unique-SVP projection condition [1] β/n λ1 ≈ δβ2β−n vol(Λ)1/n with ln δβ = ln(β/(2πe))
+                                          p
+                                                                                         2β    (1 +
+   o(1)), the asymptotic BKZ block sizes of Λτ and Λ′ satisfy
+                                                                                       
+                 n 3 ln 2 n              n             ′      n 7 ln 2 n              n
+      β(Λτ ) =     −            +O             ,   β(Λ ) =       −          +O              , (12)
+                 2      8 ln n         ln2 n                  2      8 ln n         ln2 n
+
+    sharing the same leading asymptotic ratio limn→∞ β(n)/n = 1/2.
+
+2. Lattice Quality Optimization and Expected BKZ Block-Size Reduction: While
+   the dimension  is unchanged, multiplying the covolume by 2n−1 at unchanged target norm
+   λ1 (Λ ) = n/4 cuts the Hermite ratio λ1 / vol1/n in half from 2−(n−2)/(4n) → 2−1/4 ≈ 0.8409
+        ′
+            p
+
+   on Λτ to 2−(5n−6)/(4n) → 2−5/4 ≈ 0.4204 on Λ′ (0.4222 at n = 256). By (12), this yields a
+   diverging second-order block-size reduction
+                                                                   
+                                        ′      ln 2 n           n     n→∞
+                 ∆β(n) = β(Λτ ) − β(Λ ) =              +O             −−−→ +∞,
+                                                2 ln n        ln2 n
+
+   which lowers the expected BKZ block size β (obtained by solving β/n λ1 = δβ2β−n vol(Λ)1/n
+                                                                     p
+
+   and rounding to the nearest integer) by 34, 49, and 81 across HAWK-256, HAWK-512, and
+   HAWK-1024 (Section 7.3).
+
+
+5     Structural Limits and Exact Cholesky Preconditioning
+Having isolated ±Vτ in Λ′ , we now analyze the structural root Hermite factor threshold at
+n = 256 and detail our exact Cholesky preconditioning pipeline, which eliminates Gram-mode
+condition-number squaring prior to lattice sieving.
+
+                                                  10
+5.1   The Structural Hermite Limit at n = 256
+Before describing our basis preconditioning, we note a direct consequence of Theorem 4 at
+n = 256 that explains why no pure basis-flattening algorithm (such as LLL, flatter, or small-
+block BKZ governed by a root Hermite factor bound) can ever reach λ1 (Λ′ ) without triggering
+the unique-SVP projection mechanism.
+
+Proposition 5 (Structural Root Hermite Factor Limit at n = 256). For the modulo-two sub-
+lattice Λ′ at rank n = 256, the Hermite ratio between the first minimum and the normalized
+covolume is
+                        λ1 (Λ′ )
+                                  = 2−(5n−6)/(4n) = 2−637/512 ≈ 0.4222,
+                      vol(Λ′ )1/n
+and the root Hermite factor δ0 required for a GSA-governed basis profile ∥b1 ∥ = δ0n−1 vol(Λ′ )1/n
+to reach λ1 (Λ′ ) is
+                            λ (Λ′ ) 1/(n−1)
+                               1
+                δ0,req =                      = (0.4222)1/255 ≈ 0.996624 < 1.                     (13)
+                            vol(Λ′ )1/n
+
+Proof. In the ×8 integer Gram convention
+                                      √        at n = 256, the shortest vector ±Vτ has squared
+norm λ21 = 2n = 512 = 29 , so λ1 = 512 ≈ 22.6274. By (11), the integer Gram determinant is
+det Gram(Λ′ ) = 22941 , so the normalized squared covolume is (det Gram(Λ′ ))1/256 = 22941/256 ≈
+2872.90, giving a squared ratio λ21 /(det Gram(Λ′ ))1/256 = 29−2941/256 = 2−637/256 ≈ 0.17822
+and a linear ratio λ1 / vol(Λ′ )1/256 = 2−637/512 (or 0.4222 in Euclidean norm). Since any basis
+reduction profile parameterized by a root Hermite factor δ0 enforces ∥b1 ∥ ≈ δ0n−1 vol(Λ′ )1/n
+with δ0 ≥ 1, reaching ∥b1 ∥ = λ1 (Λ′ ) through profile flattening alone would require δ0 =
+(0.4222)1/255 ≈ 0.996624 < 1, which is impossible.
+
+    Proposition 5 establishes that at n = 256, λ1 (Λ′ ) lies strictly below vol(Λ′ )1/n . Pure profile-
+compression tools such as flatter [20] therefore saturate once the basis profile approaches
+vol(Λ′ )1/n (empirically saturating at 7,939.76× the target squared norm 512, even at root Her-
+mite factor 1.01). The attack can succeed only via the standard unique-SVP projection mech-
+anism [1]: progressive BKZ or sieving must reduce the basis sufficiently that the orthogonal
+projection πn−d+1 (Vτ ) onto the last d Gram–Schmidt vectors becomes recognizable to an SVP
+oracle. This structural threshold is why BKZ alone suffices for n ≤ 128, whereas n = 256
+requires a progressive sieve.
+
+5.2   Saturated Integer Kernel Extraction
+Given the 450-byte public key, we decode Q ∈ M2 (R256 ) and assemble the homogeneous linear
+constraint matrix representing (C1) and (C2) of (3). After eliminating 2n = 512 coordinates
+via the diagonal symmetry of (C1), constraint (C2) yields a 1024 × 512 integer matrix with
+15-bit entries, from which we select 256 linearly independent rows (0.3 CPU-core-seconds).
+    Following [23], we extract an exact Z-basis of the saturated integer kernel Λτ by first com-
+puting the Hermite normal form (HNF) with unimodular transformation in Sage. While HNF
+completes in 17.1 s and returns an exact basis of Λτ , the resulting unimodular transformation suf-
+fers severe coefficient swell, producing basis entries of up to 5,483–6,351 bits. Running standard
+fplll/Sage LLL directly on this HNF basis fails to terminate within 14 minutes, as standard
+LLL bit-complexity O(d5 βbits 2 ) grows by roughly (256/32)5 × (6351/1700)2 ≈ 3.4 × 105 relative
+
+to an n = 32 (1,700-bit HNF) baseline. Replacing standard LLL with Ryan and Heninger’s
+flatter [20] (at its default root Hermite factor 1.0219) reduces the HNF kernel to a 12–13-
+bit basis of Λτ in 125.9 s of CPU time. The entire kernel extraction stage completes in 143.0
+CPU-core-seconds and is certified exact by verifying log2 det Gram(Λτ ) = 2431.00.
+
+
+
+                                                  11
+5.3   Condition-Number Squaring in Gram-Mode GSO
+After forming Λ′ = 2Λτ +Zw0 and its 256×256 integer Gram matrix Gp = Gram(Λ′ ) (1.9 CPU-
+core-seconds), we must reduce Λ′ . Because Λ′ is naturally equipped with the trace-determinant
+Gram matrix Gp rather than an explicit Euclidean coordinate embedding in Z256 , the standard
+approach in [23] operates fpylll in Gram mode, feeding Gp directly to LLL and BKZ.
+    However, the natural basis of Λ′ exhibits a basis condition number of approximately 241 (236
+GSO spread) with 40–41-bit Gram entries. In fpylll’s Gram mode, Gram–Schmidt orthogo-
+nalization (GSO) operates directly on inner products Gp = BB T , which squares the condition
+number relative to basis-mode GSO on B [18, 12]. As a result, Gram-mode LLL in hard-
+ware double and long-double precision aborts immediately inside Babai’s nearest-plane routine.
+Switching to arbitrary-precision floating-point arithmetic (MPFR) allows a single Gram-mode
+LLL pass to finish, but it consumes 299–333 s and leaves the shortest basis vector at 2.828 × 105
+times the target squared norm 512.
+
+5.4   Exact Cholesky Embedding and Unimodular Recovery
+Whereas [23] applies a scaled Cholesky embedding only after an initial Gram-mode BKZ warm-
+up, we move high-precision Cholesky embedding and flatter ahead of initial LLL to avoid
+Gram-mode condition-number squaring altogether:
+
+1. High-Precision Cholesky Factorization. We compute the lower-triangular Cholesky
+   factor L ∈ M256 (R) satisfying Gp = LLT using high-precision (1,600-bit) floating-point
+   arithmetic, round the scaled factor to an integer basis matrix Bchol = ⌊2s L⌉ ∈ M256 (Z) (s =
+   61 for exact unimodular preconditioning, followed by s = 21 on G1 for the g6k embedding;
+   3.7 CPU-core-seconds).
+
+2. Fast Basis-Mode Reduction via flatter. Because Bchol is an explicit integer basis
+   matrix whose condition number is the square root of that of Gp , we reduce Bchol in basis mode
+   using flatter (55.6 CPU-core-seconds), obtaining a reduced integer matrix Bred = U Bchol .
+
+3. Exact Unimodular Transform Recovery. Rather than relying on floating-point Gram
+                                                                                           −1
+   updates, we recover the exact integer unimodular transformation matrix U = Bred Bchol       ∈
+   GL256 (Z) by exact triangular backward substitution against the lower-triangular factor Bchol ,
+   and apply U to the exact integer Gram matrix:
+
+                                          G1 = U G p U T .                                   (14)
+
+    In 59.3 CPU-core-seconds total, this preconditioning transforms Gp (which had 40–41-bit
+entries and ∼ 241 basis condition number) into an exact integer Gram matrix G1 with 27-bit
+entries and a Gram diagonal ratio of 2.2–3.0. Subsequent LLL on the preconditioned lattice
+starts at 71,197×–76,752× the target norm instead of 282,800× (a 4× improvement in starting
+quality before any BKZ or sieving begins).
+
+5.5   Relaxed LLL and BKZ Conditioning Warm-Up
+Three further empirically driven ablations on the preconditioned basis inform our pre-sieving
+design:
+
+• Relaxing LLL from δ = 0.99 to δ = 0.75. Running fplll’s [12] default δ = 0.99 LLL on
+  this instance costs 1,126.8 CPU-core-seconds. Relaxing the classical Lovász parameter [15] to
+  δ = 0.75 reduces the LLL time to 87.5 CPU-core-seconds (12.9× speedup) with zero penalty
+  to downstream convergence because a subsequent BKZ-20 conditioning pass or flatter com-
+  pression repairs the basis profile.
+
+
+                                               12
+           1. Decode               2. Kernel Λτ             3. Mod-2 Λ′           4. Cholesky
+          pk → Q (0.3 s)       HNF+flatter (143.0 s)        F2 solve (1.9 s)   G1 = U Gp U T (59.3 s)
+
+
+
+                8. Verify              7. τ -Tower           6. Pullback        5. Sieve (d=80)
+             ∗ B                    ℓ = 9 → 3 (174.2 s)
+            Brec rec = Q (3.6 s)                              v = uU → Vτ         g6k (1,469.5 s)
+
+
+Figure 3: End-to-end 8-stage HAWK-256 single-core key recovery pipeline with measured CPU-
+core-seconds for each stage (total 1,851.8 s, or 30.9 minutes).
+
+• BKZ-20 Conditioning Warm-Up. A naive schedule that runs four tours at each block
+  size β = 3, 4, 5, . . . without a low-β warm-up fails to converge. In our control experiment on
+  the same key without warm-up, running BKZ across β ∈ {3, 4, 5, 6, 7, 8} consumed 130 s in
+  total while the automatic abort condition triggered three times (at β ∈ {4, 6, 8}) and the first
+  vector stalled at 1.2 × 105 times the target norm. The reason is structural: BKZ-β requires
+  approximately d/(β − 1) tours to equilibrate its GSA profile across dimension d = 256 [5],
+  which is ≈ 13 tours at β = 20 versus only ≈ 4 tours at β = 58. Supplying a dedicated BKZ-20
+  conditioning warm-up equilibrates the global basis slope before ramping the block size.
+• Replacing Enumeration BKZ with g6k. In fpylll 0.6.4 [12], standard enumeration-
+  based BKZ in fixed-precision floating-point (d, ld, dpe) aborts in Babai’s nearest-plane loop
+  across Gram and Cholesky-basis presentations at β ≥ 5, whereas driving reduction directly
+  through the General Sieve Kernel (g6k) [2] on the flatter-preconditioned Cholesky basis
+  bypasses fplll’s enumeration loop and progresses smoothly to the lattice minimum.
+
+
+6     Progressive Sieving and Tower Descent
+With the preconditioned Gram matrix G1 = U Gp U T in hand, this section describes the pro-
+gressive sieving tour in g6k, the exact coordinate pullback to Λ′ , and the subsequent τ -tower
+descent to recover an equivalent secret key.
+
+6.1    Progressive Pump-and-Jump Sieve Ladder
+Figure 3 summarizes the complete eight-stage recovery chain. Once the preconditioned Gram
+matrix G1 = U Gp U T is embedded at scale s = 21 and initialized with internal LLL (2.4 s), we
+invoke the General Sieve Kernel (g6k) [2] on a single thread using its progressive pump-and-jump
+BKZ tour across five sieve dimensions:
+                                     dsieve ∈ {40, 50, 60, 70, 80}.                                     (15)
+Because Bchol = ⌊2s L⌉ scales Euclidean lengths by 2s with s = 21, the unique shortest vector
+±Vτ of integer Gram norm squared 2n = 512 corresponds to an embedded lattice vector of
+squared Euclidean norm
+                               ∥btarget ∥2 ≈ 22s · 2n = 242 · 512 = 251 .
+During the progressive sieve ladder (15), the tours at dsieve ∈ {40, 50, 60, 70, 80} take 85.6 s,
+142.9 s, 215.2 s, 331.8 s, and 691.6 s of CPU time (88.9 s, 143.6 s, 216.3 s, 333.2 s, and 694.1 s wall-
+clock), reaching a cumulative single-core SVP runtime of 1,469.5 CPU-core-seconds (1,478.5 s
+wall-clock time) while driving the squared norm ratio ∥b1 ∥2 /∥btarget ∥2 down along the sequence
+72,768 → 57,524 → 36,216 → 19,417 → 8,979 → 0.999625. At dsieve = 80, the pump projects
+±Vτ into the active sieve window and lifts it to row 0 of the basis, achieving an embedded
+squared norm of 0.999625 × 251 (the deviation of 3.75 × 10−4 coming solely from the s = 21
+integer rounding of Bchol ).
+
+                                                       13
+6.2   Exact Preconditioned Coordinate Recovery
+After the sieve places the shortest vector bmin at row 0 of the reduced embedded basis, we must
+recover the exact integer coordinate vector v ∈ Z256 of ±Vτ with respect to our original Z-basis
+of Λ′ . As in [23], because the s = 21 Cholesky factor Bs = ⌊221 chol(G1 )⌉ is lower triangular,
+exact triangular backward substitution of bmin against Bs returns an integer coordinate vector
+u ∈ Z256 .
+    Because the sieve operated on Bs (the Cholesky embedding of G1 = U Gp U T ), the coor-
+dinate vector u is expressed in the preconditioned basis of Λ′ , whose Gram matrix is G1 =
+U Gp U T from (14), rather than in the unpreconditioned basis of Λ′ , whose Gram matrix is
+Gp = Gram(Λ′ ). Evaluating u in G1 and mapping back to the original Λ′ basis via the saved
+unimodular transformation U ∈ GL256 (Z) yields:
+
+      v = u U ∈ Z256       =⇒     v Gp v T = u (U Gp U T ) uT = u G1 uT = 2n = 512.             (16)
+
+Our verification routine confirms (16) alongside four exact algebraic certificates in under 2 CPU-
+seconds: (i) log2 det Gram(Λ′ ) = 2941.00 = 2431 + 2 × 255, certifying [Λτ : Λ′ ] = 2255 ; (ii) row 0
+of the reduced embedded basis attains squared norm 0.999625 × 251 ; (iii) uG1 uT = 512 in the
+preconditioned Gram form and vGp v T = 512 in the original Λ′ Gram form, matching 2n = 512;
+and (iv) mapping v ∈ Z256 through the Z-basis of Λ′ yields the exact matrix Vτ = B −1 τ (B) ∈
+SL2 (R256 ), satisfying Vτ ≡ I2 (mod 2) and Vτ τ (Vτ ) = I2 .
+
+6.3   The τ -Tower Descent at n = 256
+Once Vτ = B −1 τ (B) is recovered at level ℓ = 9 (n = 256), the remaining task is to solve
+Hilbert-90 / cocycle splitting down the cyclotomic tower L9 ⊃ L8 ⊃ · · · ⊃ L3 to reconstruct an
+                                                       ∗ B
+equivalent secret basis Brec ∈ SL2 (R256 ) satisfying Brec rec = Q. For this stage, we invoke the
+τ -tower descent algorithm of Straznickas and Weis [23] (building on [13]) without modification.
+     Running the tower descent on our recovered Vτ at n = 256 completes in 174.2 CPU-core-
+seconds and records the exact BKZ block-size trace across tower levels ℓ ∈ {9, 8, 7, 6, 5, 4, 3}:
+               
+                 9 : Preset, 8 : 13, 7 : 0, 6 : 0, 5 : 0, 4 : 0, 3 : Base .
+
+Here ℓ = 9 takes our preset cocycle Vτ , the first subfield level ℓ = 8 (n = 128) requires only
+BKZ block size β = 13, every intermediate level ℓ ∈ {7, 6, 5, 4} (n ∈ {64, 32, 16, 8}) is solved by
+pure LLL (β = 0), and ℓ = 3 (n = 4) is the base level. The descent outputs Brec ∈ SL2 (R256 )
+              ∗ B
+satisfying Brec   rec = Q bit-for-bit. For HAWK-512 (ℓ = 10, n = 512), where the tower’s first
+sub-level is an ℓ = 9 (n = 256) cocycle solve [23], our 27.9-minute Λ′ cocycle solve (30.9 minutes
+including ℓ = 9 → 3 descent) directly replaces the default Gram-mode BKZ at ℓ = 9.
+
+
+7     Sieve Dimension Scaling and Experimental Verification
+We now report the stage-by-stage timing breakdown of our single-core HAWK-256 key recovery,
+analyze the runtime scaling from sieve dimension d = 118 down to d = 80, and evaluate the
+concrete security impact on HAWK-256, HAWK-512, and HAWK-1024.
+
+7.1   Stage-by-Stage Timing Breakdown
+All computational costs are reported in CPU-core-seconds, measured via operating-system re-
+source accounting summed across the parent process and all child processes so that every stage
+is fully included.
+    To ensure transparent accounting of parallelism, we note that the decisive SVP stage (Stage
+5) ran strictly single-threaded, accumulating 1,469.5 s of CPU time against 1,478.5 s of wall-
+clock time (0.994 cores). Across the entire chain, pre-SVP setup and preconditioning account
+
+                                                 14
+Table 2: Stage-by-stage single-core CPU-core-second breakdown for end-to-end HAWK-256 key
+recovery (n = 256, ℓ = 9), compared against Straznickas and Weis [23].
+Stage                          Operation                                                                  Time (s)          Share
+Public-key decode        Decode Q and build 1024 × 512 constraint matrix                                        0.3 s < 0.1%
+Cocycle kernel           Extract saturated Z-basis of Λτ (HNF 17.1 s + flatter 125.9 s)                       143.0 s   7.7%
+Sublattice setup         Solve F2 parity system and form Gp = Gram(Λ′ )                                         1.9 s   0.1%
+Cholesky preconditioning Compute Gp = LLT , reduce Bchol via flatter, recover U, G1                            59.3 s   3.2%
+Pre-SVP subtotal               All setup and preconditioning stages (Stages 1–4)                             204.5 s        11.0%
+Progressive sieve              Single-thread g6k tour (d ∈ {40, 50, 60, 70, 80})                           1,469.5 s        79.4%
+Tower descent                  Coordinate pullback v = uU and τ -tower (ℓ = 9 → 3)                            174.2 s        9.4%
+Reference check                Encode 592-byte key and run C reference sign/verify                              3.6 s        0.2%
+Total time                     Complete end-to-end HAWK-256 key recovery                                   1,851.8 s 100.0%
+Prior baseline [23]            3 h 42 min across 96 cores                                                 1,278,720 s          —
+Speedup factor                 Ratio against baseline [23]                                                     690×            —
+
+
+
+      Table 3: Sieve database and runtime scaling from d = 118 [23] to d = 80 (this work).
+               Metric                                  d = 118 ([23])        d = 80 (This Work)          Ratio
+                                a                    24.49               7       16.60               4
+               Database size                     2           ≈ 2.35 × 10        2        ≈ 9.93 × 10       236×
+               Predicted sieve timeb                                227.67                      218.76     481×
+               Measured total time                           1,278,720 s                    1,851.8 s     690×
+        a Heuristic database size 20.2075 d .   b Empirical scaling law ∝ (database)1.13 ≈ 20.2345 d (in relative units).
+
+
+
+
+for 204.5 s (11.0%), progressive sieving accounts for 1,469.5 s (79.4%), and coordinate pullback,
+τ -tower descent, and reference verification account for 177.8 s (9.6%), totaling 1,851.8 CPU-core-
+seconds (30.9 minutes CPU, 1,861.8 s or 31.0 minutes end-to-end wall-clock). Table 2 provides
+the complete stage-by-stage breakdown.
+
+7.2      Sieve Dimension Reduction from d = 118 to d = 80
+The 690× speedup over [23] reduces to a single structural quantity: the maximum sieving dimen-
+sion dmax required for the reduction to expose ±Vτ . In [23], the progressive BGJ-style sieve [24]
+is driven to a final sieving dimension of 118 along the slide schedule (60, 70, 80, 95, 108, 118). In
+our pipeline, the progressive sieve reaches the minimum of Λ′ at dmax = 80.
+    Standard heuristic and empirical scaling laws explain why reducing dmax from 118 to 80
+yields a factor of ≈ 500–690 in runtime. A lattice sieve in dimension d maintains a database of
+size Ndb (d) ≈ (4/3)d/2 ≈ 20.2075 d [4, 2]. Practical CPU sieving runtime scales approximately as
+Tsieve (d) ∝ Ndb (d)1.13 ≈ 20.2345 d (in standalone single-pump probes on Λ′ , g6k builds databases
+of 65,394 vectors in 10.6 s CPU at d = 70 and 275,569 vectors in 124.0 s CPU at d = 80, while
+full progressive tours take 331.8 s and 691.6 s CPU at d = 70 and d = 80). Table 3 compares
+the predicted scaling ratios between d = 118 and d = 80 against our end-to-end measurement.
+    As Table 3 demonstrates, the empirical throughput law predicts a 481× reduction in sieve
+work, closely matching our measured 690× end-to-end speedup (with the remaining gap reflect-
+ing elimination of the 16-minute intertwiner stage, 96-core parallelization overhead, and g6k’s
+early-exit progressive tour versus svp tool). Two mechanisms account for the drop 118 → 80:
+
+1. Unique-SVP isolation and block-size reduction in Λ′ (Section 4): Doubling the n/2
+   spuriouspminimal pairs of Λτ increases the covolume vol(Λ′ ) = 2n−1 vol(Λτ ) while keeping
+   ∥Vτ ∥ = n/4 unchanged, which lowers the required BKZ block size from β = 92 to β = 58
+   (9.28 bits in the AGPS20 gate model) and eliminates the intertwiner stage.
+
+
+                                                                   15
+Table 4: Expected BKZ block size β, effective sieve dimension βeff , and heuristic AGPS20 gate
+complexity on Λτ [23, Appendix C] versus our modulo-two sublattice Λ′ across HAWK-256,
+HAWK-512, and HAWK-1024.
+ Variant            n Claimed β(Λτ ) β(Λ′ ) βeff (Λ′ ) Gates (Λτ [23]) Gates (Λ′ , Ours)                      ∆Sec
+                                                                                                41.56 a
+ HAWK-256   256           64 bits      92     58         40               250.83              2        −9.28 bits
+ HAWK-512   512          128 bits     205    156        136               280.79               269.64 −11.15 bits
+ HAWK-1024 1024          256 bits     432    351        312              2146.48              2122.73 −23.74 bits
+ a Evaluated from the AGPS20 classical list-decoding cost model (jschanck/eprint-2019-1161, commit 1ec49e5); since
+
+ the precomputed CSV starts at d = 64, Cgate (40) = 33.56 (241.56 total) is evaluated directly from the exact AGPS20
+     spherical-wedge list-decoding circuit at d = 40 (ncode = 4095), agreeing within 0.11 bits with two-point affine
+                   continuation from d = 64, 72 (241.44 , −9.39 bits; ≤ 248.49 if clamped at d = 64).
+
+
+
+2. Eliminating Gram-mode skew via exact Cholesky preconditioning (Section 5):
+   The same cocycle isometry class is solved by plain LLL (β = 2) at n = 64 and small-block
+   BKZ (β ≤ 13) at n = 128, yet stalls at β = 40 at n = 256 under naive Gram-mode reduction
+   because the natural Gram matrix has ∼ 241 basis condition number and Gram-mode GSO
+   squares its condition number. Replacing Gram mode with our exact Cholesky embedding
+   and flatter preconditioning improves the post-LLL squared norm by 4× and allows the
+   progressive pump-and-jump ladder to detect Vτ at d = 80.
+
+7.3    Security Impact on HAWK-256, HAWK-512, and HAWK-1024
+To assess the concrete impact of Λ′ across all three HAWK parameter sets (HAWK-256 at n =
+256 claiming 64 bits, HAWK-512 at n = 512 claiming 128 bits for NIST Level I, and HAWK-1024
+at n = 1024 claiming 256 bits for NIST Level V), we follow the HAWK specification [10, §5.3] and
+Straznickas–Weis [23, Appendix   C]: from the expected BKZ block size β, we compute d4f(β) =
+round β ln(4/3)/ ln(β/(2πe)) [7], the effective sieve dimension βeff = 8⌊(β − d4f(β))/8⌋ (note
+that βeff is invariant even if β is replaced by ⌈β ∗ ⌉ under δβ2β−n−1 ), and the classical list-decoding
+gate complexity log2 n + Cgate (βeff ) in the AGPS20 gate model [3, 23] (alongside the provable
+(n/2 + 1)-dimensional SVP bounds of 252 , 286 , and 2158 gates per oracle call, or 272 , 2108 , and
+2182 total gates including the O(n2 log n) reduction calls [8, 23]).
+    Table 4 summarizes the resulting block-size and gate-complexity reductions across all three
+parameter sets:
+
+• HAWK-256 (n = 256, claimed 64 bits): Passing from Λτ to Λ′ lowers the GSA-intersect
+  BKZ block size by 34 (from β = 92 to β = 58, or from 82.58 to 60.19 under the HAWK
+  BKZ simulator [9]) and lowers the effective sieve dimension from 72 to 40. This reduces the
+  AGPS20 gate cost by 9.28 bits (from 250.83 to 241.56 gates; 241.44 under d = 64, 72 affine
+  continuation), while our single-core execution completes end-to-end in 1,851.8 s (≈ 210.9
+  core-seconds) at sieve dimension d = 80.
+
+• HAWK-512 (n = 512, claimed 128 bits, NIST Level I): The required BKZ block size
+  drops by 49 (from β = 205 to β = 156, or from 197.68 to 158.18 under the BKZ simulator),
+  lowering βeff from 176 to 136 (matching the BKZ simulator) and reducing the AGPS20 gate
+  complexity by 11.15 bits from 280.79 to 269.64 (58.4 bits below the 128-bit NIST Level I
+  claim; 267.35 at d = 128 if ⌊β − d4f(β)⌋ = 135 is floored prior to rounding down to a multiple
+  of 8). Carrying forward the empirical ratio d/β(Λ′ ) = 80/58 ≈ 1.379 and throughput law
+  T (d) ∝ 20.2345 d from n = 256 projects a sieve dimension of d ≈ 215 (213 at 80/59 × 157) and
+  ≈ 3.4–5.0 × 1012 CPU-core-seconds (≈ 241.6 –242.2 core-s).
+
+• HAWK-1024 (n = 1024, claimed 256 bits, NIST Level V): The required BKZ block size
+  drops by 81 (from β = 432 to β = 351, or from 429.16 to 358.29 under the BKZ simulator),
+
+
+                                                         16
+    lowering βeff from 392 to 312 and reducing the AGPS20 gate complexity by 23.74 bits from
+    2146.48 to 2122.73 (2125.11 under the BKZ simulator, pushing HAWK-1024 below the 2128
+    NIST Level I threshold and more than 133 bits below the 256-bit NIST Level V claim), with
+    a projected sieve dimension of d ≈ 480–484 (≈ 2.6–4.9 × 1031 core-s ≈ 2104.3 –2105.3 ).
+
+7.4    Reference Verification and Key Equivalence
+To verify end-to-end correctness beyond mathematical identities, we encode the recovered basis
+Brec ∈ SL2 (R256 ) into the exact 592-byte decoded secret-key layout expected by the official
+HAWK NIST submission reference C implementation [9, 10] and pass it directly to the unmod-
+ified reference signing and verification routines alongside the 450-byte original public key. Both
+the signing routine (using Brec ) and the verification routine (using the original 450-byte public
+key Q) succeed on the first attempt.
+    The recovered 592-byte secret key (MD5 digest 13189d8cd2143a3b90f1652699516126) dif-
+fers byte-for-byte from the original secret key generated alongside the challenge (MD5 digest
+cf5859cccdec228ef12cb3f877860ba3) while satisfying Brec      ∗ B
+                                                                 rec = Q identically. As explained
+in Section 3, recovering a distinct unitary-equivalent secret key that signs validly under the
+original reference public key (MD5 digest 2ee40754e31b8f29a137824d2a7e79d6) confirms that
+the recovery uses zero secret information at any stage.
+
+
+8     Scope and Limitations
+To keep our claims rigorous and reproducible, we explicitly state the scope and boundaries of
+this work:
+
+1. Algebraic Attribution vs. End-to-End Engineering: The τ -cocycle lattice Λτ and the
+   τ -tower descent algorithm are due to Straznickas and Weis [23], whose tower descent proce-
+   dure we use unmodified. What is new in this work is closing the modulo-two congruence into
+   the unique-SVP sublattice Λ′ ahead of reduction, deriving the second-order asymptotic block-
+   size shift ∆β(n) = ln22 n/ ln n and concrete β reductions across HAWK-256/512/1024, iden-
+   tifying the structural root Hermite factor barrier δ0,req = 0.996624 < 1, eliminating Gram-
+   mode condition-number squaring via pre-LLL exact Cholesky preconditioning, flatter, and
+   exact unimodular Gram pullback G1 = U Gp U T (v = uU ), and demonstrating that the com-
+   plete chain executes on a single core at n = 256 in 1,851.8 CPU-core-seconds (690× faster
+   than previously published).
+
+2. Single Reference Key Instance: Our experimental measurements at n = 256 are con-
+   ducted on a genuine reference public key (alongside controlled ablation runs for HNF/LLL,
+   Gram-mode MPFR, and BKZ warm-up), comparing against the published Λτ baseline. Be-
+   cause Theorem 4 guarantees that the isometry class of Λ′ is strictly independent of the secret
+   key, the target norm, determinant, and gap λ2 /λ1 = 2 are identical for every HAWK-256
+   key, though minor run-to-run variance in sieve tour timing is expected across seeds.
+
+3. Reproducibility Suite: Our verification suite supports both fast verification from the
+   saved reduced basis (validating the sublattice certificates, GSA/AGPS20 security estimates,
+   coordinate recovery, and C reference signing in seconds) and full end-to-end re-execution
+   from the 450-byte public key alone.
+
+Use of AI. The cryptanalytic results and artifacts were initially developed through an au-
+tonomous agent system powered by a MiniMax internal model. We validated the key technical
+claims and refined the presentation of the manuscript.
+
+
+
+                                               17
+References
+ [1] M. R. Albrecht and L. Ducas. Lattice attacks on NTRU and LWE: A history of refinements.
+     In J. W. Bos and M. Stam, editors, Computational Cryptography: Algorithmic Aspects of
+     Cryptology, volume 469 of London Mathematical Society Lecture Note Series, pages 15–40.
+     Cambridge University Press, 2021. IACR ePrint 2021/799.
+ [2] M. R. Albrecht, L. Ducas, G. Herold, E. Kirshanova, E. W. Postlethwaite, and M. Stevens.
+     The General Sieve Kernel and new records in lattice reduction. In Advances in Cryptology
+     – EUROCRYPT 2019, volume 11477 of LNCS, pages 717–746. Springer, 2019.
+ [3] M. R. Albrecht, V. Gheorghiu, E. W. Postlethwaite, and J. M. Schanck. Estimating quan-
+     tum speedups for lattice sieves. In Advances in Cryptology – ASIACRYPT 2020, volume
+     12492 of LNCS, pages 583–613. Springer, 2020. IACR ePrint 2019/1161.
+ [4] A. Becker, L. Ducas, N. Gama, and T. Laarhoven. New directions in nearest neighbor
+     searching with applications to lattice sieving. In ACM-SIAM Symposium on Discrete Al-
+     gorithms (SODA 2016), pages 10–24. SIAM, 2016.
+ [5] Y. Chen and P. Q. Nguyen. BKZ 2.0: Better lattice security estimates. In Advances in
+     Cryptology – ASIACRYPT 2011, volume 7073 of LNCS, pages 1–20. Springer, 2011.
+ [6] D. Dachman-Soled, L. Ducas, H. Gong, and M. Rossi. LWE with side information: Attacks
+     and concrete security estimation. In Advances in Cryptology – CRYPTO 2020, volume
+     12171 of LNCS, pages 329–358. Springer, 2020.
+ [7] L. Ducas. Shortest vector from lattice sieving: A few dimensions for free. In Advances in
+     Cryptology – EUROCRYPT 2018, volume 10820 of LNCS, pages 125–145. Springer, 2018.
+ [8] L. Ducas. Provable lattice reduction of Zn with blocksize n/2. Designs, Codes and Cryp-
+     tography, 92(4):909–916, 2024. IACR ePrint 2023/447.
+ [9] L. Ducas, E. W. Postlethwaite, L. N. Pulles, and W. van Woerden. Hawk: Module
+     LIP makes lattice signatures fast, compact and simple. In Advances in Cryptology –
+     ASIACRYPT 2022, volume 13794 of LNCS, pages 65–94. Springer, 2022. IACR ePrint
+     2022/1155.
+[10] J. W. Bos, O. Bronchain, L. Ducas, S. Fehr, Y.-H. Huang, T. Pornin, E. W. Postlethwaite,
+     T. Prest, L. N. Pulles, and W. van Woerden. HAWK specification document, version 1.1.
+     NIST Post-Quantum Cryptography Standardization Additional Digital Signature Schemes
+     Submission, February 2025 (advanced to Round 3 May 2026; withdrawn July 29, 2026).
+     Available at https://hawk-sign.info.
+[11] L. Ducas and W. van Woerden. On the lattice isomorphism problem, quadratic forms,
+     remarkable lattices, and cryptography. In Advances in Cryptology – EUROCRYPT 2022,
+     volume 13277 of LNCS, pages 643–673. Springer, 2022. IACR ePrint 2021/1332.
+[12] The FPLLL development team. fplll, a lattice reduction library, Version 5.4.5 (2023),
+     and fpylll, a Python interface to fplll, Version 0.6.4 (2025). Available at https://
+     github.com/fplll/fplll and https://github.com/fplll/fpylll.
+[13] D. M. H. van Gent and L. N. Pulles. HAWK: Having automorphisms weakens key. IACR
+     Communications in Cryptology, 2(2), Article 20, 2025. IACR ePrint 2025/928.
+[14] C. Gentry, C. Peikert, and V. Vaikuntanathan. Trapdoors for hard lattices and new crypto-
+     graphic constructions. In ACM Symposium on Theory of Computing (STOC 2008), pages
+     197–206. ACM, 2008.
+
+                                             18
+[15] A. K. Lenstra, H. W. Lenstra, Jr., and L. Lovász. Factoring polynomials with rational
+     coefficients. Mathematische Annalen, 261(4):515–534, 1982.
+
+[16] H. Luo, K. Jiang, Y. Pan, and A. Wang. Cryptanalysis of rank-2 module-LIP with sym-
+     plectic automorphisms. In Advances in Cryptology – ASIACRYPT 2024, volume 15487 of
+     LNCS, pages 359–385. Springer, 2024. IACR ePrint 2024/1173.
+
+[17] B. Nelson, J. Limbrey, C. Ling, and A. Mendelsohn. Cryptanalysis of HAWK: A guessing
+     game. Cryptology ePrint Archive, Paper 2026/1318, 2026.
+
+[18] P. Q. Nguyen and D. Stehlé. An LLL algorithm with quadratic complexity. SIAM Journal
+     on Computing, 39(3):874–903, 2009.
+
+[19] P.-A. Fouque, J. Hoffstein, P. Kirchner, V. Lyubashevsky, T. Pornin, T. Prest, T. Ricos-
+     set, G. Seiler, W. Whyte, and Z. Zhang. FALCON: Fast-Fourier lattice-based compact
+     signatures over NTRU. NIST Post-Quantum Cryptography Standardization Round 3 Sub-
+     mission, 2020.
+
+[20] K. Ryan and N. Heninger. Fast practical lattice reduction through iterated compression.
+     In Advances in Cryptology – CRYPTO 2023, volume 14083 of LNCS, pages 3–36. Springer,
+     2023.
+
+[21] M.-J. O. Saarinen. HAWK “Guessing Game” is not polynomial-time. Cryptology ePrint
+     Archive, Paper 2026/1377, 2026.
+
+[22] C.-P. Schnorr. A hierarchy of polynomial time lattice basis reduction algorithms. Theoret-
+     ical Computer Science, 53(2–3):201–224, 1987.
+
+[23] Z. Straznickas and S. A. Weis. HAWK-n key recovery reduces to SVP in dimension n/2+1.
+     Cryptology ePrint Archive, Paper 2026/1593, 2026.
+
+[24] Z. Zhao, J. Ding, and B.-Y. Yang. Sieving with streaming memory access. IACR Transac-
+     tions on Cryptographic Hardware and Embedded Systems (TCHES), 2025(2):362–384, 2025.
+     IACR ePrint 2024/739.
+
+
+
+
+                                              19
+

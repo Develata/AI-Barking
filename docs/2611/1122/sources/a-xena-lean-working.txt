@@ -1,0 +1,248 @@
+Lean for the working mathematician | Xena
+
+ Xena [https://xenaproject.wordpress.com/]
+
+Mathematicians learning Lean by doing.
+
+ [https://xenaproject.wordpress.com/]
+
+Skip to content [#content]
+
+Home [https://xenaproject.wordpress.com]
+
+About Xena [https://xenaproject.wordpress.com/what-is-the-xena-project/]
+
+Student projects [https://xenaproject.wordpress.com/student-projects/]
+
+Installing Lean and mathlib [https://leanprover-community.github.io/get_started.html]
+
+Bluesky [https://bsky.app/profile/xenaproject.bsky.social]
+
+Useful links. [https://xenaproject.wordpress.com/useful-links/]
+
+← “…and the proof is checked in Lean” [https://xenaproject.wordpress.com/2026/11/12/and-the-proof-is-checked-in-lean/]
+
+Lean for the working mathematician [https://xenaproject.wordpress.com/2026/11/21/lean-for-the-working-mathematician/]
+
+ Posted on November 21, 2026 [https://xenaproject.wordpress.com/2026/11/21/lean-for-the-working-mathematician/] by xenaproject [https://xenaproject.wordpress.com/author/xenaproject/] 
+
+[(Kevin Buzzard says) This is a guest post by Mitchell Taylor [https://mitchtaylormath.ca/], a mathematician who gave a talk at Imperial’s PDE seminar a few weeks ago on the topic below. If you had shown me this blog post in 2024 and told me that this is what life would be like in 2026 I suspect I would not have believed you. Now over to Mitchell.]
+
+Recent advances in artificial intelligence have made it possible for mathematicians to formally verify their papers in Lean. This post will explain how I became interested in formal verification and how I use Lean as a tool to improve my research. It will also provide a link to a precise list of instructions that any mathematician (with a subscription to a frontier AI model) can use to verify their own results.
+
+1. What is Lean and why do I use it?
+
+Lean is a functional programming language and proof assistant designed for writing mathematically precise definitions, statements, and formal proofs. It is not the only such language, but it is the most popular among mathematicians. The main reason I use Lean is that a large body of formally verified mathematics has already been collected in Lean’s mathematical library, Mathlib. This library comprises over two million lines of carefully curated code, covering most of undergraduate mathematics, a substantial portion of graduate school, and selected research topics.
+
+1.1. How I got interested in Lean
+
+Throughout my mathematical career, I have tended to choose people to work with rather than problems to work on. My interest in Lean is no exception, as it arose naturally from interactions with my collaborators Jaume de Dios Pont, Lukas Liehr, and David Muñoz-Lahoz.
+
+Jaume and I were both postdocs at ETH Zürich from 2023 until the end of 2025. It didn’t take me long to realize that Jaume was extremely smart, but it did take me a while to process his enthusiasm for AI. Looking at the abilities of ChatGPT at the time, I could not imagine AI being able to do research-level mathematics. However, Jaume had worked at Microsoft Research in the summer of 2023, witnessed the rapid progress firsthand, and was largely convinced that within a few years AI would be extremely powerful.
+
+So what would we do? The first natural question to ask was: what part of mathematics would AI be good at first? Our guess was that it would be good at coding before theorem proving, and that formally verifying research-level mathematics in Lean might one day be possible. The issue was that neither of us knew any Lean. However, Jaume, being Jaume, quickly responded with “No problem, I’ll just teach a course on it”.
+
+I attended Jaume’s Lean course in Fall 2025. We began by playing the Natural Number Game [https://adam.math.hhu.de/], then learned some of the theory behind formal verification, and finally proceeded to read and write Lean proofs. The class was extremely fun; I see why people often compare writing proofs in Lean to playing an addictive strategy game. That said, it is also important to mention that I was likely the worst student in the class. Indeed, my programming experience is limited, I had to miss several lectures due to travel, and I may have “forgotten” to return some of my homework. I mention this to put the time commitment in perspective. Roughly speaking, 10 hours of class time was sufficient for me to later confidently check (once LLMs became good at coding) that my research papers were formalized correctly.
+
+In February 2026 I received a message from Jaume, now at NYU Data Science, enthusiastically suggesting that formalizing papers in Lean with LLMs should be possible. He was right, and within one month we had two of our joint papers in Lean. This was a shocking experience for me, and my first reaction was to tell as many people as I could. Although convincing people in March that the AI revolution had already begun was not so easy, I am happy to say that more than a dozen members of our community have now verified their papers in Lean!
+
+There are two other major contributors to our Lean effort who are worth mentioning explicitly: David Muñoz-Lahoz and Lukas Liehr. David is the creator and maintainer of our community Lean library in Banach lattice theory. His journey to Lean also began in 2025, when, for fun, he verified Kakutani’s C(K)C(K)-representation theorem, arguably the most fundamental result in Banach lattice theory. When I told him that Lean code could now be written with AI, he immediately began working on creating a high-quality reusable library for our field. Within two months, he had already put the core theory of Banach lattices in the library, and then began teaching others how to contribute. Lukas, on the other hand, had no experience with Lean before March 2026. However, he became completely fluent in just a few weeks, and has now produced several million lines of Lean code. The workflows and advice for formalizing papers and libraries that I present here have been largely influenced by their feedback. I also benefited from discussions with many other researchers, including Susanna Bertolini, Cynthia Bortolotto, Henry Cohn, Enric Florit-Simon, Bogdan Georgiev, Javier Gómez-Serrano, Josef Greilhuber, Liudmyla Kryvonos, Pedro Tradacete, and Peiyang Yu.
+
+2. How Lean can be used
+
+In February, autoformalizing a paper in Lean was far from trivial, and the code was extremely poor quality. However, over the last nine months the barrier to entry has dropped significantly (assuming you have access to a frontier LLM) and the code quality has improved dramatically. Here, I will give some examples demonstrating why formal verification is important and why one should learn it now.
+
+2.1. Some ways that I use Lean
+
+I will focus mainly on applications of “autoformalization”, where an LLM writes the Lean code with little human input, and “semi-autoformalization”, where a human guides the definitions and statements. However, before proceeding, it is important to remark on the numerous benefits of human-led formal verification. Indeed, Mathlib-level formalization yields perhaps the deepest understanding of a given theorem, as it forces one to consider the most effective way to state it, the most efficient way to execute its proof, the best use of tactics, and the potential reusability of the code. In contrast, I tend to use semi-autoformalization to explore the large-scale geometry of a proof or a research field, and autoformalization to quickly check that a theorem is correct.
+
+Checkpoints and generalizations. One way we use formal verification is to establish “checkpoints” which allow us to take bigger risks and be more creative. For example, a typical 100+ page PDE paper naturally divides into 5 or 6 sub-objectives (linear theory, difference estimates, energy estimates, etc.) which are essentially decoupled. One of the stressful parts of writing such a paper is that all of these pieces must come together at the end, and a mistake in one can make progress in the others less interesting. Nowadays, however, once we have an informal proof of one of the sub-objectives, we can quickly verify it in Lean. This then gives confidence that the sub-objective is complete and additional motivation for closing the other objectives.
+
+We have similarly used Lean to generalize proofs. For example, in our paper on L2L^2-stability of STFT phase retrieval, we initially proved what could be thought of as the case (n,p,d)=(0,1,1)(n,p,d)=(0,1,1) of a much more general theorem. We extended the result in several steps, verifying each partial extension in Lean and then using it to take the next step. This eventually led to an all-encompassing theorem whose proof was more than double the length of the original.
+
+Presenting math in new ways. Formal verification also offers the possibility of presenting math in new ways. For example, in the paper on STFT phase retrieval mentioned above, the core ideas were already present in the case (n,p,d)=(0,1,1)(n,p,d)=(0,1,1), and although the general case was practically useful, the proof was essentially just a technical exercise in bookkeeping. Formal verification presents an interesting opportunity: could mathematicians in the future spend most of the paper explaining the main ideas and then relegate technical details to an appendix or GitHub repository with a formal certificate that the details are correct? This may be a very natural way of presenting mathematics, as experts can focus on the main ideas and students can still have access to the details together with a guarantee that they will work out.
+
+Expediting the tedious parts of math. For me, one of the least instructive but most time-consuming stages of writing a paper happens when all of the sub-objectives are complete but have to be glued together. I have had several experiences where my collaborators and I had to finish writing a long paper before one of us was on the job market. We knew the proof would work, but getting all of the constants and design choices to globally align took hundreds of hours. This was neither fun nor instructive, and the combination of LLMs and Lean can help automate this process. Indeed, one can ask the LLM to put the pieces together and Lean verify the resulting blueprint. One can then analyze the Lean code to decide which design choices work and which cause issues, and then implement the most pleasing ones in the paper. One can also see more clearly how constants propagate through the argument, and how refinements of the method could improve the constants.
+
+Performing intractable computations. The combination of LLMs and Lean may help in connecting mathematics to the other sciences by making it possible to study models that are too complicated to analyze by hand. There are also likely many problems that were not worth spending time on (such as optimizing constants or doing a large case analysis) that can now be solved quickly by LLMs, verified in Lean, and stored as useful data. This could lead to new “experimental” ways of doing mathematics.
+
+Learning new math faster. Another use case is to learn new mathematics at an unprecedented rate while certifying that your understanding is correct. As an example, my collaborators and I were recently working on a conjecture in time-frequency analysis which we believed to be false, but disproving it would require topological facts that lie outside of our area of expertise. We therefore asked GPT-5.4 which topological obstructions might disprove the conjecture. It suggested that we use Chern classes, and after learning more about them, we realized that they were indeed the right tool. We then wrote an argument disproving the conjecture. Although we were quite confident that the argument was correct, we still felt a bit nervous, as we were using techniques that we had only recently learned. We therefore autoformalized our proof in Lean, confirming that our understanding of the subject was solid.
+
+More generally, LLMs can serve as a personal tutor that allows the user to explore new techniques and fields exceptionally fast. The caveat, of course, is that there is no certificate of correctness in their arguments. Five months ago, this was blatantly obvious, as the LLMs would frequently hallucinate. Now, it is less obvious, but even the most advanced models still make subtle mistakes. Since finding these mistakes is by no means fun, I personally prefer to Lean verify any major claim produced by an LLM before I commit too much of my time to understanding the argument.
+
+Organizing knowledge, building community and enhancing morale. Lean libraries serve as a way to organize knowledge. Through the process of semi-autoformalizing the Banach lattice library, the contributors obtained a remarkable understanding of the geometry of their field, leading to new mathematical discoveries and unforeseen connections. Incorporating Lean into our workflows has also united our community, as teaching Lean, building libraries, and formalizing papers all require substantial communication. These interactions have led to a noticeable boost in morale, especially among young people, who have been particularly enthusiastic about learning Lean.
+
+Formal verification also offers the potential for large-scale projects, as researchers from different communities can now confidently contribute to resolving an interdisciplinary problem without having to be an expert in all aspects of the problem. I suspect that this will lead to very interesting ways of doing research in the future.
+
+Refereeing and checking proofs. In the last few months, the number of papers on arXiv has more than doubled, placing a huge burden on referees. I believe that formal verification will soon become a standard component of the refereeing process, and that there will be an increasing demand for mathematicians who can check formal statements.
+
+Formal verification can similarly be used to catch errors in the existing literature. Although the mathematical literature is generally reliable, it is not perfect, and this can be exploited. For example, my colleagues recently told me that an LLM “solved” one of the major open problems in Banach lattice theory. Although the reasoning of the LLM was entirely correct, it relied on a reference that turned out to be wrong. A benefit of autoformalization is that it can not only check proofs and references, but also pinpoint exactly where a gap occurs.
+
+2.2. Some uses of Lean outside of mathematics.
+
+Formal verification is becoming increasingly important in industry. Major companies such as Amazon and Microsoft use it extensively to certify that their software does what it is intended to do. This work has recently become urgent, as AI can now find and exploit vulnerabilities in critical software. It is therefore essential both to identify existing bugs and to formally verify that critical software meets its specifications. The recent Anthropic post
+
+https://www.anthropic.com/research/formal-verification [https://www.anthropic.com/research/formal-verification]
+
+explains the problem well; this seems like an area where mathematicians familiar with formal verification could make a substantial contribution.
+
+Formal verification also has the potential to impact numerous other branches of science and technology. I suspect that different areas of STEM may soon blend together, with mathematics and Lean giving a rigorous basis for discovery and verification. For example, large-scale numerics and computer-assisted proofs are now often AI-assisted. However, if AI writes the code, it becomes difficult for humans to review it all. One fix is to write additional Lean code to verify that the original AI-assisted code is correct. Although this may sound promising, it is easier said than done. Indeed, in my experience, verifying a computer-assisted proof in Lean (without using native_decide) is considerably harder than formalizing a conventional proof. This suggests that substantial effort will be needed before formal verification can be performed at a pace and cost comparable to writing the original code.
+
+Finally, I will mention that formal verification is playing an increasingly important role in the development of AI itself. In AI safety, formal verification can, in principle, be used to ensure that AI systems satisfy certain safety properties. Formal proofs are also commonly used to train LLMs, through reinforcement learning with verifiable rewards. For better or worse, proving and formally verifying theorems in Lean is also an effective way to benchmark LLMs and advertise their capabilities.
+
+3. Verification versus understanding
+
+In February and March, the process of autoformalization was quite illuminating. Indeed, we had one example where we could not get the LLMs to verify a (correct) proof, as it relied on too many external references and compactness arguments. We therefore had to find a new, more elementary and quantitative proof that was easier to verify in Lean. This was extremely instructive, as it helped us better understand the problem we were tackling and the limitations of our methods.
+
+However, it is now possible to prompt an LLM for a solution to a problem and use Lean to verify that the solution is correct, all without understanding the proof. I would argue that this is a double-edged sword. In some cases, it is great to know that a result is true and that experts can, in principle, work to understand the proof. Often, though, the person who solved the problem also matters, as someone invested in the problem is naturally motivated to explore follow-up questions or find a simpler proof. In my own research, the problems that I leave open are often not the ones I want to solve most, but the ones blocking me from the questions I find even more interesting. Unfortunately, our current reward system gives greater recognition to resolving a named conjecture than to developing the theory that follows from its solution. I hope that in the future we will find new ways to encourage the development of complete theories, and have better venues to disseminate and organize them.
+
+A related point is that Lean does not distinguish between two proofs of the same theorem; the technical term for this is proof irrelevance. Of course, this is not how mathematicians view proofs, as different proofs often give different perspectives, insights, and hints toward future results. It is therefore natural to ask how best to present multiple proofs (both formal and informal) in an organized manner, and how to reward the production of instructive proofs, even when Lean cannot tell them apart. More broadly, I find it exciting to think about creative ways in which formal artifacts can deepen our understanding of mathematics, and how to build infrastructure to better organize and communicate knowledge.
+
+4. What does the future hold?
+
+Although the future is unpredictable, I believe that formal verification will only become more important. The recent xenaproject post How to formalize all of mathematics [https://xenaproject.wordpress.com/2026/10/16/how-to-formalize-all-of-mathematics/] discussed the possibility of formalizing all of mathematics. I have very little doubt that most, if not all, of mathematics will be formally verified in the next three years.
+
+However, if I have learned anything over the last nine months, it is that AI is advancing far faster than humans are adapting. For the formal verification of mathematics to have a maximal positive impact, I believe that it is key for mathematicians to learn how to read and use Lean now. Our tutorial [https://functionalanalysismadrid.com/lean_guide.pdf] serves as a guide for beginners who want to formalize papers and subject-specific libraries. I hope that this guide will convince mathematicians that medium-scale formal verification using LLMs is no longer out of reach, and that in the coming months we will see more programs, conferences, funding, and initiatives to encourage mathematicians to get up to speed on formal verification.
+
+Mathematical Institute, University of Oxford, Andrew Wiles Building, Radcliffe Observatory Quarter, Woodstock Road, Oxford, OX2 6GG, United Kingdom.
+
+Email: [邮箱已隐去] [mailto:[邮箱已隐去]]
+
+Share this:
+
+ Share on X (Opens in new window)
+ X
+ [https://xenaproject.wordpress.com/2026/11/21/lean-for-the-working-mathematician/?share=twitter]
+
+ Share on Facebook (Opens in new window)
+ Facebook
+ [https://xenaproject.wordpress.com/2026/11/21/lean-for-the-working-mathematician/?share=facebook]
+
+Like Loading...
+
+Related
+
+ About xenaproject 
+
+ The Xena Project aims to get mathematics undergraduates (at Imperial College and beyond) trained in the art of formalising mathematics on a computer. Why? Because I have this feeling that digitising mathematics will be really important one day. 
+
+ View all posts by xenaproject → [https://xenaproject.wordpress.com/author/xenaproject/]
+
+ This entry was posted in autoformalization [https://xenaproject.wordpress.com/category/autoformalization/], Research formalisation [https://xenaproject.wordpress.com/category/research-formalisation/] and tagged AI [https://xenaproject.wordpress.com/tag/ai/], Artificial Intelligence [https://xenaproject.wordpress.com/tag/artificial-intelligence/], autoformalisation [https://xenaproject.wordpress.com/tag/autoformalisation/], autoformalization [https://xenaproject.wordpress.com/tag/autoformalization/], lean [https://xenaproject.wordpress.com/tag/lean/], math [https://xenaproject.wordpress.com/tag/math/], mathematics [https://xenaproject.wordpress.com/tag/mathematics/], technology [https://xenaproject.wordpress.com/tag/technology/]. Bookmark the permalink [https://xenaproject.wordpress.com/2026/11/21/lean-for-the-working-mathematician/]. 
+
+← “…and the proof is checked in Lean” [https://xenaproject.wordpress.com/2026/11/12/and-the-proof-is-checked-in-lean/]
+
+Leave a Reply Cancel reply [/2026/11/21/lean-for-the-working-mathematician/#respond]
+
+Name
+
+Email
+
+Website
+
+Δ
+
+ Search for:
+
+Categories
+
+Algebraic Geometry [https://xenaproject.wordpress.com/category/algebraic-geometry/]
+
+autoformalization [https://xenaproject.wordpress.com/category/autoformalization/]
+
+computability [https://xenaproject.wordpress.com/category/computability/]
+
+Fermat's Last Theorem [https://xenaproject.wordpress.com/category/fermats-last-theorem/]
+
+formalising mathematics course [https://xenaproject.wordpress.com/category/imperial/formalising-mathematics-course/]
+
+General [https://xenaproject.wordpress.com/category/general/]
+
+Imperial [https://xenaproject.wordpress.com/category/imperial/]
+
+Learning Lean [https://xenaproject.wordpress.com/category/learning-lean/]
+
+liquid tensor experiment [https://xenaproject.wordpress.com/category/liquid-tensor-experiment/]
+
+M1F [https://xenaproject.wordpress.com/category/m1f/]
+
+M1P1 [https://xenaproject.wordpress.com/category/m1p1/]
+
+M40001 [https://xenaproject.wordpress.com/category/m40001/]
+
+M4P33 [https://xenaproject.wordpress.com/category/imperial/m4p33/]
+
+Machine Learning [https://xenaproject.wordpress.com/category/machine-learning/]
+
+mathlib [https://xenaproject.wordpress.com/category/mathlib/]
+
+number theory [https://xenaproject.wordpress.com/category/number-theory/]
+
+Olympiad stuff [https://xenaproject.wordpress.com/category/olympiad-stuff/]
+
+Research formalisation [https://xenaproject.wordpress.com/category/research-formalisation/]
+
+rigour [https://xenaproject.wordpress.com/category/rigour/]
+
+tactics [https://xenaproject.wordpress.com/category/tactics/]
+
+Technical assistance [https://xenaproject.wordpress.com/category/technical-assistance/]
+
+Type theory [https://xenaproject.wordpress.com/category/type-theory/]
+
+Uncategorized [https://xenaproject.wordpress.com/category/uncategorized/]
+
+undergrad maths [https://xenaproject.wordpress.com/category/undergrad-maths/]
+
+Recent Posts
+
+ Lean for the working mathematician [https://xenaproject.wordpress.com/2026/11/21/lean-for-the-working-mathematician/]
+ November 21, 2026
+
+ “…and the proof is checked in Lean” [https://xenaproject.wordpress.com/2026/11/12/and-the-proof-is-checked-in-lean/]
+ November 12, 2026
+
+ A Modern Reorganization of Mathematics [https://xenaproject.wordpress.com/2026/11/11/a-modern-reorganization-of-mathematics/]
+ November 11, 2026
+
+ How to Formalize All of Mathematics [https://xenaproject.wordpress.com/2026/10/16/how-to-formalize-all-of-mathematics/]
+ October 16, 2026
+
+ To grieve, or not to grieve? [https://xenaproject.wordpress.com/2026/10/01/to-grieve-or-not-to-grieve/]
+ October 1, 2026
+
+ Xena [https://xenaproject.wordpress.com/]
+
+ Create a free website or blog at WordPress.com. [https://wordpress.com/?ref=footer_website]
+
+ Comment 
+ [https://xenaproject.wordpress.com/2026/11/21/lean-for-the-working-mathematician/#respond]
+
+ Reblog
+
+ Subscribe
+
+ Subscribed
+
+Xena [https://xenaproject.wordpress.com]
+
+Join 272 other subscribers
+
+ Sign me up
+
+ Have a WordPress.com account? Log in now. [https://wordpress.com/log-in?redirect_to=https%3A%2F%2Fxenaproject.wordpress.com%2F2026%2F11%2F21%2Flean-for-the-working-mathematician%2F&signup_flow=account] 
+
+Xena [https://xenaproject.wordpress.com]
+
+Copy shortlink [https://wp.me/p9bxpM-11Y]View post in Reader [https://wordpress.com/reader/blogs/135737082/posts/3966]
+
+Manage subscriptions [https://subscribe.wordpress.com/]Sign up [https://wordpress.com/start/]Log in [https://wordpress.com/log-in?redirect_to=https%3A%2F%2Fxenaproject.wordpress.com%2F2026%2F11%2F21%2Flean-for-the-working-mathematician%2F&signup_flow=account]
+
+Report this content [https://wordpress.com/abuse/?report_url=https://xenaproject.wordpress.com/2026/11/21/lean-for-the-working-mathematician/]
+
+Collapse this bar
+
+%d
+
+Create your own website, free on WordPress.com.Create your own website.
+Start free [https://wordpress.com/start/?ref=marketing_bar] [https://wordpress.com/start/?ref=marketing_bar]

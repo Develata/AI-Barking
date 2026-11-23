@@ -1,0 +1,1331 @@
+    Algebraic Cryptanalysis of LOCKER and ROLLO
+                                                MiniMax
+
+                                            November 2026
+
+
+                                                Abstract
+          Ideal Low-Rank Parity-Check (LRPC) key encapsulation mechanisms replace Hamming
+      weight with rank weight over a binary polynomial quotient ring. They were submitted to
+      the first round of the NIST Post-Quantum Cryptography standardization process as Low-
+      Rank Parity-Check Codes Encryption (LOCKER), Low-Rank Parity-Check Key Exchange
+      (LAKE), and Rank-Ouroboros, and merged in the second round as Rank-Ouroboros, LAKE,
+      and LOCKER (ROLLO). Because an irreducible binary modulus of degree n over F2m
+      eliminates proper ideals when m and n are coprime, prior algebraic attacks unfold ring
+      multiplication into a generic linear code of length 2n over F2m , requiring hundreds of millions
+      of minor variables and petabytes of memory on first-round parameters.
+          In this paper, we show that the irreducibility of the ring modulus enables a direct al-
+      gebraic attack whenever the field extension degree m exceeds 2r for error rank r or 2d for
+      secret key rank d. Because the binary quotient ring modulo the irreducible polynomial is it-
+      self the extension field F2n , transposing the n × m binary coefficient matrix maps the scheme
+      ring isomorphically onto a polynomial quotient ring over F2n . Under this transposition, any
+      subspace of the original base field F2m consists of polynomials with binary coefficients and
+      is fixed pointwise by squaring coefficients in F2n . Iterating this partial Frobenius auto-
+      morphism generates an orbit of conjugate equations over the identical unknown support
+      from a single passive ciphertext or public key with zero decapsulation queries. We derive
+      polynomial-time ciphertext support recovery via local Schur elimination when m > 2r , and
+      direct public-key secret recovery via principal minors and a closed-form Moore-matrix gauge
+      recursion when m ≥ 2d . Across all 27 published parameter sets (24 official NIST submission
+      sets from 2017–2020 and 3 additional new2ROLLO-I sets), our attacks improve upon the
+      best published complexities on 14 sets—recovering the shared secret of LOCKER-I in 1.15 s
+      using 58 MB of memory on a 12-thread workstation and recovering the 2019 ROLLO-I-128
+      secret key in 5.97 s on a single core—while proving via exact Frobenius syzygy counts that
+      the 2020 revised ROLLO and new2ROLLO-I parameter sets with m ≤ 2r and m < 2d
+      remain immune.
+
+
+1     Introduction
+1.1    Background and Design Rationale
+Code-based public-key cryptosystems in the Hamming metric, such as Classic McEliece, require
+public keys of several hundred kilobytes because information-set decoding scales only linearly
+with the error weight in the exponent. Rank-metric cryptography replaces Hamming weight
+over F2 with the F2 -rank of vectors over an extension field K ∼
+                                                               = F2m . Because generic Rank
+Syndrome Decoding (RSD) algorithms scale quadratically with m and the rank weight r in
+the exponent, rank-metric constructions achieve 128-bit security with public keys under one
+kilobyte.
+    Introduced by Gaborit, Murat, Ruatta, and Zémor [15], Ideal Low-Rank Parity-Check
+(LRPC) cryptosystems compress keys to a single ring element by operating in the polynomial
+quotient ring R = K[X]/(P (X)) of degree n. A secret key consists of a d-dimensional F2 -
+subspace F ⊂ K and two polynomials x, y ∈ F n whose coefficients lie in F , while the public
+
+
+                                                     1
+key is the quotient h = x−1 y mod P (X) (747 bytes in LOCKER-I). Encapsulation samples an
+r-dimensional F2 -subspace E ⊂ K and error polynomials e1 , e2 ∈ E n , outputting the syndrome
+u = e1 + e2 h mod P (X). Decapsulation computes s = xu ≡ xe1 + ye2 (mod P (X)), whose
+coefficients lie in the product subspace F · E of dimension at most rd < m, and intersects
+fi−1 Supp(s) across a basis of F to recover E.
+    Across the NIST Post-Quantum Cryptography standardization process and contemporane-
+ous cryptanalytic literature, 27 Ideal-LRPC parameter sets (24 official submission sets and
+3 literature sets) were specified across four parameter families. In November 2017 (NIST
+Round 1), Aragon et al. [3] submitted three sister schemes: LAKE (an ephemeral IND-CPA
+KEM), LOCKER (an IND-CCA2 KEM with nine parameter sets LOCKER-I..IX at r ∈ {5, 6}
+and d ∈ {7, 8, 9} designed for decryption failure rates below 2−64 ), and Rank-Ouroboros. In
+March 2019 (NIST Round 2 [4]), the three submissions were merged into ROLLO-I (LAKE),
+ROLLO-II (LOCKER), and ROLLO-III (Rank-Ouroboros), comprising nine parameter sets with
+r ∈ {5, 6, 7}, d ∈ {6, 7, 8} on ROLLO-I/II and secret-key rank d = w ∈ {5, 6, 7}, error rank
+r = wr ∈ {6, 8, 8} on ROLLO-III. Following the algebraic attacks of Bardet et al. [8, 9]—
+where [9] also proposed three illustrative large-m parameter sets new2ROLLO-I-128/192/256
+(m ∈ {73, 89, 103}, r ∈ {7, 8, 9}, later re-evaluated in [10])—the April 2020 Round 2 revision [5]
+dropped ROLLO-III and raised (r, d) to 7–9 across six sets (ROLLO-I/II-128/192/256). In July
+2020, NIST declined to advance ROLLO to Round 3 [20], citing rapid progress in algebraic
+cryptanalysis of rank-metric codes.
+
+1.2   Prior Cryptanalysis
+Prior cryptanalysis of Ideal-LRPC schemes follows four main directions, summarized in Table 1.
+First, Hauteville and Tillich [17] showed that when P (X) factors over F2 (as in quasi-cyclic rings
+modulo X n −1), projecting modulo a proper factor shortens the code length while preserving the
+rank bound r. To block quotient-ring folding, all 27 published LOCKER and ROLLO parameter
+sets choose an irreducible binary polynomial P (X) ∈ F2 [X] with gcd(m, n) = 1, so that R ∼      =
+F2mn is an extension field with no proper ideals. Chee et al. [12] separately analyzed a modified
+layered ROLLO-I variant with restricted error degrees deg(ei ) ≪ n, which does not apply to
+standard full-degree errors.
+      Second, combinatorial subspace-guessing attacks [15, 3] cost O(2 e (r−1)⌈m(n+1)/(2n)⌉ ) oper-
+ations (2144 on LOCKER-I). Decryption-failure reaction attacks [21] require approximately
+DFR−1 ≥ 264 active decapsulation queries on LOCKER and do not apply to ephemeral ROLLO-I.
+Third, the structural dual-LRPC key recovery attack analyzed in the ROLLO specification [5,
+§6.2] and evaluated across the 2020 parameters by Song et al. [22] searches for rank-d multi-
+ples of (y, −x) up to n ring shifts in O((nm)ω 2d⌈m/2⌉−m−n ) operations. This structural attack
+requires 2133 operations on LOCKER-I and reduces four 2020 sets below their claimed security
+(2103.2 –2180.3 ), whereas 2020 ROLLO-I-128/256 and all new2ROLLO-I sets remain above claimed
+levels.
+      Fourth, the algebraic MaxMinors and Support-Minors attacks introduced by Bardet et al. [8,
+9, 10] and further analyzed by Couvée et al. [11] and Esser, Verbel, and Villanueva-Polanco [14]
+expand multiplication modulo P (X) into an n × n companion matrix over K = F2m and treat
+(e1 , e2 ) as a generic [2n, n] linear code over K. Even after optimal puncturing (p = 17 on
+LOCKER-I and p = 9 on 2019 ROLLO-I-128), linearizing (r + 1) × (r + 1) maximal minors
+requires 2n−p  r    = 1495    = 5.72 × 108 columns (≈ 42 PB dense memory) on LOCKER-I and
+ 85                 7
+    
+  5 = 3.28 × 10 columns (≈ 141 TB dense memory) on 2019 ROLLO-I-128. In the standard
+ring representation R = K[X]/(P (X)), one cannot generate extra equations over the same
+support E = ⟨b1 , . . . , br ⟩F2 ⊂ K by squaring K-coefficients, because the Frobenius map on K
+
+
+
+
+                                                2
+Table 1: Comparison of passive attacks (0 decapsulation queries) on LOCKER-I and 2019
+ROLLO-I-128. Column counts give the number of linearized minor variables after optimal punc-
+turing or Schur reduction; complexities are reported in log2 two-input gates.
+   Reference                     Attack Method                    Columns Memory Gates Time
+   Target: LOCKER-I (m = 71, n = 83, r = 5, d = 7; claimed 128-bit IND-CCA2)
+   Aragon et al. [3]       Combinatorial RSD           —          —      2144.0                            —
+   Hauteville–Tillich [17] Quotient folding            —          —      N/A                               —
+   Bardet et al. [9]       MaxMinors (ω = 2.81) 5.72 × 108      42 PB    281.8                             —
+   Esser et al. [14]       MaxMinors (ω = 2)      5.72 × 10 8   42 PB    258.2                             —
+                                                                              †
+   This Work (Sec. 5.2) Schur TSM (P = 9)            2,240      58 MB    245.6                           1.15 s
+   This Work (Sec. 5.4) Sparse Lanczos TSM           4,032      18 MB    246.3                             —
+   Target: 2019 ROLLO-I-128 (m = 79, n = 47, r = 5, d = 6; claimed 128-bit IND-CPA)
+   Bardet et al. [9]     MaxMinors (ω = 2.81) 3.28 × 107 141 TB             270.2   —
+   Esser et al. [14]     MaxMinors (ω = 2)       3.28 × 10 7    141 TB      250.0   —
+   This Work (Sec. 5.2) Schur TSM (P = 8)            1,120      48 MB       242.2   —
+   This Work (Sec. 6.1) Direct key recovery           64       < 2 MB       231.3 5.97 s
+   † Evaluated in the 2n2 two-input gate model on the 2184 × 2240 Schur-reduced matrix over F      39.7 under the
+                                                                                             283 (2
+                                      n = log2 q field-operation metric of [14]).
+
+
+
+sends
+                       r
+                       X                        r
+                                                X
+            ei (X) =         bk ai,k (X) 7−→          b2k ai,k (X)      (ai,k (X) ∈ F2 [X]/(P (X))),
+                       k=1                      k=1
+
+which shifts E to a distinct subspace E [1] = ⟨b21 , . . . , b2r ⟩F2 ̸= E. For this reason, the ROLLO
+specifications and subsequent rank-metric security analyses [5, 2, 6] concluded that choosing an
+irreducible modulus P (X) prevents ideal structure from accelerating syndrome decoding.
+
+1.3     Our Contributions
+We show that the irreducibility of P (X) ∈ F2 [X]—introduced specifically to defeat quotient-
+ring folding [17]—makes the binary quotient ring L = F2 [X]/(P (X)) ∼     = F2n a field and unlocks
+a partial Frobenius action that preserves the secret support. Transposing the n × m binary
+coefficient matrix exchanges the roles of X and T , mapping R = K[X]/(P (X)) isomorphically
+onto Q = L[T ]/(g(T )). In Q, each binary polynomial ai,k (X) becomes a field scalar in L, whereas
+each support basis element bk (T ) ∈ K becomes
+                                           P a polynomial       in T with {0, 1} coefficients, fixed
+pointwise by squaring L-coefficients via ρ( t γt T t ) = t γt2 T t . Iterating ρ on a single passive
+                                                        P
+ciphertext or public key generates up to n conjugate equations over the identical support basis:
+
+ 1. Transposed Partial Frobenius Orbit (Section 4, Lemma 2): Building on the classical
+                                                                               ∼
+    transposition duality of matrix codes [13], we prove that Φ : R −          → Q = L[T ]/(g(T ))
+    identifies Φ(K) = F2 [T ]/(g(T )) with the fixed subring Qρ , satisfies (L⊗F2 E)∩Φ(K) = Φ(E),
+    and generates an orbit of conjugate syndrome equations Uq = ρq (U0 ) over the unchanged
+    support Φ(E).
+ 2. Ciphertext Support Recovery for m > 2r (Section 5, Lemma 3, Propositions 4–8,
+    Theorem 5): Adapting the Support-Minors cofactor expansion of Bardet et al. [9, 10] to
+    the commutative   ring Q across P ≪ n Frobenius conjugates restricts the minor unknowns
+        P r
+         
+    to r 2 pair-transversal minors in L, where each non-pivot subset 0 ∈   / Si forms a local
+    m × 2r block Bi . When m > 2r and P ≥ P2∗ (m, r) = ⌈(mr − 2r )/(m − 2r )⌉ ≤ n, local Schur
+    elimination collapses LOCKER-I from 5.72×108 columns (42 PB) to 2,240 columns (58 MB),
+
+
+                                                          3
+      recovering the shared secret in 1.15 s on a 12-thread CPU. For r = 6, retaining the unre-
+      duced block-staircase matrix yields constant row weight w = (r + 1)2r = 448, compressing
+      LOCKER-III/VI/IX from 565–863 GB dense storage into 1.65–2.35 GB compressed sparse
+      row (CSR) format (258.8 –260.5 gates). We also prove that X n − 1 quotients and non-coprime
+      degrees gcd(m, n) > 1 remain vulnerable via cyclotomic projection.
+ 3. Direct Public-Key Recovery for m ≥ 2d (Section 6, Theorems 9–10, Proposi-
+    tion 11): We prove that when m ≥ 2d , the m × 2d matrix CH formed by subset products
+    of H0 , . . . , Hd−1 has a one-dimensional L-kernel whose entries equal all 2d principal minors
+    of the Moore transition matrix M = BA−1 ∈ GLd (L). Whereas classical principal-minor re-
+    construction [18, 16] determines M̃ only up to an unknown diagonal similarity M = DM̃ D−1
+    in (L× )d−1 and transposition, we derive a closed-form Moore-row recursion for D from the
+    uniqueness of the subspace annihilator polynomial Lα (Z). On homogeneous Ideal-LRPC
+    public keys h = x−1 y mod P (X), this recovers the secret key (F, x, y) from h alone in 5.97 s
+    on 2019 ROLLO-I-128 on a single core (whereas inhomogeneous 2019 ROLLO-III-128/192
+    public keys pk = (h, s = x + hy) are solved directly by Section 5 in 239.3 and 257.6 gates).
+ 4. Phase Transitions and 27-Set Security Ledger (Sections 7–8, Theorem 12): We
+                                                                                               −1
+    prove that in the sub-threshold regime m ≤ 2r , the exact F2 -nullity is νF2 (P ) = n[2r Pr−1
+                                                                                                  
+                                                                                                    −
+       P −2
+           
+    m r−1 ], which grows strictly with P and leaves quadratic Grassmannian Plücker relations
+    underdetermined by factors of 6.5×103 to 1.07×105 . Evaluating all 27 published parameter
+    sets shows that our attacks improve upon published 2026 complexities on 14 sets (all 9
+    Round 1 LOCKER sets and 5 of 9 initial Round 2 ROLLO sets), while all 6 revised Round 2
+    ROLLO sets (2020) and all 3 new2ROLLO-I sets [9] satisfy m < 2r , 2d and remain immune.
+
+1.4     Paper Organization
+Section 2 establishes our algebraic notation and reviews rank syndrome decoding, Ideal-LRPC
+codes, Support-Minors linearization, Moore matrices, and the Principal Minor Assignment Prob-
+lem. Section 3 gives the formal specification of LOCKER and ROLLO across all four parameter
+generations. Section 4 introduces the transposed ring isomorphism Φ and proves support invari-
+ance under the partial Frobenius ρ. Section 5 develops our ciphertext support-recovery attacks.
+Section 6 presents our direct public-key recovery attack and transposed subspace search. Sec-
+tion 7 proves the exact nullity formula and quadratic Plücker barriers for m ≤ 2r . Section 8
+presents the complete 27-set complexity ledger and experimental verification benchmarks.
+
+
+2     Preliminaries
+2.1     Finite Fields and Quotient Rings
+Let F2 = {0, 1} denote the binary field. Given an irreducible binary polynomial g(T ) ∈ F2 [T ]
+of degree m, we denote by K := F2 [T ]/(g(T )) ∼
+                                               = F2m the degree-m extension field viewed as an
+m-dimensional vector space over F2 with power basis (1, T, . . . , T m−1 ). Let P (X) ∈ F2 [X] be a
+monic binary polynomial of degree n. The polynomial quotient ring over K is
+                                                                     
+                                                n−1
+                                                  X                   
+                        R := K[X]/(P (X)) =          aj X j : aj ∈ K .
+                                                                     
+                                                     j=0
+
+
+Expanding each coefficient aj = m−1           t
+                                  P
+                                    t=0 µj,t T ∈ K (µj,t ∈ F2 ) associates to every ring element
+a ∈ R a unique binary coefficient matrix M (a) := (µj,t )0≤j<n, 0≤t<m ∈ Fn×m
+                                                                           2    .
+   The rank support of a ∈ R, denoted Supp(a) := ⟨a0 , . . . , an−1 ⟩F2 ⊆ K, is the F2 -subspace of
+K spanned by the coefficients of a(X). Its dimension rankF2 (a) := dimF2 Supp(a) = rankF2 M (a)
+
+
+                                                 4
+is the rank weight of a. An element e ∈ R satisfies Supp(e) ⊆ E for an r-dimensional subspace
+E = ⟨b1 , . . . , br ⟩F2 ⊂ K if and only if rankF2 M (e) ≤ r, or equivalently if e(X) admits the rank-r
+decomposition
+                           r
+                           X
+                  e(X) =         bk ak (X),    bk ∈ K,    ak (X) ∈ F2 [X]/(P (X)).                  (1)
+                           k=1
+
+In matrix terms, (1) expresses M (e) ∈ Fn×m 2    as a sum of r outer products of column vectors
+in Fn2 and row vectors in Fm2 . By Delsarte’s  classical duality for matrix codes [13], transposing
+               ⊤     m×n
+M (e) 7→ M (e) ∈ F2       preserves the F2 -rank r while exchanging the roles of the column space
+over Fn2 and the row space over Fm 2 .
+    We denote by GrF2 (r, K) the Grassmannian of all r-dimensional F2 -subspaces of K, whose
+cardinality is given by the Gaussian binomial coefficient
+                                                        r−1
+                                                          Y 2m − 2i
+                                                   m
+                                  GrF2 (r, K) =        :=             .
+                                                   r 2        2r − 2i
+                                                           i=0
+
+For any r-dimensional subspace E ⊂ K, we write RREF(E) ∈ K r for the canonical basis of E
+whose r × m binary matrix in the basis (1, T, . . . , T m−1 ) is in reduced row-echelon form.
+
+2.2       Rank Syndrome Decoding and Ideal-LRPC Codes
+The security of LOCKER and ROLLO rests on the Rank Syndrome Decoding (RSD) problem
+and its ring-structured specialization to Ideal-LRPC codes [15, 3, 5].
+
+Definition 1 (Ideal Rank Syndrome Decoding and Low-Rank Parity-Check Codes [15, 5]).
+Let R = K[X]/(P (X)) with K = F2m and deg P = n. In the Ideal-RSD(m, n, r) distribution,
+a public polynomial h ∈ R is given alongside a syndrome u = e1 + e2 h mod P (X), where
+      $                                                                   $
+E ←                                                            − E n are sampled uniformly
+  − GrF2 (r, K) is a uniform r-dimensional support and e1 , e2 ←
+among polynomials of full support Supp(e1 ) = Supp(e2 ) = E. An Ideal-LRPC(m, n, d) public
+                                                                              $
+key replaces uniform h ∈ R with h = x−1 y mod P (X), where F ←
+                                                             − GrF2 (d, K) is a secret
+                                    $
+                               − F n with x ∈ R× .
+d-dimensional support and x, y ←
+
+    For any two F2 -subspaces F, E ⊂ K of dimensions d and r, their product subspace F · E :=
+⟨f e : f ∈ F, e ∈ E⟩F2 ⊆ K has dimension at most rd. When rd < m, multiplying the syndrome
+u = e1 + e2 h by the secret polynomial x ∈ F n yields s = xu ≡ xe1 + ye2 (mod P (X)) whose
+coefficients lie entirely in F · E, enabling decoding by subspace intersection [15].
+
+2.3       Support-Minors Modeling and Moore Matrices
+Our cryptanalysis builds upon and extends three algebraic tools from rank-metric cryptanalysis
+and linear algebra:
+
+Support-Minors and MaxMinors Linearization [9, 10]. In a generic [N, k] linear code
+over K = F2m with parity-check matrix Hpub ∈ K (N −k)×N , a rank-r error vector e = Cb⊤ ∈ K N
+                                                                                  ×r
+factors through a basis b ∈ K r of E and a binary coordinate matrix C ∈ FN      2    of rank r.
+                                                                           ⊤
+Bardet et al. [9, 10] observed that for any syndrome equation, augmenting C with a syndrome-
+combination row produces an (r +1)×N matrix of rank r whose (r +1)×(r +1) maximal minors
+vanish. Expanding these determinants      along the augmented row expresses every equation as
+a linear combination of the Nr maximal minors (Plücker coordinates) of C. When applied
+                                 
+
+directly to an Ideal-LRPC instance over R = K[X]/(P (X)) of length N = 2n, this modeling
+requires 2n−p
+            r    minor columns after puncturing p positions.
+
+                                                    5
+Table 2: Summary of the three Ideal-LRPC KEM constructions over R = F2m [X]/(P (X)) with
+hash function H = SHA512. Here x, y ∈ F n have secret support dimF2 F = d, and e1 , e2 ∈ E n
+have ephemeral error support dimF2 E = r.
+      Scheme (R1 / R2)            Goal     pk           Ciphertext ct and Shared Secret ss                  log2 DFR
+                                             −1
+      LAKE / ROLLO-I        CPA x y        e1 + e2 h; ss = H(RREF(E))               −28..−36
+      LOCKER / ROLLO-II     CCA2 x−1 y     (u, v, dtag ); ss = H(µ ∥ u ∥ v)         −64..−128
+      Ouroboros / ROLLO-III CPA (h, spk )a (r0 +r1 h, e0 +r1 spk ); ss = H(RREF(E)) −28..−39
+  a In ROLLO-III, h ←$
+                     − R is expanded uniformly from a public seed, spk = w0 + w1 h mod P (X) has secret-key support
+ dimF2 Supp(w0 , w1 ) = d = w ∈ {5, 6, 7} (1 ∈ Supp(w0 , w1 )), and r0 , r1 , e0 ∈ E n share the rank-r error support E with
+                                                     r = wr ∈ {6, 8, 8}.
+
+
+
+Moore Matrices and Subspace Annihilator Polynomials. For elements α1 , . . . , αd in a
+                                                                           i
+characteristic-2 field L, the d × d Moore matrix is defined by A := (αk2 )0≤i<d, 1≤k≤d . By Moore’s
+determinant theorem, det(A) ̸= 0 if and only if α1 , . . . , αd are linearly independent over F2 . In
+that case, the d-dimensional F2 -subspace Vα = ⟨α1 , . . . , αd ⟩F2 ⊂ L is the root set of a unique
+monic 2-linearized annihilator polynomial of degree 2d :
+                                                                          d−1
+                                                                 2d                 j
+                                            Y                             X
+                              Lα (Z) :=           (Z + v) = Z         +         cj Z 2 ∈ L[Z].
+                                           v∈Vα                           j=0
+
+
+Principal Minor Assignment Problem [18, 16]. Given a matrix M ∈ Ld×d and a subset
+Z ⊆ {0, . . . , d−1}, the principal minor ∆Z (M ) := det M [Z, Z] is the determinant of the |Z|×|Z|
+submatrix on row and column indices Z (with ∆∅ (M ) = 1). Because det(DM̃ D−1 )[Z, Z] =
+det M̃ [Z, Z] = det M̃ ⊤ [Z, Z] for any invertible diagonal matrix D = diag(D0 , . . . , Dd−1 ) ∈
+(L× )d , the 2d principal minors of M are invariant under both diagonal conjugation and trans-
+position. Conversely, classical results on the Principal Minor Assignment Problem (PMAP)
+by Loewy [18] and Griffin and Tsatsomeros [16] establish that for a generic matrix M with
+nonzero off-diagonal entries, its principal minors of orders 1, 2, and 3 uniquely determine M up
+to diagonal conjugation D and transposition M̃ ↔ M̃ ⊤ . In general, the (d − 1)-dimensional
+diagonal gauge D cannot be recovered from the principal minors of M alone; in Section 6.1, we
+show that when M = BA−1 links two Moore matrices A and B, the Frobenius shift structure
+of A and B uniquely determines D in closed form.
+
+
+3      Specification of LOCKER and ROLLO
+3.1     Key Generation, Encapsulation, and Decapsulation
+Table 2 summarizes the three Ideal-LRPC KEM constructions over R = K[X]/(P (X)), Figure 1
+illustrates their algebraic workflow, and Algorithms 1 and 2 specify their complete procedures [3,
+4, 5].
+    While e1 , e2 ∈ E n each have rank r, multiplying e2 by the public polynomial h ∈ R mixes
+elements across K, so the public syndrome u = e1 + e2 h mod P (X) has full rank rankF2 (u) = m.
+To decapsulate u, the receiver multiplies by x ∈ F n (xh ≡ y (mod P (X))):
+
+                    s(X) := x(X) u(X) ≡ x(X) e1 (X) + y(X) e2 (X)                       (mod P (X)).
+
+Every coefficient of s(X) belongs to the product space F · E, which has dimension at most
+rd < m (35 < 71 in LOCKER-I). Since E ⊆ fi−1 (F · E) for each basis element fi of F , the
+intersection di=1 fi−1 Supp(s) recovers E whenever Supp(s) = F · E and random subspaces of
+            T
+dimension rd have trivial excess intersection. In LOCKER and ROLLO-II, Step 2 of RSR enlarges
+
+                                                             6
+                                                              sk = (F, x)
+
+              KeyGen(m, n, d)                             Encaps(pk = h)                                Decaps(sk, ct)
+
+      Support F = ⟨f1 , . . . , fd ⟩F2 ⊂ K        Support E = ⟨b1 , . . . , br ⟩F2 ⊂ K            Syndrome s = xu = xe1 + ye2
+
+
+       Sample x(X), y(X) ∈ F n ⊂ R                Sample e1 (X), e2 (X) ∈ E n ⊂ R             Supp(s) ⊆ F · E (dim ≤ rd < m)
+
+
+                                         pk = h                                          ct = u           Td    −1
+         Public key h = x−1 y in R                 Syndrome u = e1 + e2 h in R                       E=    i=1 fi  Supp(s)
+
+
+
+Figure 1: Architecture of Ideal-LRPC key encapsulation and decapsulation over R =
+K[X]/(P (X)). Multiplication by h ∈ R scrambles e2 ∈ E n to full rank rankF2 (u) = m, whereas
+multiplying by x ∈ F n confines Supp(xu) to the product space F · E of dimension at most
+rd < m.
+
+Algorithm 1: Key Generation (KeyGen) and Rank Support Recoverer (RSR)
+KeyGen(m, n, d):
+                         $
+  1. Sample σsk ←− {0, 1}320 and expand a d-dimensional support F = ⟨f1 , . . . , fd ⟩F2 ⊂ K
+     from XOF(σsk ).
+                                                                      / R× .
+  2. Sample full-rank x(X), y(X) ∈ F n ⊂ R; restart at Step 1 if x(X) ∈
+  3. h(X) ← x(X)−1 y(X) mod P (X); return pk = h, sk = (F, x, y, h).
+
+RSR(F = ⟨f1 , . . . , fd ⟩, s ∈ R, r, expand ∈ {0, 1}):         ▷ s = xu = xe1 + ye2 ∈ (F · E)n
+                                        −1
+ 1. S ← Supp(s) ⊆ K; Si ← fi S for 1 ≤ i ≤ d.
+ 2. if expand = 1 then for i = 1, . . . , d − 2 do Ui ← (Si ∩ Si+1 ) + (Si+1 ∩ Si+2 ) + (Si ∩ Si+2 );
+    if dimF2 (S + F · Ui ) ≤ rd, set S ← S + F · Ui .
+ 3. E ← di=1 fi−1 S; return RREF(E) if dimF2 (E) = r else ⊥.
+          T
+
+
+
+S = Supp(s) using pairwise intersections fi−1 S ∩ fi+1
+                                                   −1
+                                                       S before taking the final intersection,
+reducing the decryption failure rate below 2−64 for IND-CCA2 security under the Fujisaki–
+Okamoto transform.
+
+3.2     Evolution of Parameter Generations
+In all 27 published parameter sets across the four families (listed in Table 5), both g(T ) ∈ F2 [T ]
+(deg g = m) and P (X) ∈ F2 [X] (deg P = n) are chosen as sparse irreducible binary polynomials
+(trinomials or pentanomials) with gcd(m, n) = 1. In LOCKER-I (m, n, r, d) = (71, 83, 5, 7), for
+example, g(T ) = T 71 + T 6 + 1 and P (X) = X 83 + X 7 + X 4 + X 2 + 1; each coefficient aj ∈ K is
+serialized in ⌈71/8⌉ = 9 little-endian bytes, yielding 83 × 9 = 747 bytes per ring element. Across
+these families, the parameter regimes evolved from m > 2r in 2017 LOCKER (m ∈ [71, 109],
+r ∈ {5, 6}, 2r ∈ {32, 64}) and 128/192-bit 2019 ROLLO (m ∈ [79, 107], 2-IRSD rank in {5, 6},
+with m ≥ 2d = 64 on homogeneous 2019 ROLLO-I-128) to the sub-threshold regime m ≤ 2r and
+m < 2d in 2020 ROLLO (m ∈ [67, 97], r ∈ {7, 8, 9}, 2r ∈ {128, 256, 512}) and new2ROLLO-I [9]
+(m ∈ {73, 89, 103}, r ∈ {7, 8, 9}).
+
+
+
+
+                                                                   7
+Algorithm 2: Encapsulation (Encaps) and Decapsulation (Decaps)
+Encaps(pk = h):
+                                                                                                       $
+                                                                       − E n ; set
+    1. CPA (ROLLO-I): Sample E ⊂ K (dimF2 E = r) and full-rank e1 , e2 ←
+       u ← e1 + e2 h mod P (X); return ct = u, ss = SHA512(RREF(E)).
+                                                                      $
+    2. CCA2 (LOCKER / ROLLO-II): Sample µ ←      − {0, 1}512 , set θ ← XOF(µ), and expand
+       E ⊂ K (dimF2 E = r) and full-rank e1 , e2 ∈ E n from XOF(θ).
+    3. u ← e1 + e2 h mod P (X); v ← µ ⊕ SHA512(RREF(E)); dtag ← SHA512(µ).
+    4. return ct = (u, v, dtag ), ss = SHA512(µ ∥ u ∥ v).
+
+Decaps(sk = (F, x, y, h), ct):
+ 1. Verify canonical byte encoding of u; compute s ← x · u mod P (X).
+ 2. CPA: E ′ ← RSR(F, s, r, 0); return SHA512(E ′ ) if E ′ ̸=⊥ else ⊥.
+ 3. CCA2: E ′ ← RSR(F, s, r, 1); µ′ ← v ⊕ SHA512(E ′ ) (0512 if E ′ =⊥).
+ 4. Re-expand (E ′′ , e′1 , e′2 ) from XOF(XOF(µ′ )); set u′ ← e′1 + e′2 h mod P (X),
+    v ′ ← µ′ ⊕ SHA512(E ′ ), d′tag ← SHA512(µ′ ). return SHA512(µ′ ∥ u ∥ v) if
+    (u′ , v ′ , d′tag ) = (u, v, dtag ) else ⊥.
+
+      (a) Standard Ring R = K[X]/(P (X))                                  (b) Transposed Ring Q = L[T ]/(g(T ))
+
+
+         M (e) ∈ Fn×m
+                  2                      Square in K                        M (e)⊤ ∈ Fm×n
+                                                                                      2               Partial Frobenius ρ
+                                            bk 7→ b2k            Φ
+                                                                                                           γt 7→ γt2 in L
+               Pr                                                                  Pr
+      e(X) =    k=1 bk ak (X)                                             Φ(e) =    k=1 b̃k (T )αk
+                                                              M 7→ M ⊤
+
+
+
+        Shifted support E [1] = ⟨b21 , . . . , b2r ⟩F2 ̸= E                Fixed support ρ(b̃k ) = b̃k ∈ F2 [T ]/(g(T ))
+                                      2n−p                                                                   P r
+           Unfolded [2n, n] code:       r
+                                            columns                       Orbit Uq = ρq (U0 ) (0 ≤ q < P ):   r
+                                                                                                                2 columns
+
+
+
+Figure 2: Comparison between (a) coefficient squaring in R = K[X]/(P (X)), which moves
+the unknown support E ⊂ K to E [1] ̸= E, and (b) our transposed representation in Q =
+L[T ]/(g(T )), where the partial Frobenius ρ squares scalars in L = F2 [X]/(P (X)) while fixing
+Φ(E) ⊂ F2 [T ]/(g(T )) pointwise.
+
+
+4      Transposed Algebra and Partial Frobenius
+4.1     Coefficient Matrix Transposition
+Assume P (X) ∈ F2 [X] is irreducible of degree n, so that the binary quotient ring L :=
+F2 [X]/(P (X)) ∼
+               = F2n is a field, and define the polynomial quotient ring Q := L[T ]/(g(T )) ∼
+                                                                                            =
+L ⊗F2 K (Section 5.5 relaxes irreducibility of P and coprimality of m and n). Transposing the
+n × m binary coefficient matrix M (a) ∈ Fn×m2    into M (a)⊤ ∈ Fm×n
+                                                                 2   exchanges the roles of X
+and T :
+                                                              Φ: M (a)7→M (a)⊤
+                R = K[X]/(P (X))           −−−−−−−−−−−−→          Q = L[T ]/(g(T ))
+      bk (T ) ∈ K, ak (X) ∈ F2 [X]/(P (X))      7−→      b̃k (T ) ∈ F2 [T ]/(g(T )), αk ∈ L
+
+While matrix transposition of rank-metric codewords [13] and the tensor-product symmetry
+K ⊗F2 L ∼ = L ⊗F2 K are classical, their cryptographic consequence for Ideal-LRPC codes over
+an irreducible modulus P (X) has been overlooked: in Q = L[T ]/(g(T )), the secret support
+elements b̃k (T ) ∈ F2 [T ]/(g(T )) have binary coefficients, whereas the ring coordinates αk ∈ L lie
+in the extension field L ∼  = F2n .
+
+                                                                  8
+Table 3: Summary   of ciphertext support-recovery variants over L = F2 [X]/(P (X)), where
+νL = max(1, Pr 2r − P −1
+                       
+                      r   m) denotes the Stage 1 L-kernel dimension.
+ Variant                       Threshold                  Matrix Dimension Over L              Target Regime
+                                                          P −1             P −1 r
+                               m > 2 , P = P2∗
+                                      r
+                                                                     r
+                                                                               
+ Schur (Sec. 5.2)                                           r (m − 2 ) × r−1 2               r ≤ 5 dense Schur
+                                                          P −1       P
+ Overdet. (Sec. 5.3)           m > 2r , P = P1∗                          r
+                                                            r m × r 2 (νL = 1)
+                                                                                  a
+                                                                                               Single-stage (L only)
+                                                          P −1       P
+ Sparse Krylov (Sec. 5.4)      m > 2r , P = P2∗                          r          r
+                                                            r m × r 2 (w = (r+1)2 )          r = 6 sparse Lanczos
+                                                          P −1             P −1 r
+ Projection (Sec. 5.5)         deg P1 ≥ P2∗                 r
+                                                                      r
+                                                                (m − 2 ) × r−1 2 over L1       X n − 1, gcd(m, n) > 1
+                       P −1              −1 r
+        a Reduces to
+                         r
+                            (m − 2r ) × Pr−1 2 with νL = 1 if local Schur elimination is applied before solving.
+
+
+
+4.2    Support Invariance Under Partial Frobenius
+Figure 2 illustrates how the transposed representation isolates the unknown support inside the
+fixed subring of the partial Frobenius automorphism ρ.
+
+Lemma 2. For a = n−1
+                      P      Pm−1       t  j
+                        j=0 ( t=0 µj,t T )X ∈ R, the transpose map
+                                                                  
+                                          m−1
+                                          X         n−1
+                                                    X
+                            Φ(a) :=                      µj,t X j  T t ∈ Q = L[T ]/(g(T ))
+                                          t=0       j=0
+
+
+is an F2 -algebra isomorphism, and ρ : Q → Q defined by ρ( m−1
+                                                          P        t
+                                                                         Pm−1 2 t
+                                                           t=0 γt T ) :=  t=0 γt T (γt ∈ L)
+is a ring automorphism of order n with fixed subring Qρ = Φ(K) = F2 [T ]/(g(T )). For any
+r-dimensional subspace E = ⟨b1 , . . . , br ⟩F2 ⊂ K:
+
+ 1. W := spanL (Φ(E)) ⊂ Q is a free L-submodule of rank r satisfying W ∩ Φ(K) = Φ(E).
+ 2. Setting
+          PrU0 = Φ(u), H0 =PΦ(h), b̃k = Φ(bk ) ∈ Qρ , and αk = Φ(ak ), βk = Φ(ck ) ∈ L for
+    e1 = k=1 bk ak and e2 = rk=1 bk ck , applying ρq (q ≥ 0) to u = e1 + e2 h yields
+                         r
+                                           q                   q
+                         X
+                               b̃k (T ) αk2 + Hq (T ) βk2                      Uq = ρq (U0 ), Hq = ρq (H0 ).
+                                                                   
+            Uq (T ) =                                                  in Q,                                       (2)
+                         k=1
+
+
+Proof. Both R and Q identify canonically with F2 [X, T ]/(P (X), g(T )); Φ exchanges the order of
+summation and is therefore a ring isomorphism. Because char L = 2 and g(T ) has coefficients in
+F2 = LσL , squaring L-coefficients respects addition, multiplication, and reduction modulo g(T ),
+with fixed subring F2 [T ]/(g(T )) = Φ(K). In Q = L ⊗F2 Φ(K), F2 -linearly
+                                                                     Pr      independent elements
+                                                                                ∈ Φ(K) over an F2 -
+b̃1 , . . . , b̃r ∈ Φ(K) remain L-linearly independent, and expanding k=1 λk b̃kP
+basis of L forces λk ∈ F2 , proving W ∩ Φ(K) = Φ(E). Applying ρq to U0 = rk=1 b̃k (αk + H0 βk )
+fixes b̃k pointwise and squares αk , βk ∈ L q times, yielding (2).
+
+
+5     Ciphertext Support Recovery
+Given a public key h and ciphertext syndrome u = e1 + e2 h mod P (X) with error support
+dimF2 E = r, we fix a window size P ∈ {r + 1, . . . , n} and evaluate (2) for 0 ≤ q < P . Table 3
+summarizes the four ciphertext support-recovery variants developed in this section.
+
+5.1    Ring-Valued Support-Minors Linearization
+Following the Support-Minors cofactor strategy of Bardet et al. [9, 10], we eliminate the unknown
+basis elements b̃1 , . . . , b̃r ∈ Qρ by taking (r + 1) × (r + 1) determinants, but we carry out the
+expansion inside the commutative polynomial ring Q = L[T ]/(g(T )) across the P Frobenius
+
+
+                                                                   9
+                                                                                                          q                q
+conjugates rather than over an unfolded length-2n code. Write Zq,k (T ) := αk2 + Hq (T )βk2 ∈ Q
+and collect the 2P scalar columns in Lr into the coordinate matrix
+                                                                     q             q
+          G := A0 B0 · · · AP −1 BP −1 ∈ Lr×2P ,           Aq,k = αk2 , Bq,k = βk2 .
+                                            
+
+For any (r+1)-subset S ′ ⊆ {0, . . . , P −1}, the (r+1)×(r+1) matrix MS ′ = [Uq | Zq,1 · · · Zq,r ]q∈S ′
+over Q satisfies MS ′ (1, b̃1 , . . . , b̃r )⊤ = 0, so detQ (MS ′ ) = 0. Expanding detQ (MS ′ ) along col-
+umn 0 in characteristic 2 (where +1 = −1) gives
+                        X
+                               Ua (T ) det A⊤                ⊤
+                                                              
+                                                 s + Hs (T )Bs s∈S ′ \{a} = 0 in Q.
+                                             Q
+                             a∈S ′
+
+By multilinearity of the determinant in each of the r rows s1 < · · · < sr of S = S ′ \{a}, choosing
+either A⊤                        ⊤
+        si (µi = 0) or Hsi (T )Bsi (µi = 1) in row i expands this r × r cofactor in Q into 2
+                                                                                                   r
+
+terms:
+                   X                                                                   X               r
+                                                                                                       Y
+         ES ′ :=           Ua (T ) γS ′ \{a} (T ) = 0     in Q,         γS (T ) :=              pS,µ           Hsi (T ),       (3)
+                   a∈S ′                                                             µ∈{0,1}r           i=1
+                                                                                                       µi =1
+
+where pS,µ := detL G[:, (2si + µi )ri=1 ] ∈ L are the Ncol = Pr 2r pair-transversal minors of G
+                                                                 
+
+selecting one column from each conjugate pair {Asi , Bsi } (si ∈ S). Extracting the m coefficients
+of 1, T, . . . , T m−1 in (3) yields m homogeneous L-linear equations per subset S ′ .
+    The next lemma lifts the standard MaxMinors pivot-syzygy reduction [9, 10] from a field to
+the commutative ring Q = L[T ]/(g(T )).
+Lemma 3. If U0 ∈ Q× , every equation ES ′′ with 0 ∈    / S ′′ ⊆ {1, . . . , P − 1} (|S ′′ | = r + 1) is
+a Q-linear combination of {E{0}∪S : S ⊆ {1, . . . , P − 1}, |S| = r}. Retaining only the P −1        r
+subsets containing 0 yields Nrow = P −1
+                                       
+                                     r   m scalar  L-equations  without     changing the    right kernel.
+
+        P any r-subset S ⊆ {1, . . . , P − 1}, E{0}∪S = 0 rearranges in characteristic
+Proof. For
+                                                                                 ′′
+                                                                                         2 to
+U0 γS = x∈S Ux γ{0}∪(S\{x}) . Multiplying ES ′′ by U0 and substituting S = S \ {a} gives
+                    X                       X X
+         U0 ES ′′ =   Ua (U0 γS ′′ \{a} ) =           Ua Ux γ{0}∪(S ′′ \{a,x}) ≡ 0 in Q,
+                       a∈S ′′                           a∈S ′′ x∈S ′′ \{a}
+
+since each unordered pair {a, x} ⊂ S ′′ appears twice and cancels modulo 2. Because U0 ∈ Q× ,
+ES ′′ = 0.
+
+5.2    Local Schur Elimination and Frobenius Threshold
+                                                       −1                              ′ = P −1 2r
+Partition the Pr minor blocks of width 2r into the Pr−1
+                                                                                              
+                                                              core blocks with 0 ∈ S (Ncol  r−1
+                    Kblk = P −1
+                                  
+columns) and theP             r     non-pivot blocks with 0 ∈     / S. In the 0-anchored equation
+E{0}∪Si = U0 γSi + x∈Si Ux γ{0}∪(Si \{x}) , every summand except U0 γSi contains 0 in its index set.
+Consequently, unlike systematic MaxMinors over a field where each non-pivot subset contributes
+a single scalar column, the 2r columns of Si ⊆ {1, . . . , P − 1} appear exclusively in the i-th
+                         r
+m-row block Bi ∈ Lm×2 :
+                                          
+               C1    B1 0 · · ·       0
+            C2      0 B2 · · ·       0                                      ′             r
+     M= .                                    ∈ LNrow ×Ncol ,      Ci ∈ Lm×Ncol , Bi ∈ Lm×2 . (4)
+                                          
+                      .    .  .       .
+            ..       ..   ..   ..    ..  
+
+              CKblk         0        0   · · · BKblk
+
+Figure 3 illustrates the block-staircase structure of M and the resulting two-stage recovery
+pipeline.
+
+                                                               10
+    (a) Block-Staircase Matrix M (m > 2r )             (b) Two-Stage Ciphertext Support Recovery
+
+                                                               Schur System Mred pcore = 0 over L
+             C1         B1      0      0
+
+             C2          0     B2      0                    Stage 1 Kernel KL = kerL (M) (dimL = νL )
+                                               Schur
+                                                                                  P ≥ P2∗ (m, r)
+                                             Ti ∈ GLm (L)
+            CKblk        0      0    BKblk
+                                                             Stage 2 Frobenius pQ+1,µ = p2Q,µ over F2
+            0∈S          0∈/ Si (m × 2r )
+          P −1 r
+          r−1
+               2 cols   (m − 2r ) rows/blk                   Cramér Chart G ∈ Lr×2P → RREF(E)
+
+
+
+Figure 3: Structure of the 0-anchored Support-Minors system in Q = L[T ]/(g(T )): (a) each non-
+pivot subset Si ⊆ {1, . . . , P −1} forms an isolated m×2r block Bi that is eliminated locally with
+zero fill-in whenever m > 2r ; (b) the resulting two-stage solver extracts kerL (Mred ), enforces
+pQ+1,µ = p2Q,µ over F2 , and reconstructs G and E.
+
+
+Proposition 4. Suppose m > 2r and rankL (Bi ) = 2r for all 1≤ i ≤ Kblk . Left-multiplying row
+                                                 C
+                                                  ei     I2r
+block i by Ti ∈ GLm (L) such that Ti Ci Bi =                   eliminates B1 , . . . , BKblk locally
+                                                Mred,i 0
+with zero fill-in, yielding
+                         
+                 Mred,1                                                                 
+                    .            ′ ×N ′     ′      P −  1                  ′        P  − 1
+    Mred =         ..         N
+                           ∈ L row col , Nrow =                   r
+                                                            (m − 2 ), Ncol =                 2r ,
+                         
+                                                     r                               r−1
+                Mred,Kblk
+                                        ′ − N′
+with dimL ker(Mred ) = dimL ker(M) and Ncol  row = Ncol − Nrow .
+
+Proof. Applying diag(T1 , .. . , TKblk) to Mp = 0 decouples pSi = Cei pcore and leaves Mred pcore =
+                        P          P −1      P −1            ′      ′
+0. By Pascal’s identity r − r = r−1 , we have Ncol − Nrow = Ncol − Nrow .
+
+   When Stage 1 leaves kernel dimension νL = Ncol − Nrow > 1 with basis {v (1) , . . . , v (νL ) } ⊂
+                                                              [1]         [1]
+LNcol , Stage 2 enforces the Frobenius shift relation Aq+1 = Aq , Bq+1 = Bq on minors:
+
+                  pQ+1,µ = (pQ,µ )2    ∀ Q ⊆ {0, . . . , P − 2}, |Q| = r, µ ∈ {0, 1}r .           (5)
+
+Writing p = νfL=1 θf v (f ) with θf = n−1           j
+              P                       P
+                                         j=0 ϑf,j X ∈ L (ϑf,j ∈ F2 ) turns (5) into a homogeneous
+F2 -linear system Fϑ = 0 in νL n binary variables.
+
+Theorem 5. On a Stage 1 kernel KL = kerL (M) of rank Nrow = P −1
+                                                                                   
+                                                                                r    m, the Frobenius
+                           P −2
+                               
+operator F|KL satisfies r mn F2 -linear syzygies, so
+                                                                    
+                                               P −1 r           P −2
+                         rankF2 F K ≤ n                    2 −           m .                      (6)
+                                     L              r               r
+
+Two-stage TSM determines a unique solution (dimF2 ker(F |KL ) = 1 when νL > 1, or νL = 1 up
+to L× ) if and only if m > 2r and
+
+                                                  mr − 2r
+                                                         
+                                    ∗
+                               P ≥ P2 (m, r) :=             ≤ n,                         (7)
+                                                  m − 2r
+
+with strict inequality m(P − r) > 2r (P − 1) when requiring positive excess rank over F2 .
+
+
+
+                                                     11
+Algorithm 3: Two-Stage Ciphertext Support Recovery (m > 2r , P = P2∗ (m, r) ≤ n)
+   1. Compute Uq = ρq (Φ(u)) and Hq = ρq (Φ(h))in Q = 
+                                                       L[T ]/(g(T )) for 0 ≤ q < P .
+   2. For each r-subset Si ⊆ {1, . . . , P − 1}, form Ci Bi from E{0}∪Si and eliminate Bi into
+      Mred,i .
+   3. Compute kerL (Mred ) of dimension νL and back-substitute pSi = C        ei pcore .
+                                  2
+   4. If νL > 1, solve pQ+1,µ + pQ,µ = 0 over F2 on kerL (M) to obtain p.
+   5. Normalize a non-singular chart [B0 · · · Br−1 ] = Ir and reconstruct G ∈ Lr×2P via Cramér
+      minor ratios.
+   6. Solve [Gk,2q + Hq Gk,2q+1 ]q∈I, 1≤k≤r · b̃ = (Uq )q∈I over Q (|I| = r); set
+      E ← RREF(Supp(Φ−1 (b̃))).
+   7. In CCA2 mode, set µ′ = v ⊕ SHA512(E), verify SHA512(µ′ ) = dtag , and return
+      SHA512(µ′ ∥ u ∥ v).
+
+
+Proof. For each of the P −2     subsets S ′ ⊆ {0, . . . , P −2} containing 0 and any p ∈ KL , Lemma 3
+                              
+                           r
+gives ES ′ +1 (p) = 0 in addition to ρ(ES ′ (p)) = 0. Subtracting the two identities yields
+     X                X                          Y
+         Ua+1 (T )         (pQa +1,µ + p2Qa ,µ )     H(Qa )i +1 (T ) ≡ 0 in Q     (Qa = S ′ \ {a}),
+      a∈S ′        µ∈{0,1}r                    µi =1
+
+
+which imposes P −2                                                   P −1 r
+                                                                        
+                    r mn linear dependencies over F2 among the         r 2 n bit-components of
+(pQ+1,µ + p2Q,µ ) and proves (6). Because (5) restricts L× -scaling to λ2 = λ (λ = 1), unique
+recovery requires n[ P −1  2 − P −2   m] ≥ n[ Pr 2r − P −1
+                           r                              
+                        r         r                       r    m], which simplifies via Pascal’s
+             P −2       P −1 r                                r
+                           
+identity to r−1 m ≥ r−1 2 , or equivalently m(P − r) ≥ 2 (P − 1) and (7).
+
+Reconstructing G and E from Pair-Transversal Minors. Once the minor vector p is
+known, we adapt the chart-normalization procedure of [9, 10] to our pair-transversal minors
+(pS,µ ). Choose a non-singular chart (for instance B0 , . . . , Br−1 , corresponding to S0 = {0, . . . , r−
+1} and µ0 = 1r ) and normalize G under its left GLr (L)-action so that [B0 · · · Br−1 ] = Ir . Every
+column c = 2q + µ outside pairs 0, . . . , r − 1 (q ≥ r) and every diagonal entry Ai,i (0 ≤ i < r)
+is recovered by a single-column Cramér replacement in Ir :
+                           pchart(i←2q+µ)                            pS0 ,1r ⊕ei
+               Gi,2q+µ =                    (q ≥ r),        Ai,i =                 (0 ≤ i < r).
+                               pS0 ,1r                                pS0 ,1r
+
+For off-diagonal entries Ai,k (k ̸= i, 0 ≤ i, k < r), pick any external column v = G[:, 2q + µ]
+(q ≥ r) with vi ̸= 0; replacing columns i and k of Ir by Ai and v gives a 2 × 2 determinant
+p/pS0 ,1r = Ai,i vk + Ai,k vi , whence Ai,k = (p/pS0 ,1r + Ai,i vk )/vi . Solving r independent rows
+of (2) over Q then yields (b̃1 , . . . , b̃r ) and E = RREF(Supp(Φ−1 (b̃))) (Algorithm 3).
+
+5.3     Overdetermined Single-Stage Recovery
+Corollary 6. For m > 2r , choosing P ≥ P1∗ (m, r) := ⌈mr/(m − 2r )⌉ ≤ n (or mr/(m − 2r ) + 1
+when (m − 2r ) | mr) gives Nrow ≥ Ncol − 1 and νL = dimL ker(Mred ) = 1, recovering p up to
+L× -scaling in Stage 1 without forming the binary Frobenius matrix F .
+
+    On LOCKER-I (m = 71, n = 83, r = 5), setting P = P1∗ (71, 5) = 10 gives an unreduced
+8,946 × 8,064 system (4,914 × 4,032 after local Schur reduction) of rank Ncol − 1 (νL = 1). On
+r = 6, m = 107 (LOCKER-III/VI), increasing P from P2∗ = 14 to P1∗ = 15 eliminates the Stage 2
+binary matrix of 869–1,164 GiB altogether.
+
+
+
+                                                       12
+5.4     Sparse Krylov Solving
+At r = 6, dense storage of the unreduced matrix M requires 565–863 GB of memory (97–508 GB
+after local Schur reduction). Retaining the unreduced matrix M in (4) preserves exact constant
+row weight for sparse Krylov solvers such as Wiedemann [23] and Block-Lanczos [19].
+
+Proposition 7. Every row of M ∈ LNrow ×Ncol contains at most w = (r + 1)2r non-zero entries
+across the r + 1 disjoint 2r -column blocks S ′ \ {a} (a ∈ S ′ ). Compressed sparse row (CSR)
+storage uses Nrow w(4 + 8⌈n/64⌉) + 8(Nrow + 1) bytes, and Block-Lanczos on M⊤ M followed by
+Stage 2 requires
+
+                                       (νL n)ω0
+                                                         
+                                                    P −1 r
+      CCT (m, n, r) = 4Ncol Nrow wn2 +           +         2 νL n2 gates (ω0 = log2 7),    (8)
+                                          7            r
+
+at 2n2 two-input gates per F2n multiply-accumulate.
+
+Proof. For fixed S ′ = {0} ∪ S, the r + 1 subsets S ′ \ {a} (a ∈ S ′ ) are distinct, so their 2r -
+column blocks do not overlap. Block-Lanczos [19] with block width β performs ⌈Ncol /β⌉ itera-
+tions of β-wide multiplications by M and M⊤ , totaling 2Ncol Nrow w scalar F2n multiply-adds
+(4Ncol Nrow wn2 gates), plus F2 elimination on νL n columns.
+
+5.5     Reducible Quotients and Non-Coprime Degrees
+Proposition 8. 1. If P (X) ∈ F2 [X] has an irreducible divisor P1 (X) | P (X) of degree n1 ≥
+   P2∗ (m, r) (in particular, the cyclotomic polynomial Φn (X) of degree n − 1 inside X n − 1 =
+   (X + 1)Φn (X) when ordn (2) = n − 1), projecting to K[X]/(P1 (X)) and running TSM over
+   L1 = F2 [X]/(P1 (X)) recovers E with probability at least 1 − 2−(n1 −r) . Running TSM on
+   K[X]/(X n − 1) directly fails because ρ = id on K[X]/(X + 1) produces identical rows in
+   MS ′ .
+ 2. If P (X) is F2 -irreducible and k = gcd(m, n) > 1, then Q ∼= (F2lcm(m,n) )k contains zero
+    divisors, yet L = F2n remains a field, (L ⊗F2 E) ∩ Φ(K) = Φ(E), and (3)–(5) hold over L
+    and F2 whenever U0 ∈ Q× (which occurs with probability (1 − 2− lcm(m,n) )k ).
+
+Proof. In (1), the natural projection π1 : R ↠ K[X]/(P1 (X)) is K-linear, so Supp(π1 (ei )) ⊆ E
+and π1 (e2 ) has full rank r modulo Φn (X) whenever (e2,j + e2,n−1 )0≤j<n−1 spans E. In (2),
+Laplace expansion holds over any commutative ring Q, while all entries of M and F lie in the
+fields L and F2 .
+
+
+6      Public-Key Secret Recovery
+In LOCKER, ROLLO-I, and ROLLO-II, the public key h = x−1 y mod P (X) satisfies the homoge-
+neous rank-d relation
+
+      x(X) h(X) + y(X) ≡ 0   (mod P (X)),       Supp(x), Supp(y) ⊆ F = ⟨f1 , . . . , fd ⟩F2 ⊂ K.
+
+Recovering any nonzero K × -multiple (γF, γx, γy) (γ ∈ K × ) yields a functionally equivalent
+                                                             $
+secret key for decapsulation. (For ROLLO-III, where h ←
+                                                      − R is uniform and pk = (h, s =
+x + hy mod P (X)) is inhomogeneous of secret rank d = w, Algorithm 3 of Section 5 applies
+directly to (h, s) to recover (F, x, y).)
+
+
+
+
+                                               13
+6.1    Principal Minors From Partial-Frobenius Products
+Write Φ(x) = dk=1 f˜k (T )αk and Φ(y) = dk=1 f˜k (T )βk (f˜k ∈ Qρ , αk , βk ∈ L). Applying ρq for
+              P                        P
+0 ≤ q < d gives d homogeneous equations in Q:
+                       d
+                                         q             q
+                       X
+                             f˜k (T ) αk2 Hq (T ) + βk2 = 0         in Q           (0 ≤ q < d).              (9)
+                       k=1
+                                                   q                                              q
+Define the Moore matrices A = (αk2 )0≤q<d, 1≤k≤d ∈ GLd (L) and B = (βk2 )0≤q<d, 1≤k≤d ∈
+GLd (L) (both invertible because rankF2 (x) = rankF2 (y) = d), and set M := BA−1 ∈ GLd (L).
+                                  d
+Theorem
+   Q         9. Let CH ∈ Lm×2 be the matrix whose column µ ∈ {0, 1}d holds the m T -coefficients
+of q: µq =1 Hq (T ) ∈ Q. Every valid keypair (x, y) defines a right kernel vector p ∈ kerL (CH )
+with p1...1 = det(A) ̸= 0 and
+             pµ
+                   = ∆Z(µ) (M ) := det M [Z(µ), Z(µ)],  Z(µ) := {0 ≤ q < d : µq = 0}.
+            p1...1
+When m ≥ 2d , CH has generic rank 2d − 1, so one m × 2d elimination over L yields all 2d
+principal minors of M .
+                                                                               q             q
+Proof. Since f˜1 , . . . , f˜d are L-linearly independent, (9) implies detQ [α2 Hq (T ) + β 2 ] = 0. Ex-
+                                                                                          k           k
+                                      q                         q
+panding row q into µq = 1 (αk2 Hq ) and µq = 0 (βk2 ) gives CH p = 0, where pµ = det Nµ takes
+row q from A if µq = 1 and from B = M A if µq = 0. Right-multiplying Nµ by A−1 places unit
+rows e⊤      / Z(µ) and rows of M at q ∈ Z(µ), giving det(Nµ A−1 ) = det M [Z(µ), Z(µ)].
+      q at q ∈
+
+
+6.2    Closed-Form Moore-Matrix Gauge Recursion
+Once all 2d principal minors ∆Z (M ) are extracted from kerL (CH ), the classical PMAP re-
+duction [18, 16] reconstructs a representative M̃ up to diagonal conjugation M = DM̃ D−1
+(D = diag(D0 , . . . , Dd−1 ) ∈ (L× )d ) and transposition M̃ ↔ M̃ ⊤ . Imposing the row-0 gauge
+M̃0,j = 1 (1 ≤ j < d) immediately gives the diagonal M̃i,i = ∆{i} , the 2-cycle products
+πi,j := Mi,j Mj,i = ∆{i} ∆{j} + ∆{i,j} , and column 0 as M̃j,0 = π0,j . Expanding any 3 × 3
+principal minor ∆{i,j,k} isolates the 3-cycle sum
+
+M̃i,j M̃j,k M̃k,i + M̃i,k M̃k,j M̃j,i = Ti,j,k := ∆{i,j,k} + ∆{i} ∆{j} ∆{k} + ∆{i} πj,k + ∆{j} πi,k + ∆{k} πi,j .
+
+Setting (i, j, k) = (0, 1, j) (2 ≤ j < d) with M̃0,1 = M̃0,j = 1 and M̃j,1 = π1,j /M̃1,j yields d − 2
+univariate quadratics π0,j M̃1,j2 +T
+                                      0,1,j M̃1,j + π0,1 π1,j = 0 over L (solved via half-traces for odd
+n). Once row 1 and column 1 are fixed, (T0,i,j , T1,i,j ) form a 2 × 2 linear system in (M̃i,j , M̃j,i )
+for every 2 ≤ i < j < d, leaving at most two consistent candidates {M̃ , M̃ ⊤ }.
+    In a general PMAP instance, the diagonal gauge D ∈ (L× )d cannot be recovered from prin-
+cipal minors alone. Theorem 10 resolves this gauge ambiguity in closed form without searching
+(L× )d−1 by exploiting the Frobenius row-shift structure of the Moore matrices A and B.
+                                                          i                    i
+Theorem 10. For Moore matrices Ai,k = αk2 and Bi,k = βk2 = (M A)i,k with M = DM̃ D−1
+and M̃0,j = 1 (j ≥ 1), rescaling (x, y) 7→ (δx, δy) (δ ∈ L× ) fixes D0 = D1 = 1, and D2 , . . . , Dd−1
+satisfy
+                                                 2
+                                         M̃1,0 M̃i,d−1
+                         Di+1 = Di2 · 2                   (1 ≤ i ≤ d − 2).                         (10)
+                                       M̃0,d−1 M̃i+1,0
+The secret subspace ⟨α1 , . . . , αd ⟩F2 ⊂ L equals kerF2 (Lα ) for
+                                                   d−1  2
+                                          2d
+                                                   X   M0,j−1 + M1,j       j        M1,0
+                          Lα (Z) = Z           +           2           Z2 +          2    Z,                (11)
+                                                   j=1
+                                                          M0,d−1                   M0,d−1
+
+with total gate complexity CPK (m, n, d) = (2d − d − 1) · 2m2 n2 + m · 22d n2 + 12 d2 m3 n.
+
+                                                           14
+Algorithm 4: Direct Public-Key Secret Recovery (m ≥ 2d )
+                                                                        d
+  1. Compute Hq = ρq (Φ(h)) (0 ≤ q < d) and form CH ∈ Lm×2 with columns µq =1 Hq (T ).
+                                                                                  Q
+
+  2. Find p ∈ kerL (CH ) \ {0} and normalize ∆Z(µ) ← pµ /p1...1 for all µ ∈ {0, 1}d .
+  3. Reconstruct M̃ (M̃0,j = 1) from the d − 2 quadratics on (0, 1, j) and 2 × 2 linear systems
+     on (0, i, j), (1, i, j).
+  4. For M̂ ∈ {M̃ , M̃ ⊤ } (re-gauged to M̂0,j = 1), compute D via (10), M = DM̂ D−1 ,
+     ⟨α1 , . . . , αd ⟩F2 = kerF2 (Lα ) via (11), and β = M0,· A; solve
+     Pd ˜                                                           −1 ˜
+       k=1 fk (T )(αk H0 (T ) + βk ) = 0 over F2 and return Φ (f , Φ(x), Φ(y)).
+
+
+                                                             i+1            d                 2j
+Proof. Squaring row i of B = M A (0 ≤ i ≤ d − 2) gives βk2 = Mi,d−1  2   αk2 + d−1     2
+                                                                               P
+                                                                                  j=1 Mi,j−1 αk ,
+                                       i+1                  2j
+whereas row i + 1 of B = M A gives βk2 = d−1
+                                              P
+                                                j=0 Mi+1,j αk . Subtracting the two expressions
+shows that
+                                      d−1   2
+                                   d
+                                      X    Mi,j−1 + Mi+1,j 2j Mi+1,0
+                    L(i) (Z) := Z 2 +             2        Z + 2         Z
+                                      j=1
+                                               Mi,d−1             Mi,d−1
+
+                                      for every 0 ≤ i ≤ d − 2 (Mi,d−1 ̸= 0 since |Vα | = 2d ). Because
+vanishes on Vα = ⟨α1 , . . . , αd ⟩F2 Q
+the monic degree-2 annihilator v∈Vα (Z +v) is unique, L(i) = L(0) for all i, so Mi+1,0 /Mi,d−1
+                  d                                                                             2   =
+                                                                i
+        2
+M1,0 /M0,d−1 . Rescaling (αk , βk ) 7→ (δαk , δβk ) maps Di 7→ δ 2 −1 Di , so δ = D1−1 sets D0 = D1 =
+1. Substituting Mi,j = (Di /Dj )M̃i,j gives
+                              (Di+1 /D0 ) M̃i+1,0     (D1 /D0 ) M̃1,0
+                                             2
+                                                  =                2
+                                                                         ,
+                                        2
+                             (Di /Dd−1 ) M̃i,d−1    (D0 /Dd−1 )2 M̃0,d−1
+       2
+where Dd−1 cancels from both denominators, yielding (10) and (11) (Algorithm 4).
+
+
+6.3    Transposed Subspace Search for Small Field Degrees
+                                 d
+When m < 2d , CH ∈ Lm×2 has an underdetermined kernel of dimension at least 2d − m > 1.
+In this regime, the classical structural dual-LRPC subspace search [15, 17, 5] tests whether a
+candidate D-dimensional subspace W ⊂ K (d ≤ D < m) contains a K × -multiple γF of the
+secret support by solving an n(m − D) × nD binary system in O((m − D)D2 n3 ) bit operations.
+Working over the field L = F2 [X]/(P (X)) reduces each window test by a factor of n to an
+(m − D) × D matrix over L, while confirming that the exponential Grassmannian covering
+factor keeps m < 2d parameters secure.
+Proposition 11. Let W ⊂ K be a D-dimensional F2 -subspace (d ≤ D < m) extended to a
+basis (w0 , . . . , wm−1 ) of K with F2 -dual basis (ω0 , . . . , ωm−1 ), and define MW ∈ L(m−D)×D by
+                           n−1
+                           X
+             (MW )k,j :=      ⟨ωD+k , wj hi ⟩ X i ∈ L    (0 ≤ k < m − D, 0 ≤ j < D).
+                           i=0
+
+Then kerL (MW ) ∼   = {x ∈ R : Supp(x) ⊆ W and Supp(xh) ⊆ W }. One O((m − D)D2 n2 )
+elimination over L tests whether γF ⊆ W for any γ ∈ K       × , covering a multiplicative orbit of
+
+size 2m − 1; covering the full keyspace requires at least d 2 (2m − 1) D
+                                                          m                                   406.8
+                                                                         
+                                                                          d 2 subspaces (≥ 2
+at D = 8, ≥ 2  397.8 at D = 9, and ≥ 2 205.0 at D = 33 on 2020 ROLLO-I-128).
+Proof. Every x ∈ R with Supp(x) ⊆ W writes uniquely as x = D−1
+                                                                    P
+                                                                      j=0 wj λj (X) (λj ∈ L), and
+                                                                   PD−1
+its wD+k -component after multiplying by h mod P (X) equals j=0 (MW )k,j λj . If γF ⊆ W ,
+then γx ∈ kerL (MW ) \ {0}. On 2020 ROLLO-I-128 (m = 67, n = 83, d = 8) at D = 33, a single
+34 × 33 window test over F283 executes in 0.29 s on one core, but requires ≥ 2205.0 windows to
+cover GrF2 (8, K).
+
+                                                  15
+Table 4: Exact binary nullity νF2 (P ) and quadratic Grassmannian Plücker relation deficit across
+representative m ≤ 2r parameter sets. Here νF22+1 counts quadratic binary monomials on the
+                    2P
+                        2P −r+1
+kernel, and NPl = r−1      r+1     counts quadratic Plücker generators over L.
+                                                              νF2 +1
+     Parameter Set             (m, n, r)    P    νF2 (P )       2
+                                                                         NPl         nNPl
+       2019 ROLLO-I-256     (113, 67, 7)      7   8.58×103 3.68×107        3.00×103    2.01×105
+       2019 ROLLO-II-256   (127, 157, 7)      9   4.23×105 8.95×1010       9.19×106    1.44×109
+       2020 ROLLO-I-128      (67, 83, 7)      8   6.88×104 2.37×109        3.60×105    2.99×107
+       2020 ROLLO-I-192      (79, 97, 8)      8   2.48×104 3.08×108        1.14×104    1.11×106
+       2020 ROLLO-I-256     (97, 113, 9)      9   5.79×104 1.67×109        4.38×104    4.94×106
+       2020 ROLLO-II-128    (83, 189, 7)      8   1.54×105 1.18×1010       3.60×105    6.81×107
+       2020 ROLLO-II-192    (97, 193, 8)      8   4.94×104 1.22×109        1.14×104    2.21×106
+       2020 ROLLO-II-256    (97, 211, 8)      9   4.12×105 8.47×1010       1.75×106    3.69×108
+       new2ROLLO-I-128 [9] (73, 83, 7)        8   6.83×104 2.33×109        3.60×105    2.99×107
+       new2ROLLO-I-256 [9] (103, 113, 9)      9   5.79×104 1.67×109        4.38×104    4.94×106
+
+
+7      Phase Transitions and Impossibility Barriers
+7.1     Exact Binary Nullity Below Threshold
+In the sub-threshold regime m ≤ 2r (2019 ROLLO-I/II-256, 2020 ROLLO, and new2ROLLO-I),
+neither increasing the number of Frobenius conjugates P ≤ n nor adjoining quadratic Grass-
+mannian Plücker relations closes the system.
+
+Theorem 12. Over Q = L[T ]/(g(T )) with authentic conjugates Hq = ρq (H0 ) and Uq = ρq (U0 ):
+
+ 1. Because ρ is an automorphism of Q fixing Φ(K) pointwise, equation q of (2) is the ρq -image
+    of equation 0. The solution set {E    ′
+                                        m ∈ −n(m−2r)
+                                               GrF2 (r, K) : U0 ∈ WE ′ + H0 WE ′ } is independent of
+    P , with expected spurious count r 2 2              .
+                                                                      −1
+ 2. Eliminating shifted variables via pQ+1,µ = p2Q,µ leaves 2r Pr−1
+                                                                        
+                                                                          n binary unknowns, while
+     P −2           P −1
+                       
+       r    of the        0-anchored equations become redundant via ES ′ +1 = ρ(ES ′ ), leaving
+                 −2
+                    r
+    only the Pr−1   blocks with {0, 1} ⊆ S ′ . For all m ≤ 2r and r + 1 ≤ P ≤ n (d > r), the exact
+    F2 -nullity is                                                 
+                                               r P −1            P −2
+                               νF2 (P ) = n 2               −m            ,                     (12)
+                                                  r−1            r−1
+      which grows strictly with P .
+
+Proof. Part (1) follows from bijectivity of ρq on Q and ρq (b̃k ) = b̃k . For Part (2), under pQ+1,µ =
+p2Q,µ , every r-subset Q ⊆ {0, . . . , P −1} is determined by the unique shifted subset Q−min Q ∋ 0
+when anchoredfrom below, or equivalentlyQ + (P − 1 − max Q) ∋ P − 1 within {0, . . . , P − 1};
+               −1                              −1
+there are Pr−1      such orbits, giving 2r Pr−1   n independent binary variables. Among the P −1
+                                                                                                       
+                                                                                                    r
+0-anchored equations ES ′ , every subset S ′ ⊆ {0, . . . , P −2} containing 0 ( P −2
+                                                                                    
+                                                                                  r   subsets) satisfies
+ρ(ES ′ ) = ES ′ +1 , which already lies in the Q-span of {E{0}∪S } by Lemma 3. Subtracting these
+ P −2
+         redundant Q-equations leaves P −1        − P −2       −2
+                                                          = Pr−1
+                                                              
+   r                                         r        r            independent Q-equations (mn bits
+                                                                          −1        −2
+each), yielding (12). When m ≤ 2 , νF2 (P + 1) − νF2 (P ) = n[2r Pr−2
+                                        r                                     − m Pr−2
+                                                                                      
+                                                                                         ] > 0.
+
+7.2     Quadratic Plücker Deficit and Scope Boundaries
+Table 4 compares the number of quadratic binary monomials νF2 (P2 )+1 on this kernel against
+                                                                        
+                                                         2P
+                                                             2P −r+1
+the total number of quadratic Plücker generators NPl = r−1     r+1    of GrL (r, 2P ): quadratic
+
+
+                                                  16
+unknowns exceed L-relations by factors of 6.5 × 103 to 1.07 × 105 , and exceed the bit bound
+nNPl by factors of 62 to 553. In addition, since ρn = idQ , solvability on the inhomogeneous
+public key of 2019 ROLLO-III-256 (d = w = 7, while r = wr = 8 already satisfies m < 2r )
+requires P2∗ (m, d) ≤ n, which fails because m = 131 > 27 = 128 requires P ≥ 264 > n = 67
+for positive excess rank (P2∗ = 263 > 67). Hybrid sub-support guessing of an a-dimensional
+subspace E0 ⊂ E via quotient projection K ↠ K/E0 [9, 11] also fails because the product
+e2 h uses field multiplication in K and E0 is an F2 -subspace rather than an ideal of K. Finally,
+unstructured rank-metric signature schemes such as RYDE [7] and Mirath [1] have no polynomial
+quotient modulus P (X) and admit no Φ(K)-fixing automorphism ρ.
+
+
+8     Complexity Ledger and Experimental Evaluation
+8.1   Gate Complexity Across All Twenty-Seven Sets
+Table 5 evaluates all 27 published parameter sets (24 official NIST sets and 3 new2ROLLO-I
+sets [9]) in log2 two-input gates against the minimum published complexity across MaxMinors
+(MM), Support-Minors (SM) [10, 14], and structural Dual-LRPC (DL) [5, §6.2], [22]. Our
+methods improve upon the best published complexities through 2026 on 14 of the 27 sets: all 9/9
+Round 1 LOCKER sets by 10.3–23.1 bits, and 5/9 initial Round 2 ROLLO sets by 5.1–20.6 bits.
+Because the required conjugate count P2∗ (m, r) = ⌈(mr − 2r )/(m − 2r )⌉ decreases as m increases
+at fixed r, the 192-bit sets LOCKER-II/VIII (m = 101, P = 7, unreduced size 606 × 672) require
+smaller matrices and solve faster than 128-bit LOCKER-I (m = 71, P = 9, unreduced size
+3976 × 4032).
+
+8.2   Experimental Verification and Runtime Benchmarks
+Table 6 reports measured matrix dimensions, Stage 1 kernel nullities νL , memory footprints, and
+wall-clock runtimes from our C++17 and Python implementations. On LOCKER-I at P = 9, our
+12-thread C++17 Schur-reduced solver constructs the 2184 × 2240 matrix in 0.35 s, extracts the
+56-dimensional L-kernel in 1.50 s, solves the binary Frobenius system in 0.15 s, and recovers the
+exact 64-byte shared secret ss in 1.15–2.15 s wall-clock using 58 MB of RAM. Our parameterized
+dense solver solves all five r = 5 LOCKER parameter sets (LOCKER-I, II, IV, VII, VIII, where
+LOCKER-VII shares the (m, n, r, d) = (83, 149, 5, 8) parameters of 2019 ROLLO-II-128), and
+cyclotomic Φn (X) projection solves the canonical X 83 − 1 and X 107 − 1 ring variants in 1.19 s
+and 1.29 s.
+    On r = 6 LOCKER-III (107, 89, 6, 8) at P = 14, our sparse Krylov engine constructs the full
+183,612 × 192,192 CSR matrix (82,258,176 non-zeros, constant row weight w = 448) in 1.65 GB
+of RAM versus 565 GB dense, executing sparse matrix-vector products at 8.33 ns per F289
+multiply-accumulate (β = 4, 8 threads) and matching the gate cost model (8) within 1.0% on
+LOCKER-I. For direct public-key recovery, our single-core solver recovers the secret key (F, x, y)
+up to K × -scaling in 5.97 s on 2019 ROLLO-I-128.
+
+Verification Against the Reference Implementation. Our cryptanalysis targets the
+mathematical specification of LOCKER and ROLLO directly and does not exploit any software
+defect. When generating benchmark instances from the unmodified NIST Round 1 LOCKER
+C/C++ submission package [3], we noted two upstream implementation defects: (i) across all
+18 LOCKER-I..IX reference and optimized directories, ffi vec add zeroes its destination refer-
+ence before addition, turning the in-place call u ← u + e1 (where u initially holds e2 h) into
+u = e1 of rank r rather than full rank m (our fetch script strips this zeroing call across the refer-
+ence directories); and (ii) the LOCKER-IX header lists modulus exponents {7, 9, 10} copied from
+n = 149 instead of the specified irreducible exponents {2, 5, 6} for n = 157. All experiments in
+
+
+                                                 17
+Table 5: Two-input gate complexities (log2 gates) across all 27 published LOCKER and ROLLO
+parameter sets. Column Prior Best takes the minimum published complexity across MaxMi-
+nors (MM), Support-Minors (SM) [10, 14], and Dual-LRPC (DL) [5, §6.2], [22]. Column CT
+evaluates the uniform sparse Block-Lanczos cost (8) at rank r, and PK evaluates direct key
+recovery via (11) on homogeneous h = x−1 y (or inhomogeneous TSM (8) at rank d = w on
+ROLLO-III public keys pk = (h, s)); ‘—‘ indicates m ≤ 2r , P2∗ > n, or m < 2d .
+     Gen. Parameter Set                       (m, n, r, d)      Claim Prior Best CT                     PK         ∆
+               LOCKER-I                      (71, 83, 5, 7)        128       58.2 (MM)         46.3      —      −11.9
+               LOCKER-II                    (101, 83, 5, 7)        192       57.5 (MM)         41.0      —      −16.6
+               LOCKER-III                   (107, 89, 6, 8)        256       69.6 (MM)         58.8      —      −10.8
+               LOCKER-IV                    (79, 101, 5, 7)        128       60.8 (MM)         44.4      —      −16.4
+     2017      LOCKER-V                     (97, 103, 6, 8)        192       72.4 (MM)         62.1      —      −10.3
+               LOCKER-VI                   (107, 103, 6, 8)        256       72.1 (MM)         59.2      —      −12.9
+               LOCKER-VII                   (83, 149, 5, 8)        128       66.2 (MM)         45.6      —      −20.6
+               LOCKER-VIII                 (101, 149, 5, 8)        192       65.8 (MM)         42.7      —      −23.1
+               LOCKER-IX                   (109, 157, 6, 9)        256       79.3 (MM)         60.5      —      −18.8
+               ROLLO-I-128                   (79, 47, 5, 6)        128       50.0 (MM)         42.2 31.3        −18.7
+               ROLLO-I-192                   (89, 53, 6, 7)        192       61.4 (MM)         63.7 —           +2.3
+               ROLLO-I-256                  (113, 67, 7, 8)        256       127.7 (SM)         —    —           —
+               ROLLO-II-128                 (83, 149, 5, 8)        128       66.2 (MM)         45.6 —           −20.6
+     2019      ROLLO-II-192                (107, 151, 6, 8)        192       78.7 (MM)         60.3 —           −18.3
+               ROLLO-II-256                (127, 157, 7, 8)        256       113.9 (SM)         —    —           —
+               ROLLO-III-128               (101, 47, 6, 5)a        128       49.4 (MM)         58.4 39.3b       −10.1
+               ROLLO-III-192               (107, 59, 8, 6)a        192       62.7 (MM)          — 57.6b         −5.1
+               ROLLO-III-256               (131, 67, 8, 7)a        256       107.9 (SM)         —    —c          —
+               ROLLO-I-128                   (67, 83, 7, 8)        128       157.0 (DL)         —        —         —
+               ROLLO-I-192                   (79, 97, 8, 8)        192       180.3 (DL)         —        —         —
+               ROLLO-I-256                  (97, 113, 9, 9)        256       268.7 (DL)         —        —         —
+     2020
+               ROLLO-II-128                 (83, 189, 7, 8)        128       103.2 (DL)         —        —         —
+               ROLLO-II-192                 (97, 193, 8, 8)        192       141.9 (DL)         —        —         —
+               ROLLO-II-256                 (97, 211, 8, 9)        256       173.2 (DL)         —        —         —
+               new2ROLLO-I-128 (73, 83, 7, 8)                      128       175.3 (DL)         —        —         —
+     2020d     new2ROLLO-I-192 (89, 97, 8, 8)                      192       210.7 (DL)         —        —         —
+               new2ROLLO-I-256 (103, 113, 9, 9)                    256       290.0 (DL)         —        —         —
+      a In ROLLO-III, r = w
+                              r ∈ {6, 8, 8} is the ciphertext error rank and d = w ∈ {5, 6, 7} is the secret-key rank in
+
+ pk = (h, s = x + hy); Prior Best [9, 14] evaluates this rank-d [2n, n] public-key instance.      b Inhomogeneous TSM (8)
+
+        applied to pk = (h, s) at rank d = w (homogeneous Algorithm 4 does not apply as h is uniform).          c Here
+
+m = 131 > 27 = 128 at d = 7, but P2∗ (131, 7) = 263 (264 for positive excess rank) exceeds n = 67.       d Illustrative large-m
+
+                                   parameter sets proposed in [9] and re-evaluated in [10].
+
+
+
+
+                                                              18
+Table 6: Measured matrix dimensions over L = F2 [X]/(P (X)), Stage 1 nullity νL , memory
+usage, and wall-clock runtimes across our implemented solvers.
+   Instance                (m, n, r, d)       Variant        P   Matrix Size         νL    Memory        Time
+   LOCKER-I         (71, 83, 5, 7)   Schur TSM 9   2184 × 2240     56  58 MB   1.15 sa
+   LOCKER-I         (71, 83, 5, 7)    Overdet. 10  8946 × 8064     1  128 MB   14.2 s
+   LOCKER-II        (101, 83, 5, 7) Dense TSM 7     606 × 672      66  12 MB   0.48 sb
+   LOCKER-IV        (79, 101, 5, 7) Dense TSM 8    1659 × 1792    133  48 MB   6.05 sb
+   LOCKER-VII       (83, 149, 5, 8) Dense TSM 8    1743 × 1792    49   72 MB   6.91 sb
+   LOCKER-VIII      (101, 149, 5, 8) Dense TSM 7    606 × 672      66  16 MB   1.33 sb
+               83
+   LOCKER-I (X −1) (71, 82, 5, 7)    Projection 9  2184 × 2240     56  58 MB   1.19 s
+   Split (m=n=15)   (15, 15, 3, 5)   Projection 6   150 × 160      10 < 1 MB   0.02 s
+   LOCKER-III (CSR) (107, 89, 6, 8)   Lanczos 14 183612 × 192192 8580 1.65 GB 258.8 Gc
+   2019 ROLLO-I-128 (79, 47, 5, 6)   Direct PK 6  79 × 64 (CH )     1 < 2 MB   5.97 s
+a 1.15 s wall-clock on 12-thread AVX-512 VPCLMULQDQ; 1.77–2.15 s on portable 12-thread PCLMULQDQ.        b Stage 1–2
+                                                       P −1
+                                                             m × Pr 2r system.   c Measured CSR build (w = 448) and
+                                                                   
+C++ linear-algebra time (12 threads) on the unreduced    r
+  β = 4 sparse matrix-vector multiply benchmark (8.33 ns per multiply-add, 8 threads); total gate count from (8).
+
+
+
+this paper use the specified irreducible modulus P (X), compute the genuine non-aliased syn-
+drome u = e1 + e2 h mod P (X), and assert full rank rankF2 (u) = m and successful reference
+decapsulation on every trial.
+
+Use of AI. The cryptanalytic results and artifacts were initially developed through an au-
+tonomous agent system powered by a MiniMax internal model. We validated the key technical
+claims and refined the presentation of the manuscript.
+
+
+References
+ [1] G. Adj et al., “Mirath signature scheme: Algorithm specifications and supporting documen-
+     tation (v2.1.0),” Submission to the NIST Post-Quantum Cryptography Additional Digital
+     Signatures Process (Round 2), 2025.
+
+ [2] C. Aguilar-Melchor, N. Aragon, V. Dyseryn, P. Gaborit, and G. Zémor, “LRPC codes with
+     multiple syndromes: Near ideal-size KEMs without ideals,” in Post-Quantum Cryptography
+    – PQCrypto 2022, LNCS, vol. 13512, pp. 45–68, Springer, 2022.
+
+ [3] N. Aragon, O. Blazy, J.-C. Deneuville, P. Gaborit, A. Hauteville, O. Ruatta, J.-P. Tillich,
+     and G. Zémor, “LOCKER – LOw rank parity ChecK codes EncRyption,” Submission to
+     the NIST Post-Quantum Cryptography Standardization Process (Round 1), Nov. 2017.
+
+ [4] N. Aragon, O. Blazy, J.-C. Deneuville, P. Gaborit, A. Hauteville, O. Ruatta, J.-P. Tillich,
+     G. Zémor, C. Aguilar Melchor, M. Bardet, S. Bettaieb, L. Bidoux, and A. Otmani, “ROLLO
+     – Rank-Ouroboros, LAKE & LOCKER,” Submission to the NIST Post-Quantum Cryptog-
+     raphy Standardization Process (Round 2 Initial Specification), Mar. 2019.
+
+ [5] N. Aragon et al., “ROLLO – Rank-Ouroboros, LAKE & LOCKER (Updated Specifica-
+     tion),” NIST Post-Quantum Cryptography Round 2 Revision, Apr. 21, 2020.
+
+ [6] N. Aragon, P. Briaud, V. Dyseryn, P. Gaborit, and A. Vinçotte, “The blockwise rank
+     syndrome learning problem and its applications to cryptography,” in Post-Quantum Cryp-
+     tography – PQCrypto 2024, Part I, LNCS, vol. 14771, pp. 75–106, Springer, 2024. (IACR
+     ePrint 2023/1875.)
+
+
+
+                                                        19
+ [7] N. Aragon et al., “RYDE: Rank syndrome DEcoding signature scheme (v2.1.0),” Sub-
+     mission to the NIST Post-Quantum Cryptography Additional Digital Signatures Process
+     (Round 2), 2025.
+
+ [8] M. Bardet, P. Briaud, M. Bros, P. Gaborit, V. Neiger, O. Ruatta, and J.-P. Tillich, “An
+     algebraic attack on rank metric code-based cryptosystems,” in Advances in Cryptology –
+     EUROCRYPT 2020, Part III, LNCS, vol. 12107, pp. 64–93, Springer, 2020.
+
+ [9] M. Bardet, M. Bros, D. Cabarcas, P. Gaborit, R. Perlner, D. Smith-Tone, J.-P. Tillich, and
+     J. Verbel, “Improvements of algebraic attacks for solving the rank decoding and MinRank
+     problems,” in Advances in Cryptology – ASIACRYPT 2020, Part I, LNCS, vol. 12491,
+     pp. 507–536, Springer, 2020.
+
+[10] M. Bardet, P. Briaud, M. Bros, P. Gaborit, and J.-P. Tillich, “Revisiting algebraic attacks
+     on MinRank and on the rank decoding problem,” Designs, Codes and Cryptography, vol. 91,
+     no. 11, pp. 3671–3707, 2023. (IACR ePrint 2022/1031.)
+
+[11] H. Beeloo-Sauerbier Couvée, A. Wachter-Zeh, and V. Weger, “Hybrid subsupport guessing:
+     A new hybrid technique for the rank decoding problem,” in Post-Quantum Cryptography
+    – PQCrypto 2026, Part I, LNCS, vol. 16491, pp. 130–155, Springer, 2026. (IACR ePrint
+     2025/2168.)
+
+[12] S. Chee, K. C. Jeong, T. Lange, N. Lee, A. Pellegrini, and H. Ryu, “Analysis of layered
+     ROLLO-I: A BII-LRPC code-based KEM,” IACR Communications in Cryptology, vol. 1,
+     no. 3, art. 45, 2024. (IACR ePrint 2024/230.)
+
+[13] P. Delsarte, “Bilinear forms over a finite field, with applications to coding theory,” Journal
+     of Combinatorial Theory, Series A, vol. 25, no. 3, pp. 226–241, 1978.
+
+[14] A. Esser, J. A. Verbel, and R. Villanueva-Polanco, “Rank syndrome decoding estimator –
+     An asymptotic and concrete analysis,” Cryptology ePrint Archive, Paper 2026/082, 2026.
+
+[15] P. Gaborit, G. Murat, O. Ruatta, and G. Zémor, “Low rank parity check codes and their
+     application to cryptography,” in Proceedings of the Workshop on Coding and Cryptography
+     (WCC 2013), pp. 168–180, 2013.
+
+[16] K. E. Griffin and M. J. Tsatsomeros, “Principal minors, Part II: The principal minor
+     assignment problem,” Linear Algebra and its Applications, vol. 419, no. 1, pp. 125–171,
+     2006.
+
+[17] A. Hauteville and J.-P. Tillich, “New algorithms for decoding in the rank metric and an at-
+     tack on the LRPC cryptosystem,” in 2015 IEEE International Symposium on Information
+     Theory (ISIT), pp. 2747–2751, IEEE, 2015.
+
+[18] R. Loewy, “Principal minors and diagonal similarity of matrices,” Linear Algebra and its
+     Applications, vol. 78, pp. 23–64, 1986.
+
+[19] P. L. Montgomery, “A block Lanczos algorithm for finding dependencies over GF(2),” in
+     Advances in Cryptology – EUROCRYPT ’95, LNCS, vol. 921, pp. 106–120, Springer, 1995.
+
+[20] G. Alagic et al., “Status report on the second round of the NIST Post-Quantum Cryptog-
+     raphy Standardization Process,” National Institute of Standards and Technology, Internal
+     Report NISTIR 8309, Jul. 2020.
+
+[21] S. Samardjiska, P. Santini, E. Persichetti, and G. Banegas, “A reaction attack against
+     cryptosystems based on LRPC codes,” in Progress in Cryptology – LATINCRYPT 2019,
+     LNCS, vol. 11774, pp. 197–216, Springer, 2019. (IACR ePrint 2019/845.)
+
+                                                20
+[22] Y. Song, J. Zhang, X. Huang, and W. Wu, “Blockwise rank decoding problem and LRPC
+     codes: Cryptosystems with smaller sizes,” in Advances in Cryptology – ASIACRYPT 2023,
+     Part VII, LNCS, vol. 14444, pp. 284–316, Springer, 2023. (Extended in IEEE Trans. Inf.
+     Theory, vol. 71, no. 6, pp. 4806–4838, 2025; IACR ePrint 2023/1387.)
+
+[23] D. H. Wiedemann, “Solving sparse linear equations over finite fields,” IEEE Transactions
+     on Information Theory, vol. 32, no. 1, pp. 54–62, 1986.
+
+
+
+
+                                             21
+

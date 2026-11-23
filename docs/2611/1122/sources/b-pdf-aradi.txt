@@ -1,0 +1,1452 @@
+                    Integral Cryptanalysis of ARADI
+                                                 MiniMax
+
+                                             November 2026
+
+
+                                                 Abstract
+          ARADI is a 128-bit block, 256-bit key, 16-round substitution–permutation network pub-
+      lished by the U.S. National Security Agency (Greene, Motley, and Weeks, IACR ePrint
+      2024/1240) for low-latency memory encryption alongside LLAMA. The ARADI specification
+      gives no round-by-round security bounds, relying on strict per-key data limits from frequent
+      rekeying. In ToSC 2026 (Issue 3), Beyne, Neyt, and Sajjad proved via quasidifferential
+      trails that high-round differential trails of ARADI collapse to weak-key subsets (2−38 at 12
+      rounds and 2−39 at 14 rounds, invalidating prior 11–14-round single-key differential attacks).
+      Meanwhile, prior all-key integral attacks (Dunkelman and Ghosh, ePrint 2025/1227) need
+      2118 –2126.8 chosen plaintexts on 10–12 rounds or reach only 6 rounds (1,536 chosen plaintexts).
+          We present OPTIC (Orthogonal Pullback and Ternary Integral Cryptanalysis), a three-
+      module framework achieving all-key (100% of 2256 keys) master-key recovery on ARADI across
+      5 to 12 rounds. Forward, pulling masks back onto the quadratic rows of ARADI’s Toffoli S-box
+      across the four-column islands of its orthogonal fourth linear layer collapses two nonlinear
+      rounds into one cubic layer. Backward, each weight-three involution turns subkey recovery into
+      evaluating a ternary inverse-S-box tree, closing to the 256-bit master key in constant time from
+      any even-starting subkey pair (Dunkelman and Ghosh). Instantiating OPTIC yields: (i) single-
+      core recovery on 5 rounds (6 chosen plaintexts for the last subkey in 11 ms; 4 chosen plaintexts
+      for the master key in 16.0 s) and 6 rounds (48 chosen plaintexts in 2.4 s via 198 certified equa-
+      tions); (ii) a 216 -chosen-plaintext 6-round distinguisher with a 42-dimensional null space (261 ×
+      below ePrint 2024/1772 and 266 × below ToSC 2026(3)), enabling single-core master-key recov-
+      ery on 7 rounds (3,072 chosen plaintexts, 3.5 s) and 8 rounds (90,112 chosen plaintexts, 6.0 s,
+      < 20 MB RAM), plus the first dedicated 9-round master-key attack (222.32 chosen plaintexts,
+      254.77 Walsh–Hadamard butterflies, 4.7 MB); and (iii) 10–12-round all-key attacks improving
+      data and time over ePrint 2025/1227, reaching (2126.81 , 2149.88 packed ops, 2123.49 bits) and
+      (2126.58 , 2148.62 packed ops ≈ 2141 encryptions, 2153.81 bits) at 12 rounds. This trades higher
+      data and memory than ToSC 2026(3) to cover all 2256 keys and run > 248 × faster than its
+      non-heuristic 2197 attack.
+
+
+1     Introduction
+1.1    Memory Encryption and Threat Model
+Protecting random-access memory (RAM) against physical probing, interposer snooping, and
+cold-boot extraction [24] requires encrypting cache lines on the critical memory-bus path.
+Because every additional nanosecond of encryption latency directly stalls processor load/store
+pipelines, general-purpose ciphers such as AES are frequently replaced in memory controllers by
+dedicated low-latency primitives, including PRINCE [12], PRINCEv2 [14], MANTIS [4], QARMA [3],
+QARMAv2 [1], SCARF [15], and ChiLow [5].
+    In August 2024 (revised September 2024), Patricia Greene, Mark Motley, and Bryan Weeks
+of the U.S. National Security Agency published ARADI alongside its authenticated memory-
+encryption mode LLAMA [23]. ARADI is an unrolled 16-round substitution–permutation network
+(SPN) operating on a 128-bit state (four 32-bit words w, x, y, z) under a 256-bit master key.
+It combines a bit-sliced 4-Toffoli-gate S-box π with four alternating involution linear layers
+
+
+                                                      1
+Λ0 , Λ1 , Λ2 , Λ3 of row weight 3 and an F2 -affine key schedule. Unlike open academic designs, the
+19-page NSA specification [23] provides no differential, linear, algebraic, or integral security
+bounds justifying its 16-round count. It notes only that the rotation offsets (aj , bj , cj ) “were
+chosen by a limited search over the possible values” [23, Section 3.1, p. 5]. Instead, Section 2
+of [23, p. 2] states the operational threat model explicitly.
+      “we can reasonably enforce frequent re-keying (say once per day), and so we have a
+      relatively small upper bound on the amount of data available to the attacker on a
+      given key.”
+This operational constraint creates a clear split in the cryptanalysis of ARADI. Theoretical
+attacks requiring 2108 –2128 chosen plaintexts per key exceed physically realizable memory-bus
+traffic under daily rekeying by more than twenty orders of magnitude. By contrast, ultra-low-data,
+practical-time all-key recovery attacks directly probe the true security margin of ARADI under
+its intended deployment assumptions.
+
+1.2    Prior Cryptanalysis of ARADI
+Since August 2024, ARADI and LLAMA have attracted sustained scrutiny across fifteen active
+cryptanalytic works on IACR ePrint and in peer-reviewed venues. One early power side-channel
+preprint, ePrint 2024/1987, was withdrawn in July 2025 and is excluded below.1 Table 1
+summarizes all single-key cryptanalytic results on ARADI:
+
+  • Differential Cryptanalysis and the Quasidifferential Weak-Key Barrier (ToSC
+    2026(3) [10]): Automated trail searches by Bellini et al. [7] (INDOCRYPT 2024 ) proposed
+    8–10-round differential/linear distinguishers and an 11-round differential attack. Mandal
+    et al. [31] reported 11- and 12-round differential attacks (D = 2127 , T = 2234 and 2254 ).
+    Ghosh, Michel, and Naya-Plasencia [22] proposed a 14-round differential-MITM attack
+    (D = 2126 , T = 2248.57 ). However, in ToSC 2026(3), Beyne, Neyt, and Sajjad [10] applied
+    quasidifferential trail analysis [11] to ARADI. They prove that all high-probability differential
+    characteristics impose 26–39 independent linear constraints on the master key, outside which
+    the fixed-key differential probability is identically zero:
+
+    (a) Invalidation of Prior 11–14-Round Differential Attacks: Beyne et al. [10, Table 1, §3.2,
+        §4.1] proved that the 9-round differential underlying [22] holds only for a weak-key class
+        of size 2256−26 = 2230 , so its T = 2248.57 complexity exceeds exhaustive search (2230 )
+        over the valid key space (ineffective). Meanwhile, both [7] and [31] omitted 4 required
+        outer-round subkey columns (16 bits) during 2-round partial decryption, causing the
+        right key to be discarded (invalid ).
+    (b) Weak-Key 12- and 14-Round Differential Attacks in [10]: Constructing two new 9-round
+        differentials (with fixed-key probabilities 2−107.678 for a 2−38 fraction of keys and 2−119
+        for a 2−39 fraction of keys), Beyne et al. [10, §5.2–5.3, §6.1–6.2] presented a 12-round
+        attack valid only for 2218 weak keys (2−38 of the key space) with primary complexity
+        D = 2108.68 chosen plaintexts (CP), T = 2196.68 ≈ 2197 , M = 236 . A high-memory variant
+        runs at D = 2111.38 CP, T = 2117 , M = 282.38 , relying on a binomial key-randomization
+        heuristic with 63% success within the 2−38 weak-key class. Their 14-round attack is valid
+        for 2217 weak keys (2−39 fraction) with D = 2120 CP, T = 2208 , M = 236 .
+   1
+     For mode-level and non-standard adversary models outside single-key black-box ARADI: Avanzi, Dunkelman,
+and Ghosh [2] identified a negligible-cost related-IV confidentiality and forgery flaw in LLAMA when variable-length
+IVs share a key (prompting the September 2024 revision of [23]). Hu et al. [25] constructed a 4-related-key
+impossible-boomerang attack on 16-round ARADI (D = 2130 , T = 2253.78 , M = 2235.75 ). Dey, Sahoo, and
+Sarkar [18] presented a differential fault attack on 16-round ARADI using ≤ 108 nibble faults and 3 · 232 time. La
+Scala and Tiwari [30, 29] studied symbolic Gröbner-basis hybrid solving on 16-round ARADI (≈ 2256 seconds after
+guessing 251–252 key bits, explicitly noting this does not beat brute force).
+
+
+                                                         2
+  • All-Key Integral, ZeroSum, and Impossible-Differential Attacks (10–13 Rounds):
+    Because algebraic degree bounds hold deterministically for all 2256 keys, integral/ZeroSum
+    cryptanalysis [27] bypasses the weak-key barrier entirely. Bellini et al. [8] (ACNS 2025 ;
+    reproduced by CLAASP-MP [9]) derived 4–8-round Toffoli degree distinguishers (D =
+    24 , 216 , 284 , 2113 , 2124 CP) and a 10-round attack (D = 2124 CP, T = 2192 after correcting
+    balanced-bit multiplicity [19]). Kim et al. [26] gave 5–8-round division-property distinguishers
+    (D = 213 , 277 , 2112 , 2124 CP, where 7R uses a shifted starting round). Combining ZeroSum
+    distinguishers with partial-sum Fast Walsh–Hadamard Transforms (FHT/WHT) [21, 16,
+    33, 20], Dunkelman and Ghosh [19] achieved all-key 10–12-round master-key recovery
+    (D = 2118 –2126.8 CP, T = 2118 –2151.8 ). Derbez and Euler [17] (SAC 2025 ) gave a 13-round
+    impossible-differential attack (D = 2121.47 CP, full-key T ≈ 2255 [22]).
+
+  • Low- and Medium-Data Key Recovery (5–7 Rounds): Vaziri [34] proposed a 5-round
+    known-plaintext (KP) MITM attack (28 KP, T = 2234.8 ). At LATINCRYPT 2025, Bellini
+    et al. [6] studied neural-assisted key recovery (5 rounds with ≤ 1,040 CP [≤ 520 pairs] and
+    10 · 240 neural evaluations assuming 30 pre-known key bits; 7 rounds with D = 232 CP,
+    T = 270 –272 evaluations). They also report a classical 5-round truncated-differential attack
+    with 20 CP (40 CP after blind-column correction) and T = 242 operations for the last round
+    key. Finally, Dunkelman and Ghosh [19, Footnote 4, p. 16] released a 6-round FHT prototype
+    requiring 6 × 28 = 1,536 CP.
+
+
+1.3     Overview of the OPTIC Framework
+Spanning 5 to 12 rounds across twelve orders of magnitude in data (4 CP to 2126.58 CP) appears
+to require a patchwork of disparate techniques. These range from dead-column island MITM,
+one-hot XOR-SAT, and super-S-box collapse to colliding-pair cubes, 1-round lifts, additive-split
+Bloom-MITM, streaming joint-histogram WHTs, and progressive list joins. Building on the
+ZeroSum and partial-sum Walsh–Hadamard key-recovery paradigm [28, 21, 16, 33, 20, 8, 19],
+we show that all of these attacks are parametric instantiations of a single framework, OPTIC
+(Orthogonal Pullback and Ternary Integral Cryptanalysis).
+    For any R-round instance of ARADI (R = rin + rout ∈ {5, . . . , 12}), let Qrin (P ) ∈ F128
+                                                                                           2   denote
+the internal state after rin rounds on plaintext P , and let C(P ) denote the R-round ciphertext
+(formal bit-sliced definitions are given in Section 2). Given a d-dimensional affine plaintext cube
+(or cube prefix) C ⊂ F128
+                        2   and a 128-bit linear mask α ∈ F128
+                                                             2 , every attack in OPTIC solves the
+same three-stage ZeroSum-peeling relation.
+
+                                                                                                                                                               (1)
+            M                                           M
+                                                                                                              Kmaster = KS−1 K (2m) , K (2m+1) , 2m
+                                                                                                                                                  
+                   α, Qrin (P ) = 0              ⇐⇒            α, Trout C(P ); Kout          =0        =⇒                                                  .
+            P ∈C                                        P ∈C
+                                                                                                              |               {z                    }
+            |          {z          }                    |                  {z                  }            Module III: Even-Pair Closure [19, Remark 5]
+         Module I: Forward Pullback                     Module II: Backward Tree Peeling                         (O(1) inversion + affine KS filtering)
+   (Cube C, dim C=d, mask α on quadratic rows)        (Depth-rout 3-ary S-box tree, 3rout −1 leaves)
+
+
+
+    Equation (1) separates the design of distinguishers from backward subkey solvers cleanly:
+
+ 1. Forward Pullback Distinguishers (Module I, Section 3): Over F2 , a plaintext pair
+    is a 1D cube (d = 1) whose cube sum is its output difference. Thus, 5-round truncated
+    differentials (d = 1, 2), our 6-round 48-point prefix distinguisher (d = 6), our 6-round 42–80D
+    balanced linear-mask null spaces (d = 16–24), and existing 7–8-round high-degree Toffoli
+    zero-sums (d = 113, 124 [8, 26] and d = 116 [19]) all follow one rule. Each pulls α across one
+    round’s linear involution onto the two quadratic rows of the S-box [8]. Pulling back a single
+    column gives a localized 1-round lift (6–10 rounds). Pulling back a 4-column island of the
+    unique orthogonal fourth linear layer cancels all cross-column quadratic terms and collapses
+    two consecutive rounds into one degree-3 super-S-box (6 rounds at 48 CP).
+
+
+
+                                                                                  3
+Table 1: Single-key cryptanalysis of unmodified ARADI (128-bit block, 256-bit key, 16 rounds,
+ Round 0 start). “Keys” indicates full-key (all-key) vs. restricted weak-key (weak-key) validity;
+“Data” is in chosen plaintexts (CP) unless noted; “Runtime” gives measured single-core wall time
+(RKR = final whitening key, “b” = bits, “blk” = 128-bit blocks).
+Work                        Rds      Target        Keys                  Data               Time      Runtime     Memory
+                                                                              a               234.8
+Vaziri [34]                   5        MK         all-key                    28             2               —     219 blk
+                                                                                                 42
+Bellini et al. [6]            5        RK5        all-key                     20               2            —     O(1)
+Bellini et al. [6]            5        RK5        all-key              ≤ 1,040                243.3         —     —
+Kim et al. [26]               5        Dist.      all-key                    213               213          —     O(1)
+Beyne et al. [10]             5        Dist.     weak-key                 > 242             > 242           —     O(1)
+Dunkelman–Ghosh [19]          6     2 subkeys     all-key                  1,536              220.6     < 0.1 s   215 b
+Kim et al. [26]               6        Dist.      all-key                    277               277          —     O(1)
+Beyne et al. [10]             6        Dist.     all-keyd                 > 282             > 282           —     O(1)
+Bellini et al. [6]            7        RK7        all-key                    232               272          —     —
+Kim et al. [26]               7        Dist.      all-key                   2112              2112          —     O(1)
+Beyne et al. [10]             9        Dist.     weak-key        > 2106.68 –2109   > 2106.68 –2109          —     O(1)
+Bellini et al. [8]           10        MK         all-key                   2124              2192          —     2131 b
+Dunkelman–Ghosh [19]         10        MK         all-key                   2118              2118          —     248 b
+Dunkelman–Ghosh [19]         11        MK         all-key                   2126              2126          —     248 b
+Dunkelman–Ghosh [19]         11        MK         all-key                   2119           2147.76          —     2107.1 b
+Mandal et al. [31]           11        MK        weak-key                   2127               —b           —     —b
+Mandal et al. [31]           12        MK        weak-key                   2127               —b           —     —b
+                                                                          126.81             151.80
+Dunkelman–Ghosh [19]         12        MK         all-key                2                 2                —     2123.5 b
+Beyne et al. [10]            12        MK        weak-key                2108.68           2196.68          —     236 blk
+Beyne et al. [10]            12        MK        weak-key                2111.38              2117          —     282.4 blk
+Derbez–Euler [17]            13        MK         all-key                2121.47              2255          —     2112 blk
+Beyne et al. [10]            14        MK        weak-key                   2120              2208          —     236 blk
+Ghosh et al. [22]            14        MK        weak-key                   2126               —b           —     —b
+This work (§4.1)              5       RK5          all-key                     6                212      0.01 s   < 2 MB
+This work (§4.1)              5       MK           all-key                     4                 —       16.0 s   < 10 MB
+This work (§4.1)              6       MK           all-key                   48                  —        2.4 s   < 10 MB
+This work (§3.3)              6       Dist.        all-key                  216                 216      0.03 s   O(1)
+This work (§4.2)              7       MK           all-key               3,072                   —        3.5 s   < 5 MB
+This work (§4.2)              8       MK           all-key              90,112                  232       6.0 s   < 20 MB
+This work (§4.3)              9       MK           all-key               222.32           254.77c           —     4.7 MB
+This work (§4.4)             10       MK           all-key               222.00            2137.21          —     4.0 MB
+This work (§4.4)             10       MK           all-key               2117.00           2117.00          —     246.2 b
+This work (§4.4)             10       MK           all-key               2116.00          2116.00           —     2109.9 b
+This work (§4.4)             11       MK           all-key               2125.58          2125.58           —     299.6 b
+This work (§4.4)             11       MK           all-key              2118.81           2147.17c          —     2119.5 b
+This work (§4.4)             12       MK           all-key               2126.81          2149.88c          —     2123.5 b
+This work (§4.4)             12       MK           all-key              2126.58          2148.62c           —     2153.8 b
+a Known plaintexts (KP). b Invalid or ineffective [10]. c FHT butterflies (9R) or packed 64-bit ops [19] (11–12R). d Key-averaged p
+                                                                                                                                      avg .
+
+
+
+
+ 2. Backward Ternary-Tree Solvers (Module II, Section 4): Because every round linear
+    layer is an involution of row weight 3 [23], partially decrypting an internal 4-bit S-box column
+    across rout = R − rin outer rounds forms a depth-rout ternary (3-ary) expression tree Trout
+    in the outer round keys Kout . Increasing rout from 1 to 4 yields four canonical evaluation
+    regimes. (i) At depth 1 (5–6R), flat leaf sums are solved via 2 + 2 island MITM (212 ops at
+    6 CP) or one-hot CNF-XOR SAT (4 CP and 48 CP). (ii) At depth 2 (7–8R), we use 12-bit
+    subtree FHTs (7R), or stop before the root S-box so the tree splits additively into three
+    16-bit FHT branches joined via a Bloom filter (8R). (iii) At depth 3 (9R), we stream 216 -point
+    cubes directly into a 4 KB 12-bit joint histogram before WHT convolution [20, 19], cutting
+    memory from 256 GB to 4.7 MB. (iv) At depth 3–4 (10–12R), we refine the greedy-overlap
+    FHT framework of [19] via d = 113 pullbacks, O(1) root parity-pattern lookup tables,
+
+
+                                                             4
+Table 2: Overview of OPTIC instantiations across 5- to 12-round unmodified ARADI (R =
+rin + rout ; Section 2 defines the subkey pairs (K (2m) , K (2m+1) )).
+Rds   Split   Module I: Forward Pullback                 Module II: Backward Tree Peeling          Leaves Module III Result (D, T )
+  5   3 + 1 d=1 (3 pairs), 3R dead-column subspace       Depth 1: 2+2 Island MITM (212 )          4 cols    RK5 only         6 CP, 11 ms
+  5   1 + 4 d=2 affine plane, 1–4R subspace checks       Depth 1×4: 4-Layer XOR-SAT†              32 cols (K (2) , K (3) ) 4 CP, 16.0 s
+  6   5 + 1 d=6 (48-pt prefix), 4-col orthogonal islands Depth 1: 198-Eq XOR-SAT + Cascade                    (4)     (5)
+                                                                                                  12 cols (K , K ) 48 CP, 2.4 s
+  7   5 + 2 d=9 colliding pair+1 bit, 1-col balance      Depth 2: Single-Subtree 212 FHT [33, 19] 3 cols   (K (6) , K (7) ) 3,072 CP, 3.5 s
+           ∗
+  8 5.5+2.5 d=12 colliding 3-col cube, pre-root S-box Depth 2: Root-Free 3×16b FHT                9 cols   (K (6) , K (7) ) 90,112 CP, 6.0 s
+  9   6 + 3 d=16 colliding 4-col cube, 1-col balance     Depth 3: 4 KB Streaming WHT              9 cols   (K (8) , K (9) ) 222.3 CP, 254.8
+ 10   6 + 4 d=16 colliding 4-col cube, 1-col balance     Depth 4: 4R WHT + O(1) Root LUT          23 cols (K (8) , K (9) ) 222.0 CP, 2137.2 enc
+ 10   7 + 3 d=113 Toffoli row-sum cube [8]               Depth 3: 13–24 Tree List-Join            9 cols   (K (8) , K (9) ) 2116.0 CP, 2116.0
+ 11   8 + 3 d=124 [8] (m=3 cubes)                        Depth 3: Guided Leaf Pruning             9 cols   (K (8) , K (9) ) 2125.6 CP, 2125.6
+ 11   7 + 4 d=116 [19] (m=7 cubes)                       Depth 4: Guided Leaf Pruning             23 cols (K (8) , K (9) ) 2118.8 CP, 2147.2
+ 12   8 + 4 d=124 [8] (m=7 or m=6 cubes)                 Depth 4: Lower-Half 22-Leaf Cones        22 cols (K (10) , K (11) ) 2126.6 CP, 2148.6
+† Coupled with 256 affine key-schedule equations across K (2) , . . . , K (5) . ∗ Half-round split 5.5 + 2.5 stops after Round 5’s
+
+S-box layer (prior to its linear involution), removing the root inverse S-box of the backward tree (Section 4.2).
+
+
+
+      surviving-list leaf pruning, and lower-half narrow-cone root selection (22 leaves instead of
+      23, a 16× per-tree speedup).
+
+
+Organization. Following Table 2, the remainder of the paper is organized into four technical
+sections:
+  • Section 2: Introduces our notation, Walsh–Hadamard preliminaries, the ARADI specifica-
+    tion [23], and the three structural laws exploited by OPTIC.
+  • Section 3: Formulates Module I across Regimes I–IV, proving the Blind-Column Audit
+    (Proposition 1), the Orthogonal-Island Collapse Theorem (Theorem 1), the Super-S-Box
+    Spectrum (Proposition 2), and our colliding-cube / lifted distinguishers.
+  • Section 4: Formulates Modules II and III across backward tree depths rout = 1 (5–6R),
+    rout = 2 (7–8R), rout = 3 (9R), and rout ∈ {3, 4} multi-tree progressive joins (10–12R).
+  • Section 5: Presents single-core experimental verification alongside a comparative analysis
+    with Beyne et al. [10].
+
+
+2      Preliminaries and Structural Properties of ARADI
+2.1      Notation and Cipher Specification
+Vector, Tensor-Mask, Cube, and Walsh–Hadamard Preliminaries. For u, v ∈ Fn2 , we
+denote bitwise    LXOR      by ⊕, componentwise (Hadamard) product by u ⊙ v, binary inner product
+                     n−1
+by ⟨u, v⟩ =          i=0 i vi ∈ F2 , and vector support by supp(u) = {i : ui = 1}. For a matrix
+                         u
+         m×n
+M ∈ F2 , suppr (M ) := {c : Mr,cL= 1} denotes the support of row r. Let {e0 , . . . , e31 } denote
+the standard basis of F32      2 , 1S =     b∈S eb the indicator of S ⊆ {0, . . . , 31}, and {ew , ex , ey , ez }
+the row basis of F42 . For any 4 × 32 bit array Q = (w, x, y, z) ∈ (F32        4 ∼ 128 with b-th column
+                                                                           2 ) = F2
+Q↑b = (wb , xb , yb , zb )⊤ ∈ F42 , a column mask            32                          4
+                                                    Lβ ∈ F2 and row mask ν ∈ F2 define the 128-bit
+                              128
+tensor mask β ⊗ ν ∈ F2 via ⟨β ⊗ ν, Q⟩ = b∈supp(β) ⟨ν, Q↑b ⟩.
+    Every Boolean function f : Fd2 → F2 admits a unique Algebraic Normal Form (ANF)
+               . , ud−1 ]/(u2t − ut ) of algebraic degree deg(f ). Given an affine d-dimensional cube
+in F2 [u0 , . .L
+C = {p0 ⊕ d−1                       d      128 (d linearly independent directions d ), Lai’s higher-order
+                  t=0 ut dt : u ∈ F2 } ⊂ F2 L                                          t
+derivative identity [28, 27] states that P ∈C f (P ) = 0 identically whenever deg(f |C ) < d. For a
+real-
+P or integer-valued          table f : Fn2 → Z, the n-bit Walsh–Hadamard Transform is WHTn (f )[ω] =
+         f [x] (−1)   ⟨ω,x⟩ (ω ∈ Fn2 ), which satisfies WHTn (WHTn (f )) = 2n f , maps XOR convolution
+   x∈Fn2        P
+(f ∗ g)[z] = x⊕y=z f [x]g[y] to pointwise multiplication WHTn (f ∗ g) = WHTn (f ) ⊙ WHTn (g),
+and runs in n2n additions via the Fast Hadamard Transform (FHT), enabling fast partial-sum
+integral key recovery [16, 33, 20, 19].
+
+
+                                                                      5
+     (a) R-Round Encryption ARADIR and Decryption ARADI−1
+                                                       R
+                  K (0)                               K (i)                                         K (R−1)                                K (R)
+
+
+    Enc: P          +     π         Λ0       ···       +             π       Λi mod 4         ···     +           π       ΛR−1              +          C
+                                                              Ri (0 ≤ i < R)
+
+                  K (R)                                              λ(i+1)                                       λ(1)                     K (0)
+
+    Dec: C          +     ΛR−1      π −1      ···     Λi mod 4           +        π −1        ···     Λ0              +   π −1              +          P
+
+                                           Equivalent R−1
+                                                       i  (λ(i+1) = Λi mod 4 (K (i+1) ))
+
+
+
+
+     (b) Round Ri on 4 × 32 State (w, x, y, z)                                   (c) 256-Bit Key Schedule (A0 . . . A7 )
+              (i)
+             Kw                                                                          K (2m) (even i)                        K (2m+1) (odd i)
+   w32                                                         ′
+                                                              w32
+             +                             Li mod 4                                A0         A1     A2         A3        A4         A5         A6         A7
+              (i)
+             Kx
+
+    x32      +                             Li mod 4           x′32                       M0                M1                   M0                    M1
+              (i)          π ⊗32
+             Ky
+                                                                                                                                                           +     i
+                          32 cols
+    y32                                                        ′
+                                                              y32
+             +                             Li mod 4                              Word Swap P0 = (1 2)(5 6) (even) | P1 = (1 4)(3 6) (odd)
+              (i)
+             Kz
+                                                                                   A′0        A′1    A′2        A′3       A′4        A′5        A′6        A′7
+    z32                                                        ′
+                                                              z32
+             +                             Li mod 4
+
+
+Figure 1: Specification of the ARADI block cipher [23]. (a) Overall R-round encryption ARADIR
+(top, applying Ri (Qi ) = Λi mod 4 (π(Qi ⊕ K (i) )) for 0 ≤ i < R and final post-whitening K (R) )
+and decryption ARADI−1    R (bottom, showing both standard decryption [23, Section 3.3] at
+Round R − 1 and the equivalent involution reordering R−1                 −1
+                                                            i (Qi+1 ) = π (Λi mod 4 (Qi+1 ) ⊕ λ
+                                                                                                (i+1) )
+
+with λ(i+1) = Λi mod 4 (K (i+1) ) [10, Figure 1]). (b) Bitsliced round Ri on the four 32-bit words
+(w, x, y, z), applying 32 parallel 4-bit column S-boxes π followed by word-wise linear involutions
+Li mod 4 . (c) 256-bit key schedule updating eight 32-bit words (A0 , . . . , A7 ) via pair maps
+(M0 , M1 ), round constant ⊕i, and word permutation Pi mod 2 .
+
+
+ARADI State Layout, Encryption, and Decryption Specification. We follow the exact
+specification of Greene, Motley, and Weeks [23, Sections 3.1–3.4, pp. 3–8], verified bit-for-bit
+against all 17 round keys, 16 intermediate states, and 21 test vectors in [23, Figures 3.4, 4.3,
+and 4.4] (Figure 1). An ARADI state Q = (w, x, y, z) ∈ (F32         4
+                                                               2 ) consists of four 32-bit words (w
+most significant, zPleast significant [23, p. 3]). Writing each word in standard unsigned LSB-0 bit
+numbering W = 31              b
+                     b=0 Wb 2 (W0 LSB, upper 16-bit half u = W ≫ 16 on columns {16, . . . , 31},
+lower 16-bit half l = W mod 216 on columns {0, . . . , 15}), Q forms a 4 × 32 bit array with
+columns Q↑b = (wb , xb , yb , zb ) ∈ F42 (0 ≤ b ≤ 31).2 Starting from Q0 = P at standard round
+offset r0 = 0 (more generally, round-i linear index (i + r0 ) mod 4 for r0 ∈ {0, 1, 2, 3}), Round i
+(0 ≤ i < R) computes post-S-box state Zi := Si (Qi ⊕ K (i) ) = π(Qi ⊕ K (i) ) (where Si applies π
+to all 32 columns) followed by Qi+1 = Λ(i+r0 ) mod 4 (Zi ), and outputs ciphertext C = QR ⊕ K (R)
+(RKR := K (R) ). Conversely, because every linear layer Λj is an involution (Λ−1       = Λ ), decryption
+        −1                       (R)                  −1
+                                                                                 j (i) j
+ARADIR sets QR = C ⊕ K , iterates Qi = π                  Λ(i+r0 ) mod 4 (Qi+1 ) ⊕ K for i = R − 1
+downto 0, and returns P = Q0 [23, Section 3.3, p. 7]; equivalently, pulling each key addition
+across Λi mod 4 yields the reordered inverse round R−1     i (Qi+1 ) = π
+                                                                           −1 Λ
+                                                                                 i mod 4 (Qi+1 ) ⊕ λ
+                                                                                                     (i+1)
+
+with equivalent subkey λ(i+1) = Λi mod 4 (K (i+1) ) (Figure 1(a); cf. [10, Figure 1]). All attacks in
+this paper target unmodified ARADI at r0 = 0.
+   2
+     In [10], Beyne, Neyt, and Sajjad index the 32 columns in MSB-first order cMSB ∈ {0, . . . , 31}, so b = 31 − cMSB
+and their “left/right” halves correspond to our upper/lower halves u and l (Section 5.2).
+
+
+
+
+                                                                             6
+ 2.2    Law I: S-Box Quadratic Rows and Column Products
+ The substitution layer π applies the same 4-bit S-box independently to all 32 columns via four
+ sequential word-wise Toffoli gates [23, Figure 3.1, p. 4].
+        x ← x ⊕ (w ∧ y),           z ← z ⊕ (x ∧ y),         y ← y ⊕ (w ∧ z),        w ← w ⊕ (x ∧ z).         (2)
+ Evaluating (2) on v = 8w + 4x + 2y + z ∈ {0, . . . , 15} yields the hexadecimal lookup tables
+                  π[0 . . . 15] = [0, 1, 2, 3, 4, D, F, 6, 8, B, 5, E, C, 7, A, 9],
+                  −1
+              π        [0 . . . 15] = [0, 1, 2, 3, 4, A, 7, D, 8, F, E, 9, C, 5, B, 6].
+ Expanding (2) over F2 [w, x, y, z]/(w2 −w, x2 −x, y 2 −y, z 2 −z) using y 2 = y in step 2 gives the
+ S-box ANF [7, 8, 19] underlying Structural Law I exploited by OPTIC.
+             πw = w ⊕ wy ⊕ xy ⊕ xz ⊕ wyz (deg = 3), πx = x ⊕ wy (deg = 2),
+                                                                                                             (3)
+              πy = y ⊕ wy ⊕ wz ⊕ wxy (deg = 3),                  πz = z ⊕ xy ⊕ wy (deg = 2).
+Three algebraic properties of (3) drive Module I:
+(I.1) Quadratic Row Pullback (deg πx = deg πz = 2 [8]): Whereas πw and πy have degree 3,
+      rows x and z are purely quadratic, and their sum πx ⊕ πz = x ⊕ z ⊕ xy eliminates wy to
+      leave a single quadratic monomial xy [8].
+(I.2) First-Round Single-Bit and (y, z)-Pair Affinity: Activating any single bit (such as
+      yb ) in column b traverses Round 0’s S-box with degree ≤ 1. Also, because yz is absent
+      from πx , πy , πz in (3), activating (yb , zb ) simultaneously still keeps πx , πy , πz purely affine
+      (deg ≤ 1) and introduces only wb yb zb in πw .
+(I.3) Degree-3 Intra-Column Product Cancellation (deg(πr πs ) ≤ 3 [13]): By the classical
+      degree bound on coordinate products of bijections on F42 [13], every product of two distinct
+      coordinates within the same column b has even truth-table weight 4. That cancels wxyz
+      identically: πw πy = xy ⊕ wz ⊕ wxz ⊕ xyz and (πx ⊕ πw )πy = wz ⊕ wxy ⊕ wyz ⊕ xyz
+      (deg = 3). By contrast, a cross-column product πw (Ub )πy (Ub′ ) (b ̸= b′ ) has degree 3 + 3 = 6.
+
+ 2.3    Law II: Linear Involutions and L3 Orthogonality
+ In round i, the layer Λi mod 4 (w, x, y, z) applies Lj (j = i mod 4) word-wise to each 32-bit word
+ W = u ∥ l (u, l ∈ F16
+                     2 ) [23, Figure 3.2, p. 5]:
+                                                                                             
+      Lj (u ∥ l) = u ⊕ ROL16 (u, aj ) ⊕ ROL16 (l, cj )       l ⊕ ROL16 (l, aj ) ⊕ ROL16 (u, bj ) , (4)
+
+ with published rotation triples (a0 , b0 , c0 ) = (11, 8, 14), (a1 , b1 , c1 ) = (10, 9, 11), (a2 , b2 , c2 ) =
+ (9, 4, 14), and (a3 , b3 , c3 ) = (8, 9, 7). Writing R = ROL16 (·, 1) (R16 = I16 ), Lj has block-circulant
+ matrix form
+                          I16 + Raj         Rcj                  I16 + R−aj        R−bj
+                                                                                         
+                                                           ⊤
+                Lj =                                 ,    Lj =                                .               (5)
+                              R bj       I16 + Raj                   R−cj       I16 + R−aj
+  Equation (5) yields the three properties constituting Structural Law II:
+(II.1) Row-Weight-3 Involution Decoupling (L2j = I32 [23]): As designed in [23, Section 3.1,
+       p. 5], because 2aj ≡ bj + cj (mod 16) holds for all four triples (6 ≡ 6, 4 ≡ 4, 2 ≡ 2, 0 ≡ 0),
+       L2j = diag(I16 + R2aj + Rbj +cj , I16 + R2aj + Rbj +cj ) = I32 . Following standard equivalent-
+       subkey peeling [8, 6, 19], left-multiplying ciphertext C = ΛR−1 (π(QR−1 ⊕ K (R−1) )) ⊕ K (R)
+       by ΛR−1 gives
+               T (P ) := ΛR−1 C(P ) = π QR−1 (P ) ⊕ K (R−1) ⊕ λ,             λ := ΛR−1 (K (R) ),
+                                                                
+                                                                                                   (6)
+       decoupling the outer S-box layer into 32 independent 4-bit columns Y↑b (P ) = π −1 (T↑b (P ) ⊕
+       λ↑b ).
+
+                                                        7
+   (a) OPTIC Round Split (R = rin + rout )
+
+            K (0)                       K (rin −1)                           K (rin )                        K (R)        T = ΛR−1 (C)
+
+                                                                      Qrin
+    P ∈C     +       π       Λ0   ···       +        π   Λrin −1                +       ···   π     ΛR−1        +     C      ΛR−1
+
+                                                         Mask α
+    Module I: Forward Pullback (rin rounds)                                    Module II: Backward Tree (Trout )
+
+
+
+
+       (b) Law I: 4-Toffoli S-Box π                            (c) Law II: Dual-Half Involution Lj
+       wb                                                                    ≪16 aj
+                                   +       πw (deg 3)
+                                                               u16                            +   u′ = u ⊕ Raj u ⊕ Rcj l
+                                                                             ≪16 bj
+       xb        +                         πx (deg 2)
+                                                                             ≪16 cj
+                                                               l16                            +   l′ = l ⊕ Raj l ⊕ Rbj u
+       yb                    +             πy (deg 3)                        ≪16 aj
+
+
+       zb                +                 πz (deg 2)                L3 = (8, 9, 7): 8 orthogonal islands G0 . . . G7 (L⊤
+                                                                                                                        3 L3 = I32 )
+
+
+
+
+ Figure 2: Structure of ARADI [23] and the OPTIC round split. (a) Partitioning R = rin + rout
+ rounds into Module I (pulling mask α = Λ⊤       rin −1 (β ⊗ ν) onto quadratic S-box rows at Qrin )
+ and Module II (peeling the depth-rout ternary tree Trout from T = ΛR−1 (C)). (b) Sequential
+ 4-Toffoli-gate S-box π (3), whose second and fourth outputs πx , πz have degree 2. (c) Dual-half
+ involution Lj (4); for j = 3, L3 splits into eight orthogonal 4-column islands (7).
+
+
+(II.2) Unique Orthogonality and 8-Island Split of L3 = (8, 9, 7): By (5), L⊤        j Lj = I32 ⇐⇒
+         ⊤
+       Lj = Lj ⇐⇒ 2aj ≡ bj + cj ≡ 0 (mod 16), which holds uniquely for j = 3. In
+       addition, strengthening the rotation-8 byte-wise cancellation noted in [7, 26], gcd(a3 , 16) =
+       gcd(8, 16) = 8 and b3 ≡ −c3 ≡ 1 (mod 8) partition {0, . . . , 31} into eight disjoint L3 -
+       invariant 4-column islands:
+                
+           Gg = g, g + 8, 16 + ((g + 7) mod 16), 16 + ((g + 15) mod 16)           (0 ≤ g ≤ 7). (7)
+
+(II.3) Half-Word Transpose Asymmetry of L0 , L1 , L2 (bj ̸≡ −cj (mod 16)): Swapping the
+       upper half u and lower half l conjugates Lj by I0 I0 , exchanging bj ↔ cj . Because bj ̸= cj
+       for all j and bj + cj ̸≡ 0 (mod 16) for j ∈ {0, 1, 2}, multi-round cones are asymmetric
+       between {16, . . . , 31} and {0, . . . , 15}. A 3-round forward cone from column c0 covers 23
+       columns if c0 < 16 vs. 22 if c0 ≥ 16. Denoting by Tr (c) ⊆ {0, . . . , 31} the set of active subkey
+       columns at round r in the backward dependency cone of column c, a 4-round backward
+       cone at Round 12 has leaf width |T12 (c)| = 22 for all c ∈ {0, . . . , 15} vs. |T12 (c)| = 23 for
+       all c ∈ {16, . . . , 31}. This also explains the 2–3-round key-cone asymmetry in [10, §5.1,
+       Table 5] (Section 5.2).
+
+ 2.4        Law III: Even-Pair Key-Schedule Inversion
+ The 256-bit master key initializes eight 32-bit register words (A0 , . . . , A7 ). In round i ∈
+ {0, . . . , 15}, let j = i mod 2; the round key is extracted prior to updating the register as
+
+                 K (i) = (A0 , A1 , A2 , A3 ) if i is even,            K (i) = (A4 , A5 , A6 , A7 ) if i is odd,
+
+ with post-whitening key K (R) extracted from half j = R mod 2 after R register updates. Each
+                   invertible F2 -linear pair maps M0 (X, Y ) = ROL32 (X, 1) ⊕ Y, ROL32 (Y, 3) ⊕
+ update applies the
+ ROL32 (X, 1) ⊕ Y  to (A0 , A1 ) and (A4 , A5 ), and M1 (X, Y ) = ROL32 (X, 9) ⊕ Y, ROL32 (Y, 28) ⊕
+ ROL32 (X, 9) ⊕ Y to (A2 , A3 ) and (A6 , A7 ), XORs the round counter i into A7 , and applies the
+ word swap P0 = (1 2)(5 6) (even i) or P1 = (1 4)(3 6) (odd i) [23, Section 3.2, p. 7; Figure 3.3,
+
+                                                               8
+    Algorithm 1: R-Round ARADI Key Schedule, Encryption, and Even-Pair Master-Key Inversion [23,
+    19]
+    Key Expansion ARADI-KS(A0 . . . A7 , R):
+       1. for i = 0 to R − 1 do j ← i mod 2; K (i) ← (A4j , A4j+1 , A4j+2 , A4j+3 );
+            (A0 , A1 ) ← M0 (A0 , A1 ); (A2 , A3 ) ← M1 (A2 , A3 ); (A4 , A5 ) ← M0 (A4 , A5 ); (A6 , A7 ) ←
+    M1 (A6 , A7 );
+           A7 ← A7 ⊕ i; if j = 0 then swap(A1 , A2 ), swap(A5 , A6 ) else swap(A1 , A4 ), swap(A3 , A6 );
+       2. j ← R mod 2; K (R) ← (A4j , A4j+1 , A4j+2 , A4j+3 ); return (K (0) , . . . , K (R) ).
+
+    Encryption ARADIR (P, K (0...R) ):      (retaining all R linear layers
+                                                                          and post-whitening K (R) )
+      1. Q0 ← P ; for i = 0 to R − 1 do Qi+1 ← Λi mod 4 π(Qi ⊕ K (i) ) ; return C ← QR ⊕ K (R) .
+
+    Closed-Form Master-Key Inversion KS−1 (K (2m) , K (2m+1) , 2m) [19, Remark 5]: (O(1) ops for
+    even 2m)
+       1. Parse K (2m+1) = (U4 , U6 , U5 , U7′ ); U7 ← U7′ ⊕ 2m; ▷ undo P0 = (1 2)(5 6) and counter XOR
+       2. (A4 , A5 ) ← M0−1 (U4 , U5 ); (A6 , A7 ) ← M1−1 (U6 , U7 ); S (2m) ← K (2m) ∥ (A4 , A5 , A6 , A7 );
+       3. for i = 2m − 1 downto 0 do invert step i on S (i+1) via Pi−1                              −1
+                                                                           mod 2 , A7 ⊕ i, and (M0 , M1 );
+                                                                                                             −1
+             (0)
+    return S .
+
+
+   p. 6; Figure 3.5, p. 8]. Algorithm 1 summarizes the complete R-round encryption and key
+   schedule.
+       Structural Law III powers Module III of OPTIC, formalizing the even-pair invertibility
+   noted by Dunkelman and Ghosh [19, Remark 5] and the F2 -affine subkey rank relations used
+   in [19, 22, 10, 30]:
+(III.1) Even-Pair O(1) Direct-Sum Closure: At an even round 2m, P0 = (1 2)(5 6) preserves
+         the partition between the lower half (A0 , . . . , A3 ) and upper half (A4 , . . . , A7 ). Hence
+         any even-indexed consecutive subkey pair (K (2m) , K (2m+1) )—such as (K (2) , K (3) ) at 5R,
+        (K (4) , K (5) ) at 6R, (K (6) , K (7) ) at 7–8R, (K (8) , K (9) ) at 9–11R, or (K (10) , K (11) ) at 12R—
+         uniquely reconstructs the 256-bit master key via KS−1 in O(1) word operations with
+         zero brute-force search. Conversely, an odd-indexed pair (K (2m−1) , K (2m) ) spans only 192
+         master-key bits because P1 = (1 4)(3 6) swaps two 32-bit words between the register halves.
+(III.2) Cross-Round Affine Consistency (128k −256 Equations): Because every K (i) is an F2 -
+         affine image of the 256-bit master key, any k ≥ 3 consecutive round keys satisfy 128k − 256
+         exact F2 -affine consistency equations (256 equations across K (2) , K (3) , K (4) , K (5) ).
+
+
+  3     Module I: Forward Pullback Distinguishers
+  The first half of the OPTIC pipeline constructs universal, key-independent zero-sum identities
+  at internal state Qrin using minimum plaintext data D = |C|. Rather than designing separate
+  truncated-differential, super-S-box, null-space, and Toffoli distinguishers, Module I unifies all four
+  under a single mechanism. Given a d-dimensional cube (or prefix) C ⊂ F128     2   and a pulled-back
+  linear mask
+                      α = Λ⊤                  128
+                                                     β ∈ F32
+                                                                                  
+                            rin −1 (β ⊗ ν) ∈ F2            2 , ν ∈ span{ex , ez } ,                  (8)
+  Law II.1 (Λ2rin −1 = I128 ) pulls the inner product across Λrin −1 directly onto the quadratic S-box
+  rows πx , πz of Round rin − 1.
+                                                                              (r −1) 
+                    M                     M M
+                        α, Qrin (P ) =                ν, π Qrin −1,↑b (P ) ⊕ K↑bin     .
+                    P ∈C                   P ∈C b∈supp(β)
+
+  As rin increases from 1 to 8, this pullback operates across four progressive degree-compression
+  regimes (Regimes I–IV).
+
+
+
+                                                         9
+3.1    Regime I: Difference Subspaces and Blind-Column Audit
+                                                              L
+When d = 1, C = {P, P ⊕ ∆P } is a single plaintext pair, and     P ∈C ⟨α, Qk (P )⟩ = ⟨α, ∆Qk ⟩.
+If ∆P is supported on a single column c0 , then ∆Qk is confined to a deterministic subspace
+Vk (c0 ) ⊂ F128
+            2   of dimension
+
+              dim V1 = 3,       dim V2 = 12,       dim V3 = 36,     dim V4 = 88 or 92,
+
+so every mask α ∈ Vk (c0 )⊥ (codimensions 125, 116, 92, 40/36) satisfies
+                                                                              L
+                                                                                P ∈C ⟨α, Qk (P )⟩ = 0
+unconditionally for all keys. However, if one restricts α at rin = 3 only to dead-column masks
+ek ⊗ ν (k ∈ D3 (c0 ) where ∆Q3,↑k = 0) as in Bellini et al. [6, §6.2], Law II.2–II.3 imposes a strict
+information-theoretic blind-column defect:
+Proposition 1 (Blind-Column Defect in Single-Difference 5-Round Truncated Differentials).
+Let R = 5 (r0 = 0). For every single-column input difference ∆P active solely in column
+c0 ∈ {0, . . . , 31}, deterministic propagation through Λ0 , Λ1 , Λ2 leaves |D3 (c0 )| = 9 inactive
+(“dead”) columns entering Round 3 if 0 ≤ c0 ≤ 15 and |D3 (c0 )| = 10 if 16 ≤ c0 ≤ 31. Because
+Λ3 (L3 with (a3 , b3 , c3 ) = (8, 9, 7), gcd(8, 16) = 8) partitions {0, . . . ,S
+                                                                               31} into the eight disjoint
+4-column islands G0 , . . . , G7 in (7), the backward dependency union k∈D3 (c0 ) suppk (L3 ) covers
+exactly 19 columns of λ = Λ0 (K (5) ) for 0 ≤ c0 ≤ 15 and 24 columns for 16 ≤ c0 ≤ 31, leaving 13
+or 8 “blind” columns (52 or 32 bits of K (5) ) completely unconstrained regardless of how many
+plaintext pairs are queried along ∆P .
+Proof. Proof idea: We first trace the 3-round forward diffusion cone of column c0 to identify all
+inactive columns entering Round 3, and then intersect those inactive columns with the eight
+L3 -invariant 4-column islands G0 , . . . , G7 . Any island containing zero inactive columns imposes
+no dead-column constraints on its four subkey nibbles in λ.
+    Direct evaluation of supp(L2 (L1 (L0 (ec0 )))) for each c0 ∈ {0, . . . , 31} yields 23 active columns
+(9 dead) when c0 < 16 and 22 active columns (10 dead) when c0 ≥ 16 (by the half-word
+asymmetry of Law II.3). Under L3 , any shift by a3 = 8 mod 16 preserves residue modulo 8 in
+both 16-bit halves. Meanwhile, b3 = 9 ≡ 1 (mod 8) and c3 = 7 ≡ −1 (mod 8) pair lower-half
+pair {g, g + 8} exclusively with upper-half pair {16 + ((g + 7) mod 16), 16 + ((g + 15) mod 16)},
+partitioning {0, . . . , 31} into the eight L3 -invariant 4-column islands G0 , . . . , G7 . For every
+c0 ≥ 16, two of the S     eight islands contain zero dead columns in D3 (c0 ), leaving 2 × 4 = 8
+columns of λ outside k∈D3 (c0 ) suppk (L3 ) (13 columns when c0 < 16). Thus the 10-pair (20-CP)
+single-difference procedure of [6, Section 6.2] requires at least two distinct input differences
+(40 CP) to cover all 32 columns. By contrast, choosing 3 pairs along complementary single-bit
+directions covers all 8 islands with zero blind columns at 6 CP.
+
+3.2    Regime II: Two-Round Orthogonal-Island Collapse
+At rin = 5 inner rounds (Q0 → Q5 , required for 6-round peeling), Regime I subspaces saturate
+completely (dim V5 = 128, zero dead columns). Every individual coordinate of Q5 or Z4 =
+Λ0 (Q5 ) = π(Q4 ⊕ K (4) ) reaches full algebraic degree 6 on a 6D cube. This matches Kim et
+al.’s 277 -CP 6-round division-property bound [26] and Beyne et al.’s 2−82 6-round differential
+bound [10, Appendix A].
+    Module I breaks this degree-6 barrier by setting the pullback mask in (8) to the 4-column island
+indicator β = 1Gg and ν ∈ {ex , ez }. Combining Law I.1, Law I.3, and Law II.2 (L⊤        3 L3 = I32 )
+collapses two consecutive rounds S3 → Λ3 → S4 into a single degree-3 super-S-box.
+Theorem 1 (Orthogonal-Island Super-S-Box Collapse across S3 → Λ3 → S4 ). Among the four
+linear maps L0 , L1 , L2 , L3 of ARADI (4), L3 with (a3 , b3 , c3 ) = (8, 9, 7) is the unique symmetric
+and orthogonal binary matrix (L⊤                     ⊤
+                                    3 = L3 and L3 L3 = I32 ), whereas L0 , L1 , L2 admit zero
+non-trivial cross-column product-canceling masks in F32   2 . Specifically:
+
+
+                                                   10
+ 1. Island-Wise Bilinear Inner-Product Invariance: On each of the eight disjoint 4-
+    column islands Gg ⊂ {0, . . . , 31} (0 ≤ g ≤ 7) in (7), for any Boolean polynomial vectors
+                                  32
+    A, B ∈ F2 [u0 , . . . , ud−1 ] ,
+                                  M                             M
+                                         (L3 A)b · (L3 B)b ≡           Ab · Bb   (mod 2),                      (9)
+                                 b∈Gg                           b∈Gg
+
+                                     4
+                                          × 2 = 12 cross-column quadratic products Ab Bb′ (b ̸= b′ ).
+                                      
+     identically canceling all       2
+
+ 2. Two-Round Algebraic Degree Collapse: Let Z3 = π(Q3 ⊕ K (3) ), Q4 = Λ3 (Z3 ), and
+    Z4 = π(Q4 ⊕K (4) ) = Λ0 (Q5 ). For every island Gg (0 ≤ g ≤ 7), regardless of the independent
+    round keys K (3) , K (4) ∈ F128
+                                  2 , the 4-column island sums of the second and fourth S-box output
+    rows (α = Λ⊤0 (1  G g ⊗ e x/z )) satisfy
+        M                M                                                         
+                                                ′                   ′
+              Z4,x,b =          fx (Q̃3,↑b ) ⊕ kw,b πy (Q̃3,↑b ) ⊕ ky,b πw (Q̃3,↑b ) ⊕ cg,x ,
+       b∈Gg              b∈Gg
+        M                M                                                                                   (10)
+                                                 ′      ′                     ′
+              Z4,z,b =          fz (Q̃3,↑b ) ⊕ (kx,b ⊕ kw,b ) πy (Q̃3,↑b ) ⊕ ky,b (πx ⊕ πw )(Q̃3,↑b ) ⊕ cg,z ,
+       b∈Gg              b∈Gg
+
+                                    (3)           (4)
+     where Q̃3,↑b = Q3,↑b ⊕ K↑b , kb′ = K↑b , cg,x , cg,z ∈ F2 are key constants, and the collapsed
+     intra-column super-S-box coordinates
+
+               fx (w, x, y, z) := πx ⊕ πw πy = x ⊕ wy ⊕ xy ⊕ wz ⊕ wxz ⊕ xyz,
+               fz (w, x, y, z) := πz ⊕ (πx ⊕ πw )πy = z ⊕ wy ⊕ xy ⊕ wz ⊕ wxy ⊕ wyz ⊕ xyz
+
+     both have algebraic degree at most 3 (rather than 2 × 3 = 6) in the Round-3 input Q̃3,↑b .
+
+Proof. Proof strategy: The proof proceeds in three steps: (1) we characterize orthogonality
+and cross-term canceling masks via the block-circulant transpose (5); (2) we restrict binary
+inner-product invariance to each 4 × 4 orthogonal island block to eliminate inter-column products;
+and (3) we expand the quadratic rows πx , πz of S4 and apply intra-column degree-4 cancellation
+(Law I.3) to bound the resulting two-round sum at degree 3.
+    Step 1 (Uniqueness of L3 ). By (5), symmetry L⊤           j = Lj holds if and only if 2aj ≡ 0 (mod 16)
+and bj + cj ≡ 0 (mod 16), which holds             uniquely for j = 3 ((8, 9, 7));  Phence    L⊤           2
+                                                                                               3 L3 = L3 = I32 .
+                                          32
+                                                                                    31
+For j ∈ {0, 1, 2}, solving the 2 = 496 off-diagonal equations                        b=0 ub (Lj )b,p (Lj )b,q = 0
+                                    32
+(0 ≤ p < q ≤ 31) over u ∈ F2 gives dim ker = 0, whereas for j = 3 it gives dim ker = 8, spanned
+by 1G0 , . . . , 1G7 .
+    Step 2 (Island inner-product invariance). Because L3 decomposes block-diagonally across
+G0 , . . . , G7 with L3 |⊤
+                         Gg L3 |Gg = I4 , standard bilinear inner-product preservation over the commu-
+tative ring F2 [u0 , . . . , ud−1 ] gives (L3 |Gg A)⊤ (L3 |Gg B) = A|⊤ Gg I4 B|Gg , proving (9), while column
+                     L                    L             L
+weight 3 gives b∈Gg (L3 A)b = 3 b∈Gg Ab ≡ b∈Gg Ab (mod 2).
+    Step 3 (Two-round degree collapse). By Law I.1 (3), Z4,x,b = Q4,x,b ⊕ kx,b                   ′ ⊕ (Q
+                                                                                                            4,w,b ⊕
+  ′                  ′
+kw,b )(Q4,y,b ⊕ ky,b ) with Q4,· = L3 (Z3,· ). Summing over b ∈ Gg and applying (9) to (A, B) =
+(Z3,w , Z3,y ) yields
+       M               M                             M ′                       M
+                                                                                       ′
+              Z4,x,b =        Z3,x,b ⊕ Z3,w,b Z3,y,b ⊕       kw,b (L3 Z3,y )b ⊕      ky,b (L3 Z3,w )b ⊕ cg,x .
+     b∈Gg            b∈Gg                                b∈Gg                     b∈Gg
+
+By Law I.3, expanding πx ⊕ πw πy within each column b cancels the degree-4 monomial wxyz
+identically, giving the first line of (10) of degree 3. Identical expansion of πz ⊕ (πx ⊕ πw )πy gives
+the second line of (10).
+
+
+                                                          11
+Proposition 2 (Complete Island Super-S-Box Spectrum and Uniqueness of L3 Collapse). For
+any 4-column island Gg of L3 = (8, 9, 7) and any 16-bit round key k ∈ F16    2 , define the 2-round
+island super-S-box ΨGg ,k : F16
+                             2  → F16 by Ψ
+                                   2      G g ,k (v) = π L3 |G g (π(v)) ⊕ k . Then:
+
+ 1. Key-Independent Output-Mask Degree Spectrum: Across all 216 output masks β ∈ F16               2
+    and every k ∈ F16
+                    2 , the algebraic degree  of v →
+                                                   7  ⟨β, Ψ G g ,k (v)⟩ has the exact distribution
+                                          
+                                          
+                                          
+                                            1     d = 0 (β = 0),
+                                          
+                                          3       d = 3 (β ∈ span{1Gg ⊗ ex , 1Gg ⊗ ez } \ {0}),
+      #{β ∈ F162 : deg⟨β, ΨGg ,k ⟩ = d} =
+                                          
+                                          
+                                            28 d = 5,           224 (d = 6),      65,280 (d = 8),
+                                          
+                                          0       otherwise.
+
+    In particular, no nonzero output mask has degree ≤ 2, 4, or 7; the 8-dimensional subspace
+    {β : deg ≤ 6} (255 nonzero masks) consists precisely of masks supported exclusively on rows
+    x and z.
+
+ 2. Absence of Composite Collapse Points: Define the cross-term canceling       P5       space of
+    M ∈ F32×32
+           2     by C(M  ) = {µ ∈ F32 : M ⊤ diag(µ)M is diagonal}. Across all
+                                   2                                              k=1 4 k = 1,364
+
+    composite products M = Li1 · · · Lik (and all 5,460 products up to k = 6), dim C(M ) > 0
+    holds if and only if M reduces via L2j = I32 to I32 (dim C = 32) or to L3 (dim C = 8). No
+    multi-round consecutive window L(r+k−1) mod 4 · · · Lr mod 4 with 2 ≤ k ≤ 14 has dim C > 0.
+
+Proof. Proof idea: Because XORing k translates the intermediate island state u = L3 |Gg (π(v))⊕k
+only by lower-degree π(v)-terms, highest-degree cross-column monomials are key-invariant.
+Separating masks on the quadratic rows {x, z} from those touching the cubic rows {w, y}
+explains the exact degree tiers, while finite-group enumeration settles Part 2.
+    For Part 1, an exhaustive 16-variable binary Möbius transform of ΨGg ,k over F16   2 confirms the
+spectrum and mirrors the algebraic decomposition. Any mask β supported on rows {x, z} lies in
+span{πx (ub ), πz (ub )}b∈Gg , where each πx (ub ), πz (ub ) has degree 2 in π(v) and hence degree ≤ 6
+in v. When βb,x ⊕ βb,z is constant on Gg (5D space, 28 degree-5 and 3 degree-3 masks), cubic
+cross-terms cancel to degree 5. When both βb,x and βb,z are constant on Gg , Theorem 1 cancels
+all inter-column products to degree 3. Conversely, any mask touching rows {w, y} multiplies
+three distinct columns of π(v) (3 + 3 + 2 = 8, leaving 216 − 28 = 65,280 degree-8 masks). Part 2
+follows by exact F2 Gaussian elimination on the 496 × 32 off-diagonal system across the subgroup
+generated by {L0 , L1 , L2 , L3 } (whose 4-round product P = L3 L2 L1 L0 has order 8, with P 4
+symmetric orthogonal on mod 4 classes at round 16 only).
+
+Analytical 198-Annihilator Certificate on a 48-CP Prefix. Theorem 1 reduces the
+algebraic degree analysis of five inner rounds (Q0 → Q5 ) under island pullback masks α =
+Λ⊤
+ 0 (1Gg ⊗ ex/z ) to that of three rounds (Q0 → Q3 ) followed by a single degree-3 map. Combining
+this with Law I.2 (single-y and (y, z)-pair first-round affinity), we choose an L0 -aligned 6-
+dimensional cube prefix of size 48.
+                                                                              
+                      D6 = (y, 15), (y, 17), (y, 22), (y, 25), (y, 30), (z, 30) ,
+                                                                                            (11)
+                      U48 = p0 ⊕ 5t=0 ut dt : 0 ≤ 5t=0 ut 2t < 48 .
+                                   L              P
+
+In columns b ∈ {15, 17, 22, 25}, only yb varies while (wb , xb , zb ) are constant across U48 , so
+Round 0’s S-box π is purely affine (deg ≤ 1) in (u0 , u1 , u2 , u3 ) by Law I.2. In column 30,
+(y30 , z30 ) vary together so only πw acquires a single quadratic term w30 u4 u5 while πx , πy , πz
+remain degree 1. Also, {22, 17} = 16 + {6, 1} and {30, 25} = 16 + {14, 9} form two +a0 mod 16
+(+11 mod 16) shift chains of L0 , maximizing column overlap after Λ0 . Propagating exact Boolean
+monomial supports through Q0 → Q3 and applying the degree-3 super-S-box union (10) on each
+
+
+                                                 12
+island Gg (g = 0, . . . , 7) yields the exact nullspace of present monomials on U48 (modulo the
+constant 1 absorbed by Λ0 (K (5) )).
+
+c(G0 , . . . , G7 ) = (16, 12, 10, 12, 18, 0, 16, 15) =⇒ 99 (row x) + 99 (row z) = 198 equations.
+
+This 198-equation certificate is computed purely symbolically in < 30 ms with zero random-key
+sampling. It holds unconditionally for all 2640 independent round keys (K (0) , . . . , K (5) ) (hence
+all 2256 master keys) and all 2128 base plaintexts p0 .
+
+3.3    Regime III: Colliding Cubes and Single-Column Lift
+When advancing to rin = 6 inner rounds (for 7–10-round attacks), the 48-CP prefix U48 saturates
+to zero annihilators. Regime III restores degree compression by combining two mechanisms:
+(1) First-Round Bijective Bypass via L0 -Colliding Full-Column Cubes: Varying m complete
+    4-bit columns B = {c1 , . . . , cm } over (F42 )m (d = 4m, 24m CP, as in classical Square/integral
+                                                                               (0)
+    structures [27]) maps bijectively through P↑c 7→ Z0,↑c = π(P↑c ⊕ K↑c ) for every key K (0) ,
+    bypassing Round 0 with degree 1 in Z0 . Because each column of L0 = (11, 8, 14) has support
+    size 3, two columns share at most two Round-1 active S-boxes, achieved uniquely by the
+    colliding-pair orbit {s, 16 + ((3 + s) mod 16)} (0 ≤ s < 16). In addition, every linear map Lj
+    and π commute with the intra-half cyclic shift σs : c 7→ (c + s) mod 16 (within {0, . . . , 15}
+    and {16, . . . , 31} separately), so each canonical cube generates 16 shifted distinguishers for
+    free.
+(2) Single-Column 1-Round Lift: Setting β = eb (a single column) and ν ∈ span{ex , ez } \ {0}
+    in (8) localizes the quadratic Toffoli row expansion of [8] across Λr without any island
+                                                                             (r)                   (r)
+    condition. Since L2r mod 4 = I32 (Law II.1), expanding πx (Qr,↑b ⊕ K↑b ) and πz (Qr,↑b ⊕ K↑b )
+    over an even-sized cube C cancels key constants and gives for the pulled-back 3-column mask
+    α = Λ⊤ r (eb ⊗ ν) on Qr+1 :
+
+                                                         (r)                (r)
+        M                      M                            M                                   
+            ⟨α, Qr+1 (P )⟩ =       Hν Qr,↑b (P ) ⊕ Kw,b        Qr,y,b ⊕ Ky,b linear cube sums ,
+        P ∈C                      P ∈C                   P ∈C
+
+     where Hex (v) = vx ⊕ vw vy and Hez (v) = vz ⊕ vx vy ⊕ vw vy have degree 2. Hence when-
+     ever
+     L all four rows of     LQr,↑b are cube-balanced and the two intra-column quadratic      sums
+         Q       Q       =      Q     Q      = 0 vanish,  both  3-column  masks  Λ ⊤ (e ⊗ e ) and
+        C r,w,b r,y,b          C r,x,b r,y,b                                       r   b   x
+     Λ⊤
+      r (e b ⊗ e z ) are universally balanced on Qr+1 for all
+                                                          L   round keys K (r) .
+
+    We evaluate the F2 right null space of {S(K) = P ∈C Qrin (P )}K across 160–384 random
+256-bit master keys and 160–256 independent round-key tuples, cross-checked with exact subset-
+lattice Möbius monomial-support propagation. This yields four nested colliding-pair distinguisher
+families at r0 = 0:
+                (s)
+ 1. 8D Pair B2 = {s, 16+((3+s) mod 16)} (28 = 256 CP, rin = 5): Activates only 4 S-boxes
+    in Round 1, leaving 19 full columns of Z4 = Λ0 (Q5 ) and 4 full columns {5, 9, 16, 20} of Q5
+    balanced (32× below [26]). Adding z(5+s) mod 16 (d = 9, 512 CP) yields 70 ZeroSum filter
+    bits per cube for 7-round peeling.
+                      (s)
+ 2. 12D Triple B3 = {s, (s+5) mod 16, 16+((3+s) mod 16)} (212 = 4,096 CP, rin = 5.5):
+    Activates 5 S-boxes in Round 1, balancing 116/128 bits of Q5 and 4 complete columns
+    {10, 18, 25, 31} of the Round-5 S-box output Z5 = Λ1 (Q6 ). That gives 16 balanced 3-bit
+    linear masks on 6-round C6 (265 × below [26]) for root-free 8-round peeling.
+                            (s)          (s)
+ 3. 16D Quadruple B4 = B3 ∪ {16+((8+s) mod 16)} (216 = 65,536 CP, rin = 6): Balances
+    all 128 bits of Q5 and leaves 12 columns {2, 5, 10, 13, 14, 18, 20, 21, 23, 25, 29, 31} of Q5
+    1-round-lift ready (contributing 24 balanced 3-column lifted masks). It produces a 42-
+    dimensional universal balanced linear-mask null space on Q6 , including the complete 4-bit
+
+                                                 13
+      balanced column u = 16 + ((9 + s) mod 16) (s = 0: column 25). Exhaustive census of all
+       32
+                                                                            (0)
+        4 /Z16 = 2,256 canonical 4-column shift classes confirms that B4 = {0, 5, 19, 24} is the
+      unique 216 -CP full-column cube achieving a full balanced column at Q6 (261 × less data
+      than [26] and 266 × less data than the 6-round differential of [10, Appendix A]). Across all
+                                      (s)
+      16 shifts s ∈ {0, . . . , 15}, B4 balances all 16 upper-half columns {16, . . . , 31} (64 individual
+      bits) of Q6 at total data D = 16 · 216 = 220 CP.
+ 4. 20D and 24D Extensions (220 and 224 CP): Adding column 29 (d = 20) raises the Q6
+    nullity to 66, and {0, 5, 10, 19, 24, 29} (d = 24) raises it to 80 (32 individual bits, 3 full
+    columns {13, 25, 30}). Meanwhile, Q7 nullity is identically 0 for every full-column cube up
+    to d = 28 across all r0 ∈ {0, 1, 2, 3}.
+
+3.4     Regime IV: High-Degree Toffoli Row Cancellation
+At rin = 7 and rin = 8 inner rounds (required for 10–12-round attacks with 3- or 4-round
+backward trees), low-dimensional colliding-pair cubes saturate (dim ker Q7 = 0 for d ≤ 28).
+Regime IV casts the high-degree Toffoli distinguishers of [8, 26, 19] into our pullback framework
+via Law I.1 with ν = ex ⊕ ez . Since πx ⊕ πz = x ⊕ z ⊕ xy cancels wy in every column i,
+Bellini et al. [8, Theorem 1 and Table 4, r = 6] proved that on the 113-dimensional cube IW =
+{0 . . . 28}, IX = IY = IZ = {0 . . . 27}, deg(Xi6 ) = deg(Zi6 ) ≤ 105 and deg(Xi6 ⊙ Yi6 ) ≤ 112 < 113.
+This yields their 7-round ex ⊕ ez ZeroSum (written across Λ6 ).
+      M                                    M                             
+              ei ⊗ (ex ⊕ ez ), Q7 (P ) =        Q7,x,i (P ) ⊕ Q7,z,i (P ) = 0  (∀ i ∈ {0, . . . , 31}).
+    P ∈C113                             P ∈C113
+
+This provides 1 unconditional ZeroSum filter bit per column at rin = 7 using D = 2113 CP
+(8× smaller per cube than the d = 116 cube of [19, §3.2]). Similarly, the 7-round d = 116
+distinguisher of [19, §3.2, §3.4] and 8-round d = 124 distinguisher of [8, 26, 19] each balance both
+quadratic rows x and z (2 bits per column, amplified to 10, 26, or 32 bits across m ∈ {3, 6, 7}
+cubes via Lai’s affine coset subcubes [28, 19]) for 11- and 12-round peeling.
+
+
+4      Modules II and III: Backward Tree Key Recovery
+                                        L
+Given a forward ZeroSum identity P ∈C ⟨α, Qrin (P )⟩ = 0 from Module I, Module II recovers
+the outer subkeys Kout = (K (rin +1) , . . . , K (R) ) across the remaining rout = R − rin rounds, and
+Module III closes the attack to the 256-bit master key via Law III (KS−1 (K (2m) , K (2m+1) , 2m) [19,
+Remark 5]).
+    By Law II.1, we first apply the final-round involution T (P ) = ΛR−1 (C(P )) in (6) and define
+the transformed round keys λ(r) := Λ(r−1) mod 4 (K (r) ) for rin + 1 ≤ r ≤ R. Because every linear
+map Lj has row weight 3, the recursive backward relation
+                                                                                                     !
+                                  (R)                                                            (r)
+                                                                         M
+  ZR−1,↑d (P ) = π −1 T↑d (P ) ⊕ λ↑d ,         Zr−1,↑u (P ) = π −1
+                                      
+                                                                                   Zr,↑e (P ) ⊕ λ↑u
+                                                                   e∈suppu (Lr mod 4 )
+
+defines a depth-rout ternary (3-ary) expression tree Trout ,u rooted at column u of Qrin = Zrin ⊕
+K (rin ) , whose leaves at depths 1, 2, 3, 4 span 1 → 3 → 9 → 22 or 23 columns of T (P ). We now
+present the unified backward tree-peeling algorithms as the tree depth rout progresses from 1 to
+4.
+
+4.1     Depth-One Peeling on Five and Six Rounds
+When rout = 1, the ternary tree T1 has no nested π −1 layers: the state Y↑b (P ) = π −1 (T↑b (P ) ⊕
+                        (R−1)
+λ↑b ) = QR−1,↑b (P ) ⊕ K↑b    is a direct sum of independent leaf S-boxes. Using the standard
+
+                                                    14
+direct (one-hot) SAT encoding of finite domains [35] coupled with nativePCNF-XOR solving [32],
+introducing 32 × 16 = 512 Boolean indicators xb,v = [λ↑b = v] ∈ {0, 1} ( 15
+                                                                         v=0 xb,v = 1) linearizes
+every Module I ZeroSum identity on QR−1 into an exact sparse XOR equation in (xb,v ), which
+we solve in three regimes (Figure 3):
+
+1. Five-Round 6-CP Eight-Island 212 Meet-in-the-Middle (≈ 11 ms). Selecting 3
+plaintext pairs (6 CP, e.g. 3 edges of a zero-blind-column 3D cube from Proposition 1), every dead
+                                                       (m)
+column k ∈ D3 (∆P (m) ) ∩ Gg enforces b∈N (k) ∆Y↑b (λ↑b ) = 0, where N (k) = suppk (L3 ) ⊂ Gg
+                                          L
+has size 3. Partitioning each 4-column island Gg = {a, b, c, d} into {a, b} ⊔ {c, d} splits every
+constraint into a 2-leaf left sum and a 2-leaf right sum.
+                                        (m)                         (m)
+                            M                            M
+                                    ∆Y↑x (λ↑x ) =               ∆Y↑y (λ↑y ).                   (12)
+                        x∈N (k)∩{a,b}                   y∈N (k)∩{c,d}
+
+Building a hash table over the 162 = 28 pairs (λ↑a , λ↑b ) and probing with the 28 pairs (λ↑c , λ↑d )
+solves all eight islands in 8 × 2 × 28 = 4,096 = 212 table operations (beating the 242 search
+of [6, §6.2] by > 109 ×). This is refined by the 52 additional parity-check equations of ∆Q3 ∈ V3
+(dim V3 = 36) and a second-layer column peel to κ = Λ3 (K (4) ). A single adaptive 4-th pair (8 CP
+when > 1 fibre survives; mean query budget 6.21 CP across 200 trials) resolves all 4-element
+inverse-S-box derivative fibre collisions (p(3) = 2/35, p(4) = 2/455 per column) to a unique K (5)
+in 11 ms median.
+
+2. Five-Round 4-CP Four-Layer Subspace Peel + Law III Key-Schedule Closure
+(16.0 s). On a single 4-CP        affine 2-plane P4 = {p0 , p0 ⊕ d1 , p0 ⊕ d2 , p0 ⊕ d1 ⊕ d2 } (d1 =
+                             4
+                              
+ez,16 , d2 = ez,31 , giving 2 = 6 pairs), we chain four depth-1 peels inward across Rounds 4, 3, 2, 1
+by introducing 128-bit base-point state variables Ak = Qk (p0 ) ⊕ K (k) (k ∈ {3, 2, 1}). We enforce
+                                              (i,j)
+the Regime I subspace annihilators ∆Qk              ∈ Vk (δ) (dim Vk ∈ {3, 12, 36, 88}) and 2D cube-
+sum annihilators, and couple all 256 affine key-schedule consistency equations (Law III.2) on
+K (k) = Qk (p0 ) ⊕ Ak (k ∈ {2, 3, 4, 5}) at zero extra variable cost. Solving via CryptoMiniSat [32]
+yields (K (2) , K (3) ), and Law III.1 (KS−1 (K (2) , K (3) , 2)) reconstructs the full 256-bit master key
+in 16.0 s median.
+
+3. Six-Round 48-CP One-Hot XOR Solving and Three-Layer Master-Key Cascade
+(2.4 s). On 6-round ARADI (C = Λ1 (π(Q5 ⊕ K (5) )) ⊕ K (6) ), we compute T (t) = Λ1 (C (t) )
+(0 ≤ t < 48) on U48 and write Y (t) (λ) = π −1 (T (t) ⊕ λ) = Q5 (P (t) ) ⊕ K (5) for λ = Λ1 (K (6) ).
+Because Λ0 (Y (t) ) = Z4 (P (t) ) ⊕ Λ0 (K (5) ) and every certified point mask S ⊂ {0, . . . , 47} from
+Regime II has even Hamming weight, each of the 198 island identities takes the exact depth-1
+leaf-sum form                    MM
+                                           (t)
+                                         Yr,c  (λ↑c ) = 0   (r ∈ {x, z}),                           (13)
+                                t∈S c∈Cg
+
+where Cg = supp(1⊤    Gg L0 ) = Gg ∪ G(g+1) mod 8 ∪ G(g+5) mod 8 spans |Cg | = 12 leaves (3 islands).
+Encoding (13) as 198 sparse XOR clauses over the 512 one-hot variables xc,v = [λ↑c = v] alongside
+32 column one-hot constraints (198 > 128 bits of filtering on {0, 1}512 ) isolates K (6) = Λ1 (λ)
+in 2.2 s median via CryptoMiniSat [32]. Peeling Round 5 on the same 48 ciphertexts yields
+  (0...47)
+C̃5        , from which our 212 eight-island MITM recovers K (5) in 71 ms and a deterministic
+2-round dead-column peel recovers K (4) in 108 ms. Law III.1 (KS−1 (K (4) , K (5) , 4)) then outputs
+the full 256-bit master key in 2.4 s median (32× less data than [19, Footnote 4]; Algorithm 2).
+
+4.2    Depth-Two Peeling on Seven and Eight Rounds
+When rout = 2, each subtree of T2 spans 3 leaf nibbles (12 bits of λ(R) ) fed into a middle-layer
+                       (R−1)
+inverse S-box π −1 (·⊕λ↑u ) (4 bits), which we evaluate via two fast Walsh–Hadamard strategies:
+
+                                                   15
+      (a) Six-Round 48-CP Cascade (rin = 5, rout = 1)
+
+                         Rounds 0–2          Orthogonal Collapse          198 eqs
+        Prefix U48                                                                     Tree T1 Peel
+                         deg0 (Q3 ) ≤ 1            S3 → Λ3 → S4
+                                                                                                         Subkey K (6)
+          48 CP                                                                         one-hot XOR
+
+
+
+
+                     Peel Round 5                8-Island MITM                Dead-Column Peel           Master Key
+                       states C̃5                    → K (5)                        → K (4)           KS−1 (K (4) , K (5) )
+
+
+
+
+      (b1) Five-Round 6-CP Island MITM                           (b2) Five-Round 4-CP Four-Layer Peel
+
+
+         6 CP         8-Island MITM                                4 CP                4-Layer Peel       Master Key
+        3 pairs         212 lookups
+                                            Subkey K (5)          2D plane              +256 KS eqs      KS−1 (K (2) , K (3) )
+
+
+
+
+Figure 3: Depth-one (rout = 1) key-recovery flows in OPTIC. (a) On 6 rounds (48 CP prefix
+U48 ), Theorem 1 provides 198 zero-sum equations that isolate K (6) and cascade through K (5)
+and K (4) on the same 48 ciphertexts (zero extra queries) to recover the 256-bit master key in
+2.4 s. (b1) 5-round 6-CP eight-island MITM (11 ms; 6.21 CP mean with adaptive 4-th pair).
+(b2) 5-round 4-CP four-layer subspace peel coupled with 256 Law III key-schedule relations
+(16.0 s).
+
+
+ 1. Seven-Round Single-Subtree 212 FHT Peel (3,072 CP, 3.5 s): Instantiating Module I
+                                             (s)
+    with six shifted 9D Regime III cubes B2 ∪ {z(5+s) mod 16 } (6 × 512 = 3,072 CP = 211.58 CP)
+    provides 324 ZeroSum bits on Q5 . Each balanced column of Q5 depends on a single depth-2
+    subtree with 3 leaves (12 bits of λ(7) = Λ2 (K (7) )), which a 212 -point FHT (as in [33] and
+    the 6-round prototype of [19]) evaluates in < 1 ms. Peeling Round 6 onto the 19 balanced
+    columns of Z4 = Λ0 (Q5 ) recovers K (6) , and Module III (KS−1 (K (6) , K (7) , 6) [19, Remark 5])
+    outputs the 256-bit master key in 3.5 s median on 1 core (> 220 × less data than [6]).
+
+ 2. Eight-Round Root-Free 3-Branch Additive-Split Bloom-MITM (90,112 CP, 6.0 s):
+    On 8-round ARADI, instantiating Module I at the 4 balanced columns {10, 18, 25, 31} of
+                                                         (s)
+    Z5 = Λ1 (Q6 ) under the 12D Regime III cube B3 (212 CP) stops prior to the root inverse
+    S-box S5−1 . Because Λ1 is linear, with T8 = Λ3 (C8 ), λ(8) = Λ3 (K (8) ), λ(7) = Λ2 (K (7) ), and
+    suppb (L1 ) = {u0 , u1 , u2 }, the root-free tree T2.5 splits additively into three independent
+    16-bit depth-2 subtrees:
+                               (7)    (8)                 (7)    (8)                (7)    (8)    
+                       Fu0 λ↑u0 , λN (u0 )       ⊕ Fu1 λ↑u1 , λN (u1 )         = Fu2 λ↑u2 , λN (u2 ) ,
+
+      where N (u) = suppu (L2 ) (|N (u)| = 3 leaves). We evaluate each 216 -entry subtree table
+      via FHT on 11 cubes at s = 0 and 11 at s = 8 (90,112 CP = 216.46 CP, 1.44 MB of
+      ciphertexts, < 20 MB total RAM). Indexing Fu2 in a 2 MB L3-resident Bloom filter then
+      solves b = 25 in 232 lookups, cascades through the remaining subtrees, and closes via
+      Module III (KS−1 (K (6) , K (7) , 6)) in 6.0 s mean (5.7 s median) on 1 core.
+
+4.3     Depth-Three Streaming WHT on Nine Rounds
+                                                                                                            (s)
+For 9-round ARADI (C = Q9 ⊕ K (9) at r0 = 0), our 16D Regime III distinguisher B4 on Q6 sets
+the tree depth to rout = 3 (Rounds 8, 7, 6, using Λ0 , Λ3 , Λ2 ). With T9 = Λ0 (C) and transformed
+round keys κ = Λ0 (K (9) ), γ = Λ3 (K (8) ), and g = Λ2 (K (7) ), the depth-3 ternary tree T3,u rooted
+
+
+
+
+                                                           16
+ Algorithm 2: OPTIC Instantiation at (d=6, rin =5, rout =1): Zero-Sampling 6-Round 48-CP Master-
+ Key Recovery
+ Module I Offline Analytical Certificate (runs once in ≈ 5 ms, 0 key samples):
+    1. Propagate exact ANF monomial supports of D6 in (11) through 3 rounds (Q0 → Q3 ) via (3)–(4).
+     2. For each island Gg (0 ≤ g ≤ 7), form the degree-3 super-S-box monomial unions (10) and
+ extract the F2 -nullspace on U48 , obtaining 99 + 99 = 198 universal zero-sum triples (r, Cg , S).
+ Modules II & III Online Key Recovery from 48 Chosen Plaintexts U48 :
+     1. Query C (t) ← ARADI6 (P (t) ) for t = 0, . . . , 47, and compute T (t) ← Λ1 (C (t) ).
+     2. Layer 1 (K (6) ): Encode the 32 one-hot column groups on (xc,v )0≤c<32, 0≤v<16 and the 198
+ XOR clauses (13); solve via CNF-XOR propagation to obtain K (6) ← Λ1 (λ).
+                                                                                (t)
+     3. Layer 2 (K (5) in ≈ 71 ms): Peel Round 5 on all 48 ciphertexts: C̃5 ← π −1 (Λ1 (C (t) ⊕K (6) )) =
+       (t)       (5)                12
+ Q5 (P ) ⊕ K . Apply the 2 eight-island MITM join (12) across the 128 single-column pairs inside
+ U48 to recover K (5) .
+                                                                               (t)            (t)
+     4. Layer 3 (K (4) & Master Key in ≈ 108 ms): Peel Round 4: C̃4 ← π −1 (Λ0 (C̃5 ⊕ K (5) )) =
+ Q4 (P (t) ) ⊕ K (4) ; recover K (4) from deterministic 2-round dead-column equations (≥ 23 dead columns
+ per pair across U48 ).
+     5. Module III Closure: Compute Kmaster ← KS−1 (K (4) , K (5) , 4) via Algorithm 1 (2m = 4
+ even), verify ARADI6 (P (t) , Kmaster ) = C (t) for all 0 ≤ t < 48, and return Kmaster ∈ {0, 1}256 .
+
+
+at balanced column u = 16 + ((9 + s) mod 16) of Q6 = Z6 ⊕ K (6) reads
+                                                              M
+                 Z8,↑d = π −1 (T9,↑d ⊕ κ↑d ),       Me =              Z8,↑d ,
+                                                                       d∈suppe (L3 )
+                              M                                                                        (14)
+                                          −1
+                      Vu =            π        (Me ⊕ γ↑e ),    Z6,↑u = π −1 (Vu ⊕ g↑u ),
+                             e∈E(u)
+                                                                              S
+where E(u) = suppu (L2 ) has |E(u)| = 3 internal nodes and D(u) = e∈E(u) suppe (L3 ) has
+|D(u)| = 9 disjoint leaves for every u ∈ {0, . . . , 31} (9 × 4 + 3 × 4 + 4 = 52 branch key bits).
+
+Streaming Joint-Histogram WHT Kernel (JM-WHT). Unlike the root-free 8-round tree,
+the root π −1 (Vu ⊕ g↑u ) in (14) nonlinearly couples the three subtrees e1 , e2 , e3 ∈ E(u). When
+d ≥ 113 ≫ 36, the bottom-up 3-round partial-sum FHT of [19, §3.2, Algorithm 3] must first
+tabulate a 236 -entry leaf array (241 bits = 256 GB in 32-bit words) before reducing to the
+three middle nodes. Because our Regime III cube has size |C| = 216 ≪ 236 , we bypass the leaf
+FHT stages entirely. Fixing only the unrecovered leaf nibbles of κD(u) in an outer loop, we
+stream C in 216 steps directly into the 4,096-byte 12-bit joint parity histogram JM[m1 , m2 , m3 ] =
+#{P ∈ C : (Me1 , Me2 , Me3 )(P ) = (m1 , m2 , m3 )} mod 2. We then evaluate the middle-to-root
+parity-distribution convolution of [20, 19] in the Walsh character basis Hξ (m1 , m2 , m3 ) =
+         −1      −1        −1
+(−1)⟨ξ, π (m1 )⊕π (m2 )⊕π (m3 )⟩ (ξ ∈ F42 ). This yields Φγ [z] = #{P ∈ C : Vu (P ) = z} mod 2
+simultaneously for all 212 middle keys γE(u) via 16 size-212 WHTs.
+
+                bγ [ξ] = 2−12 WHT12 JM                         Φγ = 2−4 WHT4 (N
+                                                                                 
+              N                       c ⊙H  b ξ [γ],                          bγ ) mod 2,
+                                                                                                       (15)
+                           M
+            Zu (γ, g) =         π −1 (z ⊕ g) = 0.
+                         z:Φγ [z]=1
+
+Chaining shifts s = 0, . . . , 15 sequentially (u = 25, . . . , 31, 16, . . . , 24), already-recovered κ and
+γ columns prune subsequent trees. Shift 0 searches 36 κ-bits (13 cubes), shift 1 searches 20
+new κ-bits (9 cubes), shifts 2–5 search 16 bits (8 cubes each), shift 6 searches 8 bits (6 cubes),
+and shifts 7–15 search 0 new κ-bits (2–3 cubes each, 20 cubes total). This schedule requires 80
+cubes (D = 80 · 216 = 222.32 CP), T = 254.77 FHT butterflies (= 257.52 64-bit word ops ≈ 245.33
+9-round encryptions; reducible to 256.1 word ops via 3-group character MITM), and M = 225.16
+
+                                                          17
+ Algorithm 3: OPTIC Instantiation at (d=16, rin =6, rout =3): 9-Round Streaming JM-WHT Master-
+ Key Recovery
+ Offline Precomputation (< 1 ms, 1.1 MB):
+                                                                 −1      −1      −1
+    1. For each ξ ∈ F42 , tabulate Hξ [m1 , m2 , m3 ] = (−1)⟨ξ, π (m1 )⊕π (m2 )⊕π (m3 )⟩ and H
+                                                                                             bξ ←
+ WHT12 (Hξ ).
+ Modules II & III Online Recovery (D = 222.32 CP, M = 4.7 MB, ρ = 256):             S
+   1. for shift s = 0 to 15 (u = 16 + ((9 + s) mod 16), E = suppu (L2 ), D = e∈E suppe (L3 )) do
+                                  (s)
+      Query ms translates of B4 (216 CP each) and extract T9,↑d = Λ0 (C)↑d for d ∈ D.
+      Enumerate only unrecovered nibbles of κD (fixing all κd already recovered in shifts < s):
+         Build JM on cube 0, compute JM      c ← WHT12 (JM), evaluate Φγ via (15) on consistent γE ,
+         collect (γE , gu ) with Zu (γE , gu ) = 0, and filter survivors across cubes 1, . . . , ms −1.
+      Commit unique κD ; propagate cross-shift γE consistency (each γ column appears in 3 shifts).
+   2. Module III Closure: Reconstruct K (9) ← Λ0 (κ) and K (8) ← Λ3 (γ), and return Kmaster ←
+   −1
+ KS (K (8) , K (9) , 8).
+
+
+bits (4.7 MB, > 5 × 104 × smaller than 256 GB). Across all 16 shifts, the recovered nibbles cover
+32/32 columns of both κ = Λ0 (K (9) ) and γ = Λ3 (K (8) ) (F2 rank ρ = 256, residual 20 ), and
+Module III (KS−1 (K (8) , K (9) , 8)) outputs the unique 256-bit master key in O(1) (Algorithm 3).
+
+4.4   Multi-Tree List Joins on Ten to Twelve Rounds
+For R ∈ {10, 11, 12} at unmodified offset r0 = 0, coupling our 16D Regime III distinguisher
+(rin = 6) with a depth-4 ternary tree (rout = 4, leaf widths 1, 3, 9, 23 =⇒ 36 tree nodes
+= 144 branch bits) yields an ultra-low-data 10-round all-key corner of (D = 222.00 CP, T =
+2137.21 enc., M = 225.0 bits, ρ = 256)—296 × less data than any prior 10-round attack. In the
+high-data Regime IV (rin ∈ {7, 8}, d ∈ {113, 116, 124}), introducing four targeted refinements
+into the multi-tree FHT and greedy column-overlap list-join framework of Dunkelman and
+Ghosh [19] improves both data and time upon [19] across all three of 10, 11, and 12 rounds
+under identical packed-arithmetic accounting:
+
+ 1. Regime IV d = 113 Toffoli Pullback on 10 Rounds (rin = 7, rout = 3): Replacing the
+    d = 116 cube of [19, §3.2] with the d = 113 ex ⊕ ez Toffoli distinguisher [8] (Section 3.4,
+    m = 16 cubes, 16-bit filter/column, 13 trees) reproduces the list trajectory of [19, Table 7]
+    (maxt |Lt | = 240 , M = 246.17 bits) at D = 2117.0 CP, T = 2117.0 enc., beating [19, §3.2]
+    (2118 , 2118 , 248 bits) in all three metrics. Using m = 8 cubes (24 trees under the greedy overlap
+    order of [19], ρ = 256, maxt |Lt | = 2102 , join 2103.61 ≪ 2116 ) achieves D = 2116.0 CP, T =
+    2116.0 enc., M = 2109.89 bits (4× lower data and time).
+
+ 2. O(1) Root Parity-Pattern     PRLookup Table: In [19, Algorithm 3], after reducing the
+    K-node ternary tree (K = i=rin +1 |Ti (c)|) to the 4-bit parity pattern B[0 . . . 15] entering
+                                                       (r +1)
+    the root, the final loop evaluates b:B[b]=1 π −1 (u↑cin   ⊕ b) over all 16 root keys (2Gfin +5.04
+                                      L
+
+    packed ops). Precomputing a 216 × 16 lookup table (222 bits) replaces this loop by an O(1)
+    lookup (2Gfin ops), lowering depth-3 packed peel cost to 254.75 and depth-4 (|TR (c)| = 22)
+    packed cost to 2142.75 .
+
+ 3. Tight m = 3 Lai-Coset Sizing and Lt -Guided Leaf Pruning on 11 Rounds: Auditing
+    intermediate hash-join list sizes |Lt | at every step t under the greedy column-overlap order
+    of [19] shows that m = 2 cubes (6-bit Lai coset filter [28], [19, Table 5]) on 11 rounds (8R
+    d = 124 [8]) causes |Lt | to peak at 2136.9 ≫ 2125 . By contrast, m = 3 cubes (10-bit filter,
+    19 trees) already bounds maxt |Lt | = 292 (Tjoin = 293.2 ≪ D). This yields D = 3 · 2124 =
+    2125.58 CP, T = 2125.58 enc., M = 299.58 bits, beating m = 4 in [19, §3.3] (2126 , 2126 ) in D and
+    T at higher list-join memory vs. 248 bits. On the low-data 7R d = 116 [19] branch (4 depth-4
+
+                                                  18
+      trees [0, 8, 23, 31]), after Step 3 the surviving list has |L3 | = 284 (m = 7, peak maxt |Lt | = 2112
+      at Step 2), strictly smaller than 288 leaf guesses of u(11) (0 new u(11) bits at Step 4).
+      Restricting Step 4’s outer FHT to u(11) projections present in L3 eliminates Step 4’s 2145.6
+      cost completely, giving D = 7 · 2116 = 2118.81 CP, T = 2147.17 packed ops, M = 2119.46 bits
+      (beating [19, §3.4] (2119 , 2147.76 ) in D and T , vs. M = 2107.1 bits).
+ 4. Law II.3 Lower-Half |T12 (c)| = 22 Narrow-Tree Selection on 12 Rounds: In [19,
+    §3.5, Table 11], 4 of the 8 chosen roots {19, 30, 25, 20} lie in the upper half {16 . . . 31}
+    where the depth-4 leaf cone has width |T12 (c)| = 23 (2146.76 packed ops/cube), dominating
+    their T = 2151.80 total. By Law II.3, all 16 lower-half roots {0 . . . 15} satisfy |T12 (c)| = 22
+    (16× cheaper per tree) and already span full master-key rank ρ = 256. We obtain two
+    complementary all-key 12-round tradeoffs. First, (a) using one upper-half overlap anchor
+    (c = 19 at Step 2 to cap maxt |Lt | = 2116 ) followed by lower-half trees [0, 19, 11, 6, 1, 12, 7]
+    with Lt -guided pruning at m = 7 achieves D = 2126.81 CP, T = 2149.88 packed ops, M =
+    2123.49 bits (ρ = 256, M < 2128 , strictly beating [19, §3.5] in both T [3.8×] and M at
+    equal D). Second, (b) using m = 6 cubes on pure lower-half trees [0, 5, 10, 11, 6] achieves
+    D = 6 · 2124 = 2126.58 CP, T = 2148.62 packed ops ≈ 2141 enc., M = 2153.81 bits (9.1× faster
+    than [19, §3.5] at lower D, and > 248 × faster than the non-heuristic T = 2197 weak-key
+    attack of [10, Table 1]).
+
+
+5      Experiments and Discussion
+5.1     Experimental Verification
+We implemented all distinguishers, key-recovery solvers, and complexity auditors in portable
+single-core Python 3 and C99, first verifying bit-exact compliance against all 21 official ARADI
+test vectors and round-key schedules [23]. Table 3 summarizes our empirical results across three
+blocks:
+ 1. Algebraic Certificates and Distinguishers (5–6 Rounds): Exhaustive 16-bit binary
+    Möbius evaluation verifies the degree-3 super-S-box spectrum (Proposition 2) in 1.4 s, while
+    symbolic ANF propagation derives all 198 universal 5-round zero-sum equations on the
+    48-CP prefix U48 in 5 ms (0 violations across 9,900 random key trials). On 6 rounds, live
+                                               (0)
+    evaluation of the 216 -CP colliding cube B4 confirms full 128D inner balance on Q5 and the
+    42D balanced linear-mask null space on Q6 across 640 key trials (384 master keys and 256
+    independent round-key tuples, 0.03 s per key).
+ 2. End-to-End Key Recovery (5–8 Rounds): Unassisted single-core solvers achieve 100%
+    recovery across all random SplitMix64 trials within < 20 MB peak RAM. On 5 rounds, the
+    8-island MITM recovers 128-bit K (5) from 6 CP (6.21 CP mean with an adaptive 4-th pair)
+    in 11 ms median (200/200 trials), and the 4-layer CNF-XOR peel recovers the full 256-bit
+    master key from 4 CP in 16.0 s median (10/10 trials). On 6, 7, and 8 rounds, our 3-layer
+    cascade (48 CP), single-subtree 212 FHT (3,072 CP), and root-free 3-branch FHT with a
+    2 MB Bloom filter (90,112 CP) recover the full 256-bit master key in 2.4 s median, 3.5 s
+    median, and 6.0 s mean, respectively (10/10 trials each).
+ 3. Higher-Round Kernel and Complexity Verification (9–12 Rounds): Because full
+    9-round recovery has complexity T = 254.77 FHT butterflies (236 outer leaf guesses of κ), we
+    verify a single iteration of the inner 16-shift streaming JM-WHT kernel (15) across all 216
+    (γE , gu ) candidates per shift, cross-shift K (8) propagation, and KS−1 (K (8) , K (9) , 8) closure
+    under a fixed outer κ. For 9–12 rounds, exact F2 symbolic rank and progressive list-join
+    auditors (0.3 s total) verify the subkey-span rank ρ and peak intermediate list sizes maxt |Lt |
+    underlying all (D, T, M ) bounds in Sections 4.3–4.4.
+
+
+                                                    19
+Table 3: Single-core experimental verification of OPTIC across 5- to 8-round unmodified ARADI
+(r0 = 0; 100% success across all trials). “Data” is in chosen plaintexts (CP).
+      Rds    Experiment                               Verified Target    Data     Trials   Runtime
+       5     Orthogonal-island zero-sum (§3.2)        198 zero-sum eqs       48    9,900      5 ms
+       5     8-island MITM (§4.1)                     128-bit K (5)          6a      200     11 ms
+       5     4-layer CNF-XOR peel (§4.1)              256-bit MK              4       10     16.0 s
+       6     Colliding-cube distinguisher (§3.3)      42D Q6 nullspace      216      640     0.03 s
+       6     One-hot XOR + 3-layer cascade (§4.1)     256-bit MK             48       10      2.4 s
+       7     Single-subtree 212 FHT (§4.2)            256-bit MK          3,072       10      3.5 s
+       8     Root-free 3-branch FHT + Bloom (§4.2)    256-bit MK         90,112       10      6.0 s
+      a 6.21 CP mean with adaptive 4-th pair.
+
+
+
+
+5.2    Comparison with Quasidifferential Cryptanalysis
+Comparing OPTIC against the quasidifferential analysis of Beyne, Neyt, and Sajjad [10] (ToSC
+2026(3)) highlights both the complementary tradeoffs across 5–14 rounds and deep algebraic
+connections between the two paradigms:
+
+ 1. All-Key Determinism (100% of 2256 Keys) vs. Weak-Key Differential Collapse
+    (5–12 Rounds): In [10], every differential characteristic with R ≥ 5 rounds imposes linear
+    constraints on the round keys via quasidifferential trails. Their 5-round characteristic [10,
+    Example 1, pp. 7–8] holds with probability 2−42 only on a 2−8 weak-key fraction (and zero
+    otherwise), while their corrected 6-round characteristic [10, Remark 1 and Appendix A]
+    has key-averaged probability pavg = 2−82 (and Bellini et al. [7, Table 4], reproduced in [10,
+    Table 3], report key-averaged characteristic bounds pavg = 2−106 , 2−122 , and 2−137 for 7,
+    8, and 9 rounds without fixed-key guarantees). Above 5 rounds, Beyne et al. evaluate
+    fixed-key differential probabilities only on 9 rounds: for the Round-0 differential of [7], they
+    obtain 2−109 on 3 · 2256−28 keys and 2−106.678 on 2256−28 keys (2−26 of the key space in
+    total) [10, §3.3], and for two shifted-round 9-round differentials they obtain 2−107.678 for
+    a 2−38 fraction of keys and 2−119 for a 2−39 fraction of keys [10, §5.2–5.3]. Likewise, their
+    12-round key-recovery attack [10, §6.1, Table 1] succeeds only for 2218 weak keys (2−38
+    fraction) in time T = 2196.68 ≈ 2197 (D = 2108.68 CP, M = 236 ; or T = 2117 , D = 2111.38 CP,
+    M = 282.38 under a binomial randomization heuristic with 63% success on the 2−38 weak-key
+    subset). Within its 2−38 weak-key class, [10, §6.1] uses 217.9 × less data (2108.68 vs. 2126.58 CP)
+    and lower memory (236 states vs. 2123.49 or 2153.81 bits) than our 12-round integral attacks,
+    and extends to 14 rounds on 2−39 weak keys. Conversely, every Module I identity in OPTIC
+    holds deterministically with probability 1 for all 2256 master keys. On 5 and 6 rounds we
+    recover the full 256-bit master key from 4 CP (16.0 s) and 48 CP (2.4 s). On 6 rounds our
+    216 -CP distinguisher requires 266 × less data than [10, Appendix A], and on 7–9 rounds
+    we achieve full all-key recovery where [10] gives no key recovery. On 12 rounds we trade
+    higher data and memory to expand the valid key space by 238 × while running > 248 × faster
+    (T = 2148.62 packed ops ≈ 2141 enc.) than the non-heuristic T = 2197 attack of [10, Table 1].
+
+ 2. Unified Algebraic Origin of Half-Word Cone Asymmetry (Law II.3 vs. [10,
+    Table 5]): In [10, §5.1, Table 5], Beyne et al. observed empirically via code search that
+    extending a 1-column distinguisher-output difference across 2 or 3 outer key-recovery rounds
+    requires guessing fewer subkey columns when the active column lies in the “left” 16-bit half
+    (our upper half u, MSB columns 0 . . . 15) than in the “right” 16-bit half (our lower half
+    l, MSB columns 16 . . . 31). In particular, |Kout | = 16 vs. 18 columns at 2 rounds and 39
+    vs. 43 columns at 3 rounds (16-bit difference). Law II.3 explains both their observation
+    and our 12-round |T12 (c)| = 22 vs. 23 leaf-cone split from a single matrix identity: for
+    j ∈ {0, 1, 2}, bj + cj ̸≡ 0 (mod 16), so L⊤j ̸= Lj . In [10], differences propagate through
+
+
+                                                     20
+       Lj while quasidifferential masks propagate through L−⊤       j   = L⊤
+                                                                           j . In our depth-4 ternary
+       tree T4 , backward cones propagate through L0 → L1 → L2 → L3 , making lower-half roots
+       c ∈ {0, . . . , 15} strictly narrower (22 leaves, 35 total cone columns) than upper-half roots
+       (23 leaves, 36 total cone columns).
+
+ 3. Exact Rank Audit of the 14-Round Weak-Key Attack in [10, §6.2]: In their
+    14-round weak-key attack (2 + 9 + 3 rounds on 2217 weak keys, dim W = 39), Beyne et al. [10,
+    Tables 11–12, p. 19] guess 16 columns (64 bits) of Kin ⊂ K (0) × L0 (K (1) ) and 41 columns
+    (164 bits) of Kout ⊂ L−1 1 (K
+                                   (14) ) × L−1 (K (13) ) × L−1 (K (12) ). Auditing their column sets
+                                             0               3
+    under the exact MSB-first column bijection b = 31 − cMSB against Algorithm 1 confirms that
+    rank(Kin ) = 64, rank(Kout ) = 164, and rank(Kin ∪ Kout ) = 228. That is, Kin and Kout have
+    zero direct linear intersection (dim(Kin ∩ Kout ) = 0); the 11-bit MITM matching condition
+    dim(Vin ∩ Vout ) − dim W = (64 + 39) + (164 + 39) − 256 − 39 = 11 arises entirely from
+    coupling Kin and Kout through the 39-dimensional weak-key subspace W . Hence, projecting
+    the 39 weak-key equations onto Kout ⊕ Kin during the progressive column guesses of [10,
+    Table 12] (analogous to our Lt -guided pruning in Section 4.4), rather than deferring the
+    11-bit MITM filter until after all 2197 partial decryptions complete, directly prunes the inner
+    decryption tree of [10, §6.2].3
+
+Use of AI. The cryptanalytic results and artifacts were initially developed through an
+autonomous agent system powered by a MiniMax internal model. We validated the key technical
+claims and refined the presentation of the manuscript.
+
+
+References
+ [1] R. Avanzi, S. Banik, O. Dunkelman, M. Eichlseder, S. Ghosh, M. Nageler, and F. Regazzoni, “The
+     QARMAv2 family of tweakable block ciphers,” IACR Trans. Symmetric Cryptol. (ToSC), vol. 2023,
+     no. 3, pp. 25–73, 2023.
+
+ [2] R. Avanzi, O. Dunkelman, and S. Ghosh, “A note on ARADI and LLAMA,” IACR Cryptology
+     ePrint Archive, Paper 2024/1328, 2024. https://eprint.iacr.org/2024/1328.
+
+ [3] R. Avanzi, “The QARMA block cipher family,” IACR Trans. Symmetric Cryptol. (ToSC), vol. 2017,
+     no. 1, pp. 4–44, 2017.
+
+ [4] C. Beierle, J. Jean, S. Kölbl, G. Leander, A. Moradi, T. Peyrin, Y. Sasaki, P. Sasdrich, and S. M. Sim,
+     “The SKINNY family of block ciphers and its low-latency variant MANTIS,” in CRYPTO 2016,
+     Part II, LNCS, vol. 9815, pp. 123–153. Springer, 2016.
+
+ [5] Y. Belkheyar, P. Derbez, S. Ghosh, G. Leander, S. Mella, L. Perrin, S. Rasoolzadeh, L. Stennes,
+     S. Sun, G. Van Assche, and D. Vizár, “ChiLow and ChiChi: New constructions for code encryption,”
+     in EUROCRYPT 2025, Part I, LNCS, vol. 15601, pp. 212–243. Springer, 2025.
+
+ [6] E. Bellini, R. Brunelli, D. Gerault, A. Hambitzer, and M. Pedicini, “Generic partial decryption as
+     feature engineering for neural distinguishers,” in LATINCRYPT 2025, LNCS, vol. 16129, pp. 373–398.
+     Springer, 2026 (online Oct. 2025); IACR ePrint 2025/1443.
+
+ [7] E. Bellini, M. Formenti, D. Gérault, J. Grados, A. Hambitzer, Y. J. Huang, P. Huynh, M. Rachidi,
+     R. Rohit, and S. K. Tiwari, “CLAASPing ARADI: Automated analysis of the ARADI block cipher,”
+     in INDOCRYPT 2024, Part II, LNCS, vol. 15496, pp. 90–113. Springer, 2025 (online Dec. 2024);
+     IACR ePrint 2024/1324.
+   3
+    We also note a minor typographical error in [10, §2.2, p. 4], where the odd-round key-schedule word permutation
+is written as P = (0, 3)(4, 7) (which would never swap words between the two 128-bit register halves). Their
+companion reference implementation uses the true NSA specification P1 = (1, 4)(3, 6) in Algorithm 1, so their
+cryptanalytic results are unaffected.
+
+
+
+                                                        21
+ [8] E. Bellini, M. Rachidi, R. Rohit, and S. K. Tiwari, “On the structural properties of Toffoli gate
+     composition in ARADI: Implications for algebraic distinguishers,” in ACNS 2025, Part II, LNCS,
+     vol. 15826, pp. 400–425. Springer, 2025; preprint titled “Mind the composition of Toffoli gates:
+     Structural algebraic distinguishers of ARADI,” IACR ePrint 2024/1559.
+
+ [9] E. Bellini, M. Rachidi, and S. K. Tiwari, “CLAASP-MP: An automated MILP framework for
+     monomial prediction,” IACR Cryptology ePrint Archive, Paper 2026/735, 2026. https://eprint.
+     iacr.org/2026/735.
+
+[10] T. Beyne, A. Neyt, and A. Sajjad, “Differential cryptanalysis of ARADI,” IACR Trans. Symmetric
+     Cryptol. (ToSC), vol. 2026, no. 3, pp. 1–25, 2026. https://doi.org/10.46586/tosc.avomjbv793gq.
+
+[11] T. Beyne and V. Rijmen, “Differential cryptanalysis in the fixed-key model,” in CRYPTO 2022,
+     Part III, LNCS, vol. 13509, pp. 687–716. Springer, 2022.
+
+[12] J. Borghoff, A. Canteaut, T. Güneysu, E. B. Kavun, M. Knezevic, L. R. Knudsen, G. Leander,
+     V. Nikov, C. Paar, C. Rechberger, P. Rombouts, S. S. Thomsen, and T. Yalçın, “PRINCE – A low-
+     latency block cipher for pervasive computing applications,” in ASIACRYPT 2012, LNCS, vol. 7658,
+     pp. 208–225. Springer, 2012.
+
+[13] C. Boura and A. Canteaut, “On the influence of the algebraic degree of F −1 on the algebraic degree
+     of G ◦ F ,” IEEE Transactions on Information Theory, vol. 59, no. 1, pp. 691–702, 2013; IACR ePrint
+     2011/503.
+
+[14] D. Božilov, M. Eichlseder, M. Knežević, B. Lambin, G. Leander, T. Moos, V. Nikov, S. Rasoolzadeh,
+     Y. Todo, and F. Wiemer, “PRINCEv2 – More security for (almost) no overhead,” in SAC 2020,
+     LNCS, vol. 12804, pp. 483–511. Springer, 2021.
+
+[15] F. Canale, T. Güneysu, G. Leander, J. P. Thoma, Y. Todo, and R. Ueno, “SCARF – A low-latency
+     block cipher for secure cache-randomization,” in 32nd USENIX Security Symposium (USENIX
+     Security 2023), pp. 1937–1954. USENIX Association, 2023.
+
+[16] B. Collard, F.-X. Standaert, and J.-J. Quisquater, “Improving the time complexity of Matsui’s linear
+     cryptanalysis,” in ICISC 2007, LNCS, vol. 4817, pp. 77–88. Springer, 2007.
+
+[17] P. Derbez and M. Euler, “Minimalist model for impossible differentials,” in SAC 2025, LNCS,
+     vol. 16207, pp. 113–143. Springer, 2026; IACR ePrint 2025/1552.
+
+[18] C. Dey, S. Sahoo, and S. Sarkar, “Evaluating the resistance of ARADI against differential fault attack,”
+     IACR Cryptology ePrint Archive, Paper 2025/1977, 2025. https://eprint.iacr.org/2025/1977.
+
+[19] O. Dunkelman and S. Ghosh, “Improved key-recovery attacks on ARADI,” IACR Cryptology
+     ePrint Archive, Paper 2025/1227 (revised Jan. 2026), 2025; supplementary Rust code: https:
+     //github.com/ShibamCrS/zerosum_attack_aradi.
+
+[20] O. Dunkelman, S. Ghosh, N. Keller, G. Leurent, A. Marmor, and V. Mollimard, “Partial sums
+     meet FFT: Improved attack on 6-round AES,” in EUROCRYPT 2024, Part I, LNCS, vol. 14651,
+     pp. 128–157. Springer, 2024.
+
+[21] N. Ferguson, J. Kelsey, S. Lucks, B. Schneier, M. Stay, D. Wagner, and D. Whiting, “Improved
+     cryptanalysis of Rijndael,” in FSE 2000, LNCS, vol. 1978, pp. 213–230. Springer, 2001.
+
+[22] S. Ghosh, B. Michel, and M. Naya-Plasencia, “Differential-MITM attack on 14-round ARADI,”
+     IACR Cryptology ePrint Archive, Paper 2025/1918, 2025. https://eprint.iacr.org/2025/1918.
+
+[23] P. Greene, M. Motley, and B. Weeks, “ARADI and LLAMA: Low-latency cryptography for memory
+     encryption,” IACR Cryptology ePrint Archive, Paper 2024/1240 (received Aug. 5, 2024; revised
+     Sept. 5, 2024), 2024. https://eprint.iacr.org/2024/1240.
+
+[24] J. A. Halderman, S. D. Schoen, N. Heninger, W. Clarkson, W. Paul, J. A. Calandrino, A. J. Feldman,
+     J. Appelbaum, and E. W. Felten, “Lest we remember: Cold boot attacks on encryption keys,” in
+     17th USENIX Security Symposium, pp. 45–60. USENIX Association, 2008.
+
+
+                                                    22
+[25] X. Hu, L. Jiao, D. Feng, Y. Li, S. Wang, Y. Hao, and X. Gong, “A unified key recovery framework
+     for impossible boomerang attacks: Applications to full-round-ARADI and SKINNYe v2,” IACR
+     Cryptology ePrint Archive, Paper 2025/056 (revised Dec. 2025), 2025. https://eprint.iacr.org/
+     2025/056.
+
+[26] S. Kim, I. Kim, D. Lee, D. Hong, J. Sung, and S. Hong, “Byte-wise equal property of ARADI,”
+     IACR Cryptology ePrint Archive, Paper 2024/1772, 2024. https://eprint.iacr.org/2024/1772.
+
+[27] L. Knudsen and D. Wagner, “Integral cryptanalysis,” in FSE 2002, LNCS, vol. 2365, pp. 112–127.
+     Springer, 2002.
+
+[28] X. Lai, “Higher order derivatives and differential cryptanalysis,” in Communications and Cryptogra-
+     phy: Two Sides of One Tapestry, pp. 227–233. Springer, 1994.
+
+[29] R. La Scala and S. K. Tiwari, “Algebraic cryptanalysis of symmetric ciphers: Modeling and multistep
+     solving strategies,” Serdica Mathematical Journal, vol. 51, no. 3–4, pp. 419–442, 2025.
+
+[30] R. La Scala and S. K. Tiwari, “Oracle-based multistep strategy for solving polynomial systems
+     over finite fields and algebraic cryptanalysis of the Aradi cipher,” Advances in Mathematics of
+     Communications, vol. 23, pp. 255–273, 2026; IACR ePrint 2025/1097.
+
+[31] S. Mandal, S. K. Mondal, R. Rohit, and S. Sarkar, “Improved differential cryptanalysis of ARADI,”
+     IACR Cryptology ePrint Archive, Paper 2025/1976, 2025. https://eprint.iacr.org/2025/1976.
+
+[32] M. Soos, K. Nohl, and C. Castelluccia, “Extending SAT solvers to cryptographic problems,” in SAT
+     2009, LNCS, vol. 5584, pp. 244–257. Springer, 2009.
+
+[33] Y. Todo and K. Aoki, “FFT key recovery for integral attack,” in CANS 2014, LNCS, vol. 8813,
+     pp. 64–81. Springer, 2014.
+
+[34] M. Vaziri, “Automated tool for meet-in-the-middle attacks with very low data and memory com-
+     plexity,” in LightSec 2025, LNCS, vol. 16216, pp. 306–327. Springer, 2026; full version: IACR ePrint
+     2025/1401.
+
+[35] T. Walsh, “SAT v CSP,” in CP 2000, LNCS, vol. 1894, pp. 441–456. Springer, 2000.
+
+
+
+
+                                                  23
+

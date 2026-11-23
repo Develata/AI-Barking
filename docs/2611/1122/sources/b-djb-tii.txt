@@ -1,0 +1,114 @@
+#!/bin/sh
+
+# brief notes on history:
+# 20230528 TII announced "tii_decoding_challenge":
+#   https://web.archive.org/web/20260616122319/https://groups.google.com/a/list.nist.gov/g/pqc-forum/c/KzmgtZ3qBME/m/bGh8ed_-AQAJ
+# 20230529 djb said TII is "omitting one of the central defenses in McEliece's original cryptosystem" and said algebraic attacks would be "unsurprising":
+#   https://web.archive.org/web/20260616121832/https://groups.google.com/a/list.nist.gov/g/pqc-forum/c/KzmgtZ3qBME/m/fBZ6p7MSAgAJ
+# 20230602 djb said "If these new estimates are (unsurprisingly) broken by the techniques that I cited, then the 'security foundation'/'McEliece'/... labeling will make people believe, incorrectly, that the break is a problem for the McEliece system. The labeling should be fixed.":
+#   https://web.archive.org/web/20260616122115/https://groups.google.com/a/list.nist.gov/g/pqc-forum/c/KzmgtZ3qBME/m/LTiMRSnKAQAJ
+# 20260623 Classic McEliece team issued comments:
+#   https://classic.mceliece.org/mceliece-610-20260623.pdf
+
+# this script shows that TII's parameter choices and security labeling are fake
+# by running the PQCrypto 2008 attack software
+# to very quickly decode (i.e., break a ciphertext)
+# for TII's pk_McEliece_255.txt, which TII labeled as 2^255 security
+
+set -e
+export THREADS=1
+echo "===== number of threads we will use: $THREADS"
+# no need to wake up more than one core for the attack
+
+[ -d lowweight-20220616 ] || (
+  echo '===== downloading the PQCrypto 2008 attack software...'
+  echo '(with an easy-to-use Python wrapper from 2022)'
+  wget https://cr.yp.to/software/lowweight-20220616.tar.gz
+  tar -xzf lowweight-20220616.tar.gz
+)
+cd lowweight-20220616
+
+[ -d tii_decoding_challenge ] || (
+  echo '===== downloading tii_decoding_challenge...'
+  echo '(if TII removes its repo then this will fail, sorry)'
+  git clone https://github.com/ElenaKirshanova/tii_decoding_challenge.git
+
+  echo '===== pinning version to make sure TII does not suddenly swap in different challenges in 2026...'
+  cd tii_decoding_challenge
+  git checkout e502cd59f8b1b3f05bf251a4f66d2b17f5602a63
+)
+
+(
+  echo 129 where someone in 2026 excitedly reported 4 h 30 min, 80 GiB, 28-vCPU server
+  echo 213 where someone in 2026 excitedly reported 6 h 45 min, 144 GiB, 28-vCPU server
+  echo 248 where someone in 2026 excitedly reported 64000 seconds, 700GB
+  echo 255 which is the largest number in tii_decoding_challenge
+) | while read tiifakesecuritylevel notes
+do
+  echo ''
+  echo "===== considering tiifakesecuritylevel $tiifakesecuritylevel $notes..."
+
+  echo "building a secret random ciphertext..."
+  python3 -c '
+
+import sys
+import random
+
+lines = sys.stdin.readlines()
+m = len(lines[-1].split())-1 # this line is the defining poly of the field
+lines = lines[:-1]
+mt = len(lines)
+lines = ["".join(c for c in line if c in "01") for line in lines]
+n = len(lines[0])
+t = mt//m
+
+print("# n")
+print(n)
+print("# k")
+print(n-mt)
+print("# w")
+print(t)
+
+print("# H^transpose (each line corresponds to a column of H, the identity part is omitted)")
+
+for j in range(n):
+  result = "".join(line[j] for line in lines)
+  if j < mt: assert result == "0"*j+"1"+"0"*(mt-1-j)
+  else: print(result)
+
+print("# s^transpose")
+
+selection = []
+while len(selection) < t:
+  r = random.randrange(n)
+  if r in selection: continue
+  selection += [r]
+
+result = []
+for j in range(len(lines)):
+  if lines[0][j] == "\n": continue
+  x = sum(int(lines[j][r]) for r in selection)
+  result += [x%2]
+
+print("".join(map(str,result)))
+sys.stderr.write("sorted %s\n" % " ".join(map(str,sorted(selection))))
+' \
+  < tii_decoding_challenge/public_keyRec/pk_McEliece_$tiifakesecuritylevel.txt \
+  > $tiifakesecuritylevel.txt \
+  2> $tiifakesecuritylevel.secret
+
+  echo 'running the PQCrypto 2008 attack software...'
+  time ./attack.py \
+  < $tiifakesecuritylevel.txt \
+  > $tiifakesecuritylevel.broken \
+  2> $tiifakesecuritylevel.logs
+  tail -2 $tiifakesecuritylevel.logs | sed 's/^/  /'
+
+  if grep sorted $tiifakesecuritylevel.broken | cmp - $tiifakesecuritylevel.secret
+  then
+    echo "successful decoding for tiifakesecuritylevel $tiifakesecuritylevel"
+  else
+    echo "oops, something went wrong with decoding for tiifakesecuritylevel $tiifakesecuritylevel"
+  fi
+  echo "see lowweight-20220616/$tiifakesecuritylevel.* for more details"
+done

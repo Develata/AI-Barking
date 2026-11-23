@@ -1,0 +1,1587 @@
+     Primal-Shortened ISD Key Recovery on Binary
+                     Goppa Codes
+                                              MiniMax
+
+                                           November 2026
+
+
+                                               Abstract
+          Binary Goppa codes form the algebraic foundation of the McEliece cryptosystem and the
+     NIST post-quantum candidate Classic McEliece. To evaluate concrete key-recovery security
+     margins across code parameters, the Technology Innovation Institute (TII) McEliece Chal-
+     lenges provide 206 structural key-recovery instances (Track 2). Existing algebraic key-recovery
+     attacks rely either on shortened-dual rank-2 and higher-order vanishing (HOV/HOVER) sys-
+     tems, whose standard kernels collapse at moderate code rates, or on primal hold-out attacks,
+     whose high-order derivative systems still span up to tens of millions of columns after shorten-
+     ing.
+          We present a primal-shortened key-recovery framework (Route A) built on a direct
+     structural observation: although the public parity-check matrix scrambles the rows of the
+     private Goppa matrix, it leaves the primal codeword space invariant, where every minimum-
+     weight codeword obeys an exact quadratic identity over the secret support. Restricting
+     the primal code to a compact column window before sampling compresses this degree-2
+     interpolation system by up to 6.59× without penalizing multi-target Information-Set Decoding
+     (ISD) yield. Pairing a cache-resident multi-target ISD engine with a systematic F2 -linear
+     lifting solver reduces key recovery to lightweight codeword harvesting plus seconds of dense
+     binary linear algebra, complemented by an accelerated HOVER solver (Route B) on one
+     high-rate parameter family.
+          Across the official TII catalog, our framework recovers 94 Track-2 private keys (89 via
+     Route A and 5 via Route B), achieving 55 first-blood recoveries and accelerating 39 previously
+     solved instances, with all 94 keys verified by TII’s official SageMath checker. Compared
+     to the shortened-dual records on TII-166 and TII-125 (9.20 h and 9.47 h on 72 cores,
+     CRYPTO 2026), Route A finishes in 5.36 s and 5.90 s on a single 64-core CPU server,
+     achieving 6,968× and 6,493× core-hour speedups. On TII-254 and TII-253, it finishes in
+     30.4 s and 1.80 s, achieving 1,896× and 43,400× wall-time speedups over the prior GPU-
+     cluster record and the multi-core hold-out record by Anthropic. Finally, our codeword-supply
+     analysis shows that Classic McEliece standard parameters lie far outside the feasible regime
+     of this attack.
+
+
+1    Introduction
+Code-based public-key cryptography, initiated by McEliece [28] in 1978 and reformulated in dual
+syndrome form by Niederreiter [29], is one of the oldest approaches to public-key encryption that
+resists quantum attacks. Its security rests on two distinct assumptions: the average-case hardness
+of bounded-distance syndrome decoding in random binary linear codes (whose worst-case general
+decoding problem is NP-complete [4]), and the structural hardness of distinguishing a public
+Goppa parity-check matrix Hpub ∈ Fmt×n2     from a uniform matrix or recovering its secret algebraic
+representation. Whereas high-rate alternant instances and compact algebraic proposals such
+as generalized Reed–Solomon subcodes succumbed to structural distinguishers and filtration
+attacks [15, 10], binary Goppa codes [31, 25] have withstood nearly five decades of cryptanalysis
+and form the basis of the NIST post-quantum key-encapsulation candidate Classic McEliece.
+
+
+                                                   1
+   To benchmark the concrete complexity of code-based cryptanalysis across code lengths n,
+extension degrees m = [F2m : F2 ], and Goppa degrees t, Kirshanova and Esser [21] introduced
+the TII McEliece Challenges, organized into three tracks:1
+
+ 1. Theoretical Key-Recovery Algorithms (Track 1): Design classical or quantum key-
+    recovery and distinguishing algorithms with improved asymptotic or concrete complexity
+    in secure McEliece parameter regimes. Because this track evaluates algorithmic designs
+    rather than fixed public keys, no challenge files are generated for Track 1 in the companion
+    repository [21].
+
+ 2. Practical Structural Key Recovery (Track 2): Given only a concrete public parity-
+    check matrix Hpub ∈ Fmt×n    2     and the field polynomial f (x) defining Fq = F2 [x]/(f (x))
+    (q = 2 ), recover a support tuple L̂ = (ẑ0 , . . . , ẑn−1 ) ∈ Fnq of n distinct elements and a
+          m
+
+    monic square-free degree-t Goppa polynomial ĝ(X) ∈ Fq [X] (ĝ(ẑj ) ̸= 0; chosen irreducible
+                                                                                mt×n
+    in TII’s generator
+              i
+                         [21]) whose vertical F2 -expansion Hraw (L̂, ĝ) ∈ F2      of the alternant
+    matrix ẑj /ĝ(ẑj ) 0≤i<t, 0≤j<n reproduces the public key in reduced row-echelon form:
+                                                          
+                                        RREF Hraw (L̂, ĝ) = Hpub .                                     (1)
+
+ 3. Practical Syndrome Decoding (Track 3): Given Hpub ∈ Fmt×n       2     and a target syndrome
+              ⊤     mt                                              n
+    s = Hpub e ∈ F2 for an unknown weight-t error vector e ∈ F2 , recover e. Treating Hpub
+    as a generic binary linear code, this problem is the domain of single-target Information-Set
+    Decoding (ISD) and code-sieving algorithms, spanning Lee–Brickell [23], Stern–Dumer [37,
+    14], Canteaut–Chabaud [8], Ball-Collision [6], multi-layer representation (BJMM) and
+    nearest-neighbor decoders [26, 3, 27], and recent advances in code sieving, dual reductions,
+    and concrete cost modeling [13, 9, 5].
+
+Throughout this paper, we study the 206 concrete key-recovery instances of Track 2.
+
+1.1    Prior Key-Recovery Paradigms and Bottlenecks
+The 206 Track-2 challenges span extension degrees m ∈ {5, . . . , 10}, Goppa degrees t ∈
+{2, . . . , 24}, and security ratings λTII ∈ [22, 255]. The 36 instances with λTII ≤ 82 were solved
+during the initial competition without published keys, while 41 of the 170 instances with λTII ≥ 83
+were subsequently solved across eight public papers and repositories [30, 2, 7, 18, 38, 33, 34, 35, 39].
+Aside from Panny’s support-splitting search on small parameters [30] (such as 161 core-days on
+TII-91), published algebraic key-recovery attacks fall into two paradigms.
+
+Shortened-Dual Rank-2 and Higher-Order Vanishing Attacks. Because the rows of
+Hraw (L, g) are F2 -bit slices of rational evaluations zji /g(zj ) over F2m , componentwise products of
+dual codewords satisfy low-rank polynomial relations that do not hold for random linear codes.
+Building on high-rate alternant distinguishers [15, 10], quadratic-form spaces [11], the syzygy
+distinguisher [32], and the higher-order vanishing (HOV) distinguisher [19], recent attacks first
+shorten the dual code Γ(L, g)⊥ at s coordinates to compress its dimension before extracting
+algebraic structure. Bardet, Lemoine, and Tillich [2] (via Pfaffian rank-2 ideals) and Briaud et
+al. [7] (via bilinear rank-2 modeling) isolate rank-2 forms in the shortened dual square, whereas
+Hemmert [18] (via low-rank catalecticant MinRank search) and Saarinen [33] (HOVER, via the
+public F2m -endomorphism algebra) exploit degree-3 and degree-4 forms that vanish together with
+all first partial derivatives on the shortened dual code. Although these dual methods account
+for 37 of the 41 prior Track-2 solutions, their non-trivial vanishing kernels exist only at high
+   1
+    We follow the Track 1–3 numbering of the challenge repository [21], corresponding on the HeroX portal to
+Track 1A (theoretical key recovery), Track 1B (practical key recovery), and Tracks 2A–2B (message recovery).
+
+
+                                                     2
+Table 1: Flagship key-recovery comparison on TII Track-2 challenges across wall-clock runtime,
+compute cost, and peak memory.
+ID Parameters               Prior Time      Prior Compute           Our Time Our Compute     RAM       Speedup / Status
+83    (253, 8, 5, 213)      24.3 s [35]      0.081 ch (12 cores)      1.58 s     0.028 ch    232 MB    15.4× time / 2.9× ch
+125   (507, 9, 7, 444)       9.47 h [2]      681.8 ch (72 cores)      5.90 s     0.105 ch    340 MB    5,778× time / 6,493× ch
+166   (500, 9, 7, 437)       9.20 h [2]      662.5 ch (72 cores)      5.36 s     0.095 ch    340 MB    6,180× time / 6,968× ch
+210   (491, 9, 7, 428)       4.31 h [2]      310.2 ch (72 cores)      6.04 s     0.107 ch    340 MB    2,568× time / 2,899× ch
+253   (214, 8, 9, 142)      21.7 h [39]     694.4 th (32 threads)    1.80 s      0.032 ch    242 MB    43,400× time / 21,688× th
+253   (214, 8, 9, 142)      14.0 h [38]     1×H200 + 48 threads       1.80 s     0.032 ch    242 MB    28,000× time (CPU vs. GPU)
+223   (492, 9, 9, 411)     47.75 h [18]     12,224 ch (256 cores)     39.9 s     0.709 ch    326 MB    4,308× time / 17,241× ch
+129   (509, 9, 9, 428)      4.51 h [33]    126.2 vch (28 vCPUs)       41.3 s     0.734 ch    340 MB    393× time / 172× vch
+213   (496, 9, 10, 406)     6.74 h [33]    188.8 vch (28 vCPUs)      138.8 s      2.47 ch    358 MB    175× time / 76.5× vch
+254   (223, 8, 12, 127)   16.0 h [34, 35] 8×GH200 (27.2 GPU-h∗ )      30.4 s     0.540 ch    313 MB    1,896× time (CPU vs. GPU)
+252   (1008, 10, 11, 898)   375 s [33]        1.25 ch (12 cores)      90.0 s     0.025 ch    1.45 GB   4.17× time / 50.0× ch
+147   (509, 9, 11, 410)         No prior published solution           408 s      7.25 ch     373 MB    First-Blood (n′ = 303)
+232   (233, 8, 13, 129)         No prior published solution           332 s      5.90 ch     254 MB    First-Blood (n′ = 233)
+245   (493, 9, 12, 385)         No prior published solution          2510 s      44.62 ch    422 MB    First-Blood (n′ = 326)
+172   (1020, 10, 11, 910)       No prior published solution           89.9 s     0.025 ch    1.51 GB   First-Blood (Route B)
+165   (251, 8, 14, 139)         No prior published solution           81.2 s      1.44 ch    263 MB    First-Blood (n′ = 250)
+250   (1010, 10, 12, 890)       No prior published solution          9.20 h†    66,722 ch†   1.28 GB   First-Blood (n′ = 467)
+228   (500, 9, 14, 374)         No prior published solution         57.1 min†   2,463 ch†    468 MB    First-Blood (n′ = 361)
+
+Notes: Parameters are (n, m, t, k); ch, th, and vch denote physical core-hours (64 Xeon cores for Route A, 1 core
+for Route B), thread-hours [39], and vCPU-hours [33]. ∗ 16.0 h wall is from [35] and 27.2 GPU-h in [34] covers the
+two Krylov runs; † cluster runs (2,048–10,240 EPYC cores).
+
+
+code rates and collapse once R = k/n drops toward or below 1 − 2/t. Even near this boundary,
+solving the resulting polynomial or MinRank systems required up to 9.47 h and 223 GB RAM
+on 72 Xeon cores (TII-125 [2], CRYPTO 2026) or 47.75 h on 256 EPYC cores (TII-223 [18]).
+
+Primal Hold-Out Attacks. To reach moderate code rates where shortened-dual kernels
+vanish, Ghoshal, Ishai, Jain, and Sun [17] introduced the primal hold-out distinguisher, which
+Vedenev [38], Weis [39], and Saarinen [34] extended to key recovery. Viewing the columns
+of a shortened generator matrix (of dimension kℓ ∈ [35, 50]) as points on a hidden rational
+curve, the attack holds out one or two anchor columns and searches for low-degree kℓ -variate
+polynomials (typically of degree 6) whose values and low-order Hasse derivatives vanish at all
+remaining columns. By univariate Hermite interpolation along the curve, any such polynomial
+must also vanish at the held-out columns, exposing the secret support inside the kernel. However,
+representingdegree-6 multilinear polynomials in kℓ variables still produces sparse matrices
+of width k6ℓ ∼ 107 columns, turning kernel extraction into a large-scale sparse Krylov or
+block-Lanczos computation. Recovering TII-253 (214, 8, 9) took 21.7 h on 32 Xeon threads by
+Weis at Anthropic [39] or 14.0 h on an H200 GPU with 48 CPU threads [38] (which also solved
+the shorter instances TII-173 and TII-249). Scaling further to TII-254 (223, 8, 12) required
+two deflated 15,527,170-column operators taking 16.0 h wall time and 128 GiB RAM on up to
+8× NVIDIA GH200 GPUs (27.2 GH200 GPU-h across the two Krylov stages) [34, 35].
+
+1.2       Main Results and Technical Overview
+Our primary method (Route A) bypasses both the dual rate barrier and multi-million-column
+hold-out matrices by working directly with minimum-weight codewords of a shortened primal
+code. Although the RREF transformation Hpub = T −1 Hraw (L, g) scrambles the rows of the
+parity-check matrix, the primal code Γ(L, g) = kerF2 (Hpub Q) is unchanged. In characteristic 2,
+differentiating the support locator polynomial σS (X) = j∈S (X − zj ) of any minimum odd-
+weight codeword (w = 2t + 1) annihilates odd elementary symmetric functions and yields the
+exact polynomial square σS′ (X) = ḡ(X)2 [31, 25, 16] (Theorem 1). Matching its X 2t−2 coefficient
+
+
+
+                                                                    3
+gives the constant quadratic identity
+                                            X
+                                                                    2
+                             e2 (zS ) =             cu cv zu zv = ḡt−1 ∈ Fq .                   (2)
+                                          0≤u<v<n
+
+Expanding (2) into m coordinate bits over F2 turns every weight-(2t + 1) codeword c into m
+binary quadratic equations over the secret support products zu zv . Route A turns this identity
+into a fast key-recovery engine via two pairs of techniques:
+ • Primal Shortening and Cache-Resident Multi-Target ISD (Section 3): Restricting
+   Hpub to a window of n′ ≪ n columns preserves the Goppa polynomial g(X) while compressing
+   the number of quadratic interpolation unknowns F (d) = Θ((n′ − mt)2 ) by up to 6.59×.
+   Because multi-target ISD harvests any F (d) distinct weight-(2t + 1) codewords from the
+                           ′                                 ′
+   shortened pool, the nw pool-size factor cancels the nw denominator of the single-word
+   ISD capture probability (Proposition 1). Furthermore, in the shortened multi-core regime,
+   keeping single-stage Ball-Collision and L1d-bitmap-filtered Stern–Dumer tables inside per-core
+   L1d/L2 caches avoids the DRAM bandwidth bottleneck of multi-layer BJMM.
+ • Public Polarization Quotient and Systematic F2 -Linear Lifting (Section 4): After
+   restricting
+             Pto the odd-weight affine hyperplane and quotienting out the public combinatorial
+   identity u<v cu cv = 2t+1 2    ≡ t (mod 2) (Theorem 2), we transform the affine generator
+   into systematic form [Id | P ]. This traps all d pivot diagonal weights on the main diagonal
+   of the rank-m    target matrices, allowing us to recover the shortened support LA , extract
+   ḡ(X) = σS′ (X) from a single codeword, and extend LA to all n columns via O(n) closed-form
+            p
+
+   field divisions without Gröbner bases.
+For the single high-rate family (m, t) = (10, 11), we pair Route A with a Frobenius-reduced
+shortened-dual HOVER solver (Route B, summarized in Section 4.4 and detailed in Appendix A).
+    As summarized in Table 1 and Section 5, our framework solves 94 official TII Track-2
+challenges (TII-83 through TII-254), achieving 55 first-blood recoveries (including TII-133,
+TII-228 at mt = 126, and TII-250 at mt = 120) and accelerating 39 published instances, with
+all 94 keys passing TII’s official SageMath verification script (94/94 verified). The 92 single-node
+instances finish in 177.82 physical core-hours combined.
+
+
+2     Binary Goppa Codes and Minimum-Weight Structure
+2.1   Public-Key Construction over F2m
+Fix an extension degree m ≥ 1 and field size q = 2m , with Fq = F2 [x]/(f (x)) defined by a
+degree-m
+    P irreducible    polynomial f (x) ∈ F2 [x] and primitive root a = x mod f (x). Every element
+α = m−1    c
+       b=0 b ab ∈ F has a dual representation:
+                   q
+
+ • Field scalar in Fq : α supports finite-field arithmetic and polynomial evaluation; in charac-
+   teristic 2, −1 = +1, (A + B)2 = A2 + B 2 , and the Frobenius squaring map α 7→ α2 is an
+                                                             √       m−1
+   automorphism with unique square-root inverse α = α2                    .
+                                                                                         Pm−1
+ • Bit vector in Fm                                                            m
+                            2 : Via the F2 -vector space isomorphism ϕ : Fq → F2 mapping
+                                                                                                  b
+                                                                                          b=0 cb a 7→
+                            ⊤
+   (c0 , c1 , . . . , cm−1 ) , α is a vertical column vector of m bits.
+    In the official TII specification [21], the public key Hpub is generated from the private key
+(L, g) in three steps:
+Definition 1 (Binary Goppa Public-Key Construction). Let L = (z0 , z1 , . . . , zn−1 ) ∈ Fnq be an
+ordered tuple of n ≤ q pairwise distinct support elements, and let g(X) = ti=0 gi X i ∈ Fq [X]
+                                                                               P
+be a square-free Goppa polynomial of degree t ≥ 2 satisfying g(zj ) ̸= 0 for all 0 ≤ j < n (chosen
+monic irreducible in TII’s generator [21] and Classic McEliece).
+
+                                                     4
+ 1. Step 1: Weighted Vandermonde Parity-Check Matrix over Fq . Form the t × n
+    alternant parity-check matrix HFq (L, g) ∈ Ft×n
+                                                q   with entries
+
+                                                 zji
+                              HFq (L, g)i,j =                (0 ≤ i < t, 0 ≤ j < n),               (3)
+                                                g(zj )
+
+      explicitly written as
+                                       1                1                      1   
+                                                                ···
+                                       g(z0 )         g(z1 )                g(zn−1 ) 
+                                       z
+                                       0               z1                    zn−1 
+                                                                ···                   
+                                       g(z )          g(z1 )                g(zn−1 ) 
+                                                                                     
+                         HFq (L, g) =  . 0              ..     ..               ..    ∈ Ft×n
+                                                                                           q .
+                                       ..                .          .            .   
+                                                                                     
+                                                                                t−1 
+                                                                                     
+                                       z t−1          z1t−1                  zn−1
+                                         0
+                                                                ···
+                                        g(z0 )         g(z1 )                g(zn−1 )
+
+ 2. Step 2: Vertical m-Bit Expansion into Fmt×n    2    . Expand each entry HFq (L, g)i,j ∈ Fq
+    vertically into an m-bit column vector via ϕ : Fq → Fm2 , producing the raw binary parity-
+                                  mt×n
+    check matrix Hraw (L, g) ∈ F2      :
+                                             !
+                                         zji
+               Hraw (L, g)mi+b,j = ϕ             (0 ≤ i < t, 0 ≤ b < m, 0 ≤ j < n).         (4)
+                                      g(zj )
+                                                   b
+
+      The binary Goppa code Γ(L, g) ⊆ Fn2 is the binary right kernel of this matrix:
+
+                 Γ(L, g) := c ∈ Fn2 : HFq (L, g) c⊤ = 0 in Ftq = kerF2 Hraw (L, g) .
+                                                                                 
+                                                                                                   (5)
+
+ 3. Step 3: Row-Scrambling via RREF. When Hraw (L, g) has full row rank mt, the code
+    has dimension k = n − mt. Key generation applies Gaussian elimination over F2 and
+    publishes only the canonical reduced row-echelon form
+
+                      Hpub = RREF Hraw (L, g) = T −1 Hraw (L, g) ∈ Fmt×n
+                                               
+                                                                    2    ,         (6)
+
+      where T ∈ GLmt (F2 ) is the secret invertible mt × mt binary row-mixing matrix determined
+      by the mt pivot columns of Hraw (L, g) (for systematic instances, Hpub = [Imt | R]).
+
+2.2    Row Scrambling and Codeword Space Invariance
+If an attacker were given the unscrambled matrix Hraw (L, g) prior to Step 3, regrouping the first
+m rows of column j would yield v0,j = 1/g(zj ) ∈ F×     q and regrouping rows m through 2m − 1
+would yield v1,j = zj /g(zj ) ∈ Fq . Their ratio immediately reveals every support element in O(n)
+field divisions:
+                                      v1,j   zj /g(zj )
+                               zj =        =              (0 ≤ j < n),                         (7)
+                                      v0,j   1/g(zj )
+after which g(X) follows by linear interpolation from g(zj ) = 1/v0,j .
+    On the public key Hpub = T −1 Hraw (L, g), however, the unknown matrix T −1 ∈ GLmt (F2 )
+takes arbitrary F2 -linear combinations across all mt binary rows, mixing the b-th bit of 1/g(zj )
+with the b′ -th bit of zjt−1 /g(zj ). Individual rows of Hpub no longer group into coherent m-bit field
+                                                                         2
+elements, and brute-forcing T ∈ GLmt (F2 ) costs ≈ 2(mt) . (Note that any column permutation
+P of Hraw (L, g) merely reorders the support tuple L 7→ LP , so T −1 is the sole algebraic barrier
+between Hpub and (L, g).)
+
+
+                                                         5
+    Left-multiplying by an invertible matrix T −1 ∈ GLmt (F2 ) leaves the right kernel completely
+invariant:
+
+          c ∈ Γ(L, g) ⇐⇒ Hraw (L, g) c⊤ = 0 ⇐⇒ T −1 Hraw (L, g) c⊤ = Hpub c⊤ = 0.               (8)
+
+Every codeword c ∈ kerF2 (Hpub ) is therefore unaffected by T −1 and obeys the exact algebraic
+identities of HFq (L, g). Moreover, for any affine automorphism z 7→ αz + β (α ∈ F×
+                                                                                  q , β ∈ Fq ) and
+                                                              σ       t σ  −1
+Frobenius power σ ∈ Gal(Fq /F2 ), transforming (L, g) to (αL + β, α g (α (X − β))) preserves
+the binary parity-check row space and keeps g monic; any such equivalent key (L̂, ĝ) satisfies (1).
+
+2.3   Minimum-Weight Locator Derivative Identity
+To connect kerF2 (Hpub ) to (L, g), observe that for each j ∈ {0, . . . , n − 1}, the polynomial
+g(X) − g(zj ) is divisible by X − zj with degree-(t − 1) quotient t−1
+                                                                 P           Pi     r i−r . Hence,
+                                                                   i=0 gi+1    r=0 zj X
+in Fq [X]/(g(X)),
+                                1        g(X) − g(zj )
+                                     ≡−                   (mod g(X)).
+                             X − zj      g(zj )(X − zj )
+Summing
+Pn−1       over j = 0, . . . , n − 1 weighted by cj ∈ {0, 1} shows that the t field parity checks
+     c z i /g(z ) = 0 (0 ≤ i < t) are equivalent to the classical Goppa syndrome condition [31, 25]:
+  j=0 j j      j
+
+                                   n−1
+                                   X       cj     X   1
+                       Sc (X) :=                =          ≡0               (mod g(X)),         (9)
+                                         X − zj     X − zj
+                                   j=0             j∈S
+
+where S = supp(c) = {j ∈ {0, . . . , n − 1} : cj = 1} and w = |S| = wt(c). Define the support
+locator polynomial of c:
+
+                                     Y                   w
+                                                         X
+                         σS (X) :=         (X − zj ) =         ei (zS ) X w−i ∈ Fq [X],        (10)
+                                     j∈S                 i=0
+                   P           Q
+where ei (zS ) =   J⊆S,|J|=i j∈J zj is the i-th elementary symmetric polynomial of the active
+support elements zS = (zj )j∈S (since −1 = +1 in Fq ). Let ḡ(X) = g(X)/gt = X t + t−1         i
+                                                                                   P
+                                                                                     i=0 ḡi X
+denote the monic normalization of g(X). In binary square-free Goppa codes, divisibility
+ḡ(X)2 | σS′ (X) yields dmin ≥ 2t + 1 [31, 25], and Finiasz [16] observed that at minimum weight
+w = 2t + 1 monic degree equality forces σS′ (X) = ḡ(X)2 (fixing all even elementary symmetric
+coefficients of σS (X) when (L, g) is known; see [38, 39] for higher-order differential identities
+on general codewords). Route A exploits the X 2t−2 coefficient of this classical identity in the
+inverse direction to build quadratic key-recovery equations over unknown (L, g):
+
+Theorem 1 (Minimum-Weight Locator Derivative Identity). Let Γ(L, g) be a binary Goppa
+code                                                                                   t
+Pt−1with isquare-free degree-t Goppa polynomial g(X) and monic normalization ḡ(X) = X +
+  i=0 ḡi X . For every codeword c ∈ Γ(L, g) of minimum odd weight w = 2t + 1 with support
+S = supp(c), the formal derivative σS′ (X) satisfies the exact polynomial identity
+                                                               t
+                                                               X
+                               σS′ (X) = ḡ(X)2 = X 2t +               2
+                                                                     ḡt−j X 2(t−j) .          (11)
+                                                               j=1
+
+Consequently, for every j ∈ {1, . . . , t}, the even elementary symmetric function e2j (zS ) is
+independent of the codeword c and equals the constant field element
+                                              X Y
+                                                             2
+                                e2j (zS ) =           zr = ḡt−j .                        (12)
+                                                   J⊆S r∈J
+                                                  |J|=2j
+
+
+                                                     6
+In particular, for j = 1, every weight-(2t + 1) codeword c ∈ Γ(L, g) satisfies the quadratic relation
+                                             X
+                                                                   2
+                                e2 (zS ) =         cu cv zu zv = ḡt−1 .                         (13)
+                                              0≤u<v<n
+
+Proof. We proceed in four steps:
+ 1. Step
+    Q      1 (Syndrome divisibility via σS′ (X)): Applying the product rule to σS (X) =
+      j∈S (X − zj ) yields
+                              X Y                               X       1
+                  σS′ (X) =                (X − zr ) = σS (X)                = σS (X) Sc (X).
+                                                                      X − zj
+                              j∈S r∈S\{j}                       j∈S
+
+      Because g(zj ) ̸= 0 for all j ∈ S, gcd(σS (X), g(X)) = 1. Thus Sc (X) ≡ 0 (mod g(X)) holds
+      if and only if g(X) | σS′ (X).
+ 2. Step 2 (Perfect-square structure of σS′ (X) in characteristic 2): Over Fq (char Fq = 2),
+    (X r )′ = rX r−1 vanishes for even r and equals X r−1 for odd r. At odd weight w = 2t + 1,
+    differentiating (10) annihilates all terms with even w − i (odd i) and retains only even
+    indices i = 2j (0 ≤ j ≤ t):
+                                   w
+                                   X                                  t
+                                                                      X
+                       σS′ (X) =         (w − i) ei (zS ) X w−i−1 =         e2j (zS ) X 2(t−j) .                  (14)
+                                   i=0                                j=0
+                                                                                                   m−1
+      Since Frobenius squaring a 7→ a2 is a bijection on F2m with inverse a 7→ a2                        , the identity
+      (A + B)2 = A2 + B 2 factors (14) as an exact square:
+                                                                t
+                                                                                   m−1
+                                                                X
+                σS′ (X) = hS (X)2 ,         where   hS (X) :=         e2j (zS )2         X t−j ∈ Fq [X].
+                                                                j=0
+
+ 3. Step 3 (Monic polynomial equality from square-freeness of g(X)): By Step 1,
+    g(X) | hS (X)2 . Since g(X) is square-free, its irreducible factors are pairwise distinct,
+    so g(X) | hS (X) and hence ḡ(X)2 | hS (X)2 = σS′ (X) (which implies deg(σS′ ) ≥ 2t and
+    w ≥ 2t  + 1). At w = 2t + 1, both σS′ (X) in (14) (with e0 (zS ) = 1) and ḡ(X)2 =
+    X 2t + tj=1 ḡt−j
+                  2 X 2(t−j) are monic of degree 2t, so divisibility forces equality (11).
+          P
+
+ 4. Step 4 (Quadratic codeword identity): Matching the coefficient P              of X 2(t−j) be-
+                                             2
+    tween (14) and (11) yields e2j (zS ) = ḡt−j . Setting j = 1 gives e2 (zS ) = u<v∈S zu zv =
+                              2
+    P
+      0≤u<v<n cu cv zu zv = ḡt−1 .
+
+
+
+
+3     Primal Shortening and Multi-Target ISD
+3.1     Primal Shortening and the ISD Cancellation Law
+Full-Length Interpolation Bottleneck. In a full-length Goppa code Γ(L, g) of dimension
+k = n − mt, writing c = x⊤ G in message coordinates x ∈ Fk2 (or dfull = k − 1 = n − mt − 1 affine
+coordinates on the odd-weight hyperplane) turns each of the m bit slices of (13) into a binary
+quadratic equation with
+                                                        
+                                                   dfull
+                                                           = Θ (n − mt)2
+                                                                         
+                         F (dfull ) = 1 + dfull +                                           (15)
+                                                    2
+quadratic monomials. Isolating the m secret relations on the full code requires harvesting at
+least F (dfull ) distinct weight-(2t + 1) codewords and performing dense Gaussian elimination over
+F2 in O(F (dfull )3 ) time (F (443) = 98,347 on TII-125; F (889) = 395,606 on TII-250).
+
+                                                      7
+Quadratic Feature Compression via Primal Shortening. Instead of running ISD on all
+n columns of Hpub , we select a window A ⊂ {0, . . . , n − 1} of n′ = |A| ≪ n columns such that
+                          ′
+HA := (Hpub ):,A ∈ Fmt×n
+                     2      has full row rank mt, and clamp all n − n′ coordinates outside A to
+zero (cj = 0 for j ∈
+                   / A). In the Goppa syndrome (9), terms with cj = 0 drop out:
+                          n−1
+                          X       cj     X cj
+                                       =         ≡0             (mod g(X)).
+                                X − zj    X − zj
+                          j=0               j∈A
+
+By standard Goppa shortening invariance [25, 22], the shortened primal code CA = kerF2 (HA )
+is identically the binary Goppa code Γ(LA , g) of length n′ , dimension k ′ = n′ − mt, restricted
+support LA = (zj )j∈A , and the unchanged Goppa polynomial g(X). Shortening reduces the
+odd-weight affine dimension from dfull = n − mt − 1 to d = n′ − mt − 1: on TII-125 (507, 9, 7),
+choosing n′ = 237 compresses F (d) from 98,347 to 15,052 (6.53× fewer features and ≈ 278×
+faster dense elimination); on TII-250 (1010, 10, 12), choosing n′ = 467 compresses F (d) from
+395,606 to 60,032 (6.59× compression).
+
+Single-Target vs. Multi-Target ISD. In syndrome decoding, a single target error vector e of
+weight w is fixed (or N target syndromes are given in Sendrier’s multi-target DOOM setting [36]),
+so restricting to n′ columns succeeds only if supp(e) ⊂ A, which occurs with tiny probability
+ n′
+     n
+ w / w ≪ 1. In Route A, by contrast, minimum-weight codeword search [24, 8] harvests any
+F (d) distinct weight-(2t + 1) codewords in CA . Under the random-code heuristic, the expected
+supply of weight-w codewords in CA and the single-word ISD capture probability exhibit an
+exact combinatorial cancellation:
+
+Proposition 1 (Feature Count, Heuristic Word Supply, and Multi-Target ISD Cancellation). Let
+            ′
+HA ∈ Fmt×n
+       2      be a full-rank shortened parity-check matrix with shortened dimension k ′ = n′ − mt,
+odd-weight affine dimension d = k ′ − 1 = n′ − mt − 1, and target weight w = 2t + 1.
+
+ 1. Required Evaluation Rank and Heuristic Word Supply: The odd-weight affine chart
+    has F (d) = 1 + d + d2 Boolean quadratic features. Isolating a relation kernel of dimension
+    qker requires at least F (d) − qker independent evaluation rows; using the observed kernel
+    profile qobs (m, t) (Proposition 2) as a planning target gives
+
+                                  Wreq (n′ , m, t) = F (d) − qobs (m, t).                    (16)
+
+    Under the uniform random parity-check heuristic, linearity of expectation gives the expected
+    weight-w codeword supply                          ′
+                                          ′           n −mt
+                                 Wavail (n , m, t) ≈      2    .                            (17)
+                                                      w
+    For a safety factor γ ≥ 1 (e.g., γ = 1.4), define the planning window and minimal window
+    n′min (m, t) := n′plan (m, t; 1) by
+                                                       ′ 
+                                       n                 n                             o
+              n′plan (m, t; γ) = min     ′
+                                        n > mt + 2m :         2−mt ≥ γ Wreq (n′ , m, t) .    (18)
+                                                       2t + 1
+
+ 2. Multi-Target ISD Cancellation Law: In one RREF iteration of a degree-p ISD algorithm
+    on HA , the n′ columns are partitioned into mt pivot columns and k ′ = n′ − mt non-pivot
+    columns. A fixed weight-w codeword of CA has weight p on the k ′ non-pivot columns and
+    weight w − p on the mt pivot columns with hypergeometric probability
+                                                 k′
+                                                     mt 
+                                                         p    w−p
+                                            P1 (n′ ) =       n′
+                                                                   .                        (19)
+                                                             w
+
+
+                                                    8
+                                   n = mt + k                                                 n′
+                          n′ = mt + k′            n − n′                     mt                    k′ = n′ − mt
+
+                                                                                              collision (wt ≤ e)           l bits
+                                ′
+ mt = n − k
+                      HA ∈ Fmt×n
+                            2
+                                                   HĀ       π, RREF
+                                                                             Imt                              ′
+
+                              window A          clamped Ā
+                                                                 on HA                            Q ∈ Fmt×k
+                                                                                                       2
+                                                                                                                           mt − l
+
+
+
+  c ∈ Γ(L, g) :     cA ∈ CA (wt = 2t + 1)        cĀ = 0                  wt = w − p          wt = p1     wt = p2
+
+
+Figure 1: Matrix structure of primal shortening and multi-target ISD for a Goppa code of length
+n, codimension mt, and dimension k = n − mt. Left: permuting a full-rank n′ -column window
+A to the left and clamping the remaining n − n′ columns of Hpub to zero restricts the search to
+             ′
+HA ∈ Fmt×n
+        2      (k ′ = n′ − mt), whose right kernel CA = Γ(LA , g) preserves g(X). Right: each ISD
+round reduces HA π to [Imt | Q] and collides non-pivot half-lists of weights p1 + p2 = p on an
+l-bit window to harvest codewords of odd weight w = 2t + 1.
+
+
+      By linearity of expectation across all Wavail (n′ , m, t) weight-w codewords in CA , the expected
+      number of weight-w codewords captured per ISD iteration in the unsaturated regime is
+
+                                                            n′           n′ −mt        mt           n′ −mt    mt
+                                                                                                               
+                         ′             ′               ′                    p         w−p              p     w−p
+                  Yield(n ) = Wavail (n , m, t) · P1 (n ) ≈ w  ·                              =                        ,      (20)
+                                                           2mt                n′
+                                                                                                        2mt
+                                                                              w
+
+                     n′
+                          
+      where the      w        terms cancel identically.
+
+Proof. For Part 1, rank-nullity requires evaluation rank F (d) − qker for a kernel of dimension
+                                                                        ′
+qker , and in a uniform random mt × n′ binary matrix each of the nw weight-w vectors satisfies
+the mt checks with probability 2−mt . For Part 2, a fixed weight-w support meets a random
+(k ′ , mt) partition in (p, w − p) columns with hypergeometric probability P1 (n′ ); summing over the
+Wavail (n′ , m, t) expected codewords gives (20). Transfer of the random-code supply expectation
+to Goppa codes and the choice of γ are planning heuristics rather than universal theorems.
+
+End-to-End Speedup near n′plan . Equation (20) shows that the expected yield per inner-loop
+                                ′
+syndrome check is Yield(n′ )/ kp = w−p  mt
+                                            −mt
+                                            2    , which is independent of n′ . Meanwhile, reducing
+n′ toward n′plan simultaneously reduces the required codeword count Wreq (n′ , m, t) = Θ(k ′2 ), the
+per-iteration RREF cost O((mt)2 n′ /64), and the dense linear algebra cost O(F (d)3 ) = O(k ′6 ),
+as illustrated in Figure 1. Table 2 lists our chosen shortening windows across representative TII
+parameter families.
+
+3.2     Cache-Resident Collision ISD vs. Multi-Layer BJMM
+Single-Stage Collision ISD vs. Multi-Layer BJMM. For asymptotic parameters (n =
+3488, w = 129), multi-layer representation decoders such as MMT [26] and BJMM [3] (and
+nearest-neighbor or sieving variants [27, 13]) reduce the asymptotic exponent by splitting a
+weight-p vector into overlapping halves across a multi-level merge tree. In the shortened TII
+regime (mt ∈ [35, 126], w ∈ [11, 29], and k ′ = n′ − mt ∈ [60, 347]), however, single-stage collision
+ISD outperforms multi-layer BJMM for two concrete reasons:
+
+  1. Compact Half-List Combinatorics: After primal shortening, each half-list has only
+     k ′ /2 ∈ [30, 173] columns, so even
+                                         full triple enumeration (p1 = p2 = 3) has at most
+      173                            118                              ′
+         3   = 847,549 entries (and 3 = 266,916 on TII-228). At k /2 ≈ 115, adding ε = 1
+
+
+                                                             9
+Table 2: Shortening windows, codeword-supply estimates, and quadratic feature compression
+across representative TII parameter families.
+Family Weight                 Full n          Short n′ Dim d Required Available                              Compression
+  (7, 7)        15           112–123              112          62         1,946      2.79 × 103                  1.38×
+  (8, 5)        11           252–253              143         102         5,237      7.85 × 103        4.27× (5.3k vs. 22.4k)
+  (8, 6)        13           253–254              152         103         5,348      7.78 × 103        3.93× (5.4k vs. 21.1k)
+  (8, 7)        15           221–254              163         106         5,663      8.32 × 103                 3.42×
+  (8, 8)        17           217–256              175         110         6,097      9.25 × 103                 2.99×
+  (8, 9)        19           214–255              187         114         6,547      9.88 × 103       2.54× (TII-253, 1.80 s)
+ (8, 10)        21           226–255              199         118         7,013      1.02 × 104                 2.16×
+ (8, 12)        25           223–244              223         126         7,993      1.03 × 104       Solves TII-254 in 30.4 s
+ (8, 14)        29           246–256              246         133         8,903      8.49 × 103          Illustrative window
+  (9, 7)        15           482–508              237         173        15,042      2.20 × 104         6.56× (15k vs. 98k)
+  (9, 8)        17           495–512              253         180        16,281      2.45 × 104                 5.92×
+  (9, 9)        19           492–509              269         187        17,569      2.60 × 104                 5.19×
+ (9, 10)        21           496–509              286         195        19,101      2.86 × 104                 4.52×
+ (9, 12)        25           493–505              326         217        23,644      5.23 × 104                 3.31×
+ (9, 14)        29              500               361         234        27,486      6.16 × 104           2.53× (TII-228)
+(10, 12)        25             1010               467         346        60,021      1.36 × 105    6.59× (TII-250, 60k vs. 396k)
+(12, 64)        129     3488 (standard)         3488         2719     Unverified       ≈ 223.47            Not attacked here
+
+Notes: For each family (m, t) of target weight w = 2t + 1, n′ is the shortened length, d = n′ − mt − 1 is the affine
+                                                      ′
+dimension, Wreq = F (d) − qobs (m, t) and Wavail ≈ nw 2−mt are the required and heuristic available codewords,
+and ‘Compression’ is F (nmax − mt − 1)/F (d) across each family’s ‘Full n’ range.
+
+
+Table 3: Multi-target ISD modes, window collision parameters, and per-thread cache footprints
+across TII parameter regimes.
+Mode       Regime                    Parameters           Left Step                Right Step              Cache Footprint
+Mode 3     mt < 88 or w < 21         p = 3 (no split)     Direct triple loop       Word-0 popcount prune   < 8 KB (L1d-resident)
+Mode 5     mt ∈ [88, 111], w ≥ 21    p = 2+3, l=15, e=1   16× ball expand          1× bucket lookup        128 KB bucket heads (L2)
+Mode 6     mt ≥ 112, high k′ (250)   p = 3+3, l=17, e=0   1× insert + bitmap bit   1-bit L1d bitmap gate   16 KB bitmap in L1d
+Mode 7     mt ≥ 112, mod. k′ (228)   p = 3+3, l=15, e=1   1× exact insert          16× ball probe          128 KB heads + 5.7 MB pool
+
+Notes: ‘Parameters’ list the non-pivot weight split p = p1 + p2 , collision window size l (in bits), and allowed
+window Hamming weight e (ball radius).
+
+
+       cancellation bits in a 3-level BJMM tree provides minimal representation gain while intro-
+       ducing intermediate hash-join stages and duplicate filters that cost 5–10× more instructions
+       per candidate than a register-level 3-XOR loop.
+  2. Per-Core L1d/L2 Cache Residency vs. Shared DRAM Bandwidth: Across 64
+     physical Xeon cores (or 2,048–10,240 physical EPYC cores on cluster runs), all cores share
+     the socket’s DRAM memory controllers. Multi-megabyte per-thread BJMM hash tables
+     spill out of L2 (1.25 MB/core) and L3 cache into DRAM, stalling cores on memory bus
+     contention. Keeping each thread’s hot collision structure inside private L1d (48 KB) or L2
+     (1.25 MB) cache allows all cores to run at full clock speed with linear multi-core scaling.
+
+Cache-Resident Multi-Target ISD Design. In each round, a worker thread permutes the
+                         ′
+columns of HA ∈ Fmt×n
+                    2      (with incremental pivot updates [8]), computes a 64-bit word-packed
+                                                ′
+RREF to obtain H̃A = [Imt | Q] (Q ∈ Fmt×k   2     ), and searches for weight-p non-pivot vectors
+      k ′                              mt
+v ∈ F2 whose syndrome u = Qv ∈ F2 has weight wt(u) = w − p. Our sampler incorporates
+five architectural optimizations (Table 3):
+
+  1. Bit-Transposed Non-Pivot Syndromes: Immediately after RREF, each thread trans-
+     poses the k ′ columns of Q into vertical 64-bit words (⌈mt/64⌉ ≤ 2 words per column for all
+
+                                                                    10
+      mt ≤ 126), reducing column additions to 1–2 register-level XORs and weight checks to 1–2
+      hardware population-count instructions.
+
+ 2. Mode 3: Word-0 Early-Pruned Lee–Brickell (p = 3): For mt < 88 or w < 21 (68
+    of 89 Route A instances), enumerating non-pivot triples (a < b < c) without hash tables
+    is fastest. When mt > 64, the inner loop checks whether the Hamming weight of the
+    first 64-bit syndrome word s0 already exceeds w − 3 before computing the second word s1 ,
+    pruning > 99% of triples in 2 clock cycles.
+
+ 3. Modes 5 & 7: Asymmetric Read/Write Ball-Collision (l = 15, e = 1): For
+    mt ≥ 88, w ≥ 21, we partition the k ′ non-pivot columns into blocks of sizes n1 and
+    n2 = k ′ − n1 and allow ball collisions of weight wt(hL ⊕ hR ) ≤ e = 1 [6] on a 15-bit window
+    (215 = 32,768 buckets, whose 128 KB bucket-head array fits inside L2 cache). Because a
+    15-bit ball of radius 1 contains 1 + 15 = 16 patterns, each RREF round captures 16× more
+    codewords than strict Stern–Dumer (e = 0). We flip the 16× ball expansion between left
+    insertion and right probing according to list size:
+
+       • Mode 5 (p = 2 + 3 = 5, e.g., TII-254):                                           ′
+                                                          Setting n1 = min(145, ⌊0.42k ⌋), the
+                                                       53
+         asymmetric split makes the left pair list ( 2 = 1,378 on TII-254) 47× smaller than
+         the right triple list ( 74                                                             5
+                                   
+                                 3 = 64,824). Mode 5 expands 16× on left insertion (≤ 1.67 × 10
+         nodes across all families), so the hot right loop performs a single lookup per triple.
+       • Mode 7 (p = 3 + 3 = 6, e.g.,    TII-228): With balanced halves n1 = ⌊k ′ /2⌋, both
+                                   118
+         sides enumerate triples ( 3 ≈ 2.67 × 105 ), where 16× left expansion would spill to
+                                      
+
+         DRAM. Mode 7 inserts once on the left (5.7 MB pool) and probes 16 buckets on the
+         right, keeping the 128 KB bucket-head array in L2 cache.
+
+ 4. Mode 6: 16 KB L1d-Bitmap          Pre-Filtered Stern–Dumer (p = 3 + 3 = 6, l = 17):
+                   ′       173
+                               
+    On TII-250 (k = 347, 3 = 847,549 triples/side), Mode 6 uses a 17-bit window (131,072
+    buckets, ≈ 8 MB per thread) guarded by a 16 KB occupancy bitmap (2,048 64-bit words)
+    that stays 100% resident in the 48 KB L1d cache. Left insertions set bit h in the bitmap
+    and record h in a compact dirty-bucket list; right-side triples test bit h in L1d first to reject
+    empty buckets without touching the 8 MB bucket table, and only dirty buckets are reset at
+    the end of the round.
+
+ 5. Lock-Free Atomic Global Deduplication: All threads insert discovered weight-w
+    codewords into a shared 222 -slot open-addressing hash table via 64-bit FNV-1a support
+    hashes and atomic compare-and-swap (CAS) operations, terminating as soon as the shared
+    counter reaches Wtarget .
+
+
+4     Quotient Reduction and Systematic Linear Lifting
+4.1    Affine Chart and Public Polarization Quotient
+Given W ≥ Wreq (n′ , m, t) harvested codewords c ∈ CA of odd weight w = 2t + 1, three structural
+properties govern the quadratic evaluation system (Theorem 2):
+ 1. Odd-Weight Affine Hyperplane Parameterization (d = k ′ − 1): Every               P harvested
+    codeword has odd weight w = 2t + 1 and satisfies the linear parity constraint u∈A cu ≡ 1
+                                                          ′
+    (mod 2). In message coordinates c = x⊤ GA (x ∈ Fk2 ), this reads ℓ · x = 1 where ℓ = GA 1n′ .
+                                                  ′
+    Interpolating quadratics directly in x ∈ Fk2 would introduce k ′ trivial parity-multiplied
+    syzygies xi (ℓ · x + 1) = 0. Parameterizing the affine hyperplane ℓ · x = 1 by d = k ′ − 1 free
+    coordinates y ∈ Fd2 via
+
+                      c(y) = c0 + y ⊤ G0     (y ∈ Fd2 , d = k ′ − 1 = n′ − mt − 1),             (21)
+
+                                                11
+                                                          ′
+    where wt(c0 ) is odd and every row of G0 ∈ Fd×n
+                                                2   has even weight, removes all k ′ parity
+    syzygies up front.
+
+ 2. Rank-≤ m Multiplication Forms Up to Diagonal Correction: Unlike dual-code
+    quadratic-form attacks over F2m that target rank-2 alternating matrices  P [11, 2, 7], Route A
+    pulls (13) back over F2 via linear functionals F : Fq → F2 , giving u<v cu cv F (zu zv ) =
+         2 ). Because the sum ranges over strictly ordered pairs u < v, its symmetric coefficient
+    F (ḡt−1
+                     ′    ′
+    matrix MF ∈ Fn2 ×n has off-diagonal entries (MF )uv = F (zu zv ) (u ̸= v) and zeros on the
+    diagonal ((MF )uu = 0). By contrast, the full multiplication matrix M        fF ∈ Fn′ ×n′ with
+                                                                                         2
+    (M
+     fF )uv = F (zu zv ) for all u, v (including the diagonal (MfF )uu = F (z 2 ) =: (wF )u ) factors
+                                                                             u
+    through the m-dimensional space Fq and has rankF2 (M   fF ) ≤ m. Since MfF = MF +diag(wF ),
+                                                                                                  d×d
+    pulling back by G0 yields an off-diagonal bilinear polarization matrix BF = G0 MF G⊤   0 ∈ F2
+                                       ⊤
+    such that adding G0 diag(wF )G0 drops its rank to ≤ m:
+
+                  LF := BF + G0 diag(wF )G⊤      f ⊤
+                                          0 = G0 MF G0 ,             rankF2 (LF ) ≤ m.
+
+                                                                                         ′
+ 3. Public Combinatorial Polarization Tpub : Every binary vector c ∈ {0, 1}n of constant
+    weight w = 2t + 1 satisfies the combinatorial identity
+                                                       
+                                 X               2t + 1
+                                        cu cv =           ≡ t (mod 2),              (22)
+                                      ′
+                                                    2
+                               0≤u<v<n
+
+    independent of (L, g). Substituting c(y) = c0 + y ⊤ G0 into (22) yields a public quadratic
+    relation with bilinear polarization matrix
+
+                                   Tpub = G0 (Jn′ + In′ )G⊤    d×d
+                                                          0 ∈ F2 ,                                (23)
+
+    where Jn′ + In′ has 1 off the diagonal and 0 on the diagonal. Projecting out Tpub leaves an
+    m-dimensional quotient space spanned by the m secret bit-slice forms B1 , . . . , Bm .
+
+Theorem 2 (Primal Shortening Invariance, Quotient Reduction, and Support Extension). Let
+Γ(L, g) = kerF2 (Hpub ) be a binary Goppa code of length n and dimension k = n − mt, and let
+                                                                                               ′
+A ⊂ {0, . . . , n − 1} be a subset of n′ coordinate indices such that HA := (Hpub ):,A ∈ Fmt×n
+                                                                                          2      has
+full row rank mt.
+                                                                                                      ′
+ 1. Shortened Goppa Invariance [25, 22]: The shortened primal code CA := {cA ∈ Fn2 :
+    HA c⊤                                                                ′             ′   ′
+        A = 0} is identically the binary Goppa code Γ(LA , g) of length n , dimension k = n −mt,
+    and minimum distance ≥ 2t + 1, where LA = (zj )j∈A and g(X) is the unchanged Goppa
+    polynomial.
+                                                                                              ′   ′
+ 2. Odd-Weight Affine Hyperplane and Bit-Sliced Polarization: Let GA ∈ Fk2 ×n be
+                                                     ′
+    a generator matrix of CA and ℓ = GA 1n′ ∈ Fk2 . Parameterizing the odd-weight hyperplane
+    ℓ · x = 1 by x(y) = ei0 + Ey for y ∈ Fd2 (d = k ′ − 1, where ℓi0 = 1 and im(E) = ker(ℓ⊤ ))
+                                      ′
+    and setting G0 = E ⊤ GA ∈ Fd×n 2    and c0 = (GA )i0 ,: , every F2 -linear functional F ∈ F∨
+                                                                                               q pulls
+                 2                                                                 d
+    e2 (zS ) = ḡt−1 back to an affine quadratic relation qF (y) = 0 on y ∈ F2 whose symmetric
+    bilinear polarization matrix BF ∈ Fd×d2   (BF,ii = 0) satisfies
+
+      BF = G0 MF G⊤
+                  0,          LF := BF + G0 diag(wF )G⊤      f ⊤
+                                                      0 = G0 MF G0 ,      rankF2 (LF ) ≤ m,
+                                                                                         (24)
+    where (MF )uv = F (zu zv ) for u ̸= v with (MF )uu = 0, (wF )u = F (zu2 ), and (M
+                                                                                    fF )uv =
+    F (zu zv ) for all u, v ∈ A has rankF2 (M
+                                            fF ) ≤ m.
+
+
+
+                                                 12
+  3. Public Exceptional
+                  P         Direction
+                                 2t+1
+                                      Elimination: On every weight-(2t + 1) codeword c ∈ CAd,
+     the identity u<v cu cv = 2 ≡ t (mod 2) induces a public quadratic relation on y ∈ F2
+                                                         d×d
+     with polarization matrix Tpub = G0 (Jn′ +In′ )G⊤
+                                                    0 ∈ F2 . When Tpub ̸= 0, it can be quotiented
+     out; if the m secret relations are independent of each other and of Tpub , their classes span
+     an m-dimensional subspace of the quotient.
+  4. Closed-Form O(n) Support Extension Outside A [22]: Assume t ≥ 2 and that the
+     recovered (LA , ḡ) is compatible with a representation of the full public code. Choosing
+     mt independent columns P0 ⊂ A, the unique basis change T = Hraw (LA , ḡ):,P0 (HA )−1    :,P0 ∈
+     GLmt (F2 ) unscrambles the entire public key H    e = T Hpub , and reading the first two m-bit
+     field slices v0,j , v1,j ∈ Fq of each column j ∈
+                                                    / A yields [22, 38, 39, 33, 34]
+                                         v1,j
+                                  zj =            (∀ j ∈ {0, . . . , n − 1} \ A).                        (25)
+                                         v0,j
+
+Proof. Part 1: A vector           n
+                         P c ∈ F2 with cj = 0 for j ∈   / A satisfies Hpub c⊤ = 0 ⇐⇒ HA c⊤   A = 0, and
+its Goppa syndrome j∈A cj /(X − zj ) ≡ 0 (mod g(X)) is the defining condition of Γ(LA , g).
+Since rankF2 (HA ) = mt and g(X) is square-free of degree t, dimF2 CA = n′ − mt = k ′ and
+dmin (CA ) ≥ 2t + 1.                                        Pd
+    Part 2:  Expanding   cu (y)c v (y) with cu (y) = c0,u +  a=1 ya (G0 )au inside the quadratic relation
+qF (y) = u<v cu (y)cv (y)F (zu zv ) + F (ḡt−1 ) = 0 over F2 , the diagonal quadratic terms ya2 = ya
+                                              2
+          P
+merge into the linear part of qF (y), while for a < b the coefficient of ya yb is
+           X                                                 X
+                                                                (G0 )au (MF )uv (G0 )bv = (G0 MF G⊤
+                                                 
+(BF )ab =       (G0 )au (G0 )bv +(G0 )bu (G0 )av (MF )uv =                                          0 )ab .
+           u<v                                                u̸=v
+
+Because MF is symmetric with zero diagonal, (G0 MF G⊤
+                                                                          P
+                                                               0 )aa =      u<v (G0 )au (G0 )av ((MF )uv +
+                                             ⊤
+(MF )vu ) = 0 over F2 , so BF = G0 MF G0 holds on all entries.Pm Next,        fix an F2 -basis e1 , . . . , em
+of Fq with dual coordinates e∗1 , . . . , e∗m ∈ F∨
+                                                 q  so  z u =        e ∗ (z )e . By F -linearity of F ,
+                                                                 r=1 r u r               2
+ fF )uv = F (zu zv ) = Pm e∗r (zu )F (er zv ) is a sum of m rank-1 outer products over F2 , so
+(M                         r=1
+rankF2 (MfF ) ≤ m and LF = G0 (MF + diag(wF ))G⊤ = G0 M         fF G⊤ has rank ≤ m.
+                                                   2t+1
+                                                       0             0
+    Part 3: Every weight-(2t + 1) vector has 2 = t(2t + 1) ≡ t (mod 2) active pairs u < v.
+Replacing MF in Part 2 by the off-diagonal all-ones matrix Jn′ + In′ yields the polarization
+Tpub = G0 (Jn′ + In′ )G⊤0.
+    Part 4: Under compatibility, T Hpub = Hraw (L, ḡ) is uniquely determined by inverting its
+restriction to the mt independent columns P0 ⊂ A. Its first two m-bit field slices in column
+j ∈/ A equal v0,j = 1/ḡ(zj ) and v1,j = zj /ḡ(zj ), whose ratio is zj . Full row-space equality
+RREF(Hraw (L̂, ḡ)) = Hpub is verified before accepting the extended key.
+
+Proposition 2 (Conditional Relation-Space Identification). Let E evaluate the F (d) = 1+d+ d2
+                                                                                                             
+
+Boolean affine quadratic monomials on the harvested weight-(2t + 1) words, and let U be the span
+of the m secret quadratic relations and the public relation. If these m+1 relations are independent
+and rankF2 (E) = F (d) − (m + 1), then ker E = U (cf. [12] on concrete rank verification in
+structured algebraic code systems). Across our solved Route A instances, the observed kernel
+dimension follows the profile
+                                            (
+                                              2m + 1 if t = 5,
+                            qobs (m, t) =                                                                 (26)
+                                              m+1      if t ≥ 4 and t ̸= 5.
+For the 84 solved Route A instances with t ̸= 5, quotienting ker E by Tpub leaves an m-dimensional
+quotient space. For the 5 solved instances with t = 5 (where analogous t = 5 degeneracies and
+extra kernel relations were independently observed on the shortened-dual and hold-out sides
+in [2, 39]), quotienting by Tpub leaves a 2m-dimensional quotient; a Gray-code rank census and
+subspace probe isolate the true m-dimensional subspace in < 0.2 s.
+
+                                                     13
+4.2     Systematic Linear Lifting and Support Extension
+Given m basis matrices B1 , . . . , Bm ∈ Fd×d
+                                          2    representing the m-dimensional secret quotient space
+(since each row of G0 has even weight, G0 1n′ = 0 and (G0 G⊤                                       ⊤
+                                                                0 )aa = 0, so Tpub = G0 diag(1n′ )G0
+                                                      (r)     (r)
+and representatives differing by Tpub simply shift w 7→ w + 1n′ ), each r ∈ {1, . . . , m} admits
+                                             ′
+a binary diagonal weight vector w(r) ∈ Fn2 ((w(r) )u = Fr (zu2 )) such that
+
+                         L(r) = Br + G0 diag(w(r) )G⊤
+                                                    0                  has    rankF2 (L(r) ) = m.                        (27)
+
+Decoupling Pivot Weights via Systematic Coordinates [Id | P ]. Whereas generic
+MinRank modelings such as Kipnis–Shamir [20] and Support-Minors [1] produce bilinear systems
+solved via Gröbner bases or XL, the unknowns w(r) here enter only through a diagonal matrix
+                                                           ′
+sandwiched by the known public matrix G0 . Since G0 ∈ Fd×n
+                                                        2      has full row rank d, an invertible
+row transformation U ∈ GLd (F2 ) and column permutation put G0 into systematic form:
+                                                             ′
+                               Gs := U G0 = Id P ∈ Fd×n
+                                                   
+                                                         2     ,                             (28)
+                                                                                        d×(mt+1)
+where Id is the d × d identity on the d pivot columns and P ∈ F2           is the non-pivot block
+                     ′                                     (r)     (r) (r)
+on the remaining n − d = mt + 1 columns. We split w = (u , z ) into d pivot weights
+u(r) ∈ Fd2 and mt + 1 non-pivot weights z (r) ∈ Fmt+1
+                                                  2   . In the transformed basis Br ← U Br U ⊤ ,
+the diagonal pullback decomposes as
+
+                     diag(u(r) )
+                                               
+                                       0         Id
+                                                     = diag(u(r) ) + P diag(z (r) )P ⊤ .
+             
+               Id P
+                           0       diag(z (r) )  P⊤
+
+Hence the rank-m target matrix L(r) ∈ Fd×d
+                                       2   takes the exact structural form
+
+  L(r) =        Br + P diag(z (r) )P ⊤                +            diag(u(r) )               ,        rankF2 (L(r) ) = m. (29)
+                |       {z           }                             | {z }
+           controls all off-diagonal entries (i̸=j)       only on the main diagonal (i=j)
+
+
+Because all d pivot unknowns u(r) are trapped on the main diagonal (Figure 2), every off-diagonal
+entry (i ̸= j) of L(r) depends only on the mt + 1 non-pivot weights z (r) . This enables a three-step
+purely F2 -linear lift:
+
+  1. Step 1: Off-Diagonal Kernel Linearization for z (1) . Partition {1, . . . , d} into a row
+     block R of size kR > m (e.g., kR = 30) and its complement J = {1, . . . , d} \ R (|J| = d − kR ).
+                                                    (1)
+     Because R ∩ J = ∅, the kR × |J| submatrix LR,J lies entirely off the main diagonal, where
+     diag(u(1) ) vanishes:
+                                     (1)                               ⊤                         k ×|J|
+                                   LR,J = (B1 )R,J + PR,: diag(z (1) )PJ,: ∈ F2R                          .              (30)
+
+                          (1)
+      When rankF2 (LR,J ) = m, its left kernel has dimension kR − m: any left-kernel vector
+      α ∈ Fk2R satisfies α⊤ (B1 )R,J + (α⊤ PR,: ) diag(z (1) )PJ,:
+                                                               ⊤ = 0. Absorbing z (1) into the auxiliary
+                                                                                 (1)
+      vector y = (α⊤ PR,: ) ⊙ z (1) ∈ Fmt+1
+                                       2    (yh = (α⊤ PR,: )h · zh ) produces the homogeneous linear
+      system                                                                
+                       ⊤                 ⊤ ⊤
+                                                                ⊤
+                                                                          α
+                      α (B1 )R,J + y PJ,: = 0 ⇐⇒ (B1 )R,J PJ,:                  = 0.            (31)
+                                                                             y
+      When the (kR − m)-dimensional space of true pairs (α, y) exhausts the kernel of [(B1 )⊤
+                                                                                            R,J |
+                                                                                       (1)
+      PJ,: ], Gaussian elimination recovers (α, y) and reads off zh = yh from any kernel vector
+      with (α⊤ PR,: )h = 1.
+
+
+
+                                                                 14
+                       n′ = d + mt + 1                                          R (kR )         J (d − kR )         d−m
+                       d           mt + 1
+                                                                                                     (1)
+                                                                       α⊤   ·                     LR,J                    kR > m
+                                                                                                (only z (1) )
+                                                        pullback
+ d = k′ − 1           Id              P                                                                         ·   K⊤
+                                                    Gs diag(w(r) )G⊤
+                                                                   s                              di
+                                                                                 (1)
+                                                                                LJ,R               ag (                   d − kR
+                                                                                                       u  (r
+                                                                                                           ))
+
+       w(r) :      u(r) ∈ Fd2   z (r) ∈ Fmt+1
+                                         2
+                                            ′                                             (1)
+                Gs = U G0 = [ Id | P ] ∈ Fd×n
+                                          2
+                                                              rank(L(r) ) = m : α⊤ LR,J = 0 (Step 1), L(r) K ⊤ = 0 (Step 3)
+
+
+Figure 2: Systematic coordinate decomposition Gs = [Id | P ] and block structure of L(r) =
+Br + P diag(z (r) )P ⊤ + diag(u(r) ) ∈ Fd×d
+                                        2 . Trapping all d pivot weights u
+                                                                                    (r) ∈ Fd on the
+                                                                                           2
+                                                             (1)                                  ⊤
+main diagonal leaves the kR × (d − kR ) off-diagonal block LR,J = (B1 )R,J + PR,: diag(z (1) )PJ,:
+(highlighted) dependent solely on the mt + 1 non-pivot weights z (1) . Step 1 recovers z (1) from
+                     (1)
+the left kernel α⊤ LR,J = 0; Step 2 completes u(1) ; Step 3 recovers w(2) , . . . , w(m) against the
+                                   d×(d−m)
+shared right kernel K ⊤ ∈ F2                    .
+
+
+  2. Step 2: Sliding Off-Diagonal Kernel for Pivot Diagonal u(1) . With z (1) known,
+     Off 1 := B1 + P diag(z (1) )P ⊤ is known and equals L(1) off the diagonal. For each index
+     j ∈ {1, . . . , d}, choosing m rows i1 , . . . , im ̸= j, setting R = {j, i1 , . . . , im }, and finding the
+     1-dimensional left kernel (1, α1 , . . . , αm ) of (Off 1 )R,Rc determines the diagonal entry via
+     column j:
+                                     m
+                               (1)                               (1)    (1)
+                                     X
+                              Lj,j =   αs (Off 1 )is ,j ,      uj = Lj,j + (Off 1 )j,j .                     (32)
+                                          s=1
+
+  3. Step 3: Shared-Kernel Multi-RHS Solve for r = 2, . . . , m. From the completed
+     matrix L(1) , we compute its (d − m) × d right kernel matrix K (L(1) K ⊤ = 0). Because
+     all m matrices L(1) , . . . , L(m) share the same m-dimensional column space, every L(r)
+     (r = 2, . . . , m) annihilates K ⊤ :
+                                                     
+                  L(r) K ⊤ = 0 ⇐⇒ Gs diag(w(r) )G⊤      ⊤
+                                                     s K = Br K
+                                                                 ⊤
+                                                                       (r = 2, . . . , m). (33)
+
+      Because the coefficient operator w 7→ (Gs diag(w)G⊤    ⊤
+                                                        s )K is independent of r, a single matrix
+      factorization over F2 recovers all remaining weight vectors w(2) , . . . , w(m) simultaneously.
+
+Field Alignment, Polynomial Square Root, and O(n) Support Extension. Choosing
+                                       (1)                      (1)     (r)
+an invertible m × m principal block LI,I and forming Ar = (LI,I )−1 LI,I yields an F2 -subalgebra
+isomorphic to F2m [33, 38]; matching an irreducible characteristic polynomial with f (x) aligns
+   (1)         (m)                         p
+                                       zu = zu2 for all u ∈ A. A single harvested weight-(2t + 1)
+(wu , . . . , wu ) with Fq and recoversp
+codeword c ∈ CA then gives ḡ(X) = σS′ (X) by Theorem 1, and Theorem 2(4) extends LA to
+all n − n′ remaining columns via zj = v1,j /v0,j [22] in O(n) field divisions.
+
+4.3    End-to-End Walkthrough on TII-253
+We now trace the complete Route A pipeline from an algebraic and matrix perspective in terms of
+the Goppa parameters (n, m, t, k = n−mt) and shortened parameters (n′ , k ′ = n′ −mt, d = k ′ −1).
+We illustrate every stage on TII-253 ((n, m, t, k) = (214, 8, 9, 142), codimension mt = 72,
+minimum odd weight w = 2t + 1 = 19). As shown in Figure 3(a), rather than solving for the
+secret support directly in the ambient spaces along the bottom row, Route A follows a zigzag
+
+                                                               15
+   (a) Algebraic chain of shortened spaces, quotients, and rank-m lifts
+                 shortened code                        secret quotient                            window key
+                 CA = Γ(LA , g)                        ker(E)/⟨Tpub ⟩                              (LA , ḡ)
+                   0                                                                                           zj
+                                                    ub              [I d                = p
+              ¯=
+                                                                                              u                 =
+              A                   IS              Tp                       |P             z2                        v1
+          p                        D         od                             ]l                                       ,j
+        am                                  m                                   ift   zu                                 /v
+                                                                                                                            0
+      cl                                                                                                                   ,j
+                       eval. E                         mod diag                                      pullback
+  Γ(L, g)                              ker(E)                            ⟨L(1) , . . . , L(m) ⟩                            (L, ḡ)
+
+   (b) Unscrambling Hpub and O(n) support extension outside A
+            mt                     n                          A (n′ )                 Ā (n − n′ )
+
+                                                                                           v0,j
+                                                                                                         v0,j = ḡ(zj )−1 , v1,j = zj ḡ(zj )−1
+                                                                                           v1,j
+ mt         T            ·       Hpub           =          Hraw (LA , ḡ)                                 =⇒ zj = v1,j /v0,j (j ∈ Ā)
+
+
+
+
+Figure 3: Algebraic and matrix overview of Route A for a binary Goppa code of parameters
+(n, m, t, k = n − mt). (a) Horizontal black arrows indicate structural evaluation, diagonal-
+quotient, and pullback maps along the bottom row, while the solid red zigzag path traces the
+algorithmic steps through the shortened and quotient spaces on the top row. (b) Once (LA , ḡ)
+is known on the n′ -column window A, matching Hraw (LA , ḡ) on A determines T ∈ GLmt (F2 )
+and unscrambles T Hpub so that the top two m-bit field slices of every column j ∈ Ā yield
+zj = v1,j /v0,j .
+
+
+path (in red) through shortened and quotient spaces along the top row before lifting back to the
+full private key (L, ḡ).
+
+1. Primal Shortening and Multi-Target ISD (Hpub → CA ). Given the public parity-check
+matrix Hpub ∈ Fmt×n
+                 2 P of a Goppa code Γ(L, g) with codimension mt = n − k, interpolating the
+                                               2 ) directly over the full code of dimension k would
+quadratic identity u<v cu cv F (zu zv ) = F (ḡt−1
+require F (k − 1) = Θ(k ) monomials and O(k 6 ) dense linear algebra. Instead, we partition
+                        2
+
+the n columns into an active window A of width n′ = mt + k ′ and a clamped complement
+Ā of width n − n′ (Figure 1, left). Clamping cĀ = 0 projects the search onto the shortened
+                                        ′
+code CA = ker(HA ) = Γ(LA , g) ⊂ Fn2  of dimension k ′ = n′ − mt ≪ k, preserving g(X) while
+                                    mt
+leaving the per-check ISD yield w−p 2−mt unchanged by Proposition 1. In each ISD round,
+                                                          ′
+reducing HA π to [Imt | Q] (Q ∈ Fmt×k
+                                   2     , Figure 1, right) collides non-pivot vectors of weight
+p = p1 + p2 against pivot syndromes of weight w − p to harvest W ≥ Wreq (n′ , m, t) codewords of
+minimum odd weight w = 2t + 1. On TII-253 (n = 214, m = 8, t = 9, mt = 72, k = 142, w = 19):
+shortening to n′ = 187 (n − n′ = 27 clamped columns) reduces the code dimension from k = 142
+to k ′ = 115 (d = k ′ − 1 = 114), compressing the quadratic monomial count by 1.53× from
+F (141) = 10,012 to F (114) = 6,556 (and up to 2.54× across the (8, 9) family at n = 255), and
+Mode 3 ISD (p = 3 on Q ∈ F72×115
+                              2    ) harvests W = 6,643 ≥ Wreq = 6,547 weight-19 codewords
+across 64 physical Xeon cores in 0.43 s.
+
+2. Affine Hyperplane and Public Polarization Quotient (CA → ⟨B1 , . . . , Bm ⟩). Because
+every harvested codeword has odd weight w = 2t + 1, it lies on the affine hyperplane ℓ · x = 1
+      ′
+in Fk2 , parameterized by d = k ′ − 1 = n′ − mt − 1 coordinates y ∈ Fd2 via c(y) = c0 + y ⊤ G0
+            ′
+(G0 ∈ Fd×n    , Figure 3(a)). Evaluating the F (d) = 1 + d + d2 quadratic monomials in y across
+                                                               
+         2
+                                                                                                    W ×F (d)
+W harvested codewords produces the evaluation matrix E ∈ F2          . By Theorem 2, when
+t ̸= 5 the right kernel ker(E) has dimension m + 1, spanned
+                                                         by the m secret bit-slice relations
+and the public combinatorial relation u<v cu cv = 2t+1
+                                       P
+                                                      2  ≡ t (mod 2). Quotienting ker(E) by
+
+
+                                                                   16
+its public polarization Tpub = G0 (Jn′ + In′ )G⊤    0 isolates an m-dimensional space of symmetric
+off-diagonal bilinear forms ⟨B1 , . . . , Bm ⟩ ⊂ F2 . On TII-253: eliminating E ∈ F6643×6556
+                                                  d×d
+                                                                                     2        yields
+an (m + 1) = 9-dimensional kernel, and quotienting out Tpub ∈ F114×114  2       leaves m  = 8  basis
+matrices B1 , . . . , B8 ∈ F114×114
+                            2       .
+
+3. Systematic Coordinates and Off-Diagonal Linear Lift (⟨Br ⟩ → LA ). Each basis
+matrix Br differs from a rank-m multiplication pullback L(r) = G0 M              fFr G⊤ by an unknown
+                                                                                        0
+diagonal correction G0 diag(w(r) )G⊤       , where (w (r) ) = F (z 2 ) (u ∈ A). Transforming G ∈ Fd×n′
+                                         0                 u    r u                                0    2
+                                                             d×(mt+1)
+into systematic form Gs = U G0 = [Id | P ] (P ∈ F2                     , Figure 2, left) partitions w(r) =
+(u(r) , z (r) ) into d pivot weights u(r) ∈ Fd2 and mt + 1 non-pivot weights z (r) ∈ Fmt+12     , yielding
+
+             L(r) = Br + P diag(z (r) )P ⊤ + diag(u(r) ) ∈ Fd×d
+                                                            2 ,          rankF2 (L(r) ) = m.
+As depicted in Figure 2 (right), diag(u(r) ) is trapped on the main diagonal, so for any partition
+{1, . . . , d} = R ⊔ J with |R| = kR > m and |J| = d − kR , the kR × (d − kR ) off-diagonal block
+ (1)                                ⊤ depends solely on z (1) . Its (k − m)-dimensional left kernel
+LR,J = (B1 )R,J + PR,: diag(z (1) )PJ,:                               R
+      (1)
+α⊤ LR,J = 0 linearizes into [(B1 )⊤                                                 (1)
+                                       R,J | PJ,: ](α; y) = 0 (Step 1, recovering z ), after which sliding
+(m + 1)-row off-diagonal kernels determine u(1) (Step 2) and the (d − m)-dimensional right kernel
+K ⊤ of L(1) solves L(r) K ⊤ = 0 for all r = 2, . . . , m simultaneously (Step 3). Aligning p    the m × m
+commuting algebra with Fq = F2 [x]/(f (x)) and taking square roots recovers zu = zu2 for all
+u ∈ A. On TII-253: with Gs = [I114 | P ] (P ∈ F114×73      2     ) and kR = 30, Step 1 solves the 30 × 84
+                          (1)
+off-diagonal block LR,J to recover the mt + 1 = 73 non-pivot weights z (1) ∈ F73        2 , Step 2 recovers
+the d = 114 pivot weights u ∈ F2 , and Step 3 solves against K ∈ F114×106
+                                   (1)      114                                   ⊤
+                                                                                        2        to recover
+w(2) , . . . , w(8) ∈ F187
+                       2    and hence  LA  ∈ F 187 .
+                                               28
+
+
+4. Locator Square Root and Unscrambled Support Extension (LA → (L, ḡ)). From a
+single harvested codeword c ∈ CA p   with support S ⊂ A (|S| = 2t + 1), Theorem 1 recovers the
+monic Goppa polynomial ḡ(X) = σS′ (X) in Fq [X]. Finally, choosing an invertible mt-column
+block P0 ⊂ A and computing T = Hraw (LA , ḡ):,P0 (HA )−1    :,P0 ∈ GLmt (F2 ) unscrambles the full
+public parity-check matrix H = T Hpub = Hraw (L, ḡ) ∈ Fmt×n
+                               e
+                                                                  2     (Figure 3(b)). Reading the
+first two m-bit field slices v0,j = 1/ḡ(zj ) and v1,j = zj /ḡ(zj ) of each external column j ∈ Ā
+immediately recovers the remaining n − n′ support elements via zj = v1,j /v0,j [22]. On TII-253:
+inverting a 72 × 72 block P0 ⊂ A unscrambles H     e ∈ F72×214 , and n − n′ = 27 field divisions in
+                                                         2
+F28 recover the remaining 27 support coordinates, completing algebraic recovery and RREF
+verification in 1.37 s (1.80 s total wall time, 0.032 ch, 242 MB RAM).
+
+4.4     Complementary Route B on High-Rate Instances
+For the single high-rate parameter family m = 10, t = 11, mt = 110, n ∈ [1008, 1020] (k ∈
+[898, 910], rate R ≈ 0.891 > 1 − 2/t), primal shortening in Route A would require a window n′ ≈
+443 (w = 23). Instead, the dual code admits a clean degree-3 (pHOV = 3) higher-order vanishing
+(HOV) kernel at dual shortening s∗ = 36 (κ = mt − s∗ = 74, ρ = mp2HOV = 90) [19, 18, 33].
+For these five challenges (TII-172, 187, 240, 246, 252), we deploy an optimized HOVER
+engine (Route B; Appendix A): combining Frobenius rank invariance [33] with the known span
+dimension ρ = 90 replaces the 10-matrix catalecticant rank sum over F210 by a single rank
+check rank Cat(h0 ) = 9, incremental commutator intersection stabilizes the algebra Eβ from
+1–2 right-kernel blocks instead of all 650 blocks, and Segre–Veronese fiber extraction on 450
+truncated coordinates is completed via closed-form support extension (25). Route B solves
+all five (10, 11) instances in 89.10–90.10 s on 1 physical CPU core (0.025 ch), achieving two
+first-blood recoveries (TII-172, 187) and a 4.17× wall-time / 50.0× core-hour speedup over
+the 12-core reference HOVER solver on TII-252 [33].
+
+                                                    17
+5     Feasibility Boundary and Experimental Verification
+5.1   Parameter Regimes and the Classic McEliece Boundary
+Across the 170 official Track-2 challenges with λTII ≥ 83, the word-supply model in Proposition 1
+partitions the catalog into three regimes:
+ 1. Solved Regime (94 Instances: 89 via Route A, 5 via Route B): Whenever n ≥
+    n′min (m, t) and mt ≤ 126, the code supplies enough weight-(2t + 1) codewords to determine
+    the F (d) quadratic features, and our framework recovers the private key (L, g).
+ 2. Information-Theoretically Underdetermined Regime (60 Challenges with n <
+    n′min ): In 60 challenges with short lengths n relative to mt (e.g., TII-201 with m = 8, t =
+    20, n = 253, k = 93, where Wreq = 4,270 evaluation rows are required on d = 92 coordinates
+    but the full code has only 25341 2
+                                      −160 ≈ 0.224 expected weight-41 codewords), the full code
+
+    does not contain enough minimum-weight codewords to determine the quadratic system
+    regardless of available compute.
+ 3. Compute-Limited Regime (16 Challenges with mt ∈ [120, 189]) and Classic
+    McEliece: In the remaining 16 challenges with n ≥ n′min and large mt ∈ [120, 189]
+    (w ∈ [25, 43]), the codeword supply exists in principle, but the per-iteration ISD yield (20)
+                 ′  mt 
+    scales as kp w−p      2−mt , requiring 104 –108 + core-hours. For Classic McEliece standard
+    parameters (m ∈ {12, 13}, t ≥ 64, mt ≥ 768, w ≥ 129, n ∈ [3488, 8192]), Route A is
+    doubly infeasible: for mceliece348864 (m = 12, t = 64, mt = 768, w = 129) at       the algebraic
+    threshold n′min = 793, the expected count of weight-129 codewords is 793
+                                                                                     −768
+                                                                                 129 2      < 2−264
+    (and < 2−20 even at full length n for all m = 13 Classic McEliece parameter sets), while at
+    full length n = 3488 (log2 3488129 − 768 ≈ 23.47), multi-target ISD for a weight-129 codeword
+    exceeds 2240 operations [8, 3] (and even single-target weight-64 syndrome decoding requires
+    2150.6 bit operations in CryptAttackTester [5]).
+
+5.2   Verification and Compute Accounting on 94 Challenges
+We evaluated Route A and Route B across the official TII McEliece Track-2 catalog and verified
+all 94 recovered keys:
+ • Official SageMath Verification (94/94 Verified): Every recovered key is formatted
+   in TII’s official two-line (g, L) representation and passes a complete rerun of TII’s official
+   SageMath verification script under SageMath 10.9 against the official public-key files (94/94
+   verified), with monic Fq -irreducible g(X) of degree t across all 94 keys.
+ • Physical Core-Hour Accounting: We count allocated physical CPU cores (excluding
+   hyperthreads) multiplied by end-to-end wall-clock runtime across both ISD sampling and
+   algebraic lifting. Under this metric, the 92 single-node challenges consume 177.82 physical
+   core-hours combined (87 via Route A on a 64-physical-core Dual Intel Xeon Gold 6338
+   server, and 5 via Route B on 1 physical core), while the two pure-CPU cluster challenges
+   TII-228 (500, 9, 14, mt = 126) and TII-250 (1010, 10, 12, mt = 120) consume 2,463.3 and
+   66,722.1 physical core-hours (57.1 min and 9.20 h wall time). Table 4 summarizes all 94
+   solved challenges by parameter family.
+
+
+A     Frobenius-Reduced HOVER (Route B)
+This appendix details the mathematical formulation, algorithmic optimizations, and per-instance
+experimental results of Route B on all five official TII Track-2 challenges in the high-rate family
+m = 10, t = 11, mt = 110, n ∈ [1008, 1020] (TII-172, 187, 240, 246, 252).
+
+                                                18
+Table 4: Summary of all 94 solved TII Track-2 key-recovery challenges grouped by Goppa
+parameter family (m, t).
+Family Route Solved             Window          Med. Time Med. Compute Total Compute       RAM     Challenge IDs
+ (7, 5)   A (35)     3 (0)     n′ = 120–122       10.9 s     0.194 ch          3.72 ch     237 MB 86, 90, 94
+ (7, 7)   A (49)     6 (6)       n′ = 112         0.39 s     0.007 ch          0.04 ch     231 MB 95, 103, 107, 111,
+                                                                                                   127, 133
+ (7, 8)   A (56)     4 (4)     n′ = 120–124       3.53 s     0.063 ch          0.24 ch     233 MB 87, 97, 102, 114
+ (7, 9)   A (63)     1 (1)       n′ = 127         1.76 s     0.031 ch          0.03 ch     228 MB 88
+ (8, 5)   A (40)     2 (0)       n′ = 143         1.53 s     0.027 ch          0.05 ch     286 MB 83, 89
+ (8, 6)   A (48)     2 (0)       n′ = 152         0.96 s     0.017 ch          0.03 ch     340 MB 84, 91
+ (8, 7)   A (56)     7 (0)       n′ = 163         1.06 s     0.019 ch          0.12 ch     340 MB 92, 110, 160, 171,
+                                                                                                   178, 212, 220
+ (8, 8)   A (64)    10 (7)       n′ = 175         1.32 s     0.023 ch          0.24 ch     340 MB 85, 93, 100, 112,
+                                                                                                   118, 123, 179, 186,
+                                                                                                   233, 238
+ (8, 9)   A (72)     7 (6)       n′ = 187         1.38 s     0.024 ch          0.18 ch     252 MB 101, 120, 126, 146,
+                                                                                                   216, 222, 253
+(8, 10)   A (80)    10 (10)      n′ = 199         2.02 s     0.036 ch          0.36 ch     255 MB 109, 122, 128, 139,
+                                                                                                   144, 149, 221, 224,
+                                                                                                   227, 230
+(8, 11)   A (88)     4 (4)       n′ = 212         3.75 s     0.067 ch         0.29 ch      259 MB 130, 152, 157, 206
+(8, 12)   A (96)     3 (2)     n′ = 223–224       28.8 s     0.511 ch         1.22 ch      313 MB 183, 203, 254
+(8, 13)   A (104)    1 (1)       n′ = 233         332 s      5.90 ch          5.90 ch      254 MB 232
+(8, 14)   A (112)    3 (3)     n′ = 246–250       82.7 s      1.47 ch         10.77 ch     263 MB 132, 165, 190
+ (9, 7)   A (63)     6 (0)       n′ = 237         5.50 s     0.098 ch         0.60 ch      340 MB 119, 125, 166, 210,
+                                                                                                   244, 248
+ (9, 8)   A (72)     6 (0)       n′ = 253         11.4 s     0.203 ch          1.21 ch     340 MB 96, 105, 113, 134,
+                                                                                                   164, 200
+  (9, 9) A (81)      4 (0)       n′ = 269         39.8 s     0.708 ch          2.85 ch     339 MB 129, 189, 209, 223
+ (9, 10) A (90)      4 (3)       n′ = 286          113 s      2.02 ch           8.73 ch    351 MB 138, 158, 208, 213
+ (9, 11) A (99)      1 (1)       n′ = 303          408 s      7.25 ch           7.25 ch    373 MB 147
+ (9, 12) A (108)     3 (3)       n′ = 326         2509 s     44.61 ch         133.84 ch    427 MB 182, 188, 245
+ (9, 14) A (126)     1 (1)       n′ = 361        57.1 min    2,463 ch          2,463 ch    468 MB 228
+(10, 11) B (110)     5 (2)    s∗ = 36, κ = 74     89.9 s     0.025 ch           0.12 ch    1.49 GB 172, 187, 240, 246,
+                                                                                                   252
+(10, 12) A (120)     1 (1)       n′ = 467         9.20 h     66,722 ch        66,722 ch    1.28 GB 250
+ Total    A+B       94 (55)         —              —            —            69,363.3 ch     —     92 single-node:
+                                                                                                   177.82 ch
+
+Notes: For each family (m, t), ‘Route’ lists the engine and codimension mt; ‘Solved’ lists total (and first-blood)
+solutions; ‘Window’ gives n′ (Route A) or dual shortening s∗ (Route B); compute is in physical CPU core-hours
+(ch).
+
+
+A.1       Shortened-Dual Degree-3 HOV Formulation
+In the length-n dual code Γ(L, g)⊥ ⊂ Fn2 (spanned by the mt = 110 rows of Hpub ), shortening at
+s∗ = 36 coordinates produces a shortened dual code Dshort of dimension κ = mt − s∗ = 74 and
+length n − s∗ ∈ [972, 984]. Because the rows of Hraw (L, g) are vertical F2 -bit slices of rational
+evaluations zji /g(zj ) over F210 , requiring square-free cubic (pHOV = 3) forms in Λ3 (Fκ2 ) (of
+dimension κ3 = 74
+                     
+                    3 = 64,824) to vanish together with all first partial derivatives on codewords
+of Dshort leaves a clean 10-dimensional higher-order vanishing kernel [19, 18, 33]:
+
+                             KHOV = V3 (Dshort ) ⊂ Λ3 (Fκ2 ),            dimF2 KHOV = m = 10.                        (34)
+
+Each cubic form h ∈ KHOV defines, via its partial    derivatives (its first catalecticant), a linear
+               κ     2      κ                      κ
+map Cat(h) : F2 → Λ (F2 ) represented by a 2 × κ = 2,701 × 74 matrix. Stacked horizontally
+across an F2 -basis f1 , . . . , fm of KHOV , their catalecticants span a row space of dimension
+ρ = mp2HOV = 10 × 9 = 90, yielding a row-compressed stacked catalecticant T ∈ Fρ×κm  2    = F90×740
+                                                                                              2      .
+   Saarinen [33] showed that the hidden extension field F2m acts on KHOV as an m-dimensional
+commutative endomorphism algebra Eβ ⊂ Fm×m      2    whose induced operator (Iκ ⊗ B) stabilizes the
+nz = κm − ρ = 740 − 90 = 650-dimensional right kernel ker(T ) ⊂ Fκm     2 . However, the reference
+HOVER implementation [33] incurs three computational bottlenecks:
+
+
+                                                             19
+  1. Full Commutator Stacking: To recover Eβ , it stacks all nz = 650 right-kernel invariance
+     blocks T (Iκ ⊗ B)z = 0 of size 90 × 100 (58,500 rows) before solving;
+
+  2. All-m Catalecticant Rank Evaluations Over F210 : Although Frobenius transport
+     equates catalecticant ranks across a Galois orbit [33], the P
+                                                                 reference selector evaluates all
+                                                                    m−1
+     m = 10 catalecticant matrices Cat(hr ) ∈ F2701×74
+                                               210     to check     r=0 rank Cat(hr ) = ρ = 90;
+
+  3. Full-Length Segre–Veronese Fiber Extraction: Following single-direction selection, it
+     computes Segre–Veronese tangent spaces and quadratic fibers across all n − s∗ ≈ 972–984
+     dual-unshortened coordinates.
+
+A.2     Single-Direction Rank Reduction and Incremental Extraction
+Route B eliminates these three bottlenecks via Proposition 3:
+
+Proposition 3 (Single-Direction Selector Reduction and Incremental Eβ Recovery). Let
+h0 , h1 , . . . , hm−1 ∈ KHOV ⊗F2 F2m be the m eigenlines of a primitive generator B ∈ Eβ , or-
+                                                                                     m−1
+dered so that their eigenvalues form the Frobenius conjugate orbit λ, λ2 , . . . , λ2    ∈ F2m .
+
+  1. Single-Matrix Catalecticant Selector: Because the basis f1 , . . . , fm of KHOV is defined
+     over F2 , Frobenius transport [33] maps each eigenline hr to hr+1 up to a nonzero scalar
+     µr ∈ F×
+           2m :
+
+        hr+1 = µr h[2]
+                     r   =⇒ Cat(hr+1 ) = µr Cat(hr )[2] =⇒ rank Cat(hr+1 ) = rank Cat(hr ).
+                                                                                           (35)
+      Combining (35) with the already-computed
+                                         Pm−1      row-space  dimension  ρ = 90 reduces the m-
+      matrix HOVER selector condition r=0 rank Cat(hr ) = ρ to the single-matrix rank test
+      m · rank Cat(h0 ) = ρ (i.e., rank Cat(h0 ) = p2HOV = 9), eliminating m − 1 = 9 of the 10
+      catalecticant constructions and Gaussian eliminations over F210 .
+
+  2. Rank-Checked Incremental Stabilization of Eβ : In the clean kernel regime, the true
+     m-dimensional algebra Eβ lies in the intersection of invariance constraints T (Iκ ⊗ B)zb = 0
+     for every prefix of right-kernel vectors z1 , . . . , zb ∈ ker(T ). Intersecting blocks incrementally
+     drops the candidate subspace to the target dimension dimF2 Eβ = m = 10 after 1 or 2 blocks
+     across all five (10, 11) instances, cutting Stage 2 runtime to 0.18 s.
+
+  3. Truncated 450-Coordinate Fiber Labeling and Extension: Restricting single-direction
+     Segre–Veronese fiber extraction [33] to 450 coordinates, verifying multiplier dimensions and
+     mt = 110 independent compatible columns P0 , recovering ḡ(X) and T ∈ GL110 (F2 ), and
+     applying closed-form ratio extension [22, 33] (zj = v1,j /v0,j , Theorem 2(4)) recovers all
+     remaining coordinates in O(n) field divisions.
+                                                                                     (r)             (r)
+Proof. Write the F2 -basis of KHOV as f1 , . . . , fm and let v (r) = (v1 , . . . , vm )⊤ ∈ Fm 2m be the
+                      ⊤
+                                                  Pm (r)                          m×m
+r-th eigenvector of B over F2m defining hr = i=1 vi fi . Because B ∈ F2                 has entries in F2
+                                                                                             r
+(B [2] = B), applying the Frobenius automorphism x 7→ x2 entrywise to B ⊤ v (r) = λ2 v (r) yields
+                                                            r                      r+1
+                     B ⊤ (v (r) )[2] = (B ⊤ v (r) )[2] = (λ2 )2 (v (r) )[2] = λ2         (v (r) )[2] .
+                                          r
+Since the m Frobenius conjugates λ2 of a degree-m primitive element are pairwise distinct, each
+eigenspace is 1-dimensional, so v (r+1) = µr (v (r) )[2] for some µr ∈ F×
+                                                                        2m . Because the catalecticant
+                                                            [2]
+polarization map is F2 -linear, Cat(hr+1 ) = µr Cat(hr ) . Since field automorphisms and nonzero
+scalar multiplication preserve matrix rank, rank Cat(hr+1 ) = rank Cat(hr ), establishing (35).
+Parts 2 and 3 rely on explicit dimension and compatibility verification at runtime before accepting
+the extended key.
+
+
+                                                       20
+A.3       Per-Instance Experimental Results
+Table 5 reports the per-instance experimental results for all five (m, t) = (10, 11) challenges solved
+by Route B on 1 physical CPU core. On TII-252 (90.03 s total), the runtime comprises 58.2 s
+for Stage 1 (bit-sliced degree-3 HOV kernel KHOV ), 0.18 s for Stage 2 (1–2 block incremental Eβ
+stabilization), 1.85 s for Stage 3 (single-direction Frobenius rank test rank Cat(h0 ) = 9), and
+29.8 s for Stages 4–5 (450-coordinate fiber extraction and O(n) support extension).
+
+
+Table 5: Per-instance key-recovery performance of Route B on all five (m, t) = (10, 11) TII
+Track-2 challenges.
+ID    Parameters            Prior Time    Prior Compute        Our Time Our Compute   RAM       Speedup / Status
+
+172   (1020, 10, 11, 910)     No prior published solution       89.85 s   0.025 ch    1.51 GB   First-Blood
+187   (1018, 10, 11, 908)     No prior published solution       90.10 s   0.025 ch    1.50 GB   First-Blood
+240   (1010, 10, 11, 900)    186 s [33]  0.620 ch (12 cores)    89.10 s   0.025 ch    1.49 GB   2.09× time / 24.8× ch
+246   (1009, 10, 11, 899)    191 s [33]  0.637 ch (12 cores)    89.13 s   0.025 ch    1.48 GB   2.14× time / 25.5× ch
+252   (1008, 10, 11, 898)    375 s [33]  1.250 ch (12 cores)    90.03 s   0.025 ch    1.45 GB   4.17× time / 50.0× ch
+
+Notes: All five instances use dual shortening s∗ = 36 (κ = 74, ρ = 90) on 1 physical CPU core (ch = physical
+core-hours).
+
+
+
+Use of AI. The cryptanalytic results and artifacts were initially developed through an
+autonomous agent system powered by a MiniMax internal model. We validated the key technical
+claims and refined the presentation of the manuscript.
+
+
+References
+ [1] M. Bardet, M. Bros, D. Cabarcas, P. Gaborit, R. Perlner, D. Smith-Tone, J.-P. Tillich, and
+     J. Verbel, “Improvements of algebraic attacks for solving the rank decoding and MinRank
+     problems,” in Advances in Cryptology – ASIACRYPT 2020, Part I, Lecture Notes in
+     Computer Science, vol. 12491, pp. 507–536, Springer, 2020.
+
+ [2] M. Bardet, A. Lemoine, and J.-P. Tillich, “An attack on the CFS scheme and on TII
+     McEliece challenges,” in Advances in Cryptology – CRYPTO 2026, Part IV, Lecture Notes
+     in Computer Science, vol. 16803, pp. 380–412, Springer, 2026. Full version: IACR Cryptology
+     ePrint Archive, Report 2026/430, https://eprint.iacr.org/2026/430.
+
+ [3] A. Becker, A. Joux, A. May, and A. Meurer, “Decoding random binary linear codes in
+     2n/20 : How 1 + 1 = 0 improves information set decoding,” in Advances in Cryptology –
+     EUROCRYPT 2012, Lecture Notes in Computer Science, vol. 7237, pp. 520–536, Springer,
+     2012.
+
+ [4] E. Berlekamp, R. McEliece, and H. van Tilborg, “On the inherent intractability of certain
+     coding problems,” IEEE Transactions on Information Theory, vol. 24, no. 3, pp. 384–386,
+     1978.
+
+ [5] D. J. Bernstein and T. Chou, “CryptAttackTester: High-assurance attack analysis,” in
+     Advances in Cryptology – CRYPTO 2024, Part VI, Lecture Notes in Computer Science,
+     vol. 14925, pp. 141–182, Springer, 2024.
+
+ [6] D. J. Bernstein, T. Lange, and C. Peters, “Smaller decoding exponents: ball-collision
+     decoding,” in Advances in Cryptology – CRYPTO 2011, Lecture Notes in Computer Science,
+     vol. 6841, pp. 743–760, Springer, 2011.
+
+
+
+                                                               21
+ [7] P. Briaud, A. Lemoine, H. Randriambololona, and J.-P. Tillich, “A Heuristic Subexponential
+     Attack on the McEliece Cryptosystem,” IACR Cryptology ePrint Archive, Report 2026/1232,
+     2026 (to appear in ASIACRYPT 2026 ). https://eprint.iacr.org/2026/1232.
+
+ [8] A. Canteaut and F. Chabaud, “A new algorithm for finding minimum-weight words in a
+     linear code: Application to McEliece’s cryptosystem and to narrow-sense BCH codes of
+     length 511,” IEEE Transactions on Information Theory, vol. 44, no. 1, pp. 367–378, 1998.
+
+ [9] K. Carrier, T. Debris-Alazard, C. Meyer-Hilfiger, and J.-P. Tillich, “Reduction from sparse
+     LPN to LPN, Dual Attack 3.0,” in Advances in Cryptology – EUROCRYPT 2024, Part VII,
+     Lecture Notes in Computer Science, vol. 14657, pp. 286–315, Springer, 2024.
+
+[10] A. Couvreur, P. Gaborit, V. Gauthier-Umaña, A. Otmani, and J.-P. Tillich, “Distinguisher-
+     based attacks on public-key cryptosystems using Reed–Solomon codes,” Designs, Codes
+     and Cryptography, vol. 73, no. 2, pp. 641–666, 2014.
+
+[11] A. Couvreur, R. Mora, and J.-P. Tillich, “A new approach based on quadratic forms
+     to attack the McEliece cryptosystem,” in Advances in Cryptology – ASIACRYPT 2023,
+     Part IV, Lecture Notes in Computer Science, vol. 14441, pp. 3–38, Springer, 2023.
+
+[12] M. Cueto Noval, S.-P. Merz, P. Stählin, and A. Ünal, “On the soundness of algebraic attacks
+     against code-based assumptions,” in Advances in Cryptology – EUROCRYPT 2025, Part VI,
+     Lecture Notes in Computer Science, vol. 15606, pp. 385–415, Springer, 2025.
+
+[13] L. Ducas, A. Esser, S. Etinski, and E. Kirshanova, “Asymptotics and improvements of
+     sieving for codes,” in Advances in Cryptology – EUROCRYPT 2024, Part VII, Lecture
+     Notes in Computer Science, vol. 14657, pp. 151–180, Springer, 2024.
+
+[14] I. Dumer, “On minimum distance decoding of linear codes,” in Proc. 5th Joint Soviet–Swedish
+     Int. Workshop on Information Theory, pp. 50–52, 1991.
+
+[15] J.-C. Faugère, V. Gauthier-Umaña, A. Otmani, L. Perret, and J.-P. Tillich, “A distinguisher
+     for high-rate McEliece cryptosystems,” IEEE Transactions on Information Theory, vol. 59,
+     no. 10, pp. 6830–6844, 2013.
+
+[16] M. Finiasz, “Words of minimal weight and weight distribution of binary Goppa codes,”
+     in Proc. 2003 IEEE International Symposium on Information Theory (ISIT 2003), p. 70,
+     IEEE, 2003.
+
+[17] A. Ghoshal, Y. Ishai, A. Jain, and N. Sun, “Quasipolynomial Cryptanalysis of the McEliece
+     Cryptosystem (or: PIR Meets McEliece),” IACR Cryptology ePrint Archive, Report
+     2026/1630, 2026. https://eprint.iacr.org/2026/1630.
+
+[18] T. Hemmert, “Key recovery for the McEliece cryptosystem using higher-order vanishing,”
+     IACR Cryptology ePrint Archive, Report 2026/1339, 2026. https://eprint.iacr.org/
+     2026/1339.
+
+[19] T. Hemmert and A. Wiemers, “Distinguishing Goppa codes using higher-order vanishing,”
+     in Advances in Cryptology – CRYPTO 2026, Part IV, Lecture Notes in Computer Science,
+     vol. 16803, pp. 191–223, Springer, 2026.
+
+[20] A. Kipnis and A. Shamir, “Cryptanalysis of the HFE public key cryptosystem by relin-
+     earization,” in Advances in Cryptology – CRYPTO ’99, Lecture Notes in Computer Science,
+     vol. 1666, pp. 19–30, Springer, 1999.
+
+
+
+
+                                               22
+[21] E. Kirshanova and A. Esser, “TII McEliece Challenges: Scripts and Instances,” Technology
+     Innovation Institute (TII), 2023. Challenge portal: https://crowdchallenge.tii.ae/
+     mceliece-challenges/; data repository: https://github.com/ElenaKirshanova/tii_
+     decoding_challenge.
+
+[22] E. Kirshanova and A. May, “Breaking Goppa-based McEliece with hints,” Information and
+     Computation, vol. 293, art. 105045, 2023.
+
+[23] P. J. Lee and E. F. Brickell, “An observation on the security of McEliece’s public-key
+     cryptosystem,” in Advances in Cryptology – EUROCRYPT ’88, Lecture Notes in Computer
+     Science, vol. 330, pp. 275–280, Springer, 1988.
+
+[24] J. S. Leon, “A probabilistic algorithm for computing minimum weights of large error-
+     correcting codes,” IEEE Transactions on Information Theory, vol. 34, no. 5, pp. 1354–1359,
+     1988.
+
+[25] F. J. MacWilliams and N. J. A. Sloane, The Theory of Error-Correcting Codes, North-
+     Holland, Amsterdam, 1977, ch. 12.
+
+[26] A. May, A. Meurer, and E. Thomae, “Decoding random linear codes in Õ(20.054n ),” in
+     Advances in Cryptology – ASIACRYPT 2011, Lecture Notes in Computer Science, vol. 7073,
+     pp. 107–124, Springer, 2011.
+
+[27] A. May and I. Ozerov, “On computing nearest neighbors with applications to decoding
+     of binary linear codes,” in Advances in Cryptology – EUROCRYPT 2015, Part I, Lecture
+     Notes in Computer Science, vol. 9056, pp. 203–228, Springer, 2015.
+
+[28] R. J. McEliece, “A public-key cryptosystem based on algebraic coding theory,” DSN Progress
+     Report, vol. 42-44, pp. 114–116, Jet Propulsion Laboratory, 1978.
+
+[29] H. Niederreiter, “Knapsack-type cryptosystems and algebraic coding theory,” Problems of
+     Control and Information Theory, vol. 15, no. 2, pp. 159–166, 1986.
+
+[30] L. Panny, “On breaking McEliece keys using brute force,” in Post-Quantum Cryptography
+    – PQCrypto 2026, Part II, Lecture Notes in Computer Science, vol. 16492, pp. 275–308,
+     Springer, 2026. Full version: IACR Cryptology ePrint Archive, Report 2025/632, https:
+     //eprint.iacr.org/2025/632.
+
+[31] N. J. Patterson, “The algebraic decoding of Goppa codes,” IEEE Transactions on Informa-
+     tion Theory, vol. 21, no. 2, pp. 203–207, 1975.
+
+[32] H. Randriambololona, “The syzygy distinguisher,” in Advances in Cryptology – EURO-
+     CRYPT 2025, Part VI, Lecture Notes in Computer Science, vol. 15606, pp. 324–354, Springer,
+     2025.
+
+[33] M.-J. O. Saarinen, “HOVER: Higher-Order Vanishing Endomorphism Recovery,” IACR
+     Cryptology ePrint Archive, Report 2026/1778, 2026 (to appear in NordSec 2026 ). https:
+     //eprint.iacr.org/2026/1778.
+
+[34] M.-J. O. Saarinen, “Two-Anchor Holdout/Hermite: Solving the TII-254 McEliece Key
+     Recovery Challenge,” IACR Cryptology ePrint Archive, Report 2026/1986, 2026. https:
+     //eprint.iacr.org/2026/1986.
+
+[35] M.-J. O. Saarinen, tii-solved — recovered keys for previously unsolved TII McEliece
+     challenges, accompanying artifact repository, Results table, accessed November 6, 2026.
+     https://github.com/mjosaarinen/tii-solved.
+
+
+                                              23
+[36] N. Sendrier, “Decoding one out of many,” in Post-Quantum Cryptography – PQCrypto
+     2011, Lecture Notes in Computer Science, vol. 7071, pp. 51–67, Springer, 2011.
+
+[37] J. Stern, “A method for finding codewords of small weight,” in Coding Theory and Applica-
+     tions, Lecture Notes in Computer Science, vol. 388, pp. 106–113, Springer, 1989.
+
+[38] K. Vedenev, “Extending Distinguishing to Key Recovery for Subfield Subcodes of GRS
+     codes,” IACR Cryptology ePrint Archive, Report 2026/1747, 2026. https://eprint.iacr.
+     org/2026/1747.
+
+[39] S. A. Weis, “Improving GIJS Key Recovery for Classic McEliece,” IACR Cryptology ePrint
+     Archive, Report 2026/1984, 2026. https://eprint.iacr.org/2026/1984.
+
+
+
+
+                                             24
+
