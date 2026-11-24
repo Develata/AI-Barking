@@ -73,13 +73,6 @@
 
 | 期次 | 标签 | 事实 |
 |---|---|---|
-| 1120 | 数学 | Anthropic 员工等称借 AI 证出 NS 方程无外力也爆破，证书未公开 |
-| 1120 | 开源 | Inkling 2 Mini：官方称部分测试领先总参数100B 以下开放模型 |
-| 1120 | 谷歌 | 据 Mother Jones 报道，数百名谷歌员工请愿让学校能关掉搜索里的 AI |
-| 1120 | ChatGPT | OpenAI：ChatGPT Space 逐步向18岁以上 Plus 用户开放 |
-| 1120 | METR | METR：其评测中 AI 有一半把握完成的任务，按人类用时约3.6个月翻倍 |
-| 1120 | 开源 | Inkling 2 Mini 以 Apache 2.0 开源，总参数26.4B |
-| 1120 | 模型 | Inkling 2 Mini 以 Apache 2.0 许可开放权重 |
 | 1121 | Anthropic | Anthropic IPO 交割：含超额配售共11.27亿股，每股83美元 |
 | 1121 | OpenAI | OpenAI 自家药化基准：GPT-6.2-Astra xhigh 得84.5% |
 | 1121 | 腾讯 | 腾讯 Hy4 开放权重；年营收超5000万美元的模型托管商对外服务须另获许可 |
@@ -90,6 +83,13 @@
 | 1122 | Claude | 11月23日17:39至17:56，多款 Claude 模型报错率升高 |
 | 1122 | ChatGPT | 付费版 ChatGPT 的 GPT-6 对话间歇报错，24日0:38宣布恢复 |
 | 1122 | P vs NP | AI 智能体集体攻 P vs NP：网站称0时已查738个引理，结论未定 |
+| 1123 | 安全 | OpenAI、思科开源 Shirudo：Linux 上自测不重启拦下攻击，预发布 |
+| 1123 | Claude | Claude 插件页：卸载带连接器的插件不会断开连接器，须另行断开 |
+| 1123 | 代码审查 | Anthropic：Claude Ship 代码审查正式可用，另两个代理为测试版 |
+| 1123 | 就业 | Anthropic 访谈58家美国客户（非随机）：2/3自报因 AI 少招人 |
+| 1123 | 安全评测 | 英国 AISI：同一 AI 监控器换攻击生成法，成功攻击漏报0.2%到23% |
+| 1123 | 购物 | a16z 测购物 AI 代理：允许游客结账的网店，81%的运行走到表单末尾 |
+| 1123 | 量子 | DeepMind 智能体改进量子算法，称所需资源可能仍超首批纠错量子机 |
 
 ## 已发过
 
@@ -155,3 +155,4 @@
 | 1120 | AI证黎曼猜想？机器验过，作者没吃透：【跟进1119速览】Anthropic 员工 Alpöge（remark.pdf，北京11/20 20:52）称与 Claude 找到 RH 证明、可推到 GRH，只公开 Lean；MIT Sutherland 复核页（11/21 09:30 UTC）称175,187个模块编译通过、#print axioms 只有三条标准公理、leanchecker 全重放，nanoda、con-leche 两个独立内核与 lean4lean 都接受，lake comparator 与导出重放仍在跑，“GRH”只指 Dirichlet L 函数；Lipponen（LUMI）独立编译、哈希一致，称不等于有人读懂。几小时后 Vakil（北京11/21 02:18）公布 Masullo 940页纯人工 GRH 草稿（称覆盖所有数域的酉 Hecke 特征），约8小时后补记多人借 AI 报告问题、不担保思路；稿内30处“Return here”，第522页定理13.3.1.2只有标题、脚注“Insert statement”。吠点：新浪新闻“AI 写出25万页证明”（25万页是作者脚注里的未公开文稿）、检查程序只保证每步推得通、两份“广义”范围不同；扫描把 Aaronson 原话（17 million lines、0=1、my bet）安在 Tao 头上，已更正。Qwen3.5-27B 改写自己权重（arXiv 2611.21885 v2）：另留490题×8答案上57.2%→63.8%；吠点：第二协议8轮各自从原始权重重改、5轮撤回、提交3次57.8%/61.3%/63.8%（智客前沿“8轮持续提升”），改动针对写到长度上限的答案（截断33.6%→26.1%，例题重复549次），摘要“80%以上”修复指图像题70.2%对84.3%、文本33.0%对58.5%；参考文献[25]即1102期 MIT CSAIL 博文。 |
 | 1121 | AI写代码漏了密钥，用户提示词被下载：【AI 推理供应链】Dragos 往各家 AI 服务发约200万条带假密钥与秘密链接的提示词（11/19）；OpenRouter 11/22 称据此清退3家提供商（未点名）、撤125个端点的零数据留存资格（含预防性撤下）；Together 11/21 称 AI 编码助手往公开仓库 xorl 提交了能读私有 HF 仓库的凭证，6–7月测试样本被下载，新账户改为默认零留存；Dragos 称隐私标记只约束第一跳；Novita/MiniMax 与“中国实验室”段风控不写。【3SUM】arXiv 2610.06783（v1 北京10/6，Alman、Vassilevska Williams）首页称算法由 Claude 发现，3SUM 指数2→1.9992（多项式大小整数）、作者称可能不实用；11/22 中文转载把发表日写成11/22；Vassilevska Williams 个人页称内部模型不必要，给公开版 Claude 学生2023年笔记两条提示即成，不给笔记各试三次未成 |
 | 1122 | 1700万行代码证黎曼猜想，百万奖还没发：【跟进1120】Lean FRO 与 Mathlib Initiative 联合声明（页面 2026-11-21 13:55 UTC）“hereby certify”黎曼猜想命题与 Alpöge 约1700万行 Lean 证明都正确；MIT Sutherland 复核页（11-23 14:35 UTC）记 Lean 默认内核 11-22 18:44 UTC 整份接受（单线程48小时），默认参数 paranoid 内核与 lake comparator 仍在跑；吠点：认证的是机器证明每步查过、证的是 Mathlib 里的 RH，声明末句“help explain the new ideas”；新周刊稿题“悬赏百万美元的难题先被AI破解”，Clay 规则须合格期刊发表满两年并获普遍接受才考虑，RH 页仍标“Active”（庞加莱为“Solved”）。声明署名 11-23 由“Lean and Mathlib communities, endorsed by …”改为两家机构（PR #154，未进正文）。MiniMax 内部模型 MIM 密码分析（博客 11-20 14:41 北京）：称对 NIST 往届候选做出实用破解、TII McEliece 挑战首解55个，末尾写“does not affect deployed cryptographic standards”；吠点：新智元稿题“中国AI刷爆全球纪录！比Claude快四万倍”、正文“比 Anthropic 的多GPU集群快了 43400 倍”，MiniMax 博客亦写 multi-GPU，但其论文写 43,400× 只是 TII-253 一题：Anthropic 的 Weis 用32线程 CPU 跑21.7小时、MiniMax 64核 1.80秒（对 GPU 纪录同题28,000×）；新智元写 ARADI“全面刷新理论攻击纪录”，README 写理论攻击到12轮、实用到8轮、完整16轮“remains unbroken”；“破解 NIST 候选”多条是参考实现漏洞（DRS 把 && 误写成 &），方案均已落选；风控：标题封面不写比 Claude 快。11-24 00:11 MiniMax 改 Blender 论文、00:22 回复并关闭两条 issue（未进正文） |
+| 1123 | 7万行AI证明，没有数学家查过：【VP≠VNP】Anthropic 在 anthropics/formal-math 公开署名“Claude (Anthropic)”的论文《VP ≠ VNP over every field》（70页）与约7.3万行 Lean（72,932 行，提交北京 11/24 04:04），称由内部研究用 Claude 模型发现；README 写“Both were written by AI models, and no human mathematician has checked the proof”“This does not settle P vs NP”；OpenAI 随后（提交时间晚约5小时）在 openai/math 公开同题《VP and VNP are different》（border 版下界，history 称 11/6 得出），两家互不引用；吠点：新智元稿题“Claude证出「代数版P≠NP」”，论文摘要写是 P≠NP 的代数类比但“does not settle that conjecture”、不适用于布尔电路；华尔街见闻稿题“全篇Lean机器验证通过”，Lean 只保证推导，命题是否写对论文附录 Q.1 写“judged only by AI readers”。【NariQ】Nari Labs（11/20）把 Qwen3.8-27B 量化为 3/2.5/2 比特 GGUF（3比特 10.1GB，原版 53.8GB），称长程代理、数学、看图与原版持平（作者自测）；对你：要自己部署，AMD/Intel 不支持，M3-Pro 3比特约3.8 tok/s；吠点：掘金速递“可直接对接llama.cpp等主流推理框架”，模型卡写原版 llama.cpp、Ollama、LM Studio 都加载不了、须用作者 fork；掘金写“消费级显卡甚至部分笔记本”，模型卡写 GeForce 未测，fork README 只记一张 RTX-5060-Ti 跑过、not qualified（尚未完成资格验证）。读者稿检查后删去“2.5比特档五项四项低于原版”一条 |
