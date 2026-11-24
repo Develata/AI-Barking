@@ -41,13 +41,13 @@
 |---|---|---|---|---|
 | 省流：NariQ 把 27B 模型压进约 10GB | L1 | ✅ | 模型卡标题“NariQ: Qwen3.8-27B in a 10 GB file”；3.0bpw 文件 10,123,626,592 字节 | 不含 0.93GB 视觉投影 |
 | 但只能用作者改版的 llama.cpp 跑 | L1 | ✅ | 模型卡：“Run them on our llama.cpp fork (required).”；“Stock llama.cpp, Ollama and LM Studio can't load the new tensor types yet” | |
-| 11月20日，Nari Labs 发布阿里 Qwen3.8-27B 模型的压缩版 | L1 | ✅ | 模型卡“(Nov 20, 2026) We are releasing NariQ v1 GGUFs of Qwen3.8-27B at 3, 2.5 and 2 bits per weight.”；HF 仓库创建北京 11-20 09:27:15 | |
+| 11月20日，Nari Labs 发布 Qwen3.8-27B 模型的压缩版 | L1 | ✅ | 模型卡“(Nov 20, 2026) We are releasing NariQ v1 GGUFs of Qwen3.8-27B at 3, 2.5 and 2 bits per weight.”；HF 仓库创建北京 11-20 09:27:15 | |
 | 3比特档文件约 10.1GB，原版约 54GB | L1 | ✅ | 分数表“NariQ 3-bit (10.1 GB)”“BF16 (53.8 GB)” | 论文写原版 55.6GB（含视觉与 MTP），正文用模型卡数 |
-| 称在长时间编程代理、数学和看图任务上与原版持平 | L1 | ✅ | “The 3-bit and 2.5-bit files match BF16 on long-horizon agent tasks, math and image understanding.” | 看图 = image understanding（RealWorldQA） |
+| 称在长时间编程代理、数学和看图任务上与原版持平 | L1 | ✅ | “The 3-bit and 2.5-bit files match BF16 on long-horizon agent tasks, math and image understanding.” | 看图 = image understanding（RealWorldQA）；“编程代理”：长程代理任务为 DeepSWE 与 Terminal-Bench 两列，模型卡标签 coding-agent、量化“calibrated on real coding-agent traces”（`b-hf-readme-raw.txt` 第 12、23 行）；“阿里”读者稿检查后曾加入，因存档只见“Qwen Team”未见阿里字样，已删 |
 | 成绩都是作者自测 | L1 | ✅ | 模型卡图注“Every point was measured by us with the same code.”；Unsloth 对照点读自其图表 | |
 | 对你：这次放出的是要自己部署的模型文件 | L1 | ✅ | 模型卡：“We are releasing NariQ v1 GGUFs … Run them on our llama.cpp fork (required).” | 反向核验指出原句“只在网页或 App 里聊天的用不上”无来源支持（fork 自带聊天网页与兼容 API），已改 |
 | AMD、Intel 显卡暂不支持 | L1 | ✅ | 模型卡：“AMD and Intel GPUs are not supported yet”；fork“AMD, Intel GPUs: No NariQ kernels.” | 外部 AMD 移植 PR #3 未合并 |
-| Mac 只在一台 M3-Pro 上用3比特档跑过，每秒约3.8个 token | L1 | ✅ | 模型卡：“on an M3 Pro (18 GB) decode is about 3.8 tok/s with the 3.0bpw file … Other Macs are untested.”；Metal 文档“Only one machine has run this” | |
+| Mac 只在一台 M3-Pro 上跑过，3比特档每秒约3.8个 token | L1 | ✅ | 模型卡：“on an M3 Pro (18 GB) decode is about 3.8 tok/s with the 3.0bpw file … Other Macs are untested.”；Metal 文档“Only one machine has run this” | |
 | 吠点①：掘金速递写“可直接对接 llama.cpp 等主流推理框架” | L5 | ✅（只证引文存在） | juejin.cn/post/7711225699185410102（北京 11-24 08:31:20）第6条 | 截图 `20-juejin-nariq-item.png` |
 | 吠点①：模型卡写须用作者改版，原版 llama.cpp、Ollama、LM Studio 都加载不了 | L1 | ✅ | 同省流第二句 | |
 | 吠点②：掘金同一篇写“消费级显卡甚至部分笔记本”能跑 | L5 | ✅ | 同篇：“压到10GB意味着可在消费级显卡甚至部分笔记本上本地运行” | |
@@ -129,5 +129,5 @@
 7. NICE_TO_HAVE 配图说明残留“尚未合格”：采纳，已同步。
 8. NEEDS_VERIFICATION AISI 风控：仍交终审，由 Develata 决定。
 
-视觉复核（Codex gpt-6-astra，effort medium，只读，22 张图；北京 11-25 约 01:45）：PASS / no blocker；3 项 SHOULD_FIX。处理：速览 Shirudo 补“自测”与 Claude Ship 开放范围两条，与反向核验第 2 轮一并改（见上）；`08-vp-ai-readers.png` 关键句太小：采纳，底图改为 Q.1 段首行加末两行拼接（`barking shot stack`，1000×122），关键句放大，段首保留以示出处。
+视觉复核（Codex gpt-6-astra，effort medium，只读，22 张图；北京 11-25 约 01:45）：PASS / no blocker；3 项 SHOULD_FIX。处理：速览 Shirudo 补“自测”与 Claude Ship 开放范围两条，与反向核验第 2 轮一并改（见上）；`08-vp-ai-readers.png` 关键句太小：采纳，底图改为 Q.1 段首行加末两行拼接（`barking shot stack`，1000×122），段首保留以示出处；因整行宽度不变，关键句字号只比原版略大（底图宽 1000 px，再窄会切断行）。
 
