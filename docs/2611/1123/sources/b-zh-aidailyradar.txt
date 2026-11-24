@@ -1,0 +1,235 @@
+NariQ 发布 Qwen3.8-27B 低比特量化，10 GB 文件声称接近 BF16 | AI Daily Radar
+
+跳到正文 [#main]
+
+ 2026年11月24日
+ 更新于 06:28 UTC
+
+ 往期简报 [/zh/briefing/]
+ 收藏 [/zh/saved/]
+ EN [/2026/11/24/nariq-ships-3-bit-qwen3-8-27b-quantizations-claiming-near-bf16-quality-81ec/]
+
+ AI 每日雷达
+ [/zh/]
+
+AI 与前沿科技，每天早上讲清楚
+
+今日 [/zh/]
+
+人工智能 [/zh/ai/]
+
+芯片与算力 [/zh/chips/]
+
+机器人与自动驾驶 [/zh/robots/]
+
+电动车与新能源 [/zh/energy/]
+
+航天 [/zh/space/]
+
+科学与生物科技 [/zh/science/]
+
+产业与政策 [/zh/industry/]
+
+深度解读 [/zh/analysis/]
+
+ 首页 [/zh/]/人工智能 [/zh/ai/]
+
+已发布 [/zh/standards/#status-labels]
+
+NariQ 发布 Qwen3.8-27B 低比特量化，10 GB 文件声称接近 BF16
+
+作者 AI 每日雷达·2026年11月24日·人工智能 [/zh/ai/]·雷达评分 7.0 [/zh/standards/#radar-score]
+
+依据文末链接的信息源，在 AI 辅助下撰写。
+
+图片: donterase [https://pixabay.com/photos/study-workroom-office-glimpse-789631/] / Pixabay
+
+NariQ 在 Hugging Face 发布了 Qwen3.8-27B 的 3 比特及更低比特量化版本（GGUF 格式），文件约 10 GB，作者称其在智能体任务、数学、多语言推理和图像理解上保持接近 BF16 的质量，并称这是首个在长程智能体任务上保持 BF16 水平性能的 3 比特及以下量化。作者自报的对比数据（BF16 / 3-bit / 2.5-bit / 2-bit）为：DeepSWE 39.8 / 41.0 / 41.9 / 28.6，Terminal-Bench 2.1 62.6 / 63.8 / 60.2 / 52.4，AIME 25+26 97.7 / 98.3 / 96.5 / 86.0，MSGM 94.0 / 93.1 / 91.8 / 90.6，RealWorldQA 82.4 / 82.4 / 81.3 / 80.9——在多数项目上 3-bit 与 2.5-bit 与 BF16 持平甚至略高，但 2-bit 在 DeepSWE 和 AIME 上明显下降。作者称在 RTX PRO 6000 上解码速度与其他量化相当，并给出了 4K/16K/64K 上下文下的速度数值（如 64K 时 3-bit 为 70.7、2.5-bit 为 77.5、2-bit 为 85.0，对比 Unsloth UD-IQ3_XXS 的 74.8）。运行这些模型目前需要使用作者的 llama.cpp 分支 nari-llama.cpp，而非上游版本；在 M3 Pro（18 GB）上需从源码编译，3.0bpw 文件解码约 3.8 tok/s（2.0bpw 约 4.9 tok/s），作者称远慢于 CUDA，其他 Mac 机型未测试。
+
+已证实与未证实
+
+已证实： NariQ 在 Hugging Face 上发布了 Qwen3.8-27B 的 3-bit 及更低比特量化版本，发布页列出了 DeepSWE、Terminal-Bench 2.1、AIME 25+26、MSGM、RealWorldQA 五组基准上 BF16 与 3-bit／2.5-bit／2-bit 的对比数字，并说明目前必须使用其自建的 llama.cpp 分支（nari-llama.cpp）才能运行；模型仓库的提交说明显示 DeepSWE 为三轮平均、在 Docker 环境中逐题统计并给出样本数（tool-3-1）。
+
+尚未证实： “接近 BF16 质量”和“首个在长程 agentic 任务上保持 BF16 水平”的说法均为作者自报，尚无可查的独立第三方复测；发布内容未交代标题所称 10 GB 文件的具体构成、各基准所用的评测框架版本与 held-out 划分，而公开的 Terminal-Bench 排行榜页面当前已是 4.1 版（tool-3-3），与文中 2.1 版成绩不能直接对比；Mac 上约 3.8 tok/s（M3 Pro，3.0bpw）的推理速度仅见于评论者转述的说明，发布正文未给出。
+
+背景
+
+量化（quantization）是把模型权重用更低的位数存储，以换取更小显存占用和更快速度的技术；GGUF 是 llama.cpp 生态常用的量化文件格式，”3-bit”即每个权重约 3 比特。Qwen3.8-27B 若以 BF16（每权重 2 字节）保存约需 54 GB，因此压到 3 比特左右才能装进约 10 GB 的文件、跑在消费级硬件上（tool-2-3）。不过 Nari Labs 的模型卡说明，这批文件需配合其自研的 llama.cpp 分支运行（tool-2-2）。
+
+为什么重要
+
+对想在本地或单卡上跑 27B 级模型的用户，这些文件把显存/存储门槛压到约 10 GB 量级，代价是必须改用作者的 llama.cpp 分支，意味着无法直接套用上游 llama.cpp 的常规部署流程，也拿不到上游后续的性能与兼容性修复；在 Apple Silicon 上还要自行编译，且实测速度只有个位数 tok/s。
+
+后续看点
+
+值得留意 nari-llama.cpp 的相关改动是否会进入上游 llama.cpp，以及其他开发者对这些文件在自有工作负载上的独立复现结果，包括与 Bonsai 2 27B 等同类量化的对比。
+
+社区讨论
+
+有评论者对这类高算力量化训练（QAT 风格）容易过拟合基准数据集表示怀疑，但认为该项目做了少见的基本检验——覆盖多种长程任务并提到使用了“held out”（留出）数据。另有评论者依据作者给出的图表认为，大部分提升来自测试框架（harness）差异而非模型本身；也有人追问压缩过程中究竟损失了什么信息，并关心能否塞进 16 GB 的 Mac。
+
+延伸阅读
+
+nari-labs/Qwen3.8-27B-NariQ-GGUF · Hugging Face [https://huggingface.co/nari-labs/Qwen3.8-27B-NariQ-GGUF]
+
+NariQ Quantization: Qwen3.8-27B Agents in a 10 GB File [https://aitecharchive.com/articles/nariq-quantization-qwen3-8-27b-agent-performance-10gb]
+
+Report three-round DeepSWE averages… [https://huggingface.co/nari-labs/Qwen3.8-27B-NariQ-GGUF/commit/9065513f08d8ed7dbe50b9c329cac1f40c70fde9]
+
+TERMINAL - BENCH [https://www.tbench.ai/]
+
+原始来源
+
+Hugging Face · huggingface.co
+
+发现渠道： Hacker News
+
+ 阅读原文： huggingface.co (新窗口) [https://huggingface.co/nari-labs/Qwen3.8-27B-NariQ-GGUF]
+ 参与讨论 [https://news.ycombinator.com/item?id=50611402]
+
+quantization [/zh/topics/quantization/]
+
+Qwen3.8-27B [/zh/topics/qwen3-8-27b/]
+
+local LLMs [/zh/topics/local-llms/]
+
+llama.cpp [/zh/topics/llama-cpp/]
+
+model compression [/zh/topics/model-compression/]
+
+每日早报
+
+每天早上把“今日看点”和 AI、芯片、机器人、电动车、航天的当日要闻发到你的邮箱，免费。
+
+ 你的邮箱地址
+
+ 订阅
+
+每天一封，正文为英文，附中文版链接；可随时退订。 隐私政策 [/zh/privacy/#newsletter]
+
+ 收藏
+ 分享
+ 评论 [#comments]
+
+ 分享
+ X [https://twitter.com/intent/tweet?url=https://aidailyradar.com/zh/2026/11/24/nariq-ships-3-bit-qwen3-8-27b-quantizations-claiming-near-bf16-quality-81ec/&text=NariQ%20%E5%8F%91%E5%B8%83%20Qwen3.8-27B%20%E4%BD%8E%E6%AF%94%E7%89%B9%E9%87%8F%E5%8C%96%EF%BC%8C10%20GB%20%E6%96%87%E4%BB%B6%E5%A3%B0%E7%A7%B0%E6%8E%A5%E8%BF%91%20BF16]
+ LinkedIn [https://www.linkedin.com/sharing/share-offsite/?url=https://aidailyradar.com/zh/2026/11/24/nariq-ships-3-bit-qwen3-8-27b-quantizations-claiming-near-bf16-quality-81ec/]
+ Facebook [https://www.facebook.com/sharer/sharer.php?u=https://aidailyradar.com/zh/2026/11/24/nariq-ships-3-bit-qwen3-8-27b-quantizations-claiming-near-bf16-quality-81ec/]
+ Reddit [https://www.reddit.com/submit?url=https://aidailyradar.com/zh/2026/11/24/nariq-ships-3-bit-qwen3-8-27b-quantizations-claiming-near-bf16-quality-81ec/&title=NariQ%20%E5%8F%91%E5%B8%83%20Qwen3.8-27B%20%E4%BD%8E%E6%AF%94%E7%89%B9%E9%87%8F%E5%8C%96%EF%BC%8C10%20GB%20%E6%96%87%E4%BB%B6%E5%A3%B0%E7%A7%B0%E6%8E%A5%E8%BF%91%20BF16]
+ WhatsApp [https://wa.me/?text=NariQ%20%E5%8F%91%E5%B8%83%20Qwen3.8-27B%20%E4%BD%8E%E6%AF%94%E7%89%B9%E9%87%8F%E5%8C%96%EF%BC%8C10%20GB%20%E6%96%87%E4%BB%B6%E5%A3%B0%E7%A7%B0%E6%8E%A5%E8%BF%91%20BF16%20https://aidailyradar.com/zh/2026/11/24/nariq-ships-3-bit-qwen3-8-27b-quantizations-claiming-near-bf16-quality-81ec/]
+ 微博 [https://service.weibo.com/share/share.php?url=https://aidailyradar.com/zh/2026/11/24/nariq-ships-3-bit-qwen3-8-27b-quantizations-claiming-near-bf16-quality-81ec/&title=NariQ%20%E5%8F%91%E5%B8%83%20Qwen3.8-27B%20%E4%BD%8E%E6%AF%94%E7%89%B9%E9%87%8F%E5%8C%96%EF%BC%8C10%20GB%20%E6%96%87%E4%BB%B6%E5%A3%B0%E7%A7%B0%E6%8E%A5%E8%BF%91%20BF16]
+ 邮件 [mailto:?subject=NariQ%20%E5%8F%91%E5%B8%83%20Qwen3.8-27B%20%E4%BD%8E%E6%AF%94%E7%89%B9%E9%87%8F%E5%8C%96%EF%BC%8C10%20GB%20%E6%96%87%E4%BB%B6%E5%A3%B0%E7%A7%B0%E6%8E%A5%E8%BF%91%20BF16&body=https://aidailyradar.com/zh/2026/11/24/nariq-ships-3-bit-qwen3-8-27b-quantizations-claiming-near-bf16-quality-81ec/]
+ 复制链接
+
+评论
+
+评论需要 GitHub 账号登录，会经过管理。 评论规则 [/zh/standards/#comments-policy]
+
+今日简报的其他新闻
+
+消息称 SpaceX 与特斯拉洽谈 3.5 万亿美元全股票合并，《金融时报》报道 [/zh/2026/11/24/spacex-and-tesla-in-talks-for-3-5t-all-stock-merger-ft-reports-b423/]
+
+产业与政策·11月24日·8.0
+
+大众ID. Polo与Cupra Raval供不应求，部分等待近两年 [/zh/2026/11/24/vw-id-polo-wait-times-near-two-years-despite-1-000-cars-a-day-45d2/]
+
+电动车与新能源·11月24日·7.0
+
+美国将阿里巴巴新加坡子公司Apex与Megaspeed列入实体清单 [/zh/2026/11/24/us-adds-alibaba-s-singapore-unit-apex-to-entity-list-with-megaspeed-2f8d/]
+
+芯片与算力·11月24日·7.0
+
+两个未设防数据库泄露35亿条用户名、密码与文件 [/zh/2026/11/24/two-unsecured-databases-reportedly-exposed-3-5-billion-credentials-4625/]
+
+产业与政策·11月24日·7.0
+
+研究：日本住宅光伏使高温相关超额死亡年降约8% [/zh/2026/11/24/residential-solar-tied-to-lower-heat-deaths-in-japan-study-finds-9207/]
+
+电动车与新能源·11月24日·7.0
+
+Meta 在英国向成年人推出个人 AI 代理 Muse [/zh/2026/11/24/meta-rolls-out-muse-agent-to-uk-adults-a-big-tech-first-politico-reports-734d/]
+
+人工智能·11月24日·7.0
+
+ 阅读完整简报 [/zh/briefing/2026-11-24/]
+
+更多 人工智能 [/zh/ai/]
+
+ 查看全部 [/zh/ai/]
+
+ [/zh/2026/11/24/google-ai-mode-draws-on-drive-and-wallet-for-personalized-answers-7601/]
+
+Google AI 模式接入 Drive、Wallet 与 Gemini 应用 [/zh/2026/11/24/google-ai-mode-draws-on-drive-and-wallet-for-personalized-answers-7601/]
+
+TechCrunch 11 月 23 日报道，Google 搜索的对话式 AI 模式（AI Mode）现在可以接入 Goo...
+
+人工智能·11月24日·7.0
+
+ [/zh/2026/11/24/meta-rolls-out-muse-agent-to-uk-adults-a-big-tech-first-politico-reports-734d/]
+
+Meta 在英国向成年人推出个人 AI 代理 Muse [/zh/2026/11/24/meta-rolls-out-muse-agent-to-uk-adults-a-big-tech-first-politico-reports-734d/]
+
+据 Politico 报道，Meta 已向英国成年人推出个人 AI 代理 Muse，用于协助处理日常任务。
+
+人工智能·11月24日·7.0
+
+ [/zh/2026/11/24/aws-launches-five-open-strands-decider-v2-models-the-new-stack-reports-88c0/]
+
+AWS 推出 Strands Decider v2：五个基于 Gemma 4 的开放决策模型 [/zh/2026/11/24/aws-launches-five-open-strands-decider-v2-models-the-new-stack-reports-88c0/]
+
+AWS 于周一发布 Strands Decider v2，这是一组五个“决策模型”（decision models，即针对...
+
+人工智能·11月24日·7.0
+
+ [/zh/2026/11/23/openai-makes-gpt-6-2-sol-the-default-chatgpt-model-worldwide-94d3/]
+
+OpenAI 将 GPT-6.2 Sol 设为 ChatGPT 全球默认模型 [/zh/2026/11/23/openai-makes-gpt-6-2-sol-the-default-chatgpt-model-worldwide-94d3/]
+
+OpenAI 正在将 GPT-6.2 Sol 设为 ChatGPT 聊天标签页的全球默认模型。
+
+人工智能·11月23日·8.0
+
+ AI 每日雷达
+ [/zh/]
+
+AI 每日雷达是一份关于 AI 与前沿科技的独立每日简报。新闻在 AI 辅助下筛选和撰写，每条都附原始来源链接。
+
+板块
+
+人工智能 [/zh/ai/]
+
+芯片与算力 [/zh/chips/]
+
+机器人与自动驾驶 [/zh/robots/]
+
+电动车与新能源 [/zh/energy/]
+
+航天 [/zh/space/]
+
+科学与生物科技 [/zh/science/]
+
+产业与政策 [/zh/industry/]
+
+深度解读 [/zh/analysis/]
+
+AI Daily Radar
+
+往期简报 [/zh/briefing/]
+
+话题 [/zh/topics/]
+
+关于 [/zh/about/]
+
+编辑标准 [/zh/standards/]
+
+更正记录 [/zh/corrections/]
+
+隐私政策 [/zh/privacy/]
+
+联系 [mailto:hello@aidailyradar.com]
+
+RSS [/zh/feed.xml]
+
+© 2026 AI Daily Radar · 基于开源项目 Horizon [https://github.com/Thysrael/Horizon] (MIT)
+
+Read in English [/2026/11/24/nariq-ships-3-bit-qwen3-8-27b-quantizations-claiming-near-bf16-quality-81ec/]

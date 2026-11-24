@@ -1,0 +1,372 @@
+NariQ: BF16-level Qwen3.8-27B in a 10 GB file | Hacker News
+
+ [https://news.ycombinator.com]Hacker News [news]new [newest] | past [front] | comments [newcomments] | ask [ask] | show [show] | jobs [jobs] | submit [submit]login [login?goto=item%3Fid%3D50611402]
+
+ [vote?id=50611402&how=up&goto=item%3Fid%3D50611402]NariQ: BF16-level Qwen3.8-27B in a 10 GB file [https://huggingface.co/nari-labs/Qwen3.8-27B-NariQ-GGUF] (huggingface.co [from?site=huggingface.co])
+
+181 points by toebee [user?id=toebee] 21 hours ago [item?id=50611402] | hide [hide?id=50611402&goto=item%3Fid%3D50611402] | past [https://hn.algolia.com/?query=NariQ%3A%20BF16-level%20Qwen3.8-27B%20in%20a%2010%20GB%20file&type=story&dateRange=all&sort=byDate&storyText=false&prefix&page=0] | favorite [fave?id=50611402] | 35 comments [item?id=50611402]
+
+We built NariQ: 3-bit-or-lower quantizations of Qwen3.8-27B that retain near-BF16 quality across agentic tasks, math, multilingual reasoning, and image understanding.
+To our knowledge, this is the first 3-bit-or-lower quantization that retains BF16 lvl performance on long-horizon agentic tasks.
+Benchmarks (BF16 / 3-bit / 2.5-bit / 2-bit):
+- DeepSWE: 39.8 / 41.0 / 41.9 / 28.6
+- Terminal-Bench 2.1: 62.6 / 63.8 / 60.2 / 52.4
+- AIME 25+26: 97.7 / 98.3 / 96.5 / 86.0
+- MSGM: 94.0 / 93.1 / 91.8 / 90.6
+- RealWorldQA: 82.4 / 82.4 / 81.3 / 80.9
+Decode speed is comparable to other quants on an RTX PRO 6000. Context-length results below
+(3-bit / 2.5-bit / 2-bit / Unsloth UD-IQ3_XXS):
+- 4K: 88.9 / 99.2 / 111.7 / 94.7
+- 16K: 84.5 / 93.8 / 105.1 / 89.8
+- 64K: 70.7 / 77.5 / 85.0 / 74.8
+Running these currently require our llama.cpp fork:
+(https://github.com/nari-labs/nari-llama.cpp [https://github.com/nari-labs/nari-llama.cpp])
+Feedback and questions welcome. We'd love to hear how these perform on your workloads.
+
+ help [formatdoc]
+
+ [vote?id=50618333&how=up&goto=item%3Fid%3D50611402#50618333]
+rao-v [user?id=rao-v] 18 hours ago [item?id=50618333] | next [#50617193] [–] [javascript:void(0)]
+
+I've been skeptical of these high compute QAT style quant efforts because they tend to over optimize on benchmark-like datasets, so in real usage they don't quite deliver the "almost as good" guarentee the benchmark comparisions suggest.
+This project actually does the sort of basic checks I want (and typically don't get)! They show results on multiple types of long horizon tasks (not just coding etc.) and even use the words "held out" a few times :)
+
+reply [reply?id=50618333&goto=item%3Fid%3D50611402%2350618333]
+
+ [vote?id=50622402&how=up&goto=item%3Fid%3D50611402#50622402]
+toebee [user?id=toebee] 13 hours ago [item?id=50622402] | parent [#50618333] | next [#50617193] [–] [javascript:void(0)]
+
+thank you for the kind words!
+
+reply [reply?id=50622402&goto=item%3Fid%3D50611402%2350622402]
+
+ [vote?id=50617193&how=up&goto=item%3Fid%3D50611402#50617193]
+jedbrooke [user?id=jedbrooke] 20 hours ago [item?id=50617193] | prev [#50618333] | next [#50617761] [–] [javascript:void(0)]
+
+> Apple M-series (Metal): build from source; on an M3 Pro (18 GB) decode is about 3.8 tok/s with the 3.0bpw file (4.9 with 2.0bpw), far slower than CUDA. Other Macs are untested.
+I wonder if it would be possible to squeeze it into a 16GB mac. Comparisons to Bonsai 2 27B would be useful too.
+Qwen 3.8 27B has truly been such a gift to the self hosted model landscape. “normie” hardware like a 16GB macbook being able to run “pretty useful” (obv not frontier level) LLMs is crazy
+
+reply [reply?id=50617193&goto=item%3Fid%3D50611402%2350617193]
+
+ [vote?id=50620674&how=up&goto=item%3Fid%3D50611402#50620674]
+ricardobeat [user?id=ricardobeat] 16 hours ago [item?id=50620674] | parent [#50617193] | next [#50622057] [–] [javascript:void(0)]
+
+It's possible to run Bonsai 2 PTQ1 in ~8.5GB of RAM, Macbook Air M3 at much faster speeds:
+
+ mtl chat: models/Ternary-Bonsai-2-27B-PTQ1_0.gguf | vocab 248320 | temp 0.70 top_k 20 top_p 0.80 rep 1.05 | dflash2 up to 7 draft(s)/round, n-gram recent up to 7 | ctx 32768 q8 kv
+ type /help for commands, /exit to quit
+ you> hi. Alice has 4 brothers and she also has 1 sister, so how many sisters does Alice's brother have?
+ To determine how many sisters Alice's brother has, let's break down the family composition based on the information provided:
+
+ 1. Alice is a female child.
+ 2. Alice has 4 brothers.
+ 3. Alice has 1 sister.
+
+ This means the total children in the family are:
+ • Girls: Alice + her 1 sister = 2 girls
+ • Boys: Her 4 brothers = 4 boys
+
+ Now, let's look at it from the perspective of one of Alice's brothers:
+ • He is male.
+ • His sisters are all the female children in the family.
+ • The female children are Alice and her sister.
+
+ Therefore, Alice's brother has 2 sisters.
+ [166 tok, 16.3 tok/s | prefill 36 tok in 13010 ms | 205 tokens in context | stop im_end]
+
+The speed is still not quite there for coding, prefill is especially slow. But it is incredible that it's possible to condense such a great model into a tiny blob.
+
+reply [reply?id=50620674&goto=item%3Fid%3D50611402%2350620674]
+
+ [vote?id=50622180&how=up&goto=item%3Fid%3D50611402#50622180]
+jedbrooke [user?id=jedbrooke] 13 hours ago [item?id=50622180] | root [#50617193] | parent [#50620674] | next [#50622057] [–] [javascript:void(0)]
+
+yep I’ve been running Bonsai 2 27B on my mac mini 16 GB. I can juuust about fit 100k context. I get best case 8 tok/s with typical more like 4. It’s almost usable for coding assistants but it’s great for async workflows
+Excited to see more “27B” class models that can fit in 16GB
+
+reply [reply?id=50622180&goto=item%3Fid%3D50611402%2350622180]
+
+ [vote?id=50622057&how=up&goto=item%3Fid%3D50611402#50622057]
+toebee [user?id=toebee] 13 hours ago [item?id=50622057] | parent [#50617193] | prev [#50620674] | next [#50617744] [–] [javascript:void(0)]
+
+My goal too is to build something that works well on my 18GB Mac and my 16GB 5060Ti that runs fast + is the smartest. Will be looking into inference speedups and KV / Activation quantization to make possible! It does run on my Mac alright, but as the comments say, it is pretty slow atm.
+Also on Bonsai's performance - it doesn't seem to do too well on long horizon benchmarks:
+Long-context and coding performance. This release also delivers on the roadmap set out in our initial Bonsai 27B release [2], where we identified long-horizon, tool-driven software engineering as the next major capability to improve. With Ternary Bonsai 2 27B, that progress now shows up directly in agentic performance. Evaluated for the first time on Terminal-Bench 2.1 and SWE-bench Verified, the Ternary Bonsai 2 27B reaches 52.8 and 60.8, respectively, compared with 69.7 and 80.6 for Qwen3.5-27B, retaining roughly three quarters of the full-precision performance on both benchmarks.
+from their tech report: https://github.com/PrismML-Eng/Bonsai-demo/blob/main/bonsai-... [https://github.com/PrismML-Eng/Bonsai-demo/blob/main/bonsai-2-27b-whitepaper.pdf]
+
+reply [reply?id=50622057&goto=item%3Fid%3D50611402%2350622057]
+
+ [vote?id=50617744&how=up&goto=item%3Fid%3D50611402#50617744]
+vorticalbox [user?id=vorticalbox] 19 hours ago [item?id=50617744] | parent [#50617193] | prev [#50622057] | next [#50617761] [–] [javascript:void(0)]
+
+At 3.8 t/s it’s probably not worth it until the metal speed increases it’s far better to have say ornith 1.5 which runs at 69 per second, while not as smart can iterate far faster.
+At 4 tokens a second a 1000 token reply is around 4 minutes.
+
+reply [reply?id=50617744&goto=item%3Fid%3D50611402%2350617744]
+
+ [vote?id=50617761&how=up&goto=item%3Fid%3D50611402#50617761]
+Retro_Dev [user?id=Retro_Dev] 19 hours ago [item?id=50617761] | prev [#50617193] | next [#50619545] [–] [javascript:void(0)]
+
+These quantizations seem really impressive, but I know that the file size is decreasing... What information is actually lost? Surely it's not just reduced noise and more compact, because there's no way that these benchmarks can cover the entirety of the information in the training data.
+
+reply [reply?id=50617761&goto=item%3Fid%3D50611402%2350617761]
+
+ [vote?id=50618217&how=up&goto=item%3Fid%3D50611402#50618217]
+mmastrac [user?id=mmastrac] 19 hours ago [item?id=50618217] | parent [#50617761] | next [#50617970] [–] [javascript:void(0)]
+
+The trellis quants basically rotate the weights in a way so you end up with something that looks like Gaussian noise, then do a search over the optimum set of bits to encode that noise. What you end up with is a close approximation to the old weights (up to a certain point), but with the energy of the values "shaved".
+You lose the fine detail but keep the higher structure. Models are generally pretty resilient to it, especially larger ones. An over-quantized model tends to lose fine detail in its knowledge, lose some ability to track/accumulate accurately, and occasionally loops (because the activations are rounded off too much and lose energy, and it gets trapped in a state where it just can't escape).
+When you quantize you try and get as big of a mix of calibration data as possible. You don't need to match the training _set_, just enough data that you exercise 99.999% of the most well-trod paths through the model. Anything outside of the calibration set is a crap-shoot as to whether it gets kept or not, but a well-balanced calibration set will keep performance near-unquantized.
+On what calibration does: during quantization you try to minimize the error between the run of the model with original weights and the run of the model with the quant'd weights. Calibration data lets you weight the error away from the paths that are actually chosen with real data.
+Apologies, this is a bit of a hand-wavey comment but it's sort of how you can look at it without needing to deal with the hairier math.
+
+reply [reply?id=50618217&goto=item%3Fid%3D50611402%2350618217]
+
+ [vote?id=50621073&how=up&goto=item%3Fid%3D50611402#50621073]
+andai [user?id=andai] 15 hours ago [item?id=50621073] | root [#50617761] | parent [#50618217] | next [#50625098] [–] [javascript:void(0)]
+
+Thanks for the explanation.
+Unrelated: Your blog goes back to 1998, and the first posts apologize about even older content being missing. That's amazing. (Maybe the old stuff is on Web Archive?)
+
+reply [reply?id=50621073&goto=item%3Fid%3D50611402%2350621073]
+
+ [vote?id=50621568&how=up&goto=item%3Fid%3D50611402#50621568]
+mmastrac [user?id=mmastrac] 14 hours ago [item?id=50621568] | root [#50617761] | parent [#50621073] | next [#50625098] [–] [javascript:void(0)]
+
+I put this together to hopefully better help show what goes on...
+https://quantwiki.kindlingai.dev/codebooks/mul1 [https://quantwiki.kindlingai.dev/codebooks/mul1]
+(claude assisted, obviously!)
+And yes, hah, that blog has been through a long, long number of years.
+
+reply [reply?id=50621568&goto=item%3Fid%3D50611402%2350621568]
+
+ [vote?id=50625098&how=up&goto=item%3Fid%3D50611402#50625098]
+alfiedotwtf [user?id=alfiedotwtf] 7 hours ago [item?id=50625098] | root [#50617761] | parent [#50618217] | prev [#50621073] | next [#50617970] [–] [javascript:void(0)]
+
+Is there a way to reverse engineer or trace the model’s internals so that instead of trying to find a corpus that covers everything like you said, you instead find the set of paths you haven’t walked yet and then keep stepping backward all the way to the input token?
+
+reply [reply?id=50625098&goto=item%3Fid%3D50611402%2350625098]
+
+ [vote?id=50626109&how=up&goto=item%3Fid%3D50611402#50626109]
+monster_truck [user?id=monster_truck] 4 hours ago [item?id=50626109] | root [#50617761] | parent [#50625098] | next [#50617970] [–] [javascript:void(0)]
+
+It's not that there isn't, it's that doing this would take far more time than its worth
+
+reply [reply?id=50626109&goto=item%3Fid%3D50611402%2350626109]
+
+ [vote?id=50617970&how=up&goto=item%3Fid%3D50611402#50617970]
+salviati [user?id=salviati] 19 hours ago [item?id=50617970] | parent [#50617761] | prev [#50618217] | next [#50619545] [–] [javascript:void(0)]
+
+It is possible that there is redundancy being removed. I'm not saying I believe that is the case, but I think it can't be ruled out. The information being thrown away might just be redundant, already present.
+
+reply [reply?id=50617970&goto=item%3Fid%3D50611402%2350617970]
+
+ [vote?id=50619545&how=up&goto=item%3Fid%3D50611402#50619545]
+WithinReason [user?id=WithinReason] 17 hours ago [item?id=50619545] | prev [#50617761] | next [#50624871] [–] [javascript:void(0)]
+
+Based on the plots most of the gains are due to a difference in harness, not the model.
+
+reply [reply?id=50619545&goto=item%3Fid%3D50611402%2350619545]
+
+ [vote?id=50622021&how=up&goto=item%3Fid%3D50611402#50622021]
+toebee [user?id=toebee] 14 hours ago [item?id=50622021] | parent [#50619545] | next [#50624871] [–] [javascript:void(0)]
+
+Fair point about harnesses. But if you look at DeepSWE (the primary comparison), BF16 on our harness passes 45.0 tasks per round vs Unsloth's reported 45.65, so I wouldn't say there are gains due to the harness. Also if we compare scores as % of BF16 in the same harness:
+DeepSWE v1.1, 113 tasks, fully solved
+
+ Our harness (Claude Code, mean of 3 runs per task)
+ File Size Solved of BF16
+ BF16 53.8 GB 45.0 100.0%
+ NariQ 2-bit 6.75 GB 32.3 71.9%
+ NariQ 2.5-bit 8.44 GB 47.3 105.2%
+ NariQ 3-bit 10.12 GB 46.3 103.0%
+
+Unsloth's harness (mini-swe-agent, read from their V3.1 chart):
+
+ File Size Solved of BF16
+ BF16 53.8 GB ~45.7 100.0%
+ Unsloth UD-IQ2_XS 7.63 GB ~14.5 31.8%
+ Unsloth UD-IQ2_S 8.42 GB ~24.5 53.7%
+ GSQ-RCO IQ2_XS 8.42 GB ~19.0 41.6%
+ GSQ-RCO IQ2_S 9.26 GB ~28.0 61.3%
+ EXL3 2.20 9.78 GB ~11.0 24.1%
+ Unsloth UD-Q2_K_XL 9.95 GB ~33.0 72.3%
+ GSQ-RCO IQ3_XXS 10.09 GB ~29.0 63.5%
+ GSQ-RCO IQ3_S 11.77 GB ~40.4 88.5%
+ Unsloth UD-IQ3_S 12.04 GB ~39.0 85.4%
+ EXL3 3.00 12.67 GB ~35.3 77.3%
+ Unsloth UD-Q3_K_XL 13.15 GB ~42.5 93.1%
+ Unsloth UD-IQ4_XS 14.35 GB ~41.0 89.8%
+
+cf) We did not run Unsloth's files ourselves, their numbers are read off their published chart. Both sides are averages over several runs. Also we'd like to run more experiments on our harness for future releases.
+
+reply [reply?id=50622021&goto=item%3Fid%3D50611402%2350622021]
+
+ [vote?id=50624825&how=up&goto=item%3Fid%3D50611402#50624825]
+WithinReason [user?id=WithinReason] 7 hours ago [item?id=50624825] | root [#50619545] | parent [#50622021] | next [#50624871] [–] [javascript:void(0)]
+
+If the comparison doesn't use the same harness, it's much harder to read
+
+reply [reply?id=50624825&goto=item%3Fid%3D50611402%2350624825]
+
+ [vote?id=50624871&how=up&goto=item%3Fid%3D50611402#50624871]
+wds [user?id=wds] 7 hours ago [item?id=50624871] | prev [#50619545] | next [#50618692] [–] [javascript:void(0)]
+
+Wish this supported Volta/sm_70 cards. It's ancient in LLM space, but the 700GB/s+ memory bandwidth for such a low price makes it pretty valuable... when it works!
+
+reply [reply?id=50624871&goto=item%3Fid%3D50611402%2350624871]
+
+ [vote?id=50618692&how=up&goto=item%3Fid%3D50611402#50618692]
+roundup [user?id=roundup] 18 hours ago [item?id=50618692] | prev [#50624871] | next [#50619132] [–] [javascript:void(0)]
+
+How does this technique compare to https://github.com/ShinMegamiBoson/lookatmyquant [https://github.com/ShinMegamiBoson/lookatmyquant]?
+
+reply [reply?id=50618692&goto=item%3Fid%3D50611402%2350618692]
+
+ [vote?id=50622432&how=up&goto=item%3Fid%3D50611402#50622432]
+toebee [user?id=toebee] 13 hours ago [item?id=50622432] | parent [#50618692] | next [#50620377] [–] [javascript:void(0)]
+
+I think lookatmyquant and existing quantization methods do well for most simple tasks with shorter horizons. What I'm interested in is long-horizon agentic tasks, since that's where I spend most of our time nowadays (e.g. inside Claude Code or Codex). Our method is the first to hit parity with BF16 on those types of tasks at 3-bpw-or-lower.
+
+reply [reply?id=50622432&goto=item%3Fid%3D50611402%2350622432]
+
+ [vote?id=50620377&how=up&goto=item%3Fid%3D50611402#50620377]
+xlayn [user?id=xlayn] 16 hours ago [item?id=50620377] | parent [#50618692] | prev [#50622432] | next [#50619132] [–] [javascript:void(0)]
+
+LOL, you are the same guy who posted that right?
+
+reply [reply?id=50620377&goto=item%3Fid%3D50611402%2350620377]
+
+ [vote?id=50619132&how=up&goto=item%3Fid%3D50611402#50619132]
+IronWolve [user?id=IronWolve] 18 hours ago [item?id=50619132] | prev [#50618692] | next [#50617252] [–] [javascript:void(0)]
+
+There are so many new quant methods that are coming up, TCQ, GSQ-RCO and a dozen others. They are chopping the models down to usable size with close precision to q8.
+I'm still waiting for the benchmarks on which methods are the best so far.
+
+reply [reply?id=50619132&goto=item%3Fid%3D50611402%2350619132]
+
+ [vote?id=50617252&how=up&goto=item%3Fid%3D50611402#50617252]
+mmastrac [user?id=mmastrac] 19 hours ago [item?id=50617252] | prev [#50619132] | next [#50620722] [–] [javascript:void(0)]
+
+EDIT: I'm not sure why there's downvotes here - if you purport to come out with a new quantization format and it's not front-and-center what your inspiration and trellis are, that's a bit of a red flag (and especially any comparison to the mul1 codebook that it's evolved from).
+Its seems unnecessarily hard to understand what NariQ is, but it appears to be a derivative of exl3's mul1 with k1-k6, costing ~2 IMAD + 2 LOP3 + 2 IDP + 1 pack IMAD. It's not a real half-width codebook, just averaging k2/k3 to make k2.5? Happy to see someone else discovering the integer addition tricks too.
+FWIW in exlr8 we added a pmcgx codebook that likely does better than this at low bitrates, and has a real half-bit (it's pairwise so you can feed an odd number of bits to it). Our team just finished a quant on Qwen 3.8 flash next, but I might be able to spin one up on Qwen3.8-27B to do a direct head-to-head.
+Ran a quick head-to-head on some pseudo weights via Claude too:
+- NariQ's codebook comes out within ±0.3% of mul1 on every site. Neither of its two changes matters much at K2: the 6-bit digits and the skipped E4M3 rounding each move the error by about 0.1%.
+- pmcgx L20 has 1.1% to 3.1% less error than mul1, so it beats NariQ by about the same margin.
+Update:
+- NariQ looks slightly better from K4-K6 f16 trellis (barely losing to mul1, which is the king there)
+Side-by-side codebooks:
+
+ mul1(s): nariq(s): pmcgx(w): # w = 20-bit state, 2 values
+ x = s * 0x83DCD12D x = s * 0x83DCD12D x1 = w * 0xCBAC1FED
+ t = sum(bytes(x)) t = sum(bytes(x) >> 2) x2 = w * 0xBCA14C51
+ v = fp16(1024 + t)*c + d v = t - 126 m1 = (x1 & 0x8FFF8FFF) ^ 0x3B603B60
+ return e4m3(v) return v # int, exact m2 = (x2 & 0x8FFF8FFF) ^ 0x3B603B60
+ a = fp16(m1.lo) + fp16(m2.hi)
+ b = fp16(m1.hi) + fp16(m2.lo)
+ return e4m3(a), e4m3(b)
+
+reply [reply?id=50617252&goto=item%3Fid%3D50611402%2350617252]
+
+ [vote?id=50622379&how=up&goto=item%3Fid%3D50611402#50622379]
+toebee [user?id=toebee] 13 hours ago [item?id=50622379] | parent [#50617252] | next [#50620428] [–] [javascript:void(0)]
+
+Hey, thanks for the feedback. Agreed that comparison against MUL1 is lacking. Still doing experiments on what the best format might be (hence the "v1 GGUF" naming). I did internally run against MUL1 in the experiment process and got similar results to yours. But chose it because the weights stay exact on BF16 and INT8 tensor cores, which may come in handy later (e.g. activation quants)
+I'm happy to changing the format to whatever works best, and I'd say it isn't our core contribution. And very cool work on pmcgx, will look into it!
+I think our contribution here is that we calculate loss counting only the tokens the model writes in agent sessions, which then drives a width allocator. + banded output-layer widths with two-sided rounding. This lowers KL by around 3x, compared to plain Trellis.
+
+reply [reply?id=50622379&goto=item%3Fid%3D50611402%2350622379]
+
+ [vote?id=50623885&how=up&goto=item%3Fid%3D50611402#50623885]
+mmastrac [user?id=mmastrac] 10 hours ago [item?id=50623885] | root [#50617252] | parent [#50622379] | next [#50620428] [–] [javascript:void(0)]
+
+Interesting - we've been working on something similar, but found that calibration on the full sessions, but with the bit allocation on model-written tokens only was the most successful approach. I'll have to see if it improves our output if we weight error only on model-written tokens, but from my experiments it seemed that this was getting us the best results in terms of KL.
+Our approach might be slightly different however, as we encode multiple bit widths and then select per-profile manifest with the lowest KL we can solve at a given size using the per-expert/layer encoded chunks. The most recent quantization run we did for GLM 5.3 has some of the numbers and all of the slices as well.
+https://huggingface.co/kindlingai/glm-5.3-exlr8-k2-k3-k4 [https://huggingface.co/kindlingai/glm-5.3-exlr8-k2-k3-k4]
+Appreciate the response. Happy to chat more. I did find the paper with a bit more info and I'll have to see if there's anything we can learn from your approach!
+
+reply [reply?id=50623885&goto=item%3Fid%3D50611402%2350623885]
+
+ [vote?id=50620428&how=up&goto=item%3Fid%3D50611402#50620428]
+xlayn [user?id=xlayn] 16 hours ago [item?id=50620428] | parent [#50617252] | prev [#50622379] | next [#50618082] [–] [javascript:void(0)]
+
+I have spent weeks now trying to improve performance of qwen 3.8 27B... up to the point where if the issue is memory bandwith that is not enough to saturate computing units you can somehow compress decompress either the context or the model but the thing is very probably close to non compressable... and that kind of makes sense... because it's unique data there.. so how we reduce 17GB of gguf to 10 with the exact same output of the f16 begs the question of what was lost?
+I'm not saying it cannot be done, just like jpeg can represent VERY closely a bmp.. or how youtube codec is almost black magic to condense so much information in so small space...
+Just saying, IF true, will be really nice
+
+reply [reply?id=50620428&goto=item%3Fid%3D50611402%2350620428]
+
+ [vote?id=50620658&how=up&goto=item%3Fid%3D50611402#50620658]
+hugmynutus [user?id=hugmynutus] 16 hours ago [item?id=50620658] | root [#50617252] | parent [#50620428] | next [#50618082] [–] [javascript:void(0)]
+
+> I'm not saying it cannot be done, just like jpeg can represent VERY closely a bmp
+You can just mjpeg (or the internal DCT) system for quants/KV compression, just FYI: https://arxiv.org/abs/2511.01815 [https://arxiv.org/abs/2511.01815]
+
+reply [reply?id=50620658&goto=item%3Fid%3D50611402%2350620658]
+
+ [vote?id=50620937&how=up&goto=item%3Fid%3D50611402#50620937]
+xlayn [user?id=xlayn] 15 hours ago [item?id=50620937] | root [#50617252] | parent [#50620658] | next [#50618082] [–] [javascript:void(0)]
+
+YES for sure, the question is what information is lost... to my eyes jpeg may be exactly the same that bmp... in part because of smart layout of data representation, in part because of parameters aim for a lot of information preservation, in part because my eyes have limits and to those limits (and the screen, the medium the environment, etc) they may see very close or the same... but to a graphic designer may not...
+the model is not a photo we observe, is a worker that operates on it's own data and I don't know what's the process get's from that jpegification... they may say... fine or output crap
+
+reply [reply?id=50620937&goto=item%3Fid%3D50611402%2350620937]
+
+ [vote?id=50618082&how=up&goto=item%3Fid%3D50611402#50618082]
+andai [user?id=andai] 19 hours ago [item?id=50618082] | parent [#50617252] | prev [#50620428] | next [#50620722] [–] [javascript:void(0)]
+
+Thanks for the info. As for votes, I wouldn't worry about it too much. Votes are mostly noise in my experience.
+Though I've noticed when I say something important, it tends to get downvoted (uncomfortable?) and when I say something silly, it tends to get upvotes (feels good?).
+So slightly worse than random, ime. (As far as the stated rules vs social rules go. Irks my autism!)
+I've hidden the votes and my score with a userscript to preserve my sanity.
+
+reply [reply?id=50618082&goto=item%3Fid%3D50611402%2350618082]
+
+ [vote?id=50620722&how=up&goto=item%3Fid%3D50611402#50620722]
+hugmynutus [user?id=hugmynutus] 15 hours ago [item?id=50620722] | prev [#50617252] | next [#50618147] [–] [javascript:void(0)]
+
+The fact the control model performed *that much better* in your harness compared to unsloth is fairly concerning. As it greatly undermines your point about the model.
+Interesting approach nevertheless.
+
+reply [reply?id=50620722&goto=item%3Fid%3D50611402%2350620722]
+
+ [vote?id=50622392&how=up&goto=item%3Fid%3D50611402#50622392]
+toebee [user?id=toebee] 13 hours ago [item?id=50622392] | parent [#50620722] | next [#50618147] [–] [javascript:void(0)]
+
+If you look at DeepSWE (the primary comparison), BF16 on our harness passes 45.0 tasks per round vs Unsloth's reported 45.65.
+
+reply [reply?id=50622392&goto=item%3Fid%3D50611402%2350622392]
+
+ [vote?id=50618147&how=up&goto=item%3Fid%3D50611402#50618147]
+exe34 [user?id=exe34] 19 hours ago [item?id=50618147] | prev [#50620722] [–] [javascript:void(0)]
+
+Did you reduce the context to 64k? I thought I got 200k from qwen 3.8 27b last time I tried.
+
+reply [reply?id=50618147&goto=item%3Fid%3D50611402%2350618147]
+
+ [vote?id=50622069&how=up&goto=item%3Fid%3D50611402#50622069]
+toebee [user?id=toebee] 13 hours ago [item?id=50622069] | parent [#50618147] | next [#50618898] [–] [javascript:void(0)]
+
+No. All benchmarks ran at the full 262K context. The speed comparison table just stops at 64K. The 3-bit file fits ~135K context on a 24 GB GPU and the full 262K in ~30 GB without KV / Activation quantization.
+
+reply [reply?id=50622069&goto=item%3Fid%3D50611402%2350622069]
+
+ [vote?id=50624582&how=up&goto=item%3Fid%3D50611402#50624582]
+exe34 [user?id=exe34] 8 hours ago [item?id=50624582] | root [#50618147] | parent [#50622069] | next [#50618898] [–] [javascript:void(0)]
+
+Oh right yes I think I had kv quantization on. So I'll have to try your model! Thanks for the explanation!
+
+reply [reply?id=50624582&goto=item%3Fid%3D50611402%2350624582]
+
+ [vote?id=50618898&how=up&goto=item%3Fid%3D50611402#50618898]
+contrahax [user?id=contrahax] 18 hours ago [item?id=50618898] | parent [#50618147] | prev [#50622069] [–] [javascript:void(0)]
+
+Same model Q4 in splash supports up to 262K context window
+
+reply [reply?id=50618898&goto=item%3Fid%3D50611402%2350618898]
+
+Guidelines [newsguidelines.html] | FAQ [newsfaq.html] | Lists [lists] | API [https://github.com/HackerNews/API] | Security [security.html] | Legal [https://www.ycombinator.com/legal/] | Apply to YC [https://www.ycombinator.com/apply/] | Contact [mailto:hn@ycombinator.com]
+
+Search:

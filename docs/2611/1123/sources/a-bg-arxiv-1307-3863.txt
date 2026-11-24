@@ -1,0 +1,1469 @@
+arXiv:1307.3863v2 [cs.CC] 9 Dec 2013
+                                       Algebraic Complexity Classes
+                                       Meena Mahajan
+
+                                             Abstract. This survey describes, at an introductory level, the
+                                             algebraic complexity framework originally proposed by Leslie
+                                             Valiant in 1979, and some of the insights that have been ob-
+                                             tained more recently.
+                                             Mathematics Subject Classification (2010). Primary 68Q15; Sec-
+                                             ondary 68Q05.
+                                             Keywords. algebraic complexity, circuits, formulas, branching
+                                             programs, determinant, permanent.
+
+
+
+
+                                       1. Introduction
+                                       In this survey, I am going to try and describe the algebraic complexity
+                                       framework originally proposed by Leslie Valiant [Val79, Val82], and
+                                       the insights that have been obtained more recently. This entire article
+                                       has an “as it appeals to me” flavour, but I hope this flavour will also
+                                       be interesting to many readers. The article is not particularly in-
+                                       depth, but it is an invitation to read [BCS97, Bür00a] and many
+                                       recent papers on the topic, and to start attacking the open problems
+                                       in the area.
+                                             Valiant started out with the mission of understanding the core
+                                       essence of reductions and completeness, as witnessed in both recur-
+                                       sive function theory and in computational complexity theory. He
+                                       provided an algebraic framework in which to interpet the clustering
+                                       of natural problems into completeness classes, even for problems of
+                                       an algebraic rather than combinatorial nature. He had a remarkable
+                                       hypothesis:
+
+                                       The idea for writing this survey came while the author was working on the Indo-
+                                       French CEFIPRA-supported project 4702-1.
+      Linear algebra offers essentially the only fast technique for
+      computing multivariate polynomials of moderate degree.
+Clearly, then, we are going to talk about polynomials, not languages
+or functions.
+
+
+2. Valiant’s original framework
+Let F be any field, and let F[x1 , . . . , xn ] be the ring of polynomials
+over indeterminates x1 , . . . , xn with coefficients from F. Consider a
+family (f ) of polynomials (fn )n≥1 , where each fn is in F[x1 , . . . , xs(n) ]
+for some function s : N −→ N. When should we say that (f ) is
+tractable? Clearly, if there are too many variables to keep track of,
+there cannot be tractability. So we will henceforth demand that s is a
+polynomially bounded function (∃c, ∀n, s(n) ≤ c + nc ); then the nth
+polynomial fn has O(nc ) variables. But that is of course not enough.
+      There are many ways in which we can set the bar for tractabil-
+ity. Here’s a first attempt. Can (f ) be computed by a formula of
+reasonable size? To elaborate further, a formula is an expression de-
+fined recursively:
+  1. for each c ∈ F, “c” is a formula of size 0 computing the polyno-
+     mial c,
+  2. for each indeterminate xi , “xi ” is a formula of size 0 computing
+     the polynomial xi , and
+  3. if F1 , F2 are formulas computing polynomials f1 and f2 , then
+     “(F1 + F2 )” and “(F1 × F2 )” are formulas of size size(F1 ) +
+     size(F2 )+1 each, computing the polynomials f1 +f2 and f1 ×f2
+     respectively.
+Notice that size(F ) is just the number of ring/field operations used
+to construct F .
+      Instead of such a recursive definition, we could have a more
+intuitive picture: a formula is a rooted binary tree where internal
+nodes are labeled + or × and leaf nodes are labeled from the set
+F ∪ X, where X is the set of indeterminates. The size is just the
+number of non-leaf nodes.
+      Now, for tractability, we could require that there is a polynomi-
+ally bounded function t : N −→ N and a family of formulas (Fn )n≥1
+such that each Fn computes fn and has size at most t(n). Let us use
+the notation VF to denote families of polynomials tractable in this
+sense. (VF: Valiant’s Formulas — of course, Valiant didn’t use this
+name! This class is also referred to as VPe : Valiant’s Polynomial-
+sized Expressions. Personally, I prefer VF. Also note, in formal logic,
+                                   2
+the formulas/expressions referred to above are called terms, hence
+VF means families with polynomial “termic complexity”. )
+      Here’s a second attempt: Can (f ) be computed by a straight-
+line program of reasonable size? As before, we will declare polynomial
+size to be reasonable. Straight-line programs are programs where in-
+structions involve adding or multiplying previously computed poly-
+nomials, no divisions and no conditionals (no if-then-else). In the
+more intuitive picture, they correspond to directed acyclic graphs
+where each node is a source node (indegree 0) labeled from the set
+F ∪ X, or has indegree 2 and is labeled + or ×. A designated sink
+node (outdegree 0) is the output node. Each node computes a poly-
+nomial in the obvious way, and the graph computes the polynomial
+at the output node. (The acyclicity constraint ensures that there is a
+linear ordering of the nodes such that each node, or instruction, only
+uses previously computed polynomials. This gives the straight-line
+program.) The size is the number of non-source nodes; again, this
+corresponds to the number of ring/field operations required. Such
+graphs are in fact exactly algebraic circuits, and we now look for
+polynomial size circuit families.
+      Clearly, this model generalises formulas. The catch is that it
+generalises it too much! To see why, consider the following circuit
+family: Cn has n + 1 nodes v0 , v1 , . . . , vn , and the labeling is v0 = x1 ,
+vi+1 = vi × vi for i ∈ [n]. The family of polynomials (fn ) computed
+                    n
+by (Cn ) is fn = x21 . Even for small integer values of x1 , writing down
+the value of fn (x1 ) is going to require exponentially many bits. How
+can we say that such a family (fn ) is tractable?
+      So we need to impose some additional restrictions. The obvious
+parameter to restrict is the degree of the polynomial. Say that the
+family (fn ) has moderate degree if for some polynomially bounded
+function d : N −→ N, the degree of each polynomial fn is at most
+d(n). If degree(fn ) = D is polynomially bounded, then on integer ar-
+guments with b-bit representations, the value of fn requires no more
+than poly(n, b) bits. (In general, it needs no more than poly(n, D, b)
+bits.) Henceforth, to qualify for the label tractable, a family (fn )
+must have polynomially bounded degree.
+      (Why didn’t we face this problem when considering V F ? Simply
+because a formula of size t cannot compute a polynomial of degree
+more than t + 1. Don’t just believe me; check this by induction on
+formula size.)
+      Now we have our second possible definition of tractability: (fn )
+is tractable if the sequence degree(fn ) is polynomially bounded, and
+there is a polynomially bounded function t : N −→ N and a family of
+                                     3
+straight-line programs, or algebraic circuits, (Cn )n≥1 , such that each
+Cn computes fn and has size at most t(n). Let us use the notation
+VP to denote families of polynomials tractable in this sense. (VP:
+Valiant’s analogue of the Boolean complexity class P. Valiant called
+these families p-computable [Val82].)
+
+      The well-studied polynomial family from linear algebra, the de-
+terminant of a matrix of indeterminates, is known to be tractable in
+this second sense. (To define the family (Detn ), imagine an n × n
+matrix An with a new indeterminate xij at each position (i, j), and
+let Detn be the polynomial that represents the determinant of An .
+Thus Det1 = x11 , Det2 = x11 x22 − x12 x21 , and so on. Clearly, this
+family satisfies the mandatory conditions: Detn has n2 variables and
+is of degree n.) This is not surprising; we know that the determinant
+can be computed efficiently (in polynomial time) over instantiated
+matrices using, say, Gaussian elimination. But to compute the sym-
+bolic determinant via a straight-line program, Gaussian elimination
+is apparently not directly of use because we can’t search for non-zero
+pivots and eliminate them (remember, no divisions and no condition-
+als). However, Strassen [Str73] gave a generic method of converting
+any straight-line program with divisions to a division-free straight-
+line program; the resulting program’s size is polynomially bounded
+in the original size, the number of variables, and the degree. Thus we
+can conclude that there are polynomial-sized straight-line programs
+for the symbolic determinant. There are more direct algorithms as
+well; Samuelson, Berkowitz, Csanky, ... . See [MV97] for an explicit
+description of circuits of size O(n4 ) (my favourite one – no surprise!).
+
+      Whether the determinant can be computed efficiently by for-
+mulas (is Detn in VF?) is still famously open. We know that it needs
+formula size at least Ω(n3 ), see [Kal85]. But we do know that it can be
+                                                        2
+computed by formulas of sub-exponential size 2O(log n) . This can be
+shown in many different ways, one of which we will look at a bit later,
+but the earliest demonstration of this follows from Csanky’s algo-
+rithm [Csa76], which uses binary arithmetic operations and O(log2 n)
+                                                       c
+parallel time. Thus if we use quasi-polynomial (2log n for some con-
+stant c) formula-size as the defining property for tractability (giving
+a class that we can call VQF), then again the family (Detn ) has long
+been known to be tractable. We could also use quasi-polynomial cir-
+cuit size as the defining property for tractability, giving a class that
+we can call VQP. But VQP obviously contains VP and VQF, so
+(Detn ) is in VQP; nothing new there. (Note: in defining VQF and
+VQP, the quasi-polynomial limit on formula or circuit size is over
+                                    4
+and above the requirement that the degree and number of variables
+are polynomially bounded.)
+      Does VP include essentially all interesting and natural polyno-
+mial families? We do not know. In fact, there is a large list of such
+polynomial families not known to be in VP. The most natural one is
+the permanent family (Permn ) where Permn is the polynomial rep-
+resenting the permanent of an n × n matrix An of indeterminates.
+It is tantalisingly similar to the determinant; just the sign term is
+missing.
+         X                n
+                          Y                                                   X n
+                                                                                Y
+Detn =          sign(σ)         xiσ(i)                           Permn =                 xiσ(i)
+         σ∈Sn             i=1                                                 σ∈Sn i=1
+
+Yet, it does not seem to be tractable. How “intractable” is it?
+      Mirroring the definitions of the Boolean complexity classes P
+and NP, Valiant proposed a notion of p-definability in [Val79]. A
+polynomial family (fn ) is p-definable if it can be written as an expo-
+nential sum, over partial Boolean instantiations, of another tractable
+family. Formally, a family (fn ) over s(n) variables and of degree d(n)
+is p-definable if s(n) and d(n) are polynomially-bounded, as always,
+and further, there exist a polynomially-bounded function m, and a
+family of polynomials (gn ) in VF, such that gn has s(n) + m(n)
+variables denoted {x1 , . . . , xs(n) , y1 , . . . , ym(n) }, and
+                                   1
+                                 1 X
+                                 X                    1
+                                                      X
+                  fn (x̃) =                   ...              gn (x̃, ỹ).
+                                y1 =0 y2 =0         ym(n) =0
+                                       P
+This looks like an algebraic analogue ·VF of the boolean class ∃·F ,
+where F is the class of languages decided by polynomial-size formu-
+las. But it is well-known that ∃ · F = NP, so this should be algebraic
+NP. Later, Valiant redefined p-definability (no, that is not a circular
+definition!) as exponential
+                   P         sums of families in VP, rather than VF;
+that is, VNP =        ·VP. For clarity, let us agree to temporarily re-
+fer to these two definitions as VNF (or VNPe ) and VNP. However,
+Valiant [Val82] showed that these two classes are in fact the same, so
+justPVNP will do. The proof involves showing that VP is contained
+in    ·VF. And it is of course easier to show upper bounds with the
+definition of VNP rather than VNF.
+      Now Valiant observed that not only (Detn ), even (Permn ) is p-
+definable. This should be similar to showing that the 0-1 permanent
+is in #P, right? Almost. We are dealing with symbolic polynomials,
+so we do not have the liberty of looking at an input value and deciding
+what to do next. Still, the basic idea is the same. For a statement
+                                    5
+S, let [S] denote the 0-1 valued Boolean predicate that takes value
+1 exactly when S is true. Then
+                                                        # n  n              
+                                             Y is a 0-1 Y
+                 n
+                                           "
+            X Y                    X                             X
+Permn =             xiσ(i) =                 permutation ·          Yij xij 
+           σ∈Sn i=1           Y ∈{0,1} n×n   matrix        i=1   j=1
+
+          Y is a 0-1
+        "               #
+          permutation      = [Y has at least one 1 in each row] ×
+          matrix
+                              [Y has at most one 1 in each line
+                               (line =row or column)]
+                                                                           
+                                            
+                                  n
+                                 YX   n              Y                     
+                           =            Yij               (1 − Yij Ykm )
+                                                                           
+                                 i=1 j=1
+                                                                           
+                                                          (i,j)6=(k.m);
+                                                         i=k or j=m
+
+
+Clearly, the polynomial family
+                                                          
+                                                                          
+        Yn X n            Y                               Y n   n
+                                                                  X
+gn =           Yij                        (1 − Yij Ykm )         Yij xij 
+                                                              
+        i=1 j=1
+                                                           i=1 j=1
+                             (i,j)6=(k.m);
+                            i=k or j=m
+
+
+has formulas of size O(n3 ), and Permn (x̃) = Y ∈{0,1}n×n gn (x̃, Y ),
+                                                           P
+
+so (Permn ) is in VNP.
+       So we have some families in VP (even VF), and some in VNP
+but maybe not in VP. How do we compare families? For compar-
+ing languages, we have many-one reductions and Turing reductions
+– what is the algebraic analogue? Valiant proposed projections, a
+most restrictive kind of reduction when dealing with Boolean classes,
+but completely natural in the algebraic context. We say that g ∈
+F[y1 , . . . , ym ] is a projection of f ∈ F[x1 , . . . , xn ] if g can be obtained
+from f by substituting a value in F ∪ Y for each variable in X. (For
+instance, if f = x1 x2 + x3 x4 , then the following are all projections
+of f : y1 + y2 , y1 y2 + 5, y1 y2 + y2 y3 , 2y 2 . But y12 y2 , y1 + y2 + y3 are
+not, because a projection cannot increase the degree or number of
+monomials.) Further, we say that a family (gn ) is a p-projection of
+a family (fn ) if each gn is a projection of some fm for an m not too
+far from n. That is, there is a polynomially bounded function t, and
+each gn is a projection of ft(n) . If we allow t to be quasi-polynomially
+bounded, we obtain qp-projections.
+                                         6
+      Using these notions of reductions, we have the usual notions of
+hardness and completeness for algebraic classes. Here’s what Valiant
+showed:
+   1. (Detn ) is hard for VF under p-projections (and is known to be
+      in VP).
+   2. (Detn ) is complete for the class of quasi-polynomial size formu-
+      las VQF under qp-projections.
+   3. Over fields with characteristic other than 2, (Permn ) is complete
+      for VNP under p-projections. Over fields of characteristic 2,
+      Permn equals Detn and hence is in VP and VQF.
+   4. Polynomial families associated with a number of NP-complete
+      languages are complete for VNP under p-projections.
+The first two follow from a proof that a polynomial computed by
+a size s formula is a projection of Dets+2 . (It uses the combinato-
+rial definition of determinant. as the signed weighted sum of cycle
+covers in an associated graph.) The hardness of (Permn ) for VNP
+mirrors the hardness of the Boolean permanent for the counting
+class #P . As in the case of the upper bound, additional care is
+needed to take into account non-access to an input instance and
+fully symbolic computations; in particular, the proof requires a mul-
+tiplicative inverse of 2 and hence fails over fields of characteristic 2.
+See [Val79, BCS97, Bür00a] for various versions of these proofs. See
+[Blä13] for a simplified gadget construction.
+
+
+3. The current status
+We now know much more about the classes VF, VP, VQP, VNP
+defined above, and about other similarly defined classes. Let’s review
+these results one by one.
+      Say that a family of polynomials (fn ) is a p-family if the number
+of variables in fn and the degree of F are polynomially bounded
+functions of n. We only consider p-families.
+      Recall that VP consists of p-families with polynomial-sized cir-
+cuits. Also note that algorithmically, circuit size roughly corresponds
+to number of processors needed in a parallel algorithm (associate one
+processor per gate), while circuit depth – the length of a longest path
+from the output node to an input node – corresponds to parallel time.
+      A clever construction due to Hyafil [Hya79] shows that any
+polynomial of degree D in M variables, computable by a circuit of
+size t, can be computed in parallel time O(log D × log(D2 t + M )).
+This is a depth-reduction of the circuit, and generalises Csanky’s re-
+sult which was specifically tailored for the determinant. Further, this
+                                   7
+algorithm has parallel multiplicative depth only O(log D); that is,
+any root-to-leaf path goes through at most O(log D) multiplication
+nodes. This is worth noting since multiplication seems a more costly
+operation than addition or subtraction. Unfortunately, the result-
+ing circuit, while shallow and depth-reduced, is rather large, roughly
+tlog D . Applying this construction would take us from polynomial-size
+circuits to shallow quasi-polynomial size circuits. Soon after this, an
+improved construction was presented by Valiant, Skyum, Berkowitz
+and Rackoff [VSBR83]; they achieved the same depth-reduction (and
+also O(log D) multiplicative depth) with size polynomial in tD. In
+particular, applying this construction to a circuit family (Cn ) wit-
+nessing that a polynomial family (fn ) is in VP, we see that (fn ) is
+in VSAC1 ⊆ VNC2 .
+       Wait, what exactly are these new classes? Again, we can think of
+them as analogues of Boolean classes. The Boolean circuit class NCi
+has circuits of polynomial size and O(logi n) depth. The class SACi is
+similarly defined, polynomial size, O(log i n) ∧-depth, and negations
+only at inputs. That is, if ∨ nodes are allowed to have unbounded
+in-degree, but ∧ nodes must have in-degree 2, then these circuits
+have depth O(logi n). (Hence the name SAC, for semi-unbounded
+alternation.) Clearly, NCi ⊆ SACi ⊆ NCi+1 . Now define the classes
+VNCi and VSACi as algebraic analogues of these, with × and +
+playing the roles of ∧ and ∨ respectively. In the Boolean world, we
+know that NC1 ⊆ SAC1 ⊆ NC2 ⊆ . . . ⊆ NC ⊆ P. In the algebraic
+world, however, VNC1 ⊆ VSAC1 = VNC2 = . . . = VNC = VP.
+       An important consequence of the depth reduction result of
+[VSBR83] is that the (Detn ) ∈ VQF result generalises to all of
+VP; VP ⊆ VQF. Another important consequence is that at quasi-
+polynomial size, formulas are as powerful as circuits; VQF equals
+VQP. Such an equivalence is not known for p-families at polyno-
+mial size. (It holds at exponential size, because polynomials in any
+p-family have only exponentially many monomials. An explicit sum-
+of-monomials expression gives an exponential sized formula.)
+       Even before the results of [Hya79, VSBR83], Brent [Bre74] had
+shown that depth-reduction is possible for VF. Any formula F can be
+rebalanced by identifying in it a suitably chosen node N and rewrit-
+ing F as a linear form in N , say AN + B. If N is properly chosen,
+then the polynomials A and B are computed by small sub-formulas
+(size at most half of F ) of F , and can be recursively rebalanced.
+The appropriate N is identified by using the tree separator lemma.
+This process yields a O(log size(F )) depth formula. Thus we conclude
+VF = VNC1 .
+                                    8
+       The depth reduction for VP from [VSBR83] proceeds similarly,
+but works on “proof-trees” or parse trees. Unfolding a circuit into a
+formula by systematically duplicating reused nodes may yield an ex-
+                                                 n
+ponential sized formula (recall the example X 2 .) Let us nonetheless
+do so. Now, a minimal sub-formula that includes the output node,
+both children of an included × node, and exactly one child of an in-
+cluded + node, computes a potential monomial whose degree is the
+number of leaf nodes in the sub-formula. Call such a sub-formula a
+proof tree. For a circuit computing a p-family of polynomials, we can
+ignore proof trees of super-polynomial size. For each polynomial-sized
+proof tree, the balancing technique described above should work. The
+catch is, there can be too many proof trees (there can be exponen-
+tially many monomials), and each proof tree could require cutting
+at a different node. The clever twist is the following: in the formula
+depth-reduction, A can be computed recursively because it is the
+partial derivative of F with respect to N . If F is now a circuit rather
+than a formula, then F may not be linear in N , so computing the
+partial derivative will not help. But if N is chosen to have degree
+more than half the degree of F , then this is indeed the case. So
+the algorithm of [VSBR83] computes, for each pair of nodes N, N ′ ,
+a new polynomial F (N, N ′ ); these polynomial are recursively con-
+structed, and whenever 2degree(N ) > degree(N ′ ), F (N, N ′ ) equals
+the partial derivative of N ′ with respect to N . Putting this together
+carefully gives the depth-required circuit. For details, see [VSBR83]
+itself. Also see [AJMV98a] and [Vol99] for uniform versions, where
+the task of describing the depth-reduced circuit given the original
+circuit is achieved using limited computational resources.
+
+     A couple of things slipped by almost unnoticed. We know what
+is meant by the degree of a polynomial, but what do we mean by
+degree(N )? This should be the degree of the polynomial computed at
+the node N , and indeed [VSBR83] use degree in this sense. But the
+uniform versions cannot do so, because computing the degree of a
+specified node in a given circuit is a completely non-trivial task! See
+the discussion about DegreeSLP in [ABKPM09, Kay10]. Fortunately,
+we can equally easily work with an upper bound on the degree of each
+node. And an upper bound u(N ) on the degree at each node N is easy
+to obtain: u(N ) = 1 if N is a leaf, u(N1 + N2 ) = max{u(N1 ), u(N2 )},
+u(N1 × N2 ) = u(N1 ) + u(N2 ). This upper bound is referred to as
+the complete formal degree of the circuit (as opposed to the degree
+of the polynomial it computes). However, just because the output
+node of C computes a polynomial of degree d, this does not imply
+that each node computes a polynomial of degree at most d. Higher
+                                     9
+degree monomials may get computed along the way, and get cancelled
+finally. Is it necessary, in terms of efficiency, to compute them? No! If
+C is of size s and computes a polynomial f of degree d, then we can
+construct a circuit C ′ of size O(sd2 ) computing the same polynomial
+and with each node computing a polynomial of degree at most d:
+just compute the homogeneous parts of f separately in the obvious
+way. Now C ′ will have complete formal degree O(d3 s). (See [MP08]
+for details.) Thus we could have defined VP in terms of circuits of
+polynomial size and polynomially bounded complete formal degree
+as well.
+      There is a much simpler proof of the fact that VP is contained
+in VNC. This proof yields a weaker upper bound of VSAC2 rather
+than VSAC1 , but is still beautiful, and is still enough to conclude that
+VP ⊆ VQF. I first saw this proof in a survey talk by Pascal Koiran
+at Dagstuhl [Koi10], and I wish I had come up with it myself! Let
+(fn ) be in VP, as witnessed by a circuit family (Cn ) with complete
+formal degree bounded by (dn ). To depth-reduce Cn , partition the
+nodes into 1 + ⌈log dn ⌉ parts; part k has nodes with formal degree
+in [2k−1 , 2k ). Treating the polynomials from parts i < k as variables,
+the nodes in part k form a skew circuit, where each × node has at
+most one child that is not an input node. (Multiplying two nodes
+both in part k would create high degree, giving rise to a node in part
+k + 1.) Now, skew circuits can be depth-reduced to VSAC1 rather
+easily, using a divide-and-conquer argument dating back to Savitch
+[Sav70]. Doing this separately for each part gives a VSAC2 circuit.
+     We just introduced a new kind of circuit there: skew circuits.
+Are they as powerful as general circuits? We do not know! Let’s
+define VPskew ; p-families of polynomials computed by polynomial-
+sized skew circuits. It turns out this is a great class to study, be-
+cause it exactly characterises the complexity of the determinant. Re-
+call what we have already seen; (Detn ) is hard for VF = VNC1
+and is in VP. The upper bound proof from [MV97] actually gives
+a skew circuit of size O(n4 ), but skew circuit constructions were
+known much earlier: in [Ven92], Venkateswaran first defined Boolean
+skew circuits to capture nondeterministic circuits, and subsequently
+many authors independently extended that study to arithmetic rings,
+[Dam91, Tod92, Vin91, Val92]. And the lower bound proof from
+[Val79] shows that polynomials computed by skew circuits are p-
+projections of the determinant, though it is not stated this way.
+Valiant showed that a formula can be converted to a certain kind
+of graph that we nowadays call an algebraic branching program or
+ABP (more about this below), and that polynomials computed by
+                                   10
+ABPs are p-projections of (Detn ). And we now know that ABPs are
+essentially skew circuits.
+       Time to define ABPs. These are directed acyclic graphs, with a
+designated source node s and a designated target sink node t (some-
+times there may be multiple target nodes), and with edges labeled
+from F ∪ X (similar to input nodes in a circuit). For any directed
+path ρ, the weight of ρ is the product of the labels of the edges on ρ.
+The polynomial pv computed at a node v is the sum of the weights
+of all directed sv paths. The polynomial computed by the ABP is
+just pt . Families computed by polynomial-size ABPs form the class
+VBP. (In some parts of the literature, edge labels are allowed to be
+linear forms in X. This does not significantly change the properties
+of ABPs as we discuss here. We’ll stick to the convention that labels
+are in F ∪ X.)
+       So why are ABPs and skew circuits essentially the same? ABPs
+to skew circuits: clearly, ps = 1, and for any other source node (in-
+degree 0) s′ , ps′ = 0. Look at an edge u → v of the ABP with label
+ℓ. Then pv has a contribution from pu × ℓ. Summing this over all in-
+coming edges at v gives a small circuit computing pv from previously
+computed values, and this circuit is skew. For the reverse simulation,
+reverse this construction: (1) introduce a source node s, (2) for each
+input node u labeled ℓ, add an edge s → u labeled ℓ, (3) for each
+node v = u + u′, create edges u → v and u → v labeled 1, and (4) for
+each node v = u × ℓ, create an edge u → v labeled ℓ.
+       So now we can add to the list of results at the end of Section 2:
+(Detn ) is complete for VBP = VPskew under p-projections.
+       In fact, we can add more. What makes the simulation from
+skew circuits to ABPs possible is the fact that at each × gate, one
+argument is easy. Toda [Tod92] took this argument further – it is
+enough if one argument is independent of the rest of the circuit. That
+is, for each × node α = β × γ, the entire sub-circuit rooted at either
+β or γ has no connection to the rest of the circuit except via this
+edge to α. (Equivalently, one of the edges into α is a bridge in the
+circuit.) Call such circuits weakly skew circuits. Toda showed that
+weakly skew circuits can be converted to skew circuits with linear
+size blow up. See also [MP08], where Malod and Portier made the
+size bounds in the conversions even more precise. So now we can say
+VBP = VPskew = VPws , where the subscript ws stands for weakly
+skew.
+       (Note: Neither [Tod92] not [MP08, Mal03] actually claimed lin-
+ear size blow-up. However, their constructions from weakly skew cir-
+cuits to ABPs, with the standard conversion from ABPs to skew
+                                   11
+circuits, does give linear blowup. As far as I can see, linear blowup
+for weakly-skew to skew circuits was explicitly observed in [KK08,
+Jan08, Gre12a].)
+      Taking this idea further, Malod and Portier provide a brilliant
+characterization of the class VP. Say that a circuit is disjoint if at ev-
+ery node α = β ◦ γ, where ◦ could be + or ×, the sub-circuits rooted
+at β and γ are disjoint. This is just a fancy (convoluted?) way of
+saying that the circuit is a formula. But now relax this constraint a
+bit. Say that a circuit is multiplicatively disjoint or MD if at every ×
+node α = β ×γ, the sub-circuits rooted at β and γ are disjoint. No re-
+strictions apply to + nodes. Like formulas, MD circuits of size s have
+complete formal degree bounded by s. But the MD restriction seems
+to allow more computation than formulas; for instance, weakly skew
+circuits are MD, and so MD circuits can compute (Detn ) in poly-
+nomial size. Malod and Portier showed that in fact polynomial-size
+MD circuits can compute everything in VP, but nothing more. That
+is, VP = VPMD . While this fact can also be deduced once we have
+depth-reduction to VSAC1 , Malod and Portier give a completely self-
+contained combinatorial proof which is very neat. Basically, imagine
+that each node in the VP circuit is labeled with its formal degree.
+Now make multiple copies of each node, inversely proportional to the
+formal degree. By carefully deciding which copies of its children to
+use to construct a copy of a node, multiplicative disjointness can be
+achieved with only polynomial blow-up in size.
+     A nice consequence of this characterisation
+                                           P         of VP is a simpler
+proof of the fact that VP is contained in ·VF. The key observation
+used is that a circuit is multiplicatively disjoint exactly when every
+proof tree is already a sub-graph of the circuit (even without any
+unfolding into a formula). See [MP08] for details.
+      Before we move on, we note another surprising relation be-
+tween ABPs and formulas: VF equals the class of p-families computed
+by polynomial-size ABPs of constant width. What is this resource
+“width”? Recall that an ABP is a DAG with edges going “in the
+direction from s to t”. Suppose we impose a layering constraint. The
+nodes of the DAG must be laid out at the vertices of a rectangular
+w × ℓ grid, the node s must be at position (S, 1) for some S ∈ [w],
+the node t must be at position (T, ℓ) for some T ∈ [w], and edges can
+only go across one layer, from (i, k) to (j, k + 1) for some i, j ∈ [w],
+k ∈ [ℓ − 1]. Of course, any ABP can be converted to one of this form:
+just sub-divide edges when necessary and label the sub-division path
+so that its weight is the original edge’s label (use lots of 1s). Now
+we say that w is the width of the layered ABP and ℓ is the length.
+                                  12
+A bounded-width branching program family (Bn ) is one where for
+some absolute constant c, each Bn has width at most c. Seems quite
+a squeeze – if we view moving from s towards t as an incremental
+computation, then at each stage we can carry forward just c inter-
+mediate polynomials. We shouldn’t be able to do much this way,
+right? Wrong! Ben-Or and Cleve [BOC92] showed, in a proof clev-
+erly extending Barrington’s famous characterisation [Bar89] of NC1
+by Boolean bounded-with branching programs, that every formula of
+depth D has an equivalent bounded-width branching program (that’s
+quite a mouthful; let’s agree to call it BWBP) of length 4D and width
+just 3! Since we already know that formulas can be depth-reduced
+and VF equals VNC1 , we see that VF is contained in a class that
+we can name VBWBP: polynomial-sized constant-width ABPs. The
+converse inclusion is easily seen to hold, again using a Savitch-style
+divide-and-conquer. Thus we have another characterisation of VF.
+      As a matter of curiosity, one may want to know: is the width-3
+upper bound tight? Allender and Wang [AW11] recently settled this
+question affirmatively: they show that a very simple polynomial can-
+not be computed by any width-2 ABP, no matter what the length.
+On the other hand, width-3 ABPs are universal, since every polyno-
+mial family has some formula family computing it. The question is
+one of efficiency: which families have polynomial-size width 3 ABPs?
+      OK, so we’ve had a plethora of class definitions, but just a
+handful of distinct classes: VF = VPe = VNC1 = VBWBP, VBP =
+VPskew = VPws , VP = VPMD , VQF = VQP, VNF = VNP.
+      As stated in [Bür00a], Valiant’s hypothesis says that VNP 6⊆
+VP, and Valiant’s extended hypothesis says that VNP 6⊆ VQP. Over
+fields of characteristic not equal to 2, these imply: Permn is not
+a p-projection of Detn , and Permn is not a qp-projection of Detn ,
+respectively.
+      Some miscellaneous results, in no specific order:
+  1. Let SymDetn be the polynomial that represents the determi-
+     nant of a symmetric n × n matrix of indeterminates Bn . (For
+     instance, SymDet2 = x11 x22 − x212 .) Clearly, (SymDetn ) is a
+     p-projection of (Detn ). The converse is also almost true. As
+     shown by Grenet, Kaltofen, Koiran and Portier in [GKKP11],
+     over any field of characteristic other than 2, Detn is a projection
+     of SymDetn3 . Characteristic 2 is a problem: symmetric matrices
+     correspond to undirected graphs, so each undirected cycle gives
+     rise to two directed cycles, and so to get a projection we need
+     division by 2. In characteristic 2, Detn itself is provably not a
+     projection of SymDetm for any m; see [GMT13]. The best that
+                                   13
+   we can currently say in characteristic 2 is that the squared de-
+   terminant (Detn )2 is a projection of SymDet2n3 +2 ; this is also
+   shown in [GKKP11].
+2. VQP is also characterized by quasi-polynomial-size weakly skew
+   circuits of polynomial degree. (From [VSBR83] it follows that
+   VQP = VQF; hence the above charcacterization. A direct proof
+   is presented in [MP08].) Several natural polynomials are com-
+   plete for this class under qp-reductions: the (Detn ) family, of
+   course, but also, the trace of iterated matrix product and the
+   trace of a matrix power. These families are all complete for VBP
+   under p-reductions.
+3. While we do not know the exact relationship betweenVQP and
+   VNP, (they both contain VP), we do know that VQP does not
+   equal either VP or VNP. Bürgisser ([Bür00a], Section 8.2) has
+   shown that there is an explicit family of polynomials (fn ) in
+   VQP that is provably not in VNP, let alone in VP. This fam-
+   ily is defined as follows: Consider numbers in base n. Let µ
+   range over all such numbers with m(n) = ⌈log n⌉ digits. More
+   precisely, let µ range over length-m(n) sequences over the al-
+   phabet {0, 1, . . . , n − 1}, and let kn (µ) denote the value of this
+   sequence, kn (µ) = m(n)            j−1
+                          P
+                             j=1 µj n     . Define fn as:
+                                                                 m(n)
+                                         X              kn (µ)   Y       µ
+      fn (x1 , . . . , xm(n) ) =                       22               xj j
+                                   µ∈{0,...,n−1}m(n)             j=1
+
+   Exploiting the fact that the distinct double exponentials appear
+   as coefficients in fn , Bürgisser shows that fn cannot be in VNP.
+         Furthermore, using m(n) = ⌈logi n⌉ gives a family of poly-
+                                          i
+   nomials f i in VQP with size O(nlog n ) but provably not in size
+           i−1
+   O(nlog n ), so within VQP there is a strict hierarchy.
+4. From the qp-completeness of (Detn ) for VQP, and the p-completeness
+   of (Permn ) for VNP, it follows that VNP ⊆ VQP if and only
+   if (Permn ) is a qp-projection of (Detn ). This is a very long-
+   standing open question. Originally the question of whether (Detn )
+   and (Permn ) are p-equivalent was posed by Pólya [P1́3], who
+   also showed that there is no way of expressing the permanent
+   as the determinant by only changing the signs of selected en-
+   tries (except for n = 2; flip the sign of a12 to get matrix B with
+   Det(B) = Perm(A)). (I haven’t myself seen Pólya’s note, but
+   have seen it referred to in various places.) Marcus and Minc
+   [MM61] showed that there is no size-preserving transformation
+   (Permn to Detn ), even if we relax the notion of projections
+                                   14
+   to allow linear form substitions for each variable. For    √ many
+   years, a linear lower bound was the best known (Ω( 2n) due
+   to [vzG87, Cai90, Mes89]), until Mignon and Ressayre [MR04]
+   showed that over the fields of characteristic 0 (eg real or com-
+   plex numbers), even if linear form substitutions are allowed
+   in projections, to express Permn as a projection of Detm , we
+   need m ≥ n2 /2. The same lower bound was obtained for fields
+   of characteristic other than 2 by Cai, Chen and Li [CCL10].
+   From Ryser’s work [Rys63] it follows that Permn is a projec-
+   tion of Detm for some m < n2 2n . More recently, Grenet showed
+   [Gre12b] via a very simple and neat construction that Permn
+   is a projection of Detm for m = 2n − 1. This is the best known
+   so far. Thus there is a huge gap between the lower and upper
+   bounds on what is called the determinantal complexity of the
+   permanent.
+5. It is natural to believe that the complexity of a p-family (fn )
+   in this framework is closely related to the computational com-
+   plexity of evaluating fn for a given instantiation of its vari-
+   ables. In [Bür00b], Bürgisser gave this belief a firm footing.
+   Consider a p-family (fn ) where fn depends on n variables. De-
+   fine its Boolean part BoolPart(f ) as a string function map-
+   ping x ∈ {0, 1}n to the binary encoding of fn (x). Note that we
+   have considered only Boolean values. Even so, evaluation may
+   seem difficult, because the circuits for (fn ) can involve arbi-
+   trary constants from the field. Bürgisser showed that assuming
+   the generalised Reimann hypothesis GRH, over fields of charac-
+   teristic zero, BoolPart(VP) has non-uniform multi-output NC3
+   circuits. Furthermore, assuming GRH, if Valiant’s hypothesis is
+   false over such a field, then the entire polynomial hierarchy has
+   (non-uniform) NC circuits.
+6. An extreme depth-reduction result is given by the highly in-
+   fluential paper of Agrawal and Vinay [AV08]. To first see the
+   context, note that any polynomial in n variables with degree d
+                                                                  n
+   has an unbounded fan-in depth-2 circuit of size 2O(d+d log d ) . (If
+   d ∈ Ω(n), then 2O(d) suffices, otherwise the second term in the
+   exponent makes up.) This is because we can just explicitly com-
+   pute all monomials of degree at most d, and add up the required
+   ones with suitable weights. Now, can we find circuits substan-
+                                                n
+   tially better than this, say even 2o(d+d log d ) , if we allow depth
+   to be increased a bit? Agrawal and Vinay showed that indeed
+   this is possible, even with depth 4, provided there is some cir-
+   cuit (not necessarily depth-reduced) of that size to begin with.
+
+                                15
+     The idea is extremely simple. Peform the depth-reduction from
+     [VSBR83] or [AJMV98b], and ensure with some additional care
+     that degree provably drops at × gates. (The price for this is
+     small: a × gate may have fanin upto 6, instead of 2.) Now,
+     choose a horizontal cut in the depth-reduced circuit so that for
+     the sub-circuit above it, and for the sub-circuits below it rooted
+     at gates on the cut, the “brute-force” construction described
+     above is small. Obviously there is a trade-off: if the cut is too
+     high up, the lower sub-circuits can have large explicit forms,
+     but if it is too low down, the upper sub-circuit can have large
+     explicit forms. Cut in the right place, and everything works out!
+          Subsequently the extreme depth-reductions have been pushed
+     further; see [Koi12, Tav13, GKKS13b]. The lower bound results
+     of [GKKS13a, FLMS13] show that the depth-reduction upper
+     bound from [Tav13] is tight and cannot be pushed any further.
+          This has significant implications for the quest for deran-
+     domizing algorithms for the well-studied problem ACIT (arith-
+     metic circuit identity testing) — checking if a given circuit com-
+     putes the identically-zero polynomial. But that is not directly
+     connected with this survey. One question it raises here is: what
+     kind of extreme depth-reduction can we achieve for VQP? Can
+     we stay within quasi-polynomial size?
+
+
+
+4. The syntactic multilinear world
+Much of the study concerning VP and VNP involves the families
+(Detn ) amd (Permn ). The polynomials in both families are multilin-
+ear. In principle, to compute a multilinear polynomial via a circuit,
+we need never compute intermediate polynomials that are not mul-
+tilinear. Let us call such circuits, where the polynomial computed
+at each node is multilinear, multilinear circuits. However, often it is
+the case that allowing non-multilinear terms at intermediate stages,
+and eventually cancelling them out, allows more efficient computa-
+tion (smaller circuits). This leads to the following quest: what kind
+of multilinear p-families have efficient multilinear formulas, or even
+multilinear circuits, where each intermediate polynomial is required
+to be multilinear? Even for the (Detn ) family, which we know is mul-
+tilinear and in VP, we do not know of polynomial-size multilinear
+circuits. That being the case, can we prove lower bounds?
+      This question is trickier than it seems at first glance, because
+given a circuit, even checking whether it is multilinear is non-trivial.
+                                  16
+Fournier, Malod and Mengel [FMM12] recently observed that check-
+ing multilinearity of a given circuit is computationally equivalent to
+the well-studied problem ACIT (arithmetic circuit identity testing)
+— checking if a given circuit computes the identically-zero polyno-
+mial.
+       So we may want a notion of certifiably multilinear circuits. One
+such notion is that of syntactic multilinearity, SM. A circuit is said
+to be syntactically multilinear if at every × node α = β × γ, the
+sub-circuits rooted at nodes β and γ operate on disjoint sets of vari-
+ables. Note that this is much more restrictive than multiplicative
+disjointness. But it certifies multilinearity, since no variable can ever
+get multiplied by itself. And syntactic multilinearity is easy to check
+computationally: it is violated if there is some node α = β × γ, some
+variable x, two input nodes I, I ′ labeled x, and paths from I to β
+and I ′ to γ.
+       If a family has efficient (polynomial-sized) SM circuits, then it
+has efficient multilinear circuits. The converse may not be true. But
+it is true if we look at formulas. Given a multilinear formula, identify
+an SM violation α, β, γ, x as above. Then we know by multilinearity
+of the polynomial p(α) that x does not appear in either p(β) or
+p(γ). In the appropriate sub-formula, set all instances of x to 0; the
+polynomials computed at and above α remain unchanged. Doing this
+systematically gives an SM formula of size no more than the original
+multilinear formula.
+       In the first major breakthrough, Ran Raz [Raz09] showed that
+for computation by SM formulas, and hence by multilinear formulas,
+both (Detn ) and (Permn ) need size nΩ(log n) . Clearly, this also means
+that they are not in SM-VNC1 .
+       Since (Detn ) is in VP and even in VBP, SM-VF is strictly
+weaker than VBP. But this is hardly a fair comparison: we have re-
+stricted VF to be SM, but not VBP and VP. Can we say that SM-VF
+is strictly weaker than SM-VBP or SM-VP? We do not know whether
+(Detn ) is in multilinear VP, let alone SM-VP, so a different family is
+needed as a separating example. Such an example was provided soon
+thereafter, again by Ran Raz [Raz06]. He constructed an explicit
+polynomial family that is in SM-VP and even in SM-VSAC1 , and
+showed that it needs SM-formula size nΩ(log n) and hence is not in
+SM-VNC1 . Improved lower bounds for constant-depth circuits and
+subclasses of formulas were subsequently obtained by Raz, Shpilka
+and Yehudayoff (see for instance [RY09], [RSY08]).
+       Let’s step back a bit. Why did we say “in SM-VP, and even
+in SM-VSAC1 “? Aren’t VP and VSAC1 the same? Well, we know
+                                     17
+that VP and VF can be depth-reduced. But can we assume that
+these depth-reduction tehniques preserve syntactic multilinearity?
+Fortunately, they do; Raz and Yehudayoff [RY08] showed that the
+depth-reduction of [VSBR83] preserves SM, so indeed SM-VP= SM-
+VSAC1 . Similarly, in [JMR12] it is observed that the formula depth-
+reduction of [Bre74] also does preserves SM, so SM-VF= SM-VNC1 .
+      What about other relationhips between the algebraic classes?
+We had considered ABPs – what certifies multilinearity there? It is
+easy to see that a read-once restriction, where on each path in the
+ABP each variable appears as a label at most once, does so. Let us
+therefore use read-once as the definition of syntactic multilinearity
+in ABPs. Then, as observed in [JMR12], the Savitch-style divide-and
+conquer argument preserves SM. So does the conversion from formu-
+las to ABPs, [Val79]. But the conversion from formulas to width-3
+ABPs, [BOC92], does not. In fact, Rao [Rao10] showed that even
+a significant generalisation of Ben-Or and Cleve’s technique, using
+polynomially many registers instead of just 3, cannot preserve syn-
+tactic multilinearity. Of course, there may be other ways of going
+from SM-VF to SM-VBWBP, but it could equally well be that the
+classes are distinct.
+      To get back perspective, in the SM world what we have seen so
+far is:
+            SM-VBWBP ⊆ SM-VF ⊆ SM-VBP ⊆ SM-VP
+As mentioned earlier, Raz [Raz06] showed that the inclusion from
+SM-VF to SM-VP is proper. Very recently, this was improved by
+Dvir, Malod, Perifel, and Yehudayoff [DMPY12]. They showed that
+in fact the inclusion SM-VF ⊆ SM-VBP is strict. Whether the first
+and the last inclusion are strict is still open.
+       The proof of [DMPY12] is a clever adaptation of the original
+technique from [Raz06]. Let us briefly examine this.
+       The central ingredient in Raz’s proof is randomly partition-
+ing the variables and analysing the rank of the resulting partial
+derivatives matrix. Consider a polynomial f on 2n variables X =
+{x1 , . . . , x2n }, and consider a partition of X into equi-sized sets Y ,
+Z. Consider a 2n × 2n matrix MfY,Z where rows and columns are
+indexed by subsets of Y and Z (equivalently, multilinear monomials
+over Y and Z respectively). The entry (my , mz ) is the coefficient
+of the monomial my · mz in f . Intuitively, if MfY,Z has high rank,
+then f should be hard. But high rank with respect to what parti-
+tion? Raz showed that if multilinear f has small SM-formula size,
+then for at least one partition (Y, Z) of X, MfY,Z will have low rank.
+(The existence of the partition witnessing low rank is proved using
+                                      18
+the probabilistic method; choose a partition at random, and analyse
+the probability that the resulting matrix has rank exceeding some
+threshold.) He also constructed an explicit family g in SM-VSAC1
+and showed that for every partition (Y, Z) of X, MgY,Z has high rank;
+hence g is not in SM-VF.
+      The non-trivial adaptation done in [DMPY12] is to consider not
+all partitions, but a fairly small set of what they call arc-partitions.
+They showed that if f is in SM-VF, then for at least one arc-partition
+(Y, Z) of X, MfY,Z will have low rank. They consider an explicit
+family g in SM-VBP and show that for every arc-partition (Y, Z)
+of X, MgY,Z has high rank. Hence g is not in SM-VF. The low-rank
+proof is again probabilistic, but it has a very appealing combinatorial
+flavour. So does the very definition of an arc-partition.
+
+
+
+5. More on completeness
+Assume that completeness is defined with respect to p-projections.
+If a family (fn ) is complete for a class, then understanding (fn )
+better allows us to understand the class better. If a natural family
+is complete for a class, then this is evidence that the class itself is
+natural.
+      Valiant started off with a proof that Perm is VNP-complete.
+He also showed that polynomial families associated with a number
+of NP-complete languages are complete for VNP under p-projections.
+So let us agree that VNP is a natural class.
+      What about VP? The family that naturally contrasts with Perm
+is Det, but Det is not yet known to be complete for VP (unless we
+allow qp-projections; that is not quite satisfactory). If this turns
+out to be the case, it will solve a major open problem, showing
+that polynomial-degree polynomial-size circuits are no more pow-
+erful than polynomial-size branching programs VBP. VBP seems a
+natural enough class, and Det and many other families are complete
+for it.
+      So what problems are complete for VP? One can construct a
+canonical family complete for VP. By canonical, I mean something
+similar to saying that
+ {hM, x, 1t i | M is an NDTM that accepts x in t or fewer steps}
+is NP-complete. Undoubtedly true, but it doesn’t give any new intu-
+tion about what NP is about. In the case of VP, the canonical family
+is not so trivial to construct (but not very difficult either).
+                                   19
+      The first description, with a very general completenes result,
+appears in [Bür00a] (see section 5.6, Cor 5.32(b)). Bürgisser shows
+that for every p-family h, the relativized classes VPh and VNPh have
+complete families with respect to p-projections. Since VPh = VP and
+VNPh = VNP whenever h itself is in VP, this gives families complete
+for VP and VNP as well. (In fact, it shows the existence of VNP-
+complete families, independent of Valiant’s original proof.) These
+complete families compute homogeneous components separately, to
+keep the degree small, and then add up the required parts. They are
+constructed by first defining generic polynomials, and then defining
+the appropriate projection / substitution. The generic polynomials
+capture the canonical notion referred to above.
+       Later, a more direct construction tailored for VP (as opposed
+to VPh and VNPh for all h) was described by Ran Raz [Raz10],
+and also appears in [SY10]. Here the proof of hardness exploits the
+fact that we can perform depth-reduction on VP circuits. (This was
+not needed in Bürgisser’s proof.) Roughly, here’s how it goes: For
+each natural number N , consider a circuit CN with nodes arranged
+in 2 log N + 1 layers numberd 0, 1, . . . , 2 log N . All even layers have
+exactly N nodes, and compute polynomials gi,j where i is the layer
+number, j ∈ [N ]. Odd layers are used to build these polynomials.
+At layer 0, the polynomials are just distinct variables, P     g0.j = xj . At
+higher layers, we have an inductive definition: gi+1,j = k,ℓ∈[N ] gi,k ·
+gi,ℓ ·yi,j,k,ℓ , where the yi,j,k,ℓ are new variables. Thus the nodes at the
+odd layers are the fanin-3 × nodes, and nodes at even layers (other
+than the 0 layer ) are + nodes with large fanin. (We can reduce the
+fanins to 2 later; it won’t change the polynomial computed.) The
+polynomial computed by this circuit at g2 log N,1 is pN . The total
+number of variables is O(N 3 log N ), and the circuit is also of size
+O(N 3 log N ). The degree of pN is 2N − 1. So (pN ) is in VP. Why
+is it VP-hard? Take any family (fn ) in VP. By the depth-reduction
+of [VSBR83], it can be computed in VSAC1 . The VSAC1 circuit Dn
+can be normalised to have alternating + and × nodes, with all ×
+nodes having fanin 2, and all leaves at the same depth. Choose N at
+least as large as min{size(Dn ), 2depth(Dn ) }, and also at least as large
+as the number of variables in Cn . Now, the computation of Dn can
+be embedded into CN : Choose the right number of + nodes at each
+even layer, and by carefully assigning 0,1 values to the y variables,
+ensure that they compute the required combinations of polynomials
+from the previous even layer.
+    The circuits described above are called universal circuits in
+[SY10], because every circuit is a projection of the universal circuit
+                                  20
+of appropriate size. And if we start with VP circuits, the projections
+are p-projections.
+       So now we know that VP has complete families under p-projections
+as well. But generic polynomials, universal circuits, and the polyno-
+mials they compute, are rather artifical. Are there other families that
+are defined independent of circuits and are VP-complete? Actually,
+we know very few. Recently, Stefan Mengel [Men11] made further
+progress here, considering polynomial families associated with con-
+straint satsfaction problems CSPs. (This builds on earlier work by
+Briquel, Koiran, Meer [BK09, BKM11], though they did not explic-
+itly look for VP-completeness.) Let’s first review what CSPs are.
+Think of them as generalising CNF-SAT. In CNF-SAT, each clause
+forbids one assignment to the variables in it. (eg the clause x1 ∨ x3
+forbids x1 = 0, x3 = 1.) In a CSP, variables can take values from a
+larger domain, not necessarily 0,1. Each constraint is like a clause;
+it has a set of variables, and it forbids certain combinations of as-
+signments to these variables. (eg on domain {a, b, c} a constraint on
+x1 , x2 could say that x1 6= x2 . That is, assignments aa, bb, cc are for-
+bidden, the other 6 assignments satisfy this constraint.) As in SAT,
+we look for assignments satisfying all constraints. If the domain has
+size 2, the CSP is Boolean. If each contraint involves 2 (or less) vari-
+ables, the CSP is binary. As usual, consider not just a CSP but a
+family of CSPs (Φn ), where Φn has domain Dn . For tractability, we
+will require that the CSP is p-bounded; that is, the CSP has bounded
+arity (for some fixed constant c, each constraint in every Φn looks at
+no more than c variables), and it has polynomial sized domains (in
+Φn , the variables take values from a set Dn , where the size of Dn is
+p-bounded). Now associate with each such CSP (Φn ) a polynomial
+family (Qn = Q(Φn )), where Qn is on the variable set {Xd | d ∈ Dn }
+and is defined as follows:
+                          X                          Y
+        Q(Φn ) =                   [a satisfies Φn ]        Xa(x)
+                    a:var(Φn )→Dn                       x∈var(Φn )
+                                                                |a−1 (d)|
+                         X                               Y
+                =                   [a satisfies Φn ]          Xd
+                    a:var(Φn )→Dn                       d∈Dn
+
+(Recall, [S] is Boolean, 1 if and only if statement S is true.) Mengel
+has this wonderful characterization of the complexity of the family
+(Qn ). The characterization involves associating with the CSP a graph
+G; this graph has a vertex for each variable and an edge between two
+variables if they occur simultaneously in some constraint. Now the
+treewidth and pathwidth of the graph (these parameters describe
+roughly how tree-like or path-like the graph is, if we can consider
+                                   21
+blobs of vertices. The smaller the blobs, the better the similarity. See
+[Bod98] for definitions and an overview.) relate to the complexity. It
+also involves an assignment bound: a CSP is c-assignment-bounded
+if for each constraint ϕ and each variable x in the constraint, the
+number of distinct values possible for x in assignments satisfying ϕ
+is bounded by c, even though the domain may be much larger. This
+seems like a strong condition, but recall that Boolean CSPs are by
+definition 2-assignment-bounded.
+     Enough of definitions! Here’s what Mengel shows:
+
+
+  1. For each p-bounded CSP (Φn ), (Q(Φn )) is in VNP. Every family
+     (fn ) in VNP is a p-projection of (Q(Φn )) for some p-bounded
+     (Φn ).
+  2. For each p-bounded CSP (Φn ) where Gn has bounded treewidth,
+     (Q(Φn )) is in VP. Every family (fn ) in VP is a p-projection of
+     (Q(Φn )) for some p-bounded binary (Φn ) where G is a tree
+     (treewidth 1).
+  3. For each p-bounded CSP (Φn ) where Gn has bounded path-
+     width, (Q(Φn )) is in VBP. Every family (fn ) in VBP is a p-
+     projection of (Q(Φn )) for some p-bounded binary (Φn ) where
+     G is a path (pathwidth 1).
+  4. For each p-bounded c-assignment-bounded CSP (Φn ) where
+     Gn has bounded treewidth, (Q(Φn )) is in VF. Every family
+     (fn ) in VF is a p-projection of (Q(Φn )) for some p-bounded
+     2-assignment-bounded binary (Φn ) where G has pathwidth at
+     most 26.
+
+
+The hardness proofs involve looking at the structure of parse trees
+for VP, witnessing paths for VBP.
+      Note that as stated, this falls slightly short of providing a single
+complete family for VP. However, applying the hardness reduction
+from universal circuits will yield a single CSP family that is VP-
+complete. To the best of my knowledge, this is the first instance of
+a VP-hardness result for a family defined (almost) independent of
+circuits.
+      All the above results require that the CSP has bounded arity.
+Unbounded arity seems to immediately give rise to intractability. If
+arity is unconstrained, can other types of restrictions still result in
+families in VP? For further progress in this direction, see [DM11,
+CDM13].
+                                  22
+6. Computing integers
+The questions concerning algebraic complexity classes are closely
+connected to another very intriguing question. Let N > 1 be any nat-
+ural number. Suppose we want to build up N from 1, using only +, −
+and ×. The most naive way of doing this would be N = 1+1+. . .+1.
+But depending on N there can be many other ways. Which is the
+most efficient way? That is, which way uses the least number of +
+or × operations? To do anything non-trivial, we must use + at least
+once, and the first time we use it we will generate 2. So let us not even
+count this mandatory +. How many more operations are needed?
+       We can state this as a question about circuits. Each way of
+building up N is an arithmetic circuit, or a straight-line program
+(SLP), that uses no constants other than 1 and 2. Let us denote
+by τ (N ) the size of the smallest such circuit computing N . (This
+is the τ complexity of N ). By definition, τ (1) = τ (2) = 0, and
+for all N > 2, τ (N ) > 0. Algorithms for computing N give upper
+bounds on τ (N ). For instance, to compute N = 2k , here’s an SLP:
+g0 = 2, gi+1 = 2 × gi for 0 ≤ i ≤ k − 2. Clearly, gi computes 2i+1 ,
+so τ (2k ) ≤ k − 1. But I’m sure you can already see better ways of
+doing this. From the circuit viewpoint, an explanation of why this
+is not the best is that the circuit corresponding to this SLP is skew.
+Surely we should be able to use non-skew gates and compute large
+numbers faster. Here’s another SLP that computes big numbers fast:
+                                                                     i
+f0 = 2, fi+1 = fi × fi for 0 ≤ i ≤ ℓ − 1. Clearly, fi computes 22 , so
+     ℓ
+τ (22 ) ≤ ℓ, a much better bound than the earlier 2ℓ − 1 at least for
+numbers of this form. Note that the way we used non-skewness, we
+produced a circuit with exponential formal degree (the degree at fi
+is 2i ), but we’re not worried about that for now. Now, using these
+                         ℓ
+compact circuits for 22 , we can build Pta better circuit for 2k by just
+                                                i
+using the binary expansion of k: k = i=0 bi 2 , where t = ⌊log k⌋ and
+                   Pt      i   Qt          i             i
+bt = 1. So 2k = 2 i=0 bi 2 = i=0 2bi ×2 = i:bi =1 22 . Compute all
+                                               Q
+the double powers using t operations, and then multiply the required
+ones using at most t operations. Overall, τ (2k ) ≤ 2t = 2⌊log k⌋.
+       We can use the same binary expansion idea to compute any N ,
+not just a power of 2. Compute all powers of 2 upto log N , and add
+the required ones. This shows that for all N , τ (N ) ≤ 2⌊log N ⌋ − 1.
+       So far we have not used any subtractions. But they can be very
+                               ℓ                          ℓ
+useful too. For instance, τ (22 − 1) ≤ ℓ + 1; compute 22 and subtract
+1.
+       What about a lower bound? We can actually formalise the in-
+                                                                        ℓ
+tuition that the exponential degree circuits we saw above for 22
+                                   23
+produce the largest possible number in that size. Hence, for any N ,
+τ (N ) ≥ log log N .
+                           ℓ
+       In particular, τ (22 ) = ℓ. That sounds impressive – we know
+                             ℓ
+the exact value of τ for 22 . But essentially just for that; for all other
+numbers, we still seem to have a pretty large gap. If N = 2k , then
+log log N ≤ τ (N ) ≤ 2⌊log k⌋ = 2⌊log log N ⌋, so we know τ (N ) within
+a factor of 2. But for general N , all we know is log log N ≤ τ (N ) ≤
+2⌊log N ⌋ − 1. How can we reduce this gap? An obvious search for
+an efficient way where the last operation is + or − is to express N
+as M ± k, compute M , compute k = ±(N − M ), and combine, and
+to choose M that minimizes τ (M ) + τ (k) + 1. (A similar approach
+can be used for factors of N and a × as the last operation.) But in
+computing M and ±(N − M ) (or N/M ), the complexity may be sub-
+additive since we can reuse intermediate numbers from the program
+for M while computing ±(N − M ) or N/M . (We are looking for
+circuits, not formulas.) It is identifying the extent of this reuse that
+is a challenge.
+       Similar to Shannon’s bound for functions and circuits (most
+functions require exponential sized circuits), de Melo and Svaiter
+[dMS96] showed that most numbers N have τ (N ) closer to the upper
+bound. They showed that for every ǫ > 0, most N satisfy τ (N ) ≥
+     log N
+(log log N )1+ǫ . Moreira [Mor97] improved this by showing that this
+holds even for ǫ = 0. (He also showed that for all ǫ > 0, there is an
+Nǫ such that for all N ≥ Nǫ , τ (N ) ≤ (1+ǫ)     log N
+                                          (log log N ) .) And yet, showing
+such lower bounds for specific numbers seems quite hard – the classic
+“searching for hay in a haystack” paradox.
+       Let’s move over from individual numbers to sequences of num-
+bers. Let (an )n≥1 be some sequence of natural numbers. When can
+we say that the sequence is easy to compute? Each number in the se-
+quence should be “easy” relative to its position in the sequence. That
+is, the sequence (bn ), where bn = τ (an ), should not grow very fast.
+One possible definition is that bn should be polynomially bounded
+                                  n
+in n. For instance, for an = 22 , we know that bn = n. Is that not
+moderate growth? Not really. Consider a function that maps a posi-
+tion n to not just the number τ (an ) = bn but to an SLP of size bn
+                                       n
+computing an . For the sequence (22 ), this function takes an input
+n represented in Θ(log n) bits, and outputs a circuit of size n, that
+is, exponential in the size of the input. That’s not moderate growth!
+       OK, so let’s say that a sequence (an ) is easy to compute if for
+some polynomial p(.), for each n, τ (an ) ≤ p(log n), and otherwise
+                                                                      n
+it is hard to compute. We’ve set up this definition so that (22 ) is
+hard to compute, while the sequences (n), (2n ) are easy to compute.
+                                    24
+Makes sense? Now let’s ask, what other sequences are easy? And
+what sequences are hard?
+      A sequence with famously open status is (n!). The completely
+naive SLP that constructs the first n numbers with n − 2 increments
+and then multiplies them shows that τ (n!) ≤ 2n − 4. But can this be
+improved significantly?
+                      √ Or is this sequence hard? The best we know
+is that τ (n!) ∈ O( n log2 n); see [BCS97]. Here is the interesting
+connection to algebraic circuit complexity. Building on a sequence
+of constructions by Cheng [Che04] and Koiran [Koi05], Bürgisser
+[Bür09] showed that if (n!) is hard to compute, then any algebraic
+circuit for the (Permn ) family that uses only the constants −1, 0, 1
+must be of superpolynomial size. If we can’t even compute the num-
+bers n! easily, then we cannot compute the polynomials Permn effi-
+ciently, unless we allow the use of constants that cannot themselves
+built up efficiently.
+      Analogous to the τ complexity of natural numbers, we can de-
+fine the τ complexity of polynomial families. Let τ (f ) denote the
+size of the smallest algebraic circuit using only the constants −1, 0, 1
+– call such a circuit constant-free – and computing f . We say that
+the family (fn ) has polynomially bounded τ complexity if for some
+polynomial p(n), and for each n, τ (fn ) ≤ p(n). Bürgisser’s result can
+now be stated as: if τ (Permn ) is polynomially bounded, then (n!) is
+easy to compute.
+      Let’s examine this a bit closely. Why do we state the hypoth-
+esis as “τ (Permn ) is polynomial”? Is this not equivalent to saying
+(Permn ) is in VP, and hence VNP = VP? Actually, it may not
+be equivalent. It is possible that (Permn ) has polynomial-sized cir-
+cuits but no polynomial-sized constant-free circuits. Conceivably,
+using other constants in intermediate computation and then can-
+celling them out could help. Recall that the proof of VNP-hardness
+of (Permn ) uses constants other than −1, 0, 1; 1/2 is needed. (As
+another example, recall how in showing that Detn is a projection of
+SymDetn , we needed the constant 1/2, even though all coefficients in
+Detn are −1, 0, 1.) So we can define a subclass of VP: families with
+constant-free circuits of polynomial size.
+      What can we say about such a subclass? As described above,
+Bürgisser has shown that if this subclass contains (Permn ), then (n!)
+is easy to compute. Under the same hypothesis,
+                                         √          he also shows that
+the sequences ⌊2n e⌋, ⌊(3/2)n ⌋ and ⌊2n 2⌋ are easy to compute.
+      Malod [Mal03] observed that unlike in the case of VP, for
+constant-free circuits we may not be able to bound complete for-
+mal degree. For VP, if the polynomial computed by a circuit of size
+                                   25
+s had degree d, we could find an equivalent circuit with formal de-
+gree d, and another with complete formal degree O(d3 s), with only
+polynomial blow up in size. Not so if constants aren’t freely avail-
+                                                 n
+able! Consider the polynomial family fn = 22 (x1 + . . . + xn ). With
+arbitrary constants, we have a circuit of size n. With only −1, 0, 1,
+                                                        n
+we have a circuit of size 2n + 1: build 2, build 22 , build the lin-
+ear form, multiply. But this circuit has exponential formal degree,
+and in fact, using only the constants −1, 0, 1, any circuit must have
+                                               n
+exponential formal degree to build up 22 . So this polynomial is
+in VP, it has constant-free circuits of polynomial size, but it does
+not have constant-free polynomial-size circuits with polynomially-
+bounded complete formal degree.
+      This leads to a definition of a further subclass VP0 , first defined
+in [Mal03]: polynomial families computed by constant-free circuits
+with polynomially bounded       complete formal degree. Define VNP0
+                        P      0
+analogous to VNP as        ·VP . Check back; our proof that (Permn )
+is in VNP also shows that (Permn ) is in VNP0 .
+      The hypothesis (Permn ) ∈ VP0 is stronger than saying that
+τ (Permn ) is polynomially bounded. What does it imply? Can it
+lead to more sequences being easier to compute? Firstly, note that
+(Permn ) ∈ VP0 does not immediately imply VP0 = VNP0 . All we
+can say is the following, shown by Koiran [Koi05]: If (Permn ) is in
+VP0 , then for every family (fn ) ∈ VNP0 , there is some polynomially-
+bounded function p(n) such that the family (2p(n) fn ) is in VP0 . That
+is, a “shifted” version of fn is in VP0 . The precise shift can be de-
+scribed as follows – we know that fn is a projection of Permq(n) for
+some polynomially bounded q(n), we assumed that Permq(n) can be
+computed by a circuit Cn of size and formal degree bounded by a
+polynomial function of n, we take p(n) to be the formal degree of Cn .
+Now Cn can be massaged to compute 2p(n) fn instead of Permq(n) .
+      This motivates another variant of easy-to-compute. Let’s say
+that a sequence (an ) of natural numbers is ultimately easy to com-
+pute if at least some shifted version of it is easy to compute. That is,
+there is some other integer sequence An such that the sequence an An
+is easy to compute. Note that if (an ) is not ultimately easy, then for
+infinitely many n, all non-zero multiples of an have large τ complex-
+ity. Using this property, under the hypothesis that n! is not even
+ultimately easy to compute, we can obtain a non-trivial derandom-
+ization of the Arithmetic-Circuit-Identity-Testing problem; see the
+last section of [ABKPM09]. Earlier, Koiran showed in [Koi05] that if
+n! is not even ultimately easy to compute, then we have some separa-
+tion: either VP0 6= VNP0 , or P 6= PSPACE. This is curious: we have
+                                    26
+a consequence involving Boolean classes as well. But it should not be
+so surprising. VP0 and VNP0 are computed by (sums of) constant-
+free poly-formal-degree algebraic circuits, and these are the arith-
+metic circuits that arise when we consider counting classes like #P
+that count accepting paths of Turing machines. This does not mean
+that VNP0 = #P; the former is a collection of polynomial families
+whereas the latter is a collection of functions from strings to whole
+numbers. But the complexity of evaluating polynomial families in the
+former collection, at Boolean arguments, is closely related to what
+the latter collection refers to. Koiran’s proof actually shows the con-
+trapositive: he first shows that if VP0 = VNP0 and P = PSPACE,
+then the sequence τ ((2ℓ )!) is polynomially bounded in ℓ. So con-
+sider instead of each n! the possibly larger factorial (2ℓ(n) )!, where
+2ℓ(n)−1 < n ≤ 2ℓ(n) . Then the sequence (bn ) = ((2ℓ(n) )!) is easy to
+compute, and each bn is a multiple of n!, so (n!) is ultimately easy
+to compute.
+      Since Permn is not known to be complete for VNP0 , what is?
+It turns out that for several other VNP-complete families, the hard-
+ness proofs use no constants other than −1, 0, 1 and the membership
+proofs use circuits with small formal degree; hence these families
+are complete for VNP0 as well. As a concrete example, consider the
+Hamilton cycle polynomial family HCn defined as follows: Let dis-
+tinct variables xi,j label the edges of the complete directed graph
+Dn . Let Cn denote the set of all directed Hamiltonian cycles in Dn ;
+elements of Cn can be described by cyclic permutations σ ∈ Sn .
+Then
+                                             X Y
+                HCn (x11 , . . . , xnn ) =          xi,σ(i)
+                                             σ∈Cn
+
+
+
+This family is complete for VNP0 ; ([Mal03]).
+     Returning to the question “What does (Permn ) ∈ VP0 imply?”;
+Koiran [Koi05] showed that it implies the sequence ⌊2n ln 2⌋ is easy
+to compute. He also improved the earlier-mentioned result in two
+ways, from “[(VP0 = VNP0 ) ∧ (P = PSPACE)] ⇒ (n!) is ultimately
+easy to compute” to “[(Permn ∈ VP0 ) ∧ (P = PSPACE)] ⇒ (n!) is
+easy to compute”.
+    Under the stronger hypothesis that VP0 = VNP0 , we can show
+more (again due to [Koi05]). If VP0 = VNP0 , then the sequences
+ P2n 2            n          n          n
+( i=1 2i −1 ), ⌊22 ln 2⌋, ⌊22 ln 3⌋, ⌊22 π⌋, all have polynomially bounded
+complexity, something that is not yet known unconditionally.
+                                  27
+Acknowledgements
+I thank Arvind and Manindra for inviting me to contribute to this
+volume in honour of Somenath Biswas, a wonderful professional col-
+league and friend.
+      I thank CEFIPRA for supporting an Indo-French collaboration
+(project 4702-1); many of my ideas for how to present this survey
+were crystallised during my visit to University of Paris-Diderot dur-
+ing May-June 2012.
+      I have picked material I find interesting, and have not really
+attempted an exhaustive coverage. I apologize in advance to those
+whose favourite results I have omitted.
+      I gratefully acknowledge many insightful discussions with Eric
+Allender, V Arvind, Hervé Fournier, Bruno Grenet, Nutan Limaye,
+Guillaume Malod, Stefan Mengel, Sylvain Perifel, B V Raghaven-
+dra Rao, Nitin Saurabh, Karteek Sreenivasaiah, Srikanth Srinivasan,
+V Vinay. I thank the organisers of the Dagstuhl Seminars on Cir-
+cuits, Logic and Games (Feb 2010) and Computational Counting
+(Dec 2010) for inviting me and giving me the opportunity to discuss
+these topics. The survey by Pascal Koiran at the Dagstuhl seminar
+on Computational Counting in Dec 2010 was particularly helpful.
+
+
+References
+[ABKPM09] Eric Allender, Peter Bürgisser, Johan Kjeldgaard-Pedersen,
+          and Peter Bro Miltersen. On the complexity of numerical
+          analysis. SIAM J. Comput., 38(5):1987–2006, 2009.
+[AJMV98a] E. Allender, J. Jiao, M. Mahajan, and V. Vinay. Non-
+          commutative arithmetic circuits: depth reduction and size
+          lower bounds. Theoretical Computer Science, 209:47–86,
+          1998.
+[AJMV98b] Eric Allender, Jia Jiao, Meena Mahajan, and V. Vinay. Non-
+          commutative arithmetic circuits: Depth reduction and size
+          lower bounds. Theor. Comput. Sci., 209(1-2):47–86, 1998.
+[AV08]      Manindra Agrawal and V. Vinay. Arithmetic circuits: A
+            chasm at depth four. In FOCS, pages 67–75, 2008. See also
+            ECCC TR15-062, 2008.
+[AW11]      Eric Allender and Fengming Wang. On the power of algebraic
+            branching programs of width two. In ICALP (1), pages 736–
+            747, 2011.
+[Bar89]     D.A. Barrington. Bounded-width polynomial size branching
+            programs recognize exactly those languages in NC1 . Journal
+            of Computer and System Sciences, 38:150–164, 1989.
+                                 28
+[BCS97]     P. Bürgisser, M. Clausen, and M.A. Shokrollahi. Algebraic
+            Complexity Theory. Springer, 1997.
+[BK09]      Irénée Briquel and Pascal Koiran. A dichotomy theorem for
+            polynomial evaluation. In MFCS, pages 187–198, 2009.
+[BKM11]     Irénée Briquel, Pascal Koiran, and Klaus Meer. On the ex-
+            pressive power of cnf formulas of bounded tree- and clique-
+            width. Discrete Applied Mathematics, 159(1):1–14, 2011.
+[Blä13]    Markus Bläser. Noncommutativity makes determinants hard.
+            In Proceedings of ICALP, volume 7965 of Lecture Notes in
+            Computer Science, pages 172–183. Springer, 2013. ECCC TR
+            2012-142.
+[BOC92]     M. Ben-Or and R. Cleve. Computing algebraic formulas us-
+            ing a constant number of registers. SIAM Journal on Com-
+            puting, 21:54–58, 1992.
+[Bod98]     Hans L. Bodlaender. A partial k-arboretum of graphs with
+            bounded treewidth. Theoretical Computer Science, 209(12):1
+            – 45, 1998.
+[Bre74]     R P Brent. The parallel evaluation of general arithmetic ex-
+            pressions. Journal of the ACM, 21:201–206, 1974.
+[Bür00a]   P. Bürgisser. Completeness and Reduction in Algebraic Com-
+            plexity Theory, volume 7 of Algorithms and Computation in
+            Mathematics. Springer, 2000.
+[Bür00b]   Peter Bürgisser. Cook’s versus Valiant’s hypothesis. Theor.
+            Comput. Sci., 235(1):71–88, 2000.
+[Bür09]    Peter Bürgisser. On defining integers and proving arithmetic
+            circuit lower bounds. Computational Complexity, 18(1):81–
+            103, 2009.
+[Cai90]     Jin-yi Cai. A note on the determinant and permanent prob-
+            lem. Inf. Comput., 84(1):119–127, 1990.
+[CCL10]     Jin-yi Cai, Xi Chen, and Dong Li. Quadratic lower bound for
+            permanent vs. determinant in any characteristic. Computa-
+            tional Complexity, 19(1):37–56, 2010.
+[CDM13]     Florent Capelli, Arnaud Durand, and Stefan Mengel. The
+            arithmetic complexity of tensor contractions. In STACS, vol-
+            ume 20 of LIPIcs, pages 365–376, 2013.
+[Che04]     Qi Cheng. On the ultimate complexity of factorials. Theor.
+            Comput. Sci., 326(1-3):419–429, 2004.
+[Csa76]     L. Csanky. Fast parallel inversion algorithm. SIAM J of Com-
+            puting, 5:818–823, 1976.
+[Dam91]     C. Damm. DET=L(#L) . Technical Report Informatik–
+            Preprint 8, Fachbereich Informatik der Humboldt–
+            Universität zu Berlin, 1991.
+                                  29
+[DM11]    Arnaud Durand and Stefan Mengel. On polynomials defined
+          by acyclic conjunctive queries and weighted counting prob-
+          lems. CoRR, abs/1110.4201, 2011.
+[DMPY12] Zeev Dvir, Guillaume Malod, Sylvain Perifel, and Amir Yehu-
+          dayoff. Separating multilinear branching programs and for-
+          mulas. In STOC, pages 615–624, 2012.
+[dMS96]   W. de Melo and B.F. Svaiter. The cost of computing in-
+          tegers. Proceedings of the American Mathematical Society,
+          124(5):1377–1378, 1996.
+[FLMS13]  Hervé Fournier, Nutan Limaye, Guillaume Malod, and
+          Srikanth Srinivasan. Lower bounds for depth 4 formulas com-
+          puting iterated matrix multiplication. Electronic Colloquium
+          on Computational Complexity (ECCC), 20:100, 2013.
+[FMM12]   Hervé Fournier, Guillaume Malod, and Stefan Mengel. Mono-
+          mials in arithmetic circuits: Complete problems in the count-
+          ing hierarchy. In STACS, pages 362–373, 2012.
+[GKKP11] Bruno Grenet, Erich Kaltofen, Pascal Koiran, and Natacha
+          Portier. Symmetric determinantal representation of weakly-
+          skew circuits. In STACS, pages 543–554, 2011.
+[GKKS13a] Ankit Gupta, Pritish Kamath, Neeraj Kayal, and Ramprasad
+          Saptharishi. Approaching the chasm at depth four. In IEEE
+          Conference on Computational Complexity, 2013.
+[GKKS13b] Ankit Gupta, Pritish Kamath, Neeraj Kayal, and Ramprasad
+          Saptharishi. Arithmetic circuits: A chasm at depth three.
+          In Foundations of Computer Science (FOCS), IEEE, 2013.
+          ECCC 2013-026.
+[GMT13]   Bruno Grenet, Thierry Monteil, and Stéphan Thomassé.
+          Symmetric determinantal representations in characteristic 2.
+          Linear Alg. Appl., 439(5):1364–1381, 2013.
+[Gre12a]  Bruno Grenet. Représentation des polynômes, algorithmes et
+          bornes infrieures. PhD thesis, École Normale Suprieure de
+          Lyon, 2012.
+[Gre12b]  Bruno Grenet. An upper bound for the permanent versus
+          determinant problem. manuscript, 2012.
+[Hya79]   Laurent Hyafil. On the parallel evaluation of multivariate
+          polynomials. SIAM J. Comput., 8(2):120–123, 1979.
+[Jan08]   Maurice J. Jansen. Lower bounds for syntactically multilin-
+          ear algebraic branching programs. In MFCS, volume 5162 of
+          Lecture Notes in Computer Science, pages 407–418. Springer,
+          2008.
+[JMR12]   M Jansen, M Mahajan, and B V Raghavendra Rao. Resource
+          trade-offs in syntactic multilinear arithmetic circuits. Com-
+          putational Complexity, page to appear, 2012. preliminary ver-
+          sions in MFCS 2008 and CSR 2009.
+                                  30
+[Kal85]   K. Kalorkoti. A lower bound for the formula size of rational
+          functions. SIAM J. Comput., 14(3):678–687, 1985.
+[Kay10]   Neeraj Kayal. Algorithms for arithmetic circuits. Electronic
+          Colloquium on Computational Complexity (ECCC), 17:73,
+          2010.
+[KK08]    Erich Kaltofen and Pascal Koiran. Expressing a fraction of
+          two determinants as a determinant. In ISSAC, pages 141–
+          146. ACM, 2008.
+[Koi05]   Pascal Koiran. Valiant’s model and the cost of computing
+          integers. Computational Complexity, 13(3-4):131–146, 2005.
+[Koi10]   Pascal     Koiran.     Complexity      of   arithmetic      cir-
+          cuits    (a    skewed     perspective).   In    Slides    from
+          Dagstuhl       seminar       10481.       DROPS,         2010.
+          http://www.dagstuhl.de/Materials/Files/10/10481/10481.KoiranPascal.Slides.
+[Koi12]   Pascal Koiran. Arithmetic circuits: The chasm at depth four
+          gets wider. Theor. Comput. Sci., 448:56–65, 2012.
+[Mal03]   G. Malod. Polynomes et coefficients. PhD thesis, Univ.
+          Claude Bernard Lyon 1, 2003.
+[Men11]   Stefan Mengel. Characterizing arithmetic circuit classes by
+          constraint satisfaction problems - (extended abstract). In
+          ICALP (1), pages 700–711, 2011.
+[Mes89]   Roy Meshulam. On two extremal matrix problems. Lin-
+          ear Algebra and its Applications, 114115:261 – 271,
+          1989. ¡ce:title¿Special Issue Dedicated to Alan J. Hoff-
+          man¡/ce:title¿.
+[MM61]    M. Marcus and H. Minc. On the relation between the deter-
+          minant and the permanent. Illinois Journal of Mathematics,
+          5:376–381, 1961.
+[Mor97]   Carlos Gustavo T. de A. Moreira. On asymptotic estimates
+          for arithmetic cost functions. Proceedings of the American
+          Mathematical Society, 125(2):pp. 347–353, 1997.
+[MP08]    Guillaume Malod and Natacha Portier. Characterizing
+          valiant’s algebraic complexity classes. J. Complexity,
+          24(1):16–38, 2008.
+[MR04]    Thierry Mignon and Nicolas Ressayre. A quadratic bound for
+          the determinant and permanent problem. In International
+          Mathematics Research Notices, pages 2004–4241, 2004.
+[MV97]    M. Mahajan and V Vinay. Determinant: com-
+          binatorics,       algorithms,       complexity.        Chicago
+          Journal       of      Theoretical       Computer       Science
+          http://www.cs.uchicago.edu/publications/cjtcs,
+          1997:5, dec 1997. Preliminary version in Proceedings of
+          the Eighth Annual ACM-SIAM Symposium on Discrete
+          Algorithms SODA 1997, 730–738.
+                              31
+[P1́3]    G. Pólya. Aufgabe 424. Archiv der Mathematik und Physik
+          (3), 20:271, 1913.
+[Rao10]   B V Raghavendra Rao. A Study of Width Bounded
+          Arithmetic Circuits and the Complexity of Ma-
+          troid Isomorphism. PhD thesis, The Institute of
+          Mathematical    Sciences,    Chennai,    India.,   2010.
+          http://www.imsc.res.in/xmlui/handle/123456789/177.
+[Raz06]   Ran Raz. Separation of multilinear circuit and formula size.
+          Theory of Computing, 2(1):121–135, 2006. preliminary ver-
+          sion in FOCS 2004.
+[Raz09]   Ran Raz. Multi-linear formulas for permanent and determi-
+          nant are of super-polynomial size. J. ACM, 56(2), 2009. pre-
+          liminary version in STOC 2004.
+[Raz10]   Ran Raz. Elusive functions and lower bounds for arithmetic
+          circuits. Theory of Computing, 6(1):135–177, 2010.
+[RSY08]   Ran Raz, Amir Shpilka, and Amir Yehudayoff. A lower bound
+          for the size of syntactically multilinear arithmetic circuits.
+          SIAM J. Comput., 38(4):1624–1647, 2008.
+[RY08]    Ran Raz and Amir Yehudayoff. Balancing syntactically
+          multilinear arithmetic circuits. Computational Complexity,
+          17(4):515–535, 2008.
+[RY09]    Ran Raz and Amir Yehudayoff. Lower bounds and separa-
+          tions for constant depth multilinear circuits. Computational
+          Complexity, 18(2):171–207, 2009.
+[Rys63]   H.J. Ryser. Combinatorial mathematics. Carus mathematical
+          monographs. Mathematical Association of America, 1963.
+[Sav70]   Walter J. Savitch. Relationships between nondeterministic
+          and deterministic tape complexities. J. Comput. Syst. Sci.,
+          4(2):177–192, 1970.
+[Str73]   V. Strassen. Vermeidung von divisionen. Journal of Reine U.
+          Angew Math, 264:182–202, 1973.
+[SY10]    Amir Shpilka and Amir Yehudayoff. Arithmetic circuits: A
+          survey of recent results and open questions. Foundations
+          and Trends in Theoretical Computer Science, 5(3-4):207–388,
+          2010.
+[Tav13]   Sébastien Tavenas. Improved bounds for reduction to depth
+          4 and depth 3. In MFCS, volume 8087 of Lecture Notes in
+          Computer Science, pages 813–824. Springer, 2013.
+[Tod92]   S. Toda. Classes of arithmetic circuits capturing the com-
+          plexity of computing the determinant. IEICE Transactions
+          on Information and Systems, E75-D:116–124, 1992.
+[Val79]   Leslie G. Valiant. Completeness classes in algebra. In STOC,
+          pages 249–261, 1979.
+                                32
+[Val82]     L. G. Valiant. Reducibility by algebraic projections. In Logic
+            and Algorithmic: International Symposium in honour of
+            Ernst Specker, volume 30, pages 365–380. Monograph. de
+            l’Enseign. Math., 1982.
+[Val92]     L. G. Valiant. Why is boolean complexity theory difficult? In
+            M. S. Paterson, editor, Boolean Function Complexity. Cam-
+            bridge University Press, 1992. London Mathematical Society
+            Lecture Notes Series 169.
+[Ven92]     H. Venkateswaran. Circuit definitions of nondeterministic
+            complexity classes. SIAM J. on Computing, 21:655–670,
+            1992.
+[Vin91]     V Vinay. Counting auxiliary pushdown automata and semi-
+            unbounded arithmetic circuits. In Proceedings of 6th Struc-
+            ture in Complexity Theory Conference, pages 270–284, 1991.
+[Vol99]     H. Vollmer. Introduction to Circuit Complexity: A Uniform
+            Approach. Springer-Verlag New York Inc., 1999.
+[VSBR83]    Leslie G. Valiant, Sven Skyum, S. Berkowitz, and Charles
+            Rackoff. Fast parallel computation of polynomials using few
+            processors. SIAM J. Comput., 12(4):641–644, 1983.
+[vzG87]     Joachim von zur Gathen. Permanent and determinant. Lin-
+            ear Algebra and its Applications, 96(0):87 – 100, 1987.
+
+Meena Mahajan
+The Institute of Mathematical Sciences, CIT Campus, Chennai 600 113,
+India.
+e-mail: [邮箱已隐去]
+
+
+
+
+                                  33
+

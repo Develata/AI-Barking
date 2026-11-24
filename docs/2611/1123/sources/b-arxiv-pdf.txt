@@ -1,0 +1,426 @@
+                                             NariQ: Sub-3-Bit Quantization for Long-Horizon
+                                                              Agentic Tasks
+
+
+                                                                                   Doyeob (Toby) Kim
+                                                                                        Nari Labs
+                                                                                   [邮箱已隐去]
+
+
+
+
+arXiv:2611.26157v1 [cs.LG] 19 Nov 2026
+                                                                                         Abstract
+
+                                                     Long-horizon agentic tasks require a model to call tools over many steps at contexts
+                                                     of 100K tokens or more, yet many low-bit quantization methods are calibrated
+                                                     on short web text and judged on perplexity. This mismatch is costly: existing
+                                                     quantizations of Qwen3.8-27B at or below 3 bits per weight match BF16 on shorter
+                                                     tasks like AIME, yet in published results solve at most 72% as many tasks as
+                                                     BF16 on DeepSWE, a long-horizon agentic benchmark. We propose NariQ, a
+                                                     trellis-coded post-training quantization method that calibrates on tokens generated
+                                                     by the BF16 model in agent sessions. On Qwen3.8-27B, NariQ at 3.0 and 2.5
+                                                     bits per weight stays level with BF16 on two long-horizon agentic benchmarks,
+                                                     DeepSWE and Terminal Bench, as well as on AIME and RealWorldQA. Our
+                                                     checkpoint at 2.0 bits per weight trails this performance. To our knowledge,
+                                                     these are the first quantizations at or below 3 bits per weight shown to match
+                                                     their full-precision version on long-horizon agentic tasks. We release the files as
+                                                     Qwen3.8-27B-NariQ-GGUF, with inference available through our llama.cpp fork
+                                                     at https://github.com/nari-labs/nari-llama.cpp.
+
+
+                                         1    Introduction
+
+                                         Language models are increasingly used as agents working on long-horizon tasks. For example, a
+                                         single task in DeepSWE [8], a popular software engineering benchmark, takes an agent on average
+                                         about 150 tool calls and 50 minutes, with a median context of 92K tokens.
+                                         Near 4 bits per weight, quantization already preserves such agentic performance. NVIDIA’s NVFP4
+                                         version of Qwen3.8-27B [16] stays within 1.6 points of BF16 on Terminal Bench [13] and solves at
+                                         least as many DeepSWE tasks as BF16 [9].
+                                         Below 4 bits, existing quantized models still do well on short tasks, but not on long-horizon ones. For
+                                         example, the 3-bit GSQ-RCO quantization of Qwen3.8-27B [10] stays within a point of BF16 on
+                                         AIME (96.9% against 97.7%). Yet in Unsloth’s reported results it fully solves only 63% as many
+                                         DeepSWE tasks as BF16 (Table 1).
+                                         We therefore ask whether we can quantize a model to 3 bits per weight or fewer without losing its
+                                         long-horizon agent capability. The answer decides whether capable agents can run on consumer
+                                         GPUs, where the weights must fit into 8–32 GB.
+                                         A better weight format alone is unlikely to close this gap. Random rotations make weights close to
+                                         Gaussian [1, 21], and on Gaussians, trellis codes are already within about 10% of the rate-distortion
+                                         bound at 2 bits (mean squared error 0.069 against 0.063) [22]. We instead ask which tokens a
+                                         quantized agent must get right. Many low-bit methods are calibrated on short chunks of web text [5]
+                                         and judged on perplexity and short benchmarks, which say little about agents. They weight every
+                                         calibration token equally, whereas an agent’s quality depends on the tokens it writes.
+
+
+                                         Preprint.
+We introduce NariQ, a post-training quantization recipe for long-horizon agentic use at 2.0, 2.5 and
+3.0 bits per weight. NariQ keeps the standard trellis code and changes which tokens the loss counts,
+which modules get which widths, and what data the scales are tuned on. It sets each module’s width
+from an estimate of that module’s own loss, which stays informative for trellis codes. It codes the
+output layer in bands by how likely the model is to predict each token, keeping every band at 2 bits or
+more to protect rare tokens.
+We evaluate agentic work, math, visual understanding and multilingual tasks. NariQ at 3.0 and
+2.5 bpw is level with BF16 within noise on all benchmarks we ran; at 2.0 bpw, it trails BF16.
+
+2   Method
+A file at B bpw uses B bits per text-model parameter, including codes, scales, labels, embeddings
+and the output layer. To build a file θ̂ whose next-token distribution stays close to BF16’s, we (1)
+quantize modules at several integer widths, (2) estimate their loss from gradients, (3) allocate widths
+within the budget, and (4) tune the scales.
+We trellis-quantize each rotated matrix [22], using input- and output-side statistics to compensate
+rounding error as in YAQA [23]. We retain input-only rounding unless two-sided rounding lowers
+held-out curvature-weighted error by at least 5%; almost every module uses both sides. NariQ adds
+four changes; Figure 1 shows their development sequence at 3.0 bpw.
+First, the end-to-end loss counts only model-written tokens. Agent traces contain long tool outputs
+and file contents that can dominate an all-token loss. For a calibration trace x (Section 3.1), let M
+index the tokens generated by BF16. Our objective is
+                                 1 X                                       
+                          L=             KL pBF16 (· | x<t ) pθ̂ (· | x<t ) .                       (1)
+                               |M|
+                                     t∈M
+Both models receive the same prefix x<t , including tool outputs. The mask selects prediction targets;
+it does not remove context tokens.
+Second, widths are allocated by each module’s own loss term. Since the KL is minimized at BF16,
+we use a second-order expansion around its weights and neglect interactions between modules’ errors,
+so the total loss is a sum of per-module terms. Take one module and flatten its weights into a vector:
+W at BF16 and Wk = W + Ek at width k. With H the module’s Hessian block at BF16, its loss
+term at width k is ℓk = 12 ⟨Ek , HEk ⟩. We take gradients of L on a file with every module at some
+width. Let c be the module’s width in that file and G its weight gradient; under the approximation,
+G ≈ HEc . RCO [7] scores a move to another width k ̸= c by the first-order change
+                             ⟨G, Wk − Wc ⟩ ≈ ⟨Ec , HEk ⟩ − ⟨Ec , HEc ⟩.                             (2)
+The first term measures how much the errors at the two widths align. They barely do: in held-out
+curvature estimates for four probe matrices, the curvature-weighted cosine between the 3-bit error
+and the 2-, 4- and 5-bit errors is 0.035, 0.009 and 0.004. We therefore neglect this term. The score is
+then about −2ℓc for every k ̸= c, whereas the quadratic loss change is ℓk − ℓc , so the score misses
+the loss at the destination width.
+NariQ instead uses the score to estimate the current loss: averaging 12 ⟨G, Wc − Wk ⟩ over k ̸= c gives
+an estimate of ℓc . The gradient estimates ℓc only at the current width. To predict the other widths,
+we assume a module’s loss scales with the code’s error: with rk the trellis code’s measured mean
+squared error at width k, which falls about 4× per added bit, we predict ℓk ≈ ℓc rk /rc . For example,
+a module’s loss at 2 bits is predicted as about 3.9 times its loss at 3 bits.
+Scaling a noisy gradient estimate to a distant width amplifies its noise. We combine estimates from
+several width assignments, rescaling to a common width and weighting by inverse variance. We use
+the mean plus two standard errors and apply a small positive floor.
+Let ℓ̂m,k be the resulting predicted loss for module m at width k. The allocation objective is
+                             X                                X
+                      min        ℓ̂m,km subject to Cfixed +       nm km ≤ BN,                       (3)
+                    km ∈Km
+                             m                                  m
+where nm is the module’s parameter count, Km its allowed widths, N the total text-model parameter
+count, and Cfixed the width-independent bits for scales, labels and tensors outside the allocation.
+
+
+                                                  2
+                                                                             GSQ-RCO IQ3_XXS
+                        Scalar GPTQ+GSQ, RCO widths                                        0.0592
+
+                              Trellis, re-rounded widths             0.0186
+
+               Sensitivity allocation, feed-weighted loss                0.0193
+
+                       Model-token loss + 2-s.e. margin           0.0110
+
+                                Second allocation round          0.0095
+
+                                    Two-sided rounding          0.0077
+
+                              lm_head bands, 2-bit floor        0.0070
+
+                                   Scale and norm tune          0.0068
+
+
+                                                        0.00    0.02     0.04     0.06
+                                                            Agent KL from BF16 at 3.0 bpw
+
+
+Figure 1: Development sequence at 3.0 bpw, ending at an earlier checkpoint. Trellis coding has
+3.2× lower agent KL than GPTQ+GSQ, with the scalar search’s probabilities re-rounded under
+trellis costs. Subsequent changes reduce KL a further 2.7×. The model-token step also adds the
+two-standard-error margin, so it does not isolate masking alone. Dashed: GSQ-RCO IQ3_XXS.
+
+
+Choosing one width per module makes this a multiple-choice knapsack problem. We use dynamic
+programming over a discretized budget, favoring the fullest feasible allocation. An exact-cost check
+enforces the storage limit, but global optimality is not guaranteed. The loss estimate fails at 1 bit: at
+2.0 bpw, moving the 12 modules the allocator had put at 1 bit up to 2 bits lowered KL by 7.2% for
+only 0.021 bpw, far more than predicted. Every linear layer therefore stays at 2 bits or more.
+Third, the output layer gets more bits for likely tokens. Only about 13% of its 248,320 tokens appear
+as generated tokens in our calibration traces, although every row contributes to the softmax. For a
+token with BF16 probability p, the KL curvature with respect to its logit is p(1 − p), which is close
+to p for all but the most likely tokens. We therefore rank rows by their mean predicted probability,
+as a proxy for sensitivity, and sort them into 16 bands of about 15,500 rows. We code each band at
+its own width, as a separate module in the allocation. Rare tokens still need some precision: in our
+tests, bands at 1 bit lowered KL on most traces but raised it on traces that use rare tokens, such as
+multilingual text, so every band keeps at least 2 bits. At 3.0 bpw the bands lower the mean per-trial
+KL by 12.1%. At 2.0 bpw the input embedding is also banded. It has no predicted probability, so its
+rows are ranked by how often each token appears in the input, and unlike output bands, its rare-token
+bands may use 1 bit.
+Fourth, scale tuning uses general data as well as coding traces. With codes and widths fixed, we
+tune every coded matrix’s scales and every norm weight to minimize L on coding agent traces and
+BF16 replies to general prompts (math, science, chat, code and long documents), weighted 70:30.
+An earlier 2.0 bpw file tuned on coding traces alone scored 77.3% on AIME against BF16’s 97.7%;
+adding the general data raised it to 86.0%.
+Format. We release the files as NariQ GGUFs [6]. The format rotates every matrix with randomized
+Hadamard blocks [21] of power-of-two size. In attention and DeltaNet layers, one side of most
+matrices is first shuffled by a seeded permutation. Because every block has power-of-two size, the
+format needs no Hadamard sizes tied to a particular model. The codebook is computed from the
+trellis state, as in EXL3 [24], so kernels decode the codes inside the matrix multiply.
+
+
+3     Evaluating Low-Bit Files on Agentic Tasks
+
+3.1   Data and Benchmarks
+
+Calibration and development traces. Agent sessions of the BF16 model on open-source software
+tasks, split by repository into calibration, development and reserve sets, with every repository shared
+with DeepSWE removed.
+
+
+                                                            3
+Table 1: Agent benchmarks, in our harness and as Unsloth reports them from its own harness
+(Section 3.2). Solved: DeepSWE tasks fully solved, of 113. Score: Terminal Bench mean test reward.
+% BF16: share of the same harness’s BF16. Bold: best quantized file in each harness.
+
+                                                    DeepSWE v1.1     Terminal Bench 2.1
+                  File                     bpw     Solved   % BF16   Score      % BF16
+                  Our harness
+                  BF16                       16       44       100    62.6          100
+                  Ours 3.0                 3.00       47       107    63.8          102
+                  Ours 2.5                 2.50       46       105    60.2           96
+                  Ours 2.0                 2.00       33        75    52.4           84
+                  Unsloth’s harness (reported)
+                  BF16                        16     45.7      100   59.15          100
+                  Unsloth UD-IQ4_XS         4.16     41.0       90    55.7           94
+                  Unsloth UD-Q3_K_XL 3.80            42.5       93    56.7           96
+                  EXL3 3.00 bpw             3.77     35.3       77    55.3           93
+                  GSQ-RCO IQ3_S             3.50     40.4       88    54.9           93
+                  Unsloth UD-IQ3_S          3.47     39.0       85    59.8          101
+                  GSQ-RCO IQ3_XXS           3.00     29.0       63    51.2           87
+                  EXL3 2.20 bpw             2.91     11.0       24    43.1           73
+                  Unsloth UD-Q2_K_XL 2.85            33.0       72    53.0           90
+                  GSQ-RCO IQ2_S             2.75     28.0       61    42.7           72
+                  Unsloth UD-IQ2_S          2.50     24.5       54    44.6           75
+                  GSQ-RCO IQ2_XS            2.50     19.0       42    37.8           64
+                  Unsloth UD-IQ2_XS         2.27     14.5       32    41.0           69
+
+
+
+Offline KL sets. KL from BF16 at model-written tokens on held-out agent traces (agent KL), on a
+reserve set never used for selection, and on general and math replies (Appendix A).
+DeepSWE v1.1 [8], at task-repository commit 0b9fabb. A software engineering benchmark of 113
+tasks from 91 repositories in five languages. Claude Code drives the model, which SGLang [31]
+serves. The agent runs with thinking on at maximum effort, up to 65,536 output tokens per request
+and a limit of 3 hours per task. Each task gets one attempt; agent failures count as zero, and no task is
+rerun. We report the DeepSWE score, the mean fraction of a task’s new tests that pass, the number of
+tasks solved, where every new and existing test passes, and paired differences with standard errors.
+Terminal Bench 2.1 [20]. Command-line tasks, each with its own tests and time limit. We run the 82
+tasks Unsloth reports on, with 3 attempts each, the same agent and settings as DeepSWE, and each
+task’s own time limit and internet access. We report the mean test reward over all attempts; a trial left
+without a grade counts as zero.
+AIME 2025+2026 [12], RealWorldQA [27] and MGSM [17]. Math, visual understanding and
+multilingual tasks, to measure what a file keeps outside coding. Thinking is on at the chat template’s
+default effort, with up to 131,072 output tokens for AIME and 32,768 for the others; a reply cut at
+the limit counts as wrong. We sample 8 replies per AIME problem (avg@8), 3 per RealWorldQA
+question and 1 per MGSM question, as in simple-evals [15].
+Settings shared by every benchmark. Every file, BF16 included, runs with the same settings: a
+262,144-token context window, the model card’s thinking-mode sampling (temperature 1.0, top-p
+0.95, top-k 20), and no retries.
+
+3.2   Baselines
+
+Agent benchmarks (Table 1). We run BF16 and our files in our harness. For other quantized files we
+use the DeepSWE and Terminal Bench 2.1 results Unsloth publishes for this model [25]: its Dynamic
+V3.1 GGUFs, GSQ-RCO’s GGUFs [10] and the EXL3 files [24]. Unsloth uses mini-swe-agent [19]
+and at least three passes per DeepSWE task [26]; we use Claude Code and one attempt. Table 1
+reports each file relative to its own harness’s BF16, but this normalization does not remove harness
+differences. Unsloth’s solved counts are its reported rates times 113, read from its chart to about
+±0.5 tasks.
+
+
+                                                     4
+                              Table 2: Benchmarks outside coding (%).
+
+                              File       AIME     RealWorldQA      MGSM
+                              BF16         97.7             82.4      94.0
+                              Ours 3.0     98.3             82.4      93.1
+                              Ours 2.5     96.5             81.3      91.8
+                              Ours 2.0     86.0             80.9      90.6
+
+
+Offline KL (Appendix A). We decode every published file of this model near our budgets, from
+GSQ-RCO, DASLab [3], Unsloth and EXL3, exactly to BF16 and score it with our code.
+
+4     Results
+4.1   Agent benchmarks
+
+At 3.0 and 2.5 bpw, our files are level with BF16 on DeepSWE (Table 1). They solve 47 and 46 tasks
+against BF16’s 44, and their DeepSWE scores are 84.9% and 84.5% against BF16’s 83.0% (paired by
+task, +1.9 and +1.5 points, s.e. 3.2 and 3.6). At 2.0 bpw, our file solves 33 tasks and scores 75.7%,
+7.3 points under BF16 (s.e. 3.3). In Unsloth’s reported results, every file at or below 3.0 bpw solves at
+most 72% as many tasks as its BF16.
+On Terminal Bench 2.1, our 3.0 and 2.5 bpw files score 102% and 96% of our BF16, within noise
+of it (paired by task, +1.2 and −2.4 points, s.e. 3.5 and 3.2), and our 2.0 bpw file scores 84%, 10.2
+points under (s.e. 3.5). The reported files at or below 3.0 bpw score 64–90% of Unsloth’s BF16.
+
+4.2   Beyond coding
+
+General ability holds (Table 2): on AIME, RealWorldQA and MGSM, our 3.0 bpw file is within a
+point of BF16 and our 2.5 bpw file within 2.2 points. At 2.0 bpw, the largest drop is on AIME, 11.7
+points.
+
+4.3   Size and speed
+
+NariQ’s text-only GGUFs, including embeddings and output layers, occupy 10.1, 8.4 and 6.8 GB
+at 3.0, 2.5 and 2.0 bpw. Vision adds a shared 0.9 GB BF16 projector; the original 55.6 GB BF16
+checkpoint includes vision and MTP. At these three budgets, our llama.cpp fork on one RTX PRO
+6000 generates 89, 99 and 112 tokens/s at a 4K-token context, and 71, 77 and 85 at 64K, for a single
+session.
+
+5     Related Works
+Codes and rounding. Low-bit formats include scalar and grouped codes [5, 11], and vector and
+trellis codes [4, 21, 22], often applied after random rotations [1, 21]. EXL3 [24] ships the trellis
+family for local inference. GPTQ [5] and LDLQ [1] round with the input Hessian, and YAQA [23]
+adds the output side. We use QTIP’s bitshift trellis with a computed codebook.
+Bit allocation and recovery. Mixed-precision allocation by sensitivity is established [29], and
+search methods such as EvoPress [18] and RCO [7] optimize widths against the end-to-end loss;
+GSQ-RCO [10] publishes files of this model built that way. Variable bit-width quantization [14]
+learns widths per group, down to about 1 bit on the output layer. Fine-tuning scales and other
+continuous parameters after quantization is common [2, 22]. Our allocator differs in reading the
+end-to-end gradient as each module’s own loss term, which remains informative for codes whose
+errors at different widths are uncorrelated.
+Generated calibration data. FAQ [28] regenerates calibration data with a larger model from the
+same family. OnQ [30] recovers low-bit reasoning through distillation on the quantized student’s
+own trajectories. NariQ instead uses fixed BF16-generated tool-use traces, restricts its loss to
+model-written positions, and allocates bits against that objective. We evaluate the resulting files on
+long-horizon agentic tasks.
+
+
+                                                   5
+6   Limitations and Future Work
+
+While our 3.0 and 2.5 bpw files are level with BF16 on all benchmarks we ran, evaluations on more
+models, more agent harnesses and more agentic benchmarks remain future work. At 2.0 bpw, our file
+trails BF16 by 7.3 points on DeepSWE and 11.7 on AIME, and we hypothesize that training beyond
+scales and norms can recover it.
+The multi-token prediction module is not yet quantized, and our llama.cpp fork is tuned for one GPU
+generation (SM120); other GPUs run it slower, and GPUs older than Ampere fall back to the CPU.
+We also plan to quantize the KV cache and activations, so long contexts fit on 16 GB consumer GPUs,
+and extend the study to more models and more budgets at or below 3 bits.
+
+
+7   Conclusion
+
+NariQ calibrates and allocates bits around model-written tokens in agent sessions. On Qwen3.8-27B,
+its 3.0 and 2.5 bpw files are level with BF16 on long-horizon agentic benchmarks. We release
+the files as Qwen3.8-27B-NariQ-GGUF, with inference available through our llama.cpp fork at
+https://github.com/nari-labs/nari-llama.cpp.
+
+Acknowledgments. AI tools assisted with writing, literature search, implementation, and research
+analysis.
+
+
+References
+ [1] J. Chee, Y. Cai, V. Kuleshov, and C. De Sa. QuIP: 2-bit quantization of large language models with
+     guarantees. In Advances in Neural Information Processing Systems, 2023.
+ [2] M. Chen, W. Shao, P. Xu, J. Wang, P. Gao, K. Zhang, and P. Luo. EfficientQAT: Efficient quantization-
+     aware training for large language models. In Proceedings of the 63rd Annual Meeting of the Association
+     for Computational Linguistics (Volume 1: Long Papers), pages 10081–10100, 2025. doi: 10.18653/v1/
+     2025.acl-long.498.
+ [3] A. Dadgarnia, S. Tabesh, M. Nikdan, M. Helcig, E. Kurtic, M. Kleinegger, and D. Alistarh. GSQ: Highly-
+     accurate low-precision scalar quantization for LLMs via Gumbel-softmax sampling. In Advances in Neural
+     Information Processing Systems, 2026. Accepted at NeurIPS 2026 (arXiv comment).
+ [4] V. Egiazarian, A. Panferov, D. Kuznedelev, E. Frantar, A. Babenko, and D. Alistarh. Extreme compression
+     of large language models via additive quantization. In International Conference on Machine Learning,
+     2024.
+ [5] E. Frantar, S. Ashkboos, T. Hoefler, and D. Alistarh. GPTQ: Accurate post-training quantization for
+     generative pre-trained transformers. In International Conference on Learning Representations, 2023.
+ [6] ggml-org. llama.cpp. https://github.com/ggml-org/llama.cpp, 2026.
+ [7] M. Helcig and D. Alistarh. Model compression with exact budget constraints via Riemannian manifolds,
+     2026.
+ [8] W. Huang, C. Lee, L. Tng, and S. Ge. DeepSWE: Measuring frontier coding agents on original, long-
+     horizon engineering tasks, 2026. Version 1.1, https://github.com/datacurve-ai/deep-swe.
+ [9] imec aistack. Lost in optimization: Does quantization hurt coding agents? https://aistack.imec-int.
+     com/blog/quantization, 2026. Blog post.
+[10] IST Austria Distributed Algorithms and Systems Lab. Qwen3.8-27B GSQ-RCO GGUFs. https://
+     huggingface.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF, 2026.
+[11] J. Lin, J. Tang, H. Tang, S. Yang, W.-M. Chen, W.-C. Wang, G. Xiao, X. Dang, C. Gan, and S. Han. AWQ:
+     Activation-aware weight quantization for LLM compression and acceleration. In Conference on Machine
+     Learning and Systems, 2024.
+[12] Mathematical Association of America. American Invitational Mathematics Examination. https://maa.
+     org/maa-invitational-competitions/, 2026. AIME I and II, 2025 and 2026.
+[13] NVIDIA. Qwen3.8-27B-NVFP4. https://huggingface.co/nvidia/Qwen3.8-27B-NVFP4, 2026.
+[14] H. Ogilvy. Variable bit-width quantization: Learning per-group precision for “bigger-but-smaller” language
+     models, 2026.
+[15] OpenAI. simple-evals. https://github.com/openai/simple-evals, 2024.
+[16] Qwen Team. Qwen3.8-27B. https://huggingface.co/Qwen/Qwen3.8-27B, 2026.
+[17] F. Shi, M. Suzgun, M. Freitag, X. Wang, S. Srivats, S. Vosoughi, H. W. Chung, Y. Tay, S. Ruder, D. Zhou,
+     D. Das, and J. Wei. Language models are multilingual chain-of-thought reasoners. In International
+     Conference on Learning Representations, 2023.
+
+
+                                                      6
+[18] O. Sieberling, D. Kuznedelev, E. Kurtic, and D. Alistarh. EvoPress: Accurate dynamic model compression
+     via evolutionary search. In International Conference on Machine Learning, 2025.
+[19] SWE-agent Team. mini-swe-agent. https://github.com/SWE-agent/mini-swe-agent, 2025.
+[20] The Terminal-Bench Team. Terminal-bench. https://www.tbench.ai, 2026.
+[21] A. Tseng, J. Chee, Q. Sun, V. Kuleshov, and C. De Sa. QuIP#: Even better LLM quantization with
+     Hadamard incoherence and lattice codebooks. In International Conference on Machine Learning, 2024.
+[22] A. Tseng, Q. Sun, D. Hou, and C. De Sa. QTIP: Quantization with trellises and incoherence processing. In
+     Advances in Neural Information Processing Systems, 2024.
+[23] A. Tseng, Z. Sun, and C. De Sa. Model-preserving adaptive rounding. In International Conference on
+     Machine Learning, 2026.
+[24] turboderp. ExLlamaV3. https://github.com/turboderp-org/exllamav3, 2025. Software.
+[25] Unsloth AI. Qwen3.8: How to run locally (Unsloth dynamic V3.1 GGUFs). https://unsloth.
+     ai/docs/models/qwen3.8, 2026. GGUF files at https://huggingface.co/unsloth/Qwen3.
+     8-27B-GGUF; accessed November 2026.
+[26] Unsloth AI. Dynamic 3.1 GGUFs. https://unsloth.ai/docs/basics/dynamic-3.0-ggufs/
+     dynamic-3.1-ggufs, 2026. Accessed November 2026.
+[27] xAI. Grok-1.5 Vision Preview. https://x.ai/news/grok-1.5v, 2024.
+[28] H. Xiao, W. Li, J. Guo, G. Jiang, G. Liu, and Y. Zhang. FAQ: Mitigating quantization error via regenerating
+     calibration data with family-aware quantization. In Findings of the Association for Computational
+     Linguistics: ACL 2026, pages 21441–21460, 2026. doi: 10.18653/v1/2026.findings-acl.1079. URL
+     https://aclanthology.org/2026.findings-acl.1079/.
+[29] Z. Yao, Z. Dong, Z. Zheng, A. Gholami, J. Yu, E. Tan, L. Wang, Q. Huang, Y. Wang, M. W. Mahoney, and
+     K. Keutzer. HAWQ-V3: Dyadic neural network quantization. In International Conference on Machine
+     Learning, 2021.
+[30] B. Zheng, J. Xiong, C. Wu, H. Shen, Z. Zhao, H. T. U. Chan, X. Liu, Z. Zhang, L. Shen, Z. Liu, and Z. M.
+     Mao. Right on Q: Recovering reasoning under quantization via self-generated trajectories, 2026.
+[31] L. Zheng, L. Yin, Z. Xie, C. Sun, J. Huang, C. H. Yu, S. Cao, C. Kozyrakis, I. Stoica, J. E. Gonzalez,
+     C. Barrett, and Y. Sheng. SGLang: Efficient execution of structured language model programs. In Advances
+     in Neural Information Processing Systems, 2024.
+
+
+A    Offline KL against public releases
+In Table 3, at 2.5 and 3.0 bpw the best published file in each budget group has 1.7–4.9× our KL on
+every set, with the same or more bits. At 2.0 bpw, Unsloth’s UD-IQ2_XS, with 0.27 bpw more, is
+slightly ahead on the math set (0.0819 against 0.0829); we lead on the other sets, by 2.1× on agent
+KL.
+Table 3: KL from BF16 at model-written tokens (lower is better). Agent and Reserve: held-out
+coding-agent sessions (Reserve never used for any choice). General: math, science, chat, code and
+long-document replies. Math: held-out math replies. Best per class in bold.
+
+              File                              bpw        Agent    Reserve   General      Math
+              Ours 2.0                          2.00       0.0284   0.0270     0.0841    0.0829
+              Unsloth UD-IQ1_M                  2.00       0.1823   0.2071     0.2931    0.3105
+              Unsloth UD-IQ2_XXS                2.14       0.0732   0.0851     0.1115    0.1024
+              EXL3 SC_1.40                      2.18       0.3135   0.3614     0.5536    0.5809
+              Unsloth UD-IQ2_XS                 2.27       0.0593   0.0686     0.0899    0.0819
+              EXL3 SC_1.60                      2.36       0.2415   0.2813     0.4181    0.4310
+              Ours 2.5                          2.50       0.0117   0.0109     0.0360    0.0314
+              GSQ-RCO IQ2_XS                    2.50       0.0623   0.0763     0.0928    0.0742
+              Unsloth UD-IQ2_S                  2.50       0.0453   0.0527     0.0680    0.0618
+              EXL3 SC_1.80                      2.55       0.1611   0.1893     0.2830    0.2873
+              EXL3 SC_2.00                      2.73       0.0573   0.0660     0.1060    0.1012
+              GSQ-RCO IQ2_S                     2.75       0.0435   0.0530     0.0613    0.0523
+              Unsloth UD-Q2_K_XL (V3.1)         2.85       0.0275   0.0318     0.0407    0.0364
+              EXL3 SC_2.20                      2.91       0.0484   0.0562     0.0836    0.0823
+              Ours 3.0                          3.00       0.0063   0.0060     0.0173    0.0148
+              GSQ-RCO IQ3_XXS                   3.00       0.0276   0.0333     0.0376    0.0308
+              Unsloth UD-IQ3_XXS                3.14       0.0239   0.0279     0.0390    0.0384
+              DASLab GSQ 3-bit                  3.24       0.0362   0.0436     0.0391    0.0283
+
+
+
+
+                                                       7
+

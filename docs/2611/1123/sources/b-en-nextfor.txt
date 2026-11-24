@@ -1,0 +1,173 @@
+NariQ fits Qwen3.8-27B into 10 GB with agent skills intact
+
+ [/]
+
+Home [/]AI Products [/products]AI News [/news]
+
+Home [/]AI News [/news]Models
+
+ModelsHot
+
+NariQ Fits Qwen3.8-27B Into 10 GB Without Losing Its Agent Skills
+
+A 27B model in a single file small enough for one consumer GPU is an old promise that usually breaks on long agent runs. Nari Labs says its 3-bit build doesn't, and published its own numbers to argue the point.
+
+Emily Carter
+
+🔥Heat: 900·Published 2026-11-24
+
+Dek: A 27B model in a single file small enough for one consumer GPU is an old promise that usually breaks on long agent runs. Nari Labs says its 3-bit build doesn't, and published its own numbers to argue the point.
+
+NariQ puts Qwen3.8-27B in a 10 GB gguf file
+
+Nari Labs published NariQ v1 on 20 November, a quantized release of Qwen3.8-27b at three widths: 3, 2.5 and 2 bits per weight. The repository ships Qwen3.8-27B-NariQ-3.0bpw.gguf, a 2.5bpw build, a 2.0bpw build and a BF16 mmproj file for the vision tower.
+
+The 3-bit file lands around 10 GB. For anyone used to a 27B model wanting 50 GB of BF16 weights, that's the whole pitch in one number: a model that fits on a single workstation card, or on a laptop with enough unified memory.
+
+NariQ is a compressed copy of an existing model, not a new one and not a fine-tune. That distinction matters when you read the claims, because the base model's behaviour sets the ceiling.
+
+The claim is narrow and testable. Nari Labs says the 3-bit and 2.5-bit files match BF16 on long-horizon agent tasks, math and image understanding. It says the 2-bit file is weaker on math and agents.
+
+Why 3-bit quantization breaks agent chains first
+
+Chat is forgiving. An agent isn't. A long-horizon run is a chain of tool calls where each step depends on the last, so a small quality loss doesn't stay small. It compounds.
+
+Ask a quantized model one question and a 2 percent error rate looks fine. Let it loop through twenty file edits and shell commands, and that rate decides whether the run finishes or dies in a broken state you have to debug by hand.
+
+That's why aggressive quants pass a demo and fail a job. The interesting part of NariQ isn't the file size. It's the attempt to hold agent behaviour at 3 bits, which is roughly where most compression schemes start falling apart.
+
+The NariQ numbers are self-reported
+
+Everything below comes from Nari Labs, on its own model card, measured with Claude Code CLI 2.1.309 at 262,144 tokens of context. Nobody has reproduced it. Does that make the figures worthless? Not quite, but it does make them an argument rather than a result.
+
+Variant
+
+Size
+
+What Nari Labs says holds
+
+3.0bpw
+
+about 10 GB
+
+Long agent runs, math, image understanding
+
+2.5bpw
+
+smaller
+
+Same claims as 3-bit, per the card
+
+2.0bpw
+
+smallest
+
+Weaker on math and agent tasks
+
+The headline comparisons are close enough to be noise, and worth stating plainly: DeepSWE fully solved tasks came in at 39.8 for BF16 and 41.0 at 3 bits. Terminal-Bench 2.1 was 62.6 against 63.8. AIME 25+26 was 97.7 against 98.3.
+
+The more useful figure is the share of each task's new tests that passed across three rounds: 83.1 percent for BF16, 82.9 at 3 bits, 83.2 at 2.5 bits, and 77.2 at 2 bits. That last number is where the story changes. Two bits isn't a smaller version of the same thing. It's a different, worse model on agent work.
+
+How NariQ was made: trellis codes on agent traces
+
+NariQ is post-training quantization, which means the base model is trained first and compressed afterwards. The calibration data is the interesting part: real coding-agent traces rather than generic text.
+
+Its trellis codes build on QTIP, a quantization method that packs weights into a structured codebook instead of rounding each number independently. Calibrating on agent traces pushes the error toward the kind of inputs an agent actually sees, which is a reasonable way to protect agent scores specifically.
+
+Only the language model is quantized. The multi-token prediction module isn't included yet, and the KV cache and activations stay in BF16. So the memory saving is real, and it isn't the whole model.
+
+The catch: NariQ needs a llama.cpp fork
+
+Here's the part that decides whether you can use it this month. The files need Nari Labs' own llama.cpp fork. Stock llama.cpp, Ollama and LM Studio can't load the new tensor types yet, and the team says it hopes to merge support upstream.
+
+Warning
+
+Without the fork, the GGUFs won't load at all. This isn't a drop-in Ollama pull, and no amount of prompt tuning fixes a tensor type the runtime doesn't know.
+
+Hardware coverage is uneven. The fork is tuned for SM120 cards such as the RTX PRO 6000. Older NVIDIA generations run slower than comparable GGUFs. Apple silicon is slower again. AMD and Intel GPUs aren't supported, and anything older than Ampere falls back to CPU execution, which isn't a practical option for a 27B model.
+
+An M3 Pro with 18 GB decodes at about 3.8 tokens per second with the 3.0bpw file, and 4.9 with the 2.0bpw file. That's readable, not comfortable. If your laptop is the target machine, budget for patience.
+
+Running NariQ as a local llm on your own GPU
+
+The documented path is one command on Linux with an NVIDIA GPU and driver 570 or newer. It downloads binaries and files, checks them, and fits the context to your card. Nari Labs suggests 32 GB or more for the full context window.
+
+Sampling settings are fixed in the card for agent work: temperature 1.0, top-p 0.95, top-k 20, thinking on. Copy them before you judge the model, because the difference between a working 3-bit agent and a broken one is sometimes just the sampler.
+
+For European teams weighing a local llm against an API, the appeal is straightforward. Prompts and code stay on hardware you control, which simplifies a data-protection review. The catch is that the hardware you control is probably one specific card generation right now.
+
+What to watch before you delete your BF16 weights
+
+Three things would change the picture. Upstream llama.cpp support would make the files ordinary GGUFs that Ollama and LM Studio can load. KV-cache quantization would cut memory further. And other 27B-class models getting the same treatment would turn a single release into a method.
+
+Until then, NariQ is a serious piece of work with a narrow deployment window. Test it on your own agent traces, on the fork, before you plan around it. The Hacker News thread passed 100 points, which tells you developers are interested, not that the numbers hold on your workload.
+
+Share This Story
+ [https://twitter.com/intent/tweet?text=NariQ+Fits+Qwen3.8-27B+Into+10+GB+Without+Losing+Its+Agent+Skills&url=https%3A%2F%2Fwww.nextfor.ai%2Fnews%2Fnariq-qwen3-8-27b-3-bit-quantization] [https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fwww.nextfor.ai%2Fnews%2Fnariq-qwen3-8-27b-3-bit-quantization] [/cdn-cgi/l/email-protection#f0cf8385929a959384cdbe918299a1d5c2c0b6998483d5c2c0a187959ec3dec8ddc2c7b2d5c2c0b99e849fd5c2c0c1c0d5c2c0b7b2d5c2c0a79984989f8584d5c2c0bc9f83999e97d5c2c0b98483d5c2c0b197959e84d5c2c0a39b999c9c83d6919d80cb929f9489cdbe918299a1d5c2c0b6998483d5c2c0a187959ec3dec8ddc2c7b2d5c2c0b99e849fd5c2c0c1c0d5c2c0b7b2d5c2c0a79984989f8584d5c2c0bc9f83999e97d5c2c0b98483d5c2c0b197959e84d5c2c0a39b999c9c83d5c0b1d5c0b19884848083d5c3b1d5c2b6d5c2b6878787de9e958884969f82de9199d5c2b69e958783d5c2b69e91829981dd8187959ec3ddc8ddc2c792ddc3dd929984dd8185919e84998a9184999f9e]
+
+Sources
+
+nari-labs/Qwen3.8-27B-NariQ-GGUF
+
+Hugging Face · 2026-11-20 · Official docs · Supports
+
+View Original [https://huggingface.co/nari-labs/Qwen3.8-27B-NariQ-GGUF]
+
+NariQ: BF16-level Qwen3.8-27B in a 10 GB file
+
+Hacker News · 2026-11-23 · Other · Supplements
+
+View Original [https://news.ycombinator.com/item?id=50611402]
+
+Related AI News
+
+ [/news/z-ai-glm-5-4-loop-transformer-750b]
+
+Models
+Z.ai's GLM-5.4 Runs 28 Layers Twice to Punch Above Its 750B Size
+
+The new flagship reuses a block of layers instead of adding fresh weights, and Z.ai says that puts it level with models two to three times its size. The evidence so far comes from a much smaller stand-in.
+
+🔥Heat: 1,450·2026-11-24
+
+ [/news/daisyrose-27b-agentic-coding-model]
+
+Models
+RadixArk Fine-Tuned a 27B Model on 1,200 Tasks and It Beat the Original Everywhere
+
+RadixArk took an existing open model, spent 18 days and about 1,200 hand-built tasks on it, and changed nothing about its shape. The gains are real, and the absolute scores are still low.
+
+🔥Heat: 1,330·2026-11-21
+
+ [/news/inkling-2-mini-looped-transformer]
+
+Models
+Inkling 2 Mini Fits on a Laptop by Running the Same Layers Three Times
+
+Thinking Machines Lab built a model that thinks longer by running the same block of layers three times. The trick buys reasoning without extra memory, and the bill comes due somewhere else.
+
+🔥Heat: 1,710·2026-11-21
+
+ [/news/rumble-2-flash-open-speech-model]
+
+Models
+A 0.5B Speech Model Just Matched a 30B One on Real Phone Calls
+
+Reson8 shipped a half-billion-parameter transcription model that gets within a tenth of a point of a 30B rival on noisy phone calls. The interesting part is what that does to a per-minute bill.
+
+🔥Heat: 560·2026-11-19
+
+ [/]
+Discover, compare, and understand AI apps, models, skills, and MCP servers.
+
+DirectoryDirectory
+
+Products [/products]
+
+ResourcesResources
+
+AI News [/news]
+
+© 2026 NextFor AI. All rights reserved.
+
+English
