@@ -127,7 +127,7 @@
 5. SHOULD_FIX“按提交时间……公开”混用口径：采纳，改为“OpenAI 随后也公开同题论文（提交时间晚约5小时）”；“随后”另有两仓库 PR 合并先后支持（Anthropic 北京 05:43:50，OpenAI 09:30:38）。
 6. NICE_TO_HAVE 截图时段写错：采纳，改为 01:12–01:35。
 7. NICE_TO_HAVE 配图说明残留“尚未合格”：采纳，已同步。
-8. NEEDS_VERIFICATION AISI 风控：仍交终审，由 Develata 决定。
+8. NEEDS_VERIFICATION AISI 风控：Develata 终审（北京 11-25）决定保留。
 
 视觉复核（Codex gpt-6-astra，effort medium，只读，22 张图；北京 11-25 约 01:45）：PASS / no blocker；3 项 SHOULD_FIX。处理：速览 Shirudo 补“自测”与 Claude Ship 开放范围两条，与反向核验第 2 轮一并改（见上）；`08-vp-ai-readers.png` 关键句太小：采纳，底图改为 Q.1 段首行加末两行拼接（`barking shot stack`，1000×122），段首保留以示出处；因整行宽度不变，关键句字号只比原版略大（底图宽 1000 px，再窄会切断行）。
 
