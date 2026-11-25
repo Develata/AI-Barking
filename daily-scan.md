@@ -73,11 +73,6 @@
 
 | 期次 | 标签 | 事实 |
 |---|---|---|
-| 1121 | Anthropic | Anthropic IPO 交割：含超额配售共11.27亿股，每股83美元 |
-| 1121 | OpenAI | OpenAI 自家药化基准：GPT-6.2-Astra xhigh 得84.5% |
-| 1121 | 腾讯 | 腾讯 Hy4 开放权重；年营收超5000万美元的模型托管商对外服务须另获许可 |
-| 1121 | 数学 | 数学家 Sutherland：黎曼猜想 Lean 证明重建，导出文件逐字节一致 |
-| 1121 | Runway | Runway 自报：10月合并的 PR 中38%由云端智能体驱动，6月为0.1% |
 | 1122 | 智谱 | 智谱 GLM-5.4 先向编程套餐用户开放，官方称智能达到2-3T级模型 |
 | 1122 | OpenAI | OpenAI 首席科学家提议按困惑度等设上限、监控能力达标前不越过，未给数值 |
 | 1122 | Claude | 11月23日17:39至17:56，多款 Claude 模型报错率升高 |
@@ -90,6 +85,11 @@
 | 1123 | 安全评测 | 英国 AISI：同一 AI 监控器换攻击生成法，成功攻击漏报0.2%到23% |
 | 1123 | 购物 | a16z 测购物 AI 代理：允许游客结账的网店，81%的运行走到表单末尾 |
 | 1123 | 量子 | DeepMind 智能体改进量子算法，称所需资源可能仍超首批纠错量子机 |
+| 1124 | 音乐 | Tidal 称12月9日起拒收并下架完全 AI 生成的曲目，AI 辅助的仍可上 |
+| 1124 | 数学 | OpenAI 预印本称矩阵乘法指数在任意域上恰为9/4，形式化只覆盖无除法电路 |
+| 1124 | 世界模型 | 高德开源 ABot-World 小版，称单卡 RTX-5090 每秒21帧 |
+| 1124 | 翻译 | 腾讯开源 Hy-MT3 翻译模型，支持语种由38种增至102种 |
+| 1124 | 预测 | Mantic 称200道数值题自测，预测智能体得分约同中档 Fable-5.2 |
 
 ## 已发过
 
@@ -156,3 +156,4 @@
 | 1121 | AI写代码漏了密钥，用户提示词被下载：【AI 推理供应链】Dragos 往各家 AI 服务发约200万条带假密钥与秘密链接的提示词（11/19）；OpenRouter 11/22 称据此清退3家提供商（未点名）、撤125个端点的零数据留存资格（含预防性撤下）；Together 11/21 称 AI 编码助手往公开仓库 xorl 提交了能读私有 HF 仓库的凭证，6–7月测试样本被下载，新账户改为默认零留存；Dragos 称隐私标记只约束第一跳；Novita/MiniMax 与“中国实验室”段风控不写。【3SUM】arXiv 2610.06783（v1 北京10/6，Alman、Vassilevska Williams）首页称算法由 Claude 发现，3SUM 指数2→1.9992（多项式大小整数）、作者称可能不实用；11/22 中文转载把发表日写成11/22；Vassilevska Williams 个人页称内部模型不必要，给公开版 Claude 学生2023年笔记两条提示即成，不给笔记各试三次未成 |
 | 1122 | 1700万行代码证黎曼猜想，百万奖还没发：【跟进1120】Lean FRO 与 Mathlib Initiative 联合声明（页面 2026-11-21 13:55 UTC）“hereby certify”黎曼猜想命题与 Alpöge 约1700万行 Lean 证明都正确；MIT Sutherland 复核页（11-23 14:35 UTC）记 Lean 默认内核 11-22 18:44 UTC 整份接受（单线程48小时），默认参数 paranoid 内核与 lake comparator 仍在跑；吠点：认证的是机器证明每步查过、证的是 Mathlib 里的 RH，声明末句“help explain the new ideas”；新周刊稿题“悬赏百万美元的难题先被AI破解”，Clay 规则须合格期刊发表满两年并获普遍接受才考虑，RH 页仍标“Active”（庞加莱为“Solved”）。声明署名 11-23 由“Lean and Mathlib communities, endorsed by …”改为两家机构（PR #154，未进正文）。MiniMax 内部模型 MIM 密码分析（博客 11-20 14:41 北京）：称对 NIST 往届候选做出实用破解、TII McEliece 挑战首解55个，末尾写“does not affect deployed cryptographic standards”；吠点：新智元稿题“中国AI刷爆全球纪录！比Claude快四万倍”、正文“比 Anthropic 的多GPU集群快了 43400 倍”，MiniMax 博客亦写 multi-GPU，但其论文写 43,400× 只是 TII-253 一题：Anthropic 的 Weis 用32线程 CPU 跑21.7小时、MiniMax 64核 1.80秒（对 GPU 纪录同题28,000×）；新智元写 ARADI“全面刷新理论攻击纪录”，README 写理论攻击到12轮、实用到8轮、完整16轮“remains unbroken”；“破解 NIST 候选”多条是参考实现漏洞（DRS 把 && 误写成 &），方案均已落选；风控：标题封面不写比 Claude 快。11-24 00:11 MiniMax 改 Blender 论文、00:22 回复并关闭两条 issue（未进正文） |
 | 1123 | 7万行AI证明，没有数学家查过：【VP≠VNP】Anthropic 在 anthropics/formal-math 公开署名“Claude (Anthropic)”的论文《VP ≠ VNP over every field》（70页）与约7.3万行 Lean（72,932 行，提交北京 11/24 04:04），称由内部研究用 Claude 模型发现；README 写“Both were written by AI models, and no human mathematician has checked the proof”“This does not settle P vs NP”；OpenAI 随后（提交时间晚约5小时）在 openai/math 公开同题《VP and VNP are different》（border 版下界，history 称 11/6 得出），两家互不引用；吠点：新智元稿题“Claude证出「代数版P≠NP」”，论文摘要写是 P≠NP 的代数类比但“does not settle that conjecture”、不适用于布尔电路；华尔街见闻稿题“全篇Lean机器验证通过”，Lean 只保证推导，命题是否写对论文附录 Q.1 写“judged only by AI readers”。【NariQ】Nari Labs（11/20）把 Qwen3.8-27B 量化为 3/2.5/2 比特 GGUF（3比特 10.1GB，原版 53.8GB），称长程代理、数学、看图与原版持平（作者自测）；对你：要自己部署，AMD/Intel 不支持，M3-Pro 3比特约3.8 tok/s；吠点：掘金速递“可直接对接llama.cpp等主流推理框架”，模型卡写原版 llama.cpp、Ollama、LM Studio 都加载不了、须用作者 fork；掘金写“消费级显卡甚至部分笔记本”，模型卡写 GeForce 未测，fork README 只记一张 RTX-5060-Ti 跑过、not qualified（尚未完成资格验证）。读者稿检查后删去“2.5比特档五项四项低于原版”一条 |
+| 1124 | 多家媒体称视频AI全球第一，换榜排第7：【MAGI-2】Sand.ai 北京11/25凌晨发布视频模型 MAGI-2，新浪财经等稿题“AA榜全球第一”；Artificial Analysis 视频榜（北京11/26凌晨读）MAGI-2 只在图生视频带音频、无音频两张榜第一，文生视频无音频第2、带音频暂列第7（1150，与第8、9名同分），AA 标“Provisional result”；图生带音频 1163 对 Seedance 2.5 1158，误差均±14，名次区间都是1–3；官方博客只报四项任务平均 Elo 1150.3；官网列 VidMuse，发布帖写 Higgsfield 独家，官方接口0.08美元/秒、暂不支持充值；“0.5元/秒、Seedance 1/10”只见媒体稿，未进正文。【Copilot 论文】arXiv 2611.31083（MIT Raymond、微软研究院 Dillon，北京11/24凌晨，预印本）用 GitHub 采购记录配 Revelio 招聘数据看5414家大企业，以既定合同审查时点为工具变量：提前采用者季度技术岗招聘降29%（95%区间约−61%到+9%）、初级软件工程师约40%（约−72%到+1%），均为按第一阶段放大的 Wald 估计；同口径简约式初级软件岗季度约−10%显著，月度技术岗−7.6%显著，季度技术岗简约式不显著；离职无明显增加；样本企业2022→2024年季度技术岗招聘总共降29%（55.3→39.2），论文三种假设下 Copilot 占10%、19%或51%；中文聚合稿题“Copilot使初级工程师招聘降约40%”；作者称小公司可能反应不同 |
