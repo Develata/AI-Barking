@@ -1,0 +1,376 @@
+sand-ai/MAGI-2-preview · Hugging Face
+
+ Hugging Face [/] 
+ Search models, datasets, users... Ctrl K
+
+ Models [/models]
+
+ Datasets [/datasets]
+
+ Spaces [/spaces]
+
+ Buckets [/storage]
+
+ Docs [/docs]
+
+ Enterprise [/enterprise]
+
+Pricing [/pricing]
+
+ More 
+
+Website
+
+ Tasks [/tasks] 
+
+ HuggingChat [/chat] 
+
+ Collections [/collections] 
+
+ Languages [/languages] 
+
+ Organizations [/organizations] 
+
+Community
+
+ Blog [/blog] 
+
+ Posts [/posts] 
+
+ Daily Papers [/papers] 
+
+ Hardware [/hardware] 
+
+ Learn [/learn] 
+
+ Discord [/join/discord] 
+
+ Forum [https://discuss.huggingface.co/] 
+
+ GitHub [https://github.com/huggingface] 
+
+Solutions
+
+ Team & Enterprise [/enterprise] 
+
+ Hugging Face PRO [/pro] 
+
+ Enterprise Support [/support] 
+
+ Inference Providers [/inference/models] 
+
+ Inference Endpoints [/inference-endpoints] 
+
+ Storage Buckets [/storage] 
+
+Log In [/login]
+
+Sign Up [/join]
+
+ [/sand-ai] 
+ sand-ai [/sand-ai] 
+/
+
+MAGI-2-preview [/sand-ai/MAGI-2-preview] 
+
+ Like 181
+
+Follow
+ Sand AI 410
+
+ Image-Text-to-Video 
+ [/models?pipeline_tag=image-text-to-video]
+ Safetensors 
+ [/models?library=safetensors]
+ text-to-video 
+ [/models?other=text-to-video]
+ image-to-video 
+ [/models?other=image-to-video]
+ text-to-audio-video 
+ [/models?other=text-to-audio-video]
+ image-to-audio-video 
+ [/models?other=image-to-audio-video]
+ image-text-to-audio-video 
+ [/models?other=image-text-to-audio-video]
+ audio-video-generation 
+ [/models?other=audio-video-generation]
+ multimodal 
+ [/models?other=multimodal]
+ synchronized-audio-video 
+ [/models?other=synchronized-audio-video]
+ mixture-of-experts 
+ [/models?other=mixture-of-experts]
+ magi-2-preview 
+ [/models?other=magi-2-preview]
+
+ License: apache-2.0 
+
+ Model card [/sand-ai/MAGI-2-preview] Files Files and versions 
+ xet
+ [/sand-ai/MAGI-2-preview/tree/main] Community 
+7
+ [/sand-ai/MAGI-2-preview/discussions]
+
+ More actions 
+
+ Copy to bucket 
+
+MAGI-2 Preview [#magi-2-preview] 
+
+Requirements [#requirements] 
+
+Setup [#setup] 
+
+Docker [#docker]
+
+From source [#from-source]
+
+Checkpoints [#checkpoints] 
+
+Prompts [#prompts] 
+
+Running inference [#running-inference] 
+
+License [#license] 
+
+ [https://raw.githubusercontent.com/SandAI-org/MAGI-1/main/figures/logo_black.png]
+
+ [https://sand.ai]
+ [https://sand.ai/blog/magi-2-preview]
+ [https://huggingface.co/sand-ai/MAGI-2-preview]
+ [https://x.com/SandAI_HQ]
+ [LICENSE]
+
+ [#magi-2-preview]
+
+ MAGI-2 Preview
+
+Magi-2 Preview is a 114B-parameter unified audio-video generation model that
+activates just 6B parameters per token. Built on MagiMoE and co-designed across
+architecture, systems, and data, it explores an efficient path to scaling video
+generation. The architecture, the training system built around it, and the data
+pipeline are described in MAGI-2 Preview: Scaling Video Generation Models
+Efficiently [https://sand.ai/blog/magi-2-preview]; the weights are on Hugging
+Face at sand-ai/MAGI-2-preview [https://huggingface.co/sand-ai/MAGI-2-preview].
+
+This repository is the inference code. It generates video from a text prompt
+(T2V) or from a prompt plus a still image (I2V), with sound generated alongside
+the video and muxed into the output file. Clips are 10 seconds long, which is
+the only duration the model currently supports. Generation runs in two stages:
+magi2_preview denoises the clip at low resolution, and magi2_refiner takes
+that result up to 1080p.
+
+ [#requirements]
+
+ Requirements
+
+NVIDIA Hopper GPUs, 8 of them.
+
+Python 3.12 and a recent CUDA toolkit.
+
+ffmpeg on PATH, to mux the audio track. Without it the video is still
+written, just silently.
+
+ [#setup]
+
+ Setup
+
+ [#docker]
+
+ Docker
+
+The published image, sandai/magi-2-preview [https://hub.docker.com/r/sandai/magi-2-preview],
+already has the dependencies built, including the ones that need a compiler:
+
+docker pull sandai/magi-2-preview:latest
+docker run --gpus all -it -v /path/to/ckpt:/workspace/ckpt sandai/magi-2-preview:latest
+
+There is a tag per commit as well, sandai/magi-2-preview:<commit>. Name that
+one when reporting a result, because latest moves; the image also records what
+it was built from in /etc/magi2-build-info.
+
+Building it yourself is only necessary to change a dependency version, or to
+work somewhere the registry is not reachable:
+
+docker build -t magi-2-preview:local .
+
+ [#from-source]
+
+ From source
+
+pip install -r requirements.txt
+
+MAGI-2 also needs MagiAttention [https://github.com/SandAI-org/MagiAttention]
+and MagiCompiler [https://github.com/SandAI-org/MagiCompiler]. The pinned
+revisions are recorded as build args in the Dockerfile [/sand-ai/MAGI-2-preview/tree/main/Dockerfile].
+
+ [#checkpoints]
+
+ Checkpoints
+
+Weights are not bundled with the code. Everything the pipeline loads lives in
+one Hugging Face repository,
+sand-ai/MAGI-2-preview [https://huggingface.co/sand-ai/MAGI-2-preview], roughly
+307 GB in total. Download it into ckpt/ in the repository root, which is
+gitignored:
+
+pip install huggingface_hub
+hf download sand-ai/MAGI-2-preview --local-dir ckpt
+
+The directory names in that repository are the ones the configs already expect,
+so nothing needs renaming afterwards:
+
+ckpt/
+├── preview/ # preview stage: 56 safetensors shards + index
+├── refiner/ # refiner stage: 3 shards + index
+├── text_encoder/ # text encoder
+├── vae/ # video VAE
+│ └── Wan2.2_VAE.pth
+├── stable-audio-open-1.0/ # audio VAE
+└── turbo_vae/ # fast VAE decoder
+ ├── TurboV3-Wan22-TinyShallow_7_7.json
+ └── checkpoint.ckpt
+
+Directory
+Size
+Contents
+
+preview
+228 GB
+Preview-stage transformer, released with MAGI-2
+
+text_encoder
+56 GB
+Text encoder, Qwen/Qwen3.5-27B [https://huggingface.co/Qwen/Qwen3.5-27B]
+
+refiner
+14 GB
+Refiner-stage transformer, released with MAGI-2
+
+stable-audio-open-1.0
+5 GB
+Audio VAE, decodes the generated audio latents
+
+vae
+3 GB
+Video VAE, from Wan-AI/Wan2.2-TI2V-5B [https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B]
+
+turbo_vae
+2 GB
+Distilled VAE decoder, used for decoding by default
+
+The configs under configs/ [/sand-ai/MAGI-2-preview/tree/main/configs] reference these as
+${MAGI2_CKPT_ROOT}/<name>, and that variable defaults to <repo>/ckpt. To keep
+weights somewhere else, point it at them rather than editing the configs:
+
+export MAGI2_CKPT_ROOT=/data/magi2-weights
+
+ [#prompts]
+
+ Prompts
+
+The captions the model was trained on are long and structured, so a prompt
+written by hand underuses it. Two system prompts for a prompt-enhancement LLM
+are included: prompts/t2v.md [/sand-ai/MAGI-2-preview/blob/main/prompts/t2v.md] for text to video, and
+prompts/i2v.md [/sand-ai/MAGI-2-preview/blob/main/prompts/i2v.md] for a prompt plus a still image.
+
+Use one as the system prompt of an instruction-following model, pass the raw
+prompt as the message (the still as well, for I2V), and feed the JSON caption it
+returns to the pipeline in place of the prompt. Both lay out the 10 seconds the
+model generates.
+
+assets/ [/sand-ai/MAGI-2-preview/tree/main/assets] has both ends of that step. sample_000.txt through
+sample_002.txt are raw prompts, the kind you would hand to the enhancer;
+sample_enhanced_t2v.json [/sand-ai/MAGI-2-preview/blob/main/assets/sample_enhanced_t2v.json] is the shape one
+comes back in. The demo batch runs both, so enhancing is not a precondition for
+generating.
+
+ [#running-inference]
+
+ Running inference
+
+scripts/run_demo.sh [/sand-ai/MAGI-2-preview/blob/main/scripts/run_demo.sh] launches
+inference/pipeline/entry.py [/sand-ai/MAGI-2-preview/blob/main/inference/pipeline/entry.py] under torchrun on
+every visible GPU. It generates at 1080p, with seed 42 and the batch in
+assets/demo_samples.json [/sand-ai/MAGI-2-preview/blob/main/assets/demo_samples.json]:
+
+bash scripts/run_demo.sh
+SAMPLES=my_samples.json bash scripts/run_demo.sh # a different batch
+OUTPUT_DIR=output/run7 bash scripts/run_demo.sh
+
+The script takes SAMPLES, OUTPUT_DIR, SEED and MASTER_PORT from the
+environment. Videos land in $OUTPUT_DIR/sample_000.mp4 and up, numbered by
+position in the batch.
+
+A samples file is a JSON array with one entry per video. An entry carries its
+prompt inline as prompt or as a path in prompt_file, and a first frame in
+image; leaving image out makes it a T2V entry. The shipped batch runs the
+three stills in assets/ as I2V, the same three prompts again as T2V, and
+assets/sample_enhanced_t2v.json.
+
+For a single clip, call the entry point directly:
+
+torchrun --nproc_per_node=8 inference/pipeline/entry.py \
+ --prompt "a red fox in snow" --output output/
+
+It also takes --prompt-file, --image, --seed, --config, --output-width
+/ --output-height, --num-inference-steps, --refiner-num-inference-steps
+and --deterministic. Of these only --seed, --samples and --output are
+reachable through run_demo.sh.
+
+1080p runs configs/magi2_refiner.json [/sand-ai/MAGI-2-preview/blob/main/configs/magi2_refiner.json]: the
+preview stage generates 512x896 and the refiner takes that to 1088x1920.
+magi2_refiner.json extends
+magi2_preview.json [/sand-ai/MAGI-2-preview/blob/main/configs/magi2_preview.json] and carries only what the
+refiner stage adds, so a shared setting is edited in one place.
+
+1080p is a delivery tier, not the shape that gets generated. The VAE stride
+constrains every generated dimension to a multiple of 16, so the tier generates
+1088 wide rather than 1080, and the video is written at that generated shape.
+Pass --output-width and --output-height to have the finished video rescaled
+to an exact size, 1080x1920 the way the reference delivers the tier.
+
+Four environment variables decide where each large component sits between
+phases: MAGI2_TEXT_ENC_OFFLOAD_MODE, MAGI2_PREVIEW_OFFLOAD_MODE,
+MAGI2_REFINER_OFFLOAD_MODE and MAGI2_VAE_OFFLOAD_MODE, each one of cpu,
+gpu or roundtrip. The preview and the refiner default to roundtrip, staged
+in and out around the stage that needs them, because at 1080p neither fits on an
+80GB card next to the other's activations.
+
+Decoding uses the distilled turbo decoder from ckpt/turbo_vae, a temporal
+sliding window that runs on one rank per video. MAGI2_DETERMINISTIC=1, or
+--deterministic, makes the MoE scatter and the attention kernels bit-exact at
+some cost in speed. MAGI2_SAVE_LATENT_PATH writes the post-refiner latent of
+each sample to that directory.
+
+ [#license]
+
+ License
+
+Apache 2.0. See LICENSE [/sand-ai/MAGI-2-preview/tree/main/LICENSE].
+
+Downloads last month
+
+-
+
+Downloads are not tracked for this model. How to track [https://huggingface.co/docs/hub/models-download-stats]
+
+ Inference Providers NEW [https://huggingface.co/docs/inference-providers]
+
+ Image-Text-to-Video
+ [/tasks/image-text-to-video]
+
+This model isn't deployed by any Inference Provider. 🙋 5 Ask for provider support [/spaces/huggingface/InferenceSupport/discussions/11562]
+
+ Model tree for sand-ai/MAGI-2-preview [/docs/hub/model-cards#specifying-a-base-model]
+
+Finetunes
+
+ 2 models [/models?other=base_model:finetune:sand-ai/MAGI-2-preview]
+
+ System theme 
+
+Company
+ TOS [/terms-of-service] Privacy [/privacy] About [/huggingface] Careers [https://apply.workable.com/huggingface/] [/] 
+Website
+ Models [/models] Datasets [/datasets] Spaces [/spaces] Pricing [/pricing] Docs [/docs]

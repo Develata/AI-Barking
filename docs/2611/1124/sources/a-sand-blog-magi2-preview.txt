@@ -1,0 +1,293 @@
+MAGI-2 Preview: Scaling Video Generation Models Efficiently
+
+ [https://sand.ai]
+Research [https://sand.ai/research]API Platform [https://platform.sand.ai/]About Us [https://sand.ai/about-us]
+
+NEWS / RESEARCH
+
+MAGI-2 Preview: Scaling Video Generation Models Efficiently
+
+August 5, 2026 · RESEARCH
+
+ [https://github.com/SandAI-org/MAGI-2-preview]
+
+Introduction: Building a Path from Model Scaling to Better Generation
+
+Beyond language, video is one of the largest and most diverse forms of data on the internet. It carries not only language and images, but also objects, actions, three-dimensional space, temporal evolution, sound, and the interactions among them. For a generative model, the central challenge is not merely to produce realistic images, but to learn the structures that evolve together across large-scale video data and turn them into generative, composable world knowledge. We are pursuing the most scalable way to compress the information contained in video into a model, with the long-term goal of making it a foundation for physical AGI.
+
+In Magi-1: Autoregressive Video Generation at Scale [1], we studied how video should be generated. Magi-1 divides a video into temporal chunks and models their causal relationships through autoregressive denoising, enabling streaming generation and video continuation.
+
+Magi-2 turns to another foundational question: how should a video generation model scale?
+
+Language models have established a relatively clear positive feedback loop: with appropriate data and training methods, increasing model capacity, data, and compute generally leads to measurable and predictable improvements. This feedback has continued to drive training at larger scales.
+
+Over the past two years, the video generation community has likewise expanded models, datasets, and training investment, but the path from model scaling to better generation has remained less clear. Prior work has begun to characterize loss scaling in DiTs and Video DiTs, including the relationships among model size, data, learning rate, and batch size [3][4]. Yet public evidence remains limited on whether scale can translate consistently into better complex motion, physical plausibility, long-term consistency, and audio-video synchronization.
+
+Magi-2 approaches this problem across three dimensions - model architecture, training systems, and data methodology - so that model capacity can continue to grow, training and inference costs remain practical, and data continues to provide richer and more accurate learning signals.
+
+Our work on Magi-2 therefore focuses on three interdependent directions:
+
+Scalable Model Architecture: an architecture that can reach the 100B scale while maintaining a much smaller activated parameters.
+
+Scalable Training System: architecture-infrastructure co-design for communication, kernels, routing stability, optimization, and memory efficiency.
+
+Scalable Data: a shift from a filtering-centric pipeline toward high-throughput data production and precise multimodal annotation.
+
+Magi-2 Preview is an intermediate research release. It validates that the architecture, training system, and data methodology can scale together at the 100B level, while revealing several scaling signals that merit further study. More complete scaling curves, controlled ablations, and capability-boundary analyses remain priorities for the next stage.
+
+1. Starting from Single-Stream Architecture
+
+We did not directly carry over Magi-1's autoregressive chunking. Autoregressive chunking introduces additional temporal dependencies and a more complex generation schedule. Combining it with unified audio-video modeling and 100B-scale distributed training would cause the number of system variables to grow rapidly. To focus on jointly scaling the model, data, and infrastructure, Magi-2 adopts a simpler modeling starting point.
+
+We build on the single-stream design validated in Speed by Simplicity: A Single-Stream Architecture for Fast Audio-Video Generative Foundation Model [2]. MagiHuman uses a single Transformer to process text, video, and audio as one unified token sequence using self-attention only, avoiding the additional complexity introduced by multiple modality towers and cross-attention interfaces.
+
+Text, video, and audio describe the same event. Language, lip movements, body motion, environmental sound, music, and camera rhythm are continuously interdependent. Placing these modalities in a single sequence allows them to exchange information throughout the same backbone, rather than interacting only at a small number of predefined interfaces.
+
+Magi-2 preserves this modeling interface: all three modalities enter a unified token sequence and are processed by the same Transformer backbone. This gives the subsequent MoE architecture, training system, and data methodology a common foundation for scaling.
+
+2. MagiMoE: An Ultra-Fine-Grained MoE for Video Scaling
+
+Once the single-stream interface is established, the next question is how to increase model capacity. A dense Transformer is the most direct path, but it quickly encounters two practical constraints in video generation.
+
+The first is training infrastructure. Increasing FFN width or adding layers simultaneously increases parameters, gradients, optimizer states, and the computation performed for every token. At the 100B scale, more aggressive parameter sharding and model parallelism introduce additional collective communication, cross-device synchronization, and activation memory. For long-sequence video training, dense scaling can become a systems problem before anything else.
+
+The second is inference cost. Video generation processes a large number of spatiotemporal tokens and repeatedly executes a denoising network, making it inherently more expensive than text generation. If a 100B dense model invokes all of its parameters at every step, generation latency and serving cost will constrain its practical use. Inference efficiency therefore needs to be considered at the architecture-design stage, not after training is complete.
+
+MoE offers a common structure for addressing both constraints: organizing feed-forward capacity as a conditionally accessed expert pool [9]. A model can store a large number of parameters while each token invokes only the small subset selected by its router. In simplified form:
+
+Fdense∝NPFFN,FMoE∝NPactive,Pactive≪Ptotal.F_{\text{dense}} \propto N P_{\text{FFN}},
+\qquad
+F_{\text{MoE}} \propto N P_{\text{active}},
+\qquad
+P_{\text{active}} \ll P_{\text{total}}.Fdense​∝NPFFN​,FMoE​∝NPactive​,Pactive​≪Ptotal​.
+
+Here, NNN is the sequence length, PtotalP_{\text{total}}Ptotal​ is the total parameter count, and PactiveP_{\text{active}}Pactive​ is the parameter count activated for each token. FFF denotes the dominant feed-forward compute term. MoE does not remove attention cost, and the number of activated parameters is not equivalent to end-to-end FLOPs. What it provides is a way to decouple total model capacity from per-token computation.
+
+Following this approach, Magi-2 scales to approximately 114B total parameters while keeping the number of activated parameters at approximately 6B per token. We call the architecture and execution system built around Ultra-Fine-Grained MoE MagiMoE.
+
+However, directly transplanting the token-choice MoE commonly used in LLMs does not automatically yield an efficient video MoE.
+
+In a standard expert-parallel MoE system, the router first selects Top-kkk experts for each token, after which the complete HHH-dimensional token representation is sent to the devices that host those experts. Following the notation of our earlier blog, kkk is the number of activated experts and HHH is the communication payload size. Ignoring constant factors and the return path, the dominant communication term per MoE layer is approximately:
+
+Cstandard MoE∝NkH.C_{\text{standard MoE}} \propto N k H.Cstandard MoE​∝NkH.
+
+The problem is not only that communication grows with kkk. The destination devices, the number of tokens received by each rank, and the receive-buffer shapes are all determined by the routing result of the current batch. Communication and computation are therefore dynamic and potentially imbalanced:
+
+Stragglers and bubbles: all-to-all traffic and expert computation are uneven across ranks, so overall throughput is bounded by the slowest rank.
+
+Imbalanced peak memory: receive buffers, permuted activations, and backward saved tensors vary with local expert load, potentially causing localized OOMs or frequent allocator-cache reclamation.
+
+Host-side control overhead: dynamic token counts, routing metadata, and offsets can introduce GPU-CPU synchronization, increase CPU overhead, and interrupt asynchronous GPU execution.
+
+Video latents usually produce much longer sequences than ordinary text. A unified audio-video sequence also contains tokens from different modalities, noise levels, spatial regions, and motion states. Longer sequences and greater token heterogeneity make the communication, load, and buffer fluctuations introduced by dynamic routing more likely to become first-order systems costs.
+
+Magi-2 therefore faces a concrete systems question: how can we prevent dynamic communication, load imbalance, and runtime control overhead from erasing the benefits of sparse computation?
+
+2.1 Multi-Head LatentMoE
+
+Multi-Head Mixture-of-Experts [5], introduced by Microsoft Research Asia, first proposed splitting a token into multiple sub-tokens so that different representation subspaces could select experts independently . It established the basic idea of multi-head routing, although different heads still shared the same router and expert pool.
+
+This line of work did not subsequently become a mainstream direction for scaling MoE. Most efforts continued to route the complete token representation and focused instead on increasing the number of experts, adjusting routing strategies, or optimizing Expert Parallel.
+
+Multi-Head LatentMoE and Head Parallel [6] takes the idea further by giving each latent head an independent router and expert set . This independence also enables Head Parallel: sub-tokens are first distributed along the head dimension, after which each head owner performs routing and expert computation locally.
+
+Magi-2 follows this technical path, scaling multi-head routing to a 114B video model while addressing the engineering challenges introduced by long video sequences, hierarchical clusters, small expert kernels, and a large-scale optimizer.
+
+Let the full representation be divided into MMM latent heads, each of dimension HheadH_{\text{head}}Hhead​, so that H=MHheadH = M H_{\text{head}}H=MHhead​. Head Parallel transfers partitions of the original representation. Its dominant communication term is approximately:
+
+CHead Parallel∝NMHhead=NH.C_{\text{Head Parallel}}
+\propto N M H_{\text{head}}
+= N H.CHead Parallel​∝NMHhead​=NH.
+
+Cross-device communication does not grow with Top-kkk for each head. More importantly, cross-device send and receive shapes can be determined statically by the head partition, allowing buffers to be allocated in advance. Routing remains data-dependent, but its irregularity is moved inside each head owner rather than directly determining cross-device communication shapes.
+
+Head Parallel thus establishes a regular, preallocatable communication boundary. Local load balancing, sorting, small expert kernels, and expert banks that cannot remain resident on a single GPU are handled by the systems described in the following sections.
+
+2.2 Ultra-Fine-Grained MoE
+
+Multi-Head LatentMoE provides the structural basis for finer expert granularity. Magi-2 places expert computation in independent low-dimensional head subspaces and configures a large number of narrow experts within each head. We refer to this configuration as Ultra-Fine-Grained MoE.
+
+ComponentMagi-2 Preview configuration
+
+Backbone40 Transformer layers
+
+Sparse coreThe middle 36 layers use Multi-Head MoE; the four boundary layers remain dense
+
+Model width3,072
+
+Routed representation12 heads × 256 dimensions
+
+Expert pool256 experts per head
+
+Active expertsTop-6 per head
+
+Expert FFN256 → 1,280 → 256, fused SwiGLU7
+
+For each token, a split projection first maps the 3,072-dimensional hidden state into a routed representation, which is then divided into twelve 256-dimensional subspaces:
+
+x~=Winx,x~→[x(1),…,x(12)],x(h)∈R256.\tilde{x} = W_{\text{in}}x,
+\qquad
+\tilde{x} \rightarrow [x^{(1)}, \ldots, x^{(12)}],
+\qquad
+x^{(h)} \in \mathbb{R}^{256}.x~=Win​x,x~→[x(1),…,x(12)],x(h)∈R256.
+
+Each head has an independent router and selects Top-6 experts from its own pool of 256:
+
+I(h)=TopK⁡6 ⁣(σ ⁣(G(h)x(h)+b(h))),I^{(h)} = \operatorname{TopK}_6\!\left(\sigma\!\left(G^{(h)}x^{(h)} + b^{(h)}\right)\right),I(h)=TopK6​(σ(G(h)x(h)+b(h))),
+
+y(h)=∑e∈I(h)pe(h)Ee(h) ⁣(x(h)).y^{(h)} = \sum_{e \in I^{(h)}} p_e^{(h)} E_e^{(h)}\!\left(x^{(h)}\right).y(h)=∑e∈I(h)​pe(h)​Ee(h)​(x(h)).
+
+The twelve head outputs are concatenated and mapped back to the Transformer hidden state through a merge projection:
+
+y=WoutConcat⁡ ⁣(y(1),…,y(12)).y = W_{\text{out}}\operatorname{Concat}\!\left(y^{(1)}, \ldots, y^{(12)}\right).y=Wout​Concat(y(1),…,y(12)).
+
+Each sparse layer therefore contains 12×256=3,07212 \times 256 = 3{,}07212×256=3,072 head-local expert units, of which 12×6=7212 \times 6 = 7212×6=72 are activated for each token.
+
+These are not 3,072 full-width experts. Each expert unit operates on only one 256-dimensional subspace. Compared with routing the complete hidden state once, different representation subspaces of the same token can form different expert combinations. Magi-2 does not add a collection of wide FFNs that must be invoked as indivisible units, but rather a collection of low-dimensional transformations that can be selected and recombined independently.
+
+3. Making MagiMoE Efficient at 114B Scale
+
+Multi-Head LatentMoE defines the routing architecture, but scaling it to 114B requires complete systems co-design. Real-world training must solve three problems at once: mapping Head Parallel onto a hierarchical cluster, executing thousands of small experts efficiently, and distributing optimizer computation.
+
+3.1 Hierarchical Head Parallel
+
+A single GPU cannot keep the complete expert bank for one head resident throughout training, while training clusters typically contain two bandwidth tiers: NVLink within a node and InfiniBand across nodes. Magi-2 maps head-activation exchange and expert-state sharding onto these two network tiers separately.
+
+Figure 2. Across nodes, activation slices are exchanged according to fixed head ownership. Within each node, high-bandwidth interconnects store, materialize, and reshard expert parameters, gradients, and optimizer states.
+
+Across nodes, an input of shape [N,M,Hhead][N, M, H_{\text{head}}][N,M,Hhead​] is dispatched along the head dimension using fixed shapes before routing:
+
+Code block
+PythonCopy
+
+1234567
+
+x_heads = x.view(N, M, head_dim)
+x_heads = head_dispatch_over_ib(x_heads) # fixed head ownership
+
+routes = route_per_local_head(x_heads) # data-dependent, local
+y_heads = grouped_expert_ffn(x_heads, routes)
+
+y = head_combine_over_ib(y_heads).view(N, M * head_dim)
+
+The inter-node network handles only regular head slices, not the dynamic token copies produced by Top-kkk. Send and receive counts for each rank can be derived statically from the head partition, allowing buffers to be allocated in advance.
+
+Within each node, ZeRO/FSDP-style full sharding distributes expert weights, gradients, and optimizer states over NVLink. Parameters for the current layer are materialized on demand and resharded after computation.
+
+InfiniBand therefore handles fixed-shape head-activation exchange, while NVLink handles high-bandwidth gathering and resharding of expert states. A GPU responsible for a given head does not need to keep that head's entire expert bank resident.
+
+3.2 MagiMoE: Efficient Execution of Fine-Grained Experts
+
+Head Parallel regularizes cross-node communication, but each head owner must still perform routing, token reordering, and expert computation. A standard MoE runtime typically reorders tokens according to routing results and then executes expert matrices of different sizes using Grouped GEMM. This is effective for conventional MoE, but each Magi-2 sparse layer contains 3,072 narrow expert units. Each unit receives fewer tokens, and its GEMM shapes are smaller and more irregular. Sorting, kernel launches, and intermediate tensor reads and writes can therefore become dominant costs.
+
+If a generic MoE execution path is used directly, per-head routing causes the overhead of sorting, temporary buffers, intermediate activations, and kernel scheduling to grow rapidly with the number of heads. These costs can cancel out the gains from sparse computation.
+
+MagiMoE therefore does more than replace a single Grouped GEMM kernel. It jointly optimizes the complete path from routing to expert-output merge:
+
+Code block
+PlainCopy
+
+1234
+
+fused routing and Top-K
+ → compact expert-wise token layout
+ → fused grouped expert FFN
+ → routing-weighted output merge
+
+Routing scores are computed in FP32 for numerical stability, while expert weights and the main computation use BF16. MagiMoE co-designs the organization of routing results, token gather/scatter, and grouped expert computation. It also fuses the up and gate projections with SwiGLU7 to reduce the materialization of intermediate results and memory traffic. For long video sequences, the runtime provides a memory-efficient forward and backward path to control activation memory.
+
+Routing balance uses auxiliary-loss-free expert bias [7], avoiding the introduction of an additional load-balancing loss into the main training objective. Magi-2 applies it independently to each routing head and aggregates expert-load statistics asynchronously on a separate CUDA stream, reducing interference with the main compute path.
+
+3.3 MagiMuon: An Optimizer That Understands Head × Expert Structure
+
+Multi-Head MoE changes not only the forward computation but also the population of matrices seen by the optimizer. In a dense Transformer, a weight is usually treated as one large matrix. Magi-2's expert weights naturally form a large batch of small matrices indexed by head × expert.
+
+MagiMuon preserves this structured layout. Router gates are treated as matrix batches grouped by head, while expert up, gate, and down projections flatten head and expert into the batch dimension. Muon orthogonalization is performed independently for each matrix, and the matrix batch is distributed across ranks to balance optimizer computation, rather than concatenating all heads and experts into one artificial large matrix.
+
+Not all parameters use the same update rule. Adapters, mHC, attention sinks, and gating-related parameters use Adam-style updates, while the main matrix parameters use MagiMuon. This hybrid design allows the optimizer to match the geometry of each parameter family.
+
+A notable concurrent work is Kimi K3, which introduces Per-Head Muon [8]. It splits attention Q/K/V momentum matrices along the attention-head dimension and orthogonalizes them independently. Per-Head Muon and MagiMuon target different structures: the former primarily addresses attention projections, while the latter targets head-local expert matrices in Multi-Head MoE and balances their matrix batches across ranks. Nevertheless, both reflect a similar design principle: when a model has explicit head structure, its optimizer can make use of that structure as well.
+
+Hierarchical Head Parallel, MagiMoE, and MagiMuon address the consequences of the same architectural choice at the communication, kernel-execution, and optimizer levels. Together, they make it possible to scale thousands of fine-grained expert units into a trainable 114B model.
+
+4. Data Determines What a Model Can Learn
+
+A model can learn only the relationships that are preserved and accurately described in its training data. No amount of additional capacity can recover information that has been removed or incorrectly described by the pipeline. The data pipeline itself is therefore part of video-model scaling.
+
+4.1 The Data Filtering Trap
+
+Early video generation models were often trained at approximately 7B parameters or below. Small models have limited ability to represent complex distributions, while humans are highly sensitive to visual errors. To produce more stable demonstrations, the community naturally developed a filtering-centric data strategy: retain videos with clear subjects, simple motion, and stable shots, and remove samples that are difficult for the model to learn.
+
+This works for small models, but it can constrain subsequent scaling. If data is continually trimmed to match the capability boundary of a small model, a larger model still sees a simplified world and has little new structure from which to learn.
+
+We call this the data filtering trap:
+
+When training data is continually simplified to fit the current model, the data itself becomes the capability ceiling of a stronger model.
+
+4.2 From Filtering-Centric Curation to High-Throughput Production and Precise Annotation
+
+Magi-2 shifts the center of its data pipeline from filtering toward high-throughput data production and precise annotation.
+
+Necessary data governance remains in place, including safety, compliance, privacy, severe-corruption handling, and deduplication. But whether a sample is easy for the current model to generate is no longer the primary admission criterion. Wherever possible, we retain complex motion, multi-person interactions, shot transitions, long-tail subjects, subtitles, on-screen text, and complex audio relationships.
+
+Reducing filtering is only the first step. If a complex video receives only a generic caption, the identities, actions, shots, and audio relationships it contains still cannot become effective supervision. The new pipeline therefore incorporates subjects and scenes, actions and interactions, shots and temporal structure, dialogue and songs, environmental sound and music, and on-screen text and subtitles into scalable multimodal annotation.
+
+This also gives data quality a new meaning: preserve useful complexity, then describe that complexity accurately. Under this definition, annotation is no longer an additional step after filtering, but core infrastructure for data scaling.
+
+4.3 Emerging Capabilities
+
+Filtering often removes more than an isolated low-quality segment; it can also sever relationships within a sample or across modalities. Removing multi-shot videos eliminates the correspondence of a person across shots. Systematically excluding subtitles and complex audio breaks the joint distribution among speech, music, text effects, and the visual timeline. A model cannot recover a relationship that has already been deleted by the pipeline.
+
+When these relationships are preserved and combined with greater model capacity, we observe capabilities in qualitative samples that were not explicitly introduced through dedicated modules. With more multi-shot data, identities are more likely to remain consistent across different shots. When subtitled data is retained, we also observe samples in which character dialogue or songs appear together with corresponding subtitle effects. These remain qualitative observations and require more systematic controlled experiments.
+
+These phenomena are not simply two isolated features. They suggest that some forms of visual intelligence may arise from jointly learning the relationships present in real data, without requiring a dedicated module for every capability. The role of a data pipeline is not merely to select samples that are easy to fit, but to preserve the structures connecting objects, actions, shots, sound, and text.
+
+This is where architecture scaling and data scaling intersect: Ultra-Fine-Grained MoE provides greater conditional capacity, while diverse and accurately annotated data determines whether that capacity can develop meaningful specialization.
+
+5. Magi-2 Preview: An Intermediate Validation of the Scaling Path
+
+Magi-2 Preview scales a unified audio-video model to approximately 114B total parameters while keeping activated parameters at approximately 6B per token. This result comes from the joint advancement of model architecture, the training system, and the data pipeline.
+
+Ultra-Fine-Grained MoE organizes capacity into low-dimensional expert units that can be routed and recombined independently. Broader, precisely annotated data provides learning signals for expert specialization. Hierarchical Head Parallel, MagiMoE, and MagiMuon address the scaling challenges in communication, expert computation, and optimization, respectively.
+
+These three dimensions depend on one another. Without sufficient data coverage, a larger expert pool has little reason to form meaningful specialization. Without a new way to organize capacity, more data must still be absorbed by the same dense parameters. Without a system matched to the architecture, thousands of fine-grained experts cannot run efficiently on long video sequences.
+
+Magi-2 Preview is an intermediate validation of this scaling path. Through this research release, we want to make the architecture, routing behavior, and inference characteristics of a 100B-scale video MoE directly available for study by the community.
+
+Magi-2 Preview does not suggest that more parameters automatically produce a better model. Rather, model capacity, data complexity, and systems efficiency must scale together: the model architecture determines how capacity is organized, data determines what that capacity can learn, and the system determines whether that capacity can be trained and deployed reliably.
+
+Magi-2 Preview remains a research preview on this path. Future scaling curves, controlled ablations, and capability-boundary analyses will continue to test how far this approach can go.
+
+References
+
+[1] MAGI-1: Autoregressive Video Generation at Scale [https://arxiv.org/abs/2505.13211]
+
+[2] Speed by Simplicity: A Single-Stream Architecture for Fast Audio-Video Generative Foundation Model [https://arxiv.org/abs/2603.21986]
+
+[3] Scaling Laws for Diffusion Transformers [https://arxiv.org/abs/2410.08184]
+
+[4] Towards Precise Scaling Laws for Video Diffusion Transformers [https://arxiv.org/abs/2411.17470]
+
+[5] Multi-Head Mixture-of-Experts [https://arxiv.org/abs/2404.15045]
+
+[6] Multi-Head LatentMoE and Head Parallel: Communication-Efficient and Deterministic MoE Parallelism [https://arxiv.org/abs/2602.04870]
+
+[7] Auxiliary-Loss-Free Load Balancing Strategy for Mixture-of-Experts [https://arxiv.org/abs/2408.15664]
+
+[8] Kimi K3: Open Frontier Intelligence [https://arxiv.org/abs/2607.24653]
+
+[9] Scaling Video Diffusion Models with Mixture-of-Experts [https://sand.ai/blog/scaling-video-diffusion-models-with-moe]
+
+ [/]
+
+API
+
+API Platform [https://platform.sand.ai/]
+
+Company
+
+About us [/about-us]News [/research]
+
+©2026 All Rights Reserved, Sand.aiTerms of Use [/terms-of-service/]Privacy Policy [/privacy-policy/]
+
+ [https://x.com/sandai_hq] [https://discord.gg/hgaZ86D7Wv] [https://github.com/sandai-org]

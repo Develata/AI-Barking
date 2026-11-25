@@ -1,0 +1,2350 @@
+        Discrete Logarithms in Finite Fields of Fixed Characteristic
+                      in Sub-Quasi-Polynomial Time∗
+
+
+
+                                                       Abstract
+           We give an unconditional classical zero-error Las Vegas algorithm for the Discrete Logarithm
+        Problem in the multiplicative group F×          pn of any finite field of small characteristic. Given a
+        prime p ≥ 2, an integer n ≥ 1, a monic irreducible polynomial f ∈ Fp [X] of degree n presenting
+        Fpn = Fp [X]/(f (X)), and nonzero elements g, h ∈ F×           pn , the algorithm either returns an integer
+        x ∈ {0, . . . , pn − 2} satisfying g x = h or returns an explicit exponent certifying h ∈        / ⟨g⟩. For
+        every fixed prime p ≥ 2 as n → ∞ (and uniformly whenever ln p ≤ 14 (ln ln ln n)2 ), the worst-case
+        expected running time in bit operations is at most
+
+                                                 2 + o(1)
+                                              (︃                    )︃
+                                         exp                (ln n) = (pn)o(log n) ,
+                                                                  2
+                                                 ln ln ln n
+
+        and along any sequence with n → ∞ and (ln p)/(ln ln n) → 0 it is bounded by exp(o((ln n)2 )) =
+        (pn)o(log n) . This improves unconditionally upon the quasi-polynomial (pn)Θ(log n) algorithms
+        of Kleinjung–Wesolowski (2022) and Lido (2026), as well as the (pn)Θ(log n) heuristic regime
+        initiated by Barbulescu–Gaudry–Joux–Thomé (2014).
+            The proof replaces PGL2 degree-halving Frobenius polynomials by sparse Fq0 -affine linearized
+        Frobenius pencils over a slowly growing intermediate field Fq0 = Fps ⊂ Fq = Fq0t . On an ordinary
+        elliptic presentation of an auxiliary extension Fqn′ , each descent step reduces divisor degrees by an
+        unbounded factor B ≍ (ln ln n)/(s ln p) while restricting the geometric and arithmetic monodromy
+        group to AGLN (Fq0 ) × SNR , where N = t + 2B + 3 and NR = 2(q02B+4 + q02B+3 ) − 2B. Both the
+        monodromy order and the cardinality of the base extension have size exp(O((ln n)2 /(ln ln ln n)2 )),
+        so Hasse–Weil controls the splitting probability at every step and the entire base divisor set
+        serves directly as the factor base with no exceptional traps.
+
+
+1       Introduction
+1.1      Main result
+Let p be a prime, let n ≥ 1 be an integer, and let Fpn = Fp [X]/(f (X)) be a finite field of order pn ,
+presented explicitly by a monic irreducible polynomial f ∈ Fp [X] of degree n. Given g, h ∈ F×   pn , the
+Discrete Logarithm Problem (DLP) asks for an integer x ∈ {0, 1, . . . , pn − 2} satisfying g x = h, or a
+proof that h does not lie in the cyclic subgroup ⟨g⟩ ⊆ F×pn . Because an input instance has bit-length
+b = Θ(n log p), a running time of the form bΘ(log b) , or equivalently (pn)Θ(log n) when p is fixed or
+small, is quasi-polynomial in the input size.
+    ∗
+    This paper was entirely obtained by Cogentic [2], an agentic framework for mathematical discovery, using Gemini 4
+as the base model. There was no human interaction other than the initial prompt for Cogentic to generate a full
+proof. The Cogentic harness was built by Yang Cai, Vineet Gupta, Yanchen Jiang, Christopher Liaw, Aranyak Mehta,
+Grigoris Velegkas, and Di Wang.
+
+
+
+                                                            1
+    Following the heuristic quasi-polynomial algorithm of Barbulescu, Gaudry, Joux, and Thomé [1],
+together with the rigorous building blocks of Granger, Kleinjung, and Zumbrägel [5], Kleinjung
+and Wesolowski [7], and Göloğlu and Joux [4], Kleinjung and Wesolowski [8] established the
+first unconditional quasi-polynomial bound (pn)2 log2 n+O(1) for discrete logarithms in finite fields
+of small characteristic; an alternative proof via elliptic models was given by Lido [9]. Both
+unconditional results, as well as the underlying heuristic descent algorithms, have complexity
+exp(Θ((ln n)2 )) = (pn)Θ(log n) for fixed p as n → ∞.
+    In this paper we show that discrete logarithms in small-characteristic finite fields can be computed
+unconditionally in expected time (pn)o(log n) , strictly below (pn)c log n for every constant c > 0. To
+make all uniformity and zero-error claims precise, we fix the standard Turing model.
+Definition 1.1 (Input encoding and zero-error Las Vegas model). A valid DLP instance is a
+tuple I = (p, n, f, g, h), where p ≥ 2 is a prime and n ∈ Z≥1 is an integer (both given in binary),
+f (X) = X n + n−1     i=0 fi X ∈ Fp [X] is a monic irreducible polynomial encoded by (f0 , . . . , fn−1 ) ∈
+                              i
+                    ∑︁
+
+{0, . . . , p − 1} defining Fpn := Fp [X]/(f (X)), and g, h ∈ F×
+                  n
+                                                                pn are encoded by the coefficient tuples in
+{0, . . . , p − 1}n of their polynomial representatives of degree < n. The input bit-length is Θ(n log2 p).
+    An algorithm is a single uniform classical multitape Turing machine M (without advice or
+precomputed tables) equipped with a read-once tape of independent uniform bits in {0, 1}, charging
+one bit operation per step or random bit read. We call M a zero-error Las Vegas DLP solver if, on
+every valid instance I:
+  (i) whenever M(I) halts, it outputs either (LOG, x) with x ∈ {0, . . . , pn − 2} and g x = h, or
+      (NOT_IN_SUBGROUP, E) with E ∈ {1, . . . , pn − 1}, g E = 1, and hE ̸= 1 (which certifies h ∈
+                                                                                                 / ⟨g⟩,
+      since h = g would imply h = (g ) = 1);
+                 x             E     E  x
+
+
+ (ii) M(I) halts with probability 1, and its total step count TM (I) from start to finish has finite
+      expectation E[TM (I)] over the random tape alone.
+   Throughout, ln x and log2 x = (ln x)/ ln 2 denote the natural and base-2 logarithms; in asymptotic
+expressions such as (pn)o(log n) we write log for ln, as the constant base is absorbed into o(1).
+Theorem 1.2 (Unconditional sub-quasi-polynomial DLP algorithm). There exist an explicit,
+unconditional, classical zero-error Las Vegas DLP solver A (Algorithm SuperQuasiPolyDLP in
+Section 6.2) and an absolute constant C0 > 0 with the following properties:
+ (1) Universal zero-error correctness: On every valid instance I = (p, n, f, g, h) with p ≥ 2
+     prime and n ≥ 1, the machine A(I) halts with probability 1 and returns either (LOG, x) with
+     x ∈ {0, . . . , pn −2} verified to satisfy g x = h, or (NOT_IN_SUBGROUP, E) with E ∈ {1, . . . , pn −1}
+     verified to satisfy g E = 1 and hE ̸= 1. It requires no factorization of pn − 1 (stripping only
+     primes of size nO(1) and never factoring the remaining cofactor) and relies on no unproven
+     hypotheses.
+ (2) Explicit uniform bound: For n ≥ 16, define ℓ1 := ⌊log2 n⌋, ℓ2 := ⌊log2 ℓ1 ⌋, ℓ3 := ⌊log2 ℓ2 ⌋,
+     ℓp := ⌈log2 p⌉,
+                         s := max 3, ⌈ℓ23 /ℓp ⌉ ,  B := ℓ2 /(32sℓp ) .
+                                 (︁            )︁       ⌊︁          ⌋︁
+
+     For every prime p ≥ 2 and every integer n ≥ 16 with ℓ3 ≥ 10 and B ≥ 4,
+                                                        2    60
+                                               (︃(︃               )︃                           )︃
+                sup E TA (p, n, f, g, h) ≤ exp            +       (ln n)2 + C0 (ln n)(ln ln n) ,       (1.1)
+                       [︁              ]︁
+               f,g,h                                  ln B s ln p
+     where the supremum is taken over all degree-n monic irreducibles f ∈ Fp [X] and all (g, h) ∈
+     F×     ×
+      pn × Fpn .
+
+
+                                                       2
+ (3) Fixed characteristic: For every fixed prime p ≥ 2, as n → ∞,
+
+                                         2 + o(1)
+                                             (︃                       )︃
+                                                                                 log2 n
+          sup E TA (p, n, f, g, h) ≤ exp            (ln n)2 = (pn)(2 ln 2+o(1)) ln ln ln n = (pn)o(log n) .
+                 [︁                   ]︁
+          f,g,h                          ln ln ln n
+
+ (4) Growing characteristic: Along every sequence of pairs (pν , nν ) with pν ≥ 2 prime, nν → ∞,
+     and (ln pν )/(ln ln nν ) → 0,
+
+                         sup E TA (pν , nν , f, g, h) = exp o((ln nν )2 ) = (pν nν )o(log nν ) ;
+                                 [︁                    ]︁       (︁              )︁
+                         f,g,h
+
+
+      if moreover ln pν ≤ 41 (ln ln ln nν )2 , then supf,g,h E[TA (pν , nν , f, g, h)] ≤ exp ln2+o(1)
+                                                                                                ln ln nν (ln nν ) .
+                                                                                                                 2
+                                                                                               (︁                )︁
+
+
+Remark 1.3. Writing Q = pn , the condition (ln p)/(ln ln n) → 0 as n → ∞ holds throughout the
+fixed-characteristic and very-small-characteristic regime p = (ln ln Q)o(1) (Q → ∞), including for
+instance p ≤ (ln ln Q)1/ω(Q) for any ω(Q) → ∞. In that entire range, ln(pn) = (1 + o(1)) ln n = (1 +
+o(1)) ln ln Q, so Theorem 1.2 yields expected time (log Q)o(log log Q) , strictly faster than (log Q)c log log Q
+for every fixed c > 0. Notice also that the expected time counts all preprocessing, field-tower
+construction, factor-base evaluation, relation collection, composite-modulus linear algebra, and
+individual descent from scratch, with no separate per-query amortization needed.
+
+1.2    The monodromy barrier and the sparse linearized descent
+To explain the idea of the proof for a general reader, let us first recall how an ordinary elliptic curve
+translates multiplicative relations in a finite field into divisor relations on a curve. Suppose q = pr
+exceeds 16n2 . By Waterhouse’s theorem and Rück’s structure theorem for elliptic-curve groups
+over Fq , there exists an ordinary elliptic curve E/Fq whose rational point group E(Fq ) contains a
+point Q of exact order n. Because the Lang isogeny P ↦→ ϕq (P ) − P is surjective on E(Fq ) (where
+ϕq (x, y) = (xq , y q ) is the q-Frobenius), we can choose I0 = (x0 , y0 ) ∈ E(Fq ) with
+
+                                                  ϕq (I0 ) = I0 + Q.                                          (1.2)
+
+Iterating (1.2) gives ϕuq (I0 ) = I0 + [u]Q, so the Frobenius orbit I = n−1 u=0 [ϕq (I0 )] has exact size
+                                                                                  u  ∑︁
+
+n and presents Fqn = Fq (x0 ) as the residue field of a degree-n closed point on E. Every rational
+function H ∈ Fq (E)× regular and nonvanishing along I evaluates to an element H(I0 ) ∈ F×              qn .
+Consequently, if two rational functions agree at I0 , their quotient takes the value 1 at I0 , turning a
+multiplicative congruence in F×   q n into an additive congruence between their divisors.
+    The power of (1.2) is that, along I , the high-degree algebraic operation T ↦→ T q coincides with
+a low-degree geometric translation. Indeed, for any point P ∈ E(k) defined over an extension k/Fq ,
+set xP (R) := x(R + P ) and x̃P (R) := x(R + Q + ϕq (P )). Both xP and x̃P have degree only 2 on E,
+yet at R = I0 equation (1.2) gives
+
+             xP (I0 )q = x(I0 + P )q = x ϕq (I0 ) + ϕq (P ) = x I0 + Q + ϕq (P ) = x̃P (I0 ).
+                                            (︁                   )︁        (︁             )︁
+
+
+Thus, given any polynomial L(T ) ∈ k[T ] involving T q and T , replacing T q by x̃P and T by xP
+produces a low-degree function f ∈ k(E) satisfying f (I0 ) = L(xP (I0 )). If f vanishes on a given
+divisor D of Ek , while the remaining “cofactor” zeros of f split into k-rational points and L(T )
+splits completely into linear factors ℓ (T − γℓ ) over k, then comparing the Galois norms of f and
+                                     ∏︁
+
+L(xP ) expresses D in terms of the degree-2 divisors div0 (xP − γℓ ) and degree-1 points over k.
+
+
+
+                                                            3
+Why prior descents were limited to (pn)Θ(log n) . All prior rigorous Frobenius descents [5, 7,
+4, 8, 9] build L(T ) from the PGL2 -orbit of T q − T , i.e., bilinear combinations of 1, xP , x̃P , xP x̃P
+(plus small linear variants). Such polynomials have only four coefficients, so they can be forced to
+vanish on divisors of constant degree and reduce field extension degrees by only a constant factor
+(typically 2) at each step. Since L(T ) has degree ≈ q = nΘ(1) , each step spawns ≈ q child divisors
+across a tree of depth log2 n + O(1), making the total tree size q Θ(log2 n) = nΘ(log n) .
+    To reduce the tree depth to (ln n)/ ln B with an unbounded factor B → ∞, one must descend
+from kj−1 through a degree-B extension kj /kj−1 : a degree-2 divisor over kj restricts to a divisor D
+of degree up to λ = 2B over kj−1 , so a single step must force f to vanish at 2B points simultaneously.
+However, if one enlarges the template naively to general Frobenius polynomials A1 (T )T q + A0 (T )
+with deg A0 , deg A1 ≍ B, a one-parameter pencil LZ (T ) generically has Galois group equal to the
+full symmetric group Sq+Θ(B) . By Chebotarev’s density theorem (quantified over function fields by
+Hasse–Weil), the probability that a random specialization z ∈ k splits Lz (T ) completely is then
+1/(q + Θ(B))!, which is super-exponentially small in n.
+
+Bypassing the obstruction via sparse Fq0 -affine pencils. Observe how much slack sits unused
+in the PGL2 descent: the tree has size nΘ(log n) , whereas the PGL2 (Fq ) monodromy group has order
+only ≈ q 3 = nO(1) . We trade this vast unused monodromy budget for an unbounded degree-reduction
+factor B by exploiting additive (linearized) structure over a slowly growing intermediate field
+                                         Fq0 = Fps ⊂ Fq = Fq0t = Fpst .
+
+Choose s so that s ln p ≍ (ln ln ln n)2 , set B ≍ (ln ln n)/(s ln p) and m := 2B + 4 (keeping q0m ≤
+(log2 n)1/8 ), and take q = q0t of size n2+o(1) , so t ≍ (ln n)/(s ln p). Instead of adding consecutive
+                                                                                     t
+powers T 2 , T 3 , . . . , T m , we take only q0 -Frobenius powers of T and T q = T q0 :
+                                 m−1                         m
+                                                 t+j                        j
+                     LZ (T ) =         cj (Z) T q0     +           bj (Z) T q0 + d0 (Z) ∈ k[Z][T ].              (1.3)
+                                 ∑︂                          ∑︂
+
+                                 j=0                         j=0
+
+Three structural features make (1.3) work unconditionally:
+ (1) Small linearized monodromy. Every nonconstant exponent in LZ (T ) is a power of q0 , so the
+     homogeneous part of LZ is an Fq0 -linear operator and the roots of LZ form an affine space
+     over Fq0 of dimension N = t + m − 1 ≈ (2 ln n)/(s ln p). Its Galois group is therefore trapped
+     inside AGLN (Fq0 ), which despite acting on q0N = q0m−1 q = n2+o(1) roots has size only
+                                                            4 + o(1)                    (ln n)2
+                                                       (︃                       )︃      (︄ (︄         )︄)︄
+                               N (N +1)
+              |AGLN (Fq0 )| < q0        = exp                        (ln n)2 = exp O                         .
+                                                              s ln p                 (ln ln ln n)2
+
+ (2) Tiny geometric cofactor degree. Substituting T ↦→ xP and T q ↦→ x̃P turns (1.3) into a (2m + 2)-
+                                                                    qj                      qj
+      dimensional space WP ⊂ k(E) spanned by 1, xP0 (0 ≤ j ≤ m), and x̃P0 (0 ≤ j ≤ m − 1). Every
+      function in WP has total pole degree at most 2(q0m + q0m−1 ). Imposing vanishing on a reduced
+      divisor D of degree λ = 2B leaves an (m + 6)-dimensional linear system HD,P (by Moore’s
+      determinant, once the xP (Di ) are Fq0 -linearly independent), and the residual cofactor has
+      degree only
+                                NR = 2(q0m + q0m−1 ) − 2B < 4(log2 n)1/8 .
+      Even though the cofactor cover has full symmetric monodromy SNR , its order (NR )! <
+      exp((log2 n)1/4 ) = no(1) is completely negligible. Meanwhile, eliminating degree 2B at each
+      step shrinks the descent depth to J ≈ (ln n)/ ln B = (1 + o(1))(ln n)/ ln ln ln n, giving total
+      tree size W J = exp ln2+o(1)
+                             ln ln n (ln n) .
+                                           2
+                          (︁                 )︁
+
+
+                                                              4
+ (3) Exact constant field and a trap-free base case. To guarantee via Hasse–Weil that a random
+     z ∈ k simultaneously splits both Lz (T ) and the cofactor with probability ≥ 2|G|     1
+                                                                                               (where
+     G = AGLN (Fq0 ) × SNR ), two things must hold: k must be the exact constant field of the joint
+     splitting field F/k(Z) (no nontrivial constant field extension can sneak in and obstruct degree-1
+     places), and |k| must exceed roughly g(F )2 ≈ (N |G|)2 . We ensure the first by proving that
+     the geometric Galois group over k(Z) is already the full ambient group AGLN (Fq0 ) × SNR ,
+     matching the arithmetic upper bound and forcing F ∩ k = k. We ensure the second by running
+     the descent along a tower kj = FqM0 Bj resting on a base field k0 = FqM0 of size
+
+                                                                      (ln n)2
+                                                                 (︄ (︄                )︄)︄
+                             |k0 | = q   M0
+                                              = |G|
+                                                  2+o(1)
+                                                           = exp O                           .
+                                                                   (ln ln ln n)2
+
+                                                               (2)
+      At j = 0, the entire set of rational points E(k0 ) over the quadratic extension of k0 still
+      has cardinality < 2|k0 |2 = exp(o((ln n)2 / ln ln ln n)), which is asymptotically smaller than
+      the descent tree. We therefore take all nontrivial closed points of EFq dividing degree 2M0
+      (except I ) as our factor base, evaluate their discrete logarithms directly by Riemann–Roch
+      and Miller’s algorithm, and avoid trap divisors altogether.
+
+   This also explains why exp ln2+o(1)ln ln n (ln n)
+                                                     2 is the natural balancing point of the method. Elim-
+                                 (︁                   )︁
+
+inating degree 2B creates a residual cofactor of degree NR ≍ q02B+4 with symmetric monodromy
+(NR )!, so keeping (NR )! subdominant forces q02B+4 < (ln n)2 , capping B at O((ln ln n)/ ln q0 ) and
+hence  ln B ≤ (1 + o(1))  ln ln ln n. Meanwhile both |AGLN (Fq0 )| and the base factor base K have size
+exp Θ((ln n)2 / ln q0 ) , so taking ln q0 ≍ (ln ln ln n)2 pushes them strictly below the tree size while
+   (︁                  )︁
+
+lowering ln B by only O(ln ln ln ln n), and the leading constant 2 comes from the Hasse/Waterhouse
+threshold q ≥ n2+o(1) for realizing a rational order-n point on E/Fq . The descent operates along
+the field tower
+                                  s        t       M0        B      B         B
+                            Fp −→ Fq0 −→ Fq −−−→         k0 −−→ k1 −−→ · · · −−→ kJ ,
+                                                                         Eliminate(kj )           restrict
+repeating at each level j ≥ 1 the degree cycle degkj ≤ 2B −−−−−−−−→ degkj ∈ {1, 2} −−−−−→
+degkj−1 ≤ 2B.
+
+1.3    Architecture of the proof and parameter summary
+Table 1 summarizes the main parameters and their asymptotic scales in the fixed-characteristic
+regime. (An auxiliary prime ℓ∗ ∈ (2B, (2B)! + 1] replaces n by n′ = ℓ∗ n so that the order n′ of Q
+never divides small multiples of the tower degrees M0 B j .)
+    The body of the paper is organized into four short, self-contained parts following the preliminaries
+in Section 2 (with routine Turing-machine verification deferred to Appendix A):
+
+  • Section 3 (The linearized group AGLN (Fq0 )). Given a generic pencil LZ (T ) = L0 (T ) +
+    ZL1 (T ) of sparse Fq0 -affine polynomials whose exponents include {0, N −1, N }, a Möbius change
+    of parameter places a single wild break at W = ∞. Newton-polygon analysis there exhibits an
+    (N − 1)-dimensional subspace of local roots together with the full group of transvections fixing
+    it and all determinants in F×   q0 . Together with irreducibility of the homogeneous root space V ,
+    an elementary dual-space argument (Lemma 3.2) forces the homogeneous Galois group to be
+    all of GL(V ). Commuting with a nontrivial central scalar in F×      q0 (q0 ≥ 3) then shows that the
+    translation subgroup cannot vanish without producing a rational root in k(W ), forcing the full
+    group AGLN (Fq0 ) (Lemma 3.3).
+
+
+                                                           5
+Table 1: Principal parameters and their scales for fixed p ≥ 2 as n → ∞ (where ℓ1 = ⌊log2 n⌋,
+ℓ2 = ⌊log2 ℓ1 ⌋, ℓ3 = ⌊log2 ℓ2 ⌋, ℓp = ⌈log2 p⌉).
+Parameter   Definition / scale                           Role in the proof
+s, q0       s ≍ ℓ23 /ℓp , q0 = ps                        Linearity field Fq0 with ln q0 ≍ (ln ln ln n)2
+                                                                                                          1/8
+B, λ, m     B = ⌊ℓ2 /(32sℓp )⌋, λ = 2B, m = 2B + 4       Degree reduction B ≍ (lnlnlnlnlnnn)2 ; q0m < ℓ1
+ℓ∗ , n′     prime ℓ∗ ∈ (λ, λ! + 1], n′ = ℓ∗ n            Coprimality guard (ℓ∗ ∤ ceM0 B j ); ℓ∗ = no(1)
+t, q        q = q0t ∈ [16(n′ )2 , 16q0 (n′ )2 )          Elliptic base field Fq (q = n2+o(1) , t ≍ (ln lnlnlnn n)2 )
+N           t + m − 1 ≈ 2s ln n
+                           ln p                          Fq0 -dimension of root space of LZ (T ) (degT LZ =
+                                                         q0N )
+                                       1/8
+NR          2(q0m + q0m−1 ) − λ < 4ℓ1                    Degree of residual cofactor cover φ = −U/V : E →
+                                                         P1
+                                                                                                       n)2
+G, Gub      AGLN (Fq0 ) × SNR , |G| < Gub                Joint monodromy group; ln Gub ≈ 4(ln      s ln p
+                                                                                                2
+                                    2+o(1)                                                     n)
+M0 , k0     k0 = FqM0 , |k0 | = Gub                      Base field of tower; ln |k0 | ≈ 8(ln
+                                                                                           s ln p
+K            F| < 2q 2M0
+            |˜︁                                          Factor base size (all closed points of degree | 2M0 )
+J, kj       kj = FqM0 Bj , J ≈ ln
+                                ln n
+                                  B                      B-adic tower (0 ≤ j ≤ J) with M0 B J ≥ 4n′
+            W ≈ 2q0N = n2+o(1)                           Branching and tree size exp ln2+o(1)
+                                                                                            ln ln n (ln n)
+                                                                                        (︁                  )︁
+W, W J+1                                                                                                  2
+
+
+
+
+ • Section 4 (Elliptic geometry and the cofactor group SNR ). Working uniformly across
+   all primes p ≥ 2—including the wild characteristics p = 2 and p = 3—we show that for almost
+   all translations P ∈ E(k), the evaluation coordinates xP (Di ) and x̃P (Di ) are Fq0 -linearly
+   independent and HD,P is base-point-free outside D (Lemma 4.4, proved via the curve-morphism
+   parallelogram law in Lemma 4.2). Controlling the second Hasse derivative and bitangent
+   pairs (Lemma 4.6), we pick U ∈ HD,P (k) with a unique simple double zero at a chosen point
+   R∗ ∈ E(k) and simple zeros elsewhere (Lemma 4.7). For a random partner V ∈ HD,P (k), the
+                                                                      ∑︁ R −2
+   morphism φ = −U/V : E → P1 has degree NR , fiber 2[R∗ ] + N          ν=1 [Sν ] over Z = 0, and
+   is geometrically indecomposable: any nontrivial intermediate curve C cannot have genus 1
+   (by Hurwitz and the unique double point) and cannot have genus 0 because HD,P separates
+   generic fibers of every candidate cover E → P1 —otherwise Moore’s affine lemma would induce
+   a degree-2 Kummer (p ≥ 3) or Artin–Schreier (p = 2) cover whose small nonempty branch locus
+   is invariant under translation by [2](Q + ϕq (P ) − P ), contradicting our torsion avoidance on
+   P . Indecomposability gives primitivity, the unique double point at Z = 0 yields a local Galois
+   transposition in every characteristic, and Jordan’s theorem forces Gal(F2geom /k(Z)) ∼   = SNR
+   (Lemma 4.8).
+
+ • Section 5 (Simultaneous splitting and one-step elimination). At Z = 0, the linearized
+   polynomial LZ (T ) splits completely over k((Z)) by Hensel lifting, whereas the cofactor splitting
+   field has local Galois group generated by a single transposition. Because the normal closure
+   of a transposition in SNR is all of SNR , the two splitting fields are linearly disjoint over k(Z).
+   Comparing degrees pins down k as the exact constant field, Castelnuovo’s inequality bounds
+   the genus by (N + NR + 1)|G|, and Hasse–Weil supplies at least |k|/(2|G|) simultaneously
+   splitting values z ∈ k (Lemma 5.1), yielding the zero-error single-step procedure Eliminate
+   (Lemmas 5.2–5.3).
+
+ • Section 6 (Recursive descent, composite linear algebra, and assembly). After
+   enumerating and evaluating the base factor base F˜︁ via Miller’s algorithm and Riemann–Roch
+                                ×
+   (Lemma 6.1), any target u ∈ Fqn′ is lifted to a monic irreducible polynomial of degree BMJ
+
+
+                                                     6
+      via Wan’s effective Dirichlet theorem and descended recursively down the tower kJ ⊃ · · · ⊃ k0
+      (Lemma 6.2). Finally, basis-shifted relation sampling produces a matrix of full rank modulo
+      every prime dividing the unfactored group order ML regardless of the output distribution of the
+      descent, and deterministic unimodular elimination over Z/ML Z solves the system and certifies
+      either the discrete logarithm or subgroup non-membership (Lemmas 6.3–6.4), completing the
+      proof of Theorem 1.2.
+
+
+2     Preliminaries and Background Results
+2.1     Conventions on groups, curves, and valuations
+For a finite field Fq0 and N ≥ 1, the affine general linear group AGLN (Fq0 ) := {v ↦→ Av + b : A ∈
+GLN (Fq0 ), b ∈ FN      ∼ N                           N ∏︁N −1 (q N − q j ). For a finite set Ω, Sym(Ω)
+                   q0 } = Fq0 ⋊ GLN (Fq0 ) has order q0   j=0    0     0
+denotes the symmetric group on Ω, with SM := Sym({1, . . . , M }). For a subset S of an abelian
+group and an element T , we write S ± T := {W ± T : W ∈ S}.
+    Throughout, a smooth projective curve over an algebraically closed field K means a smooth,
+irreducible projective variety of dimension 1 over K, and ∆Y ⊂ Y × Y denotes the diagonal
+of a variety Y . For a smooth projective curve E over a perfect field K with algebraic closure
+K, we write DivK (E) for the divisor group on E(K), Div0K (E) for its degree-0 subgroup, and
+DivK (E) := DivK (E)Gal(K/K) for the group of K-rational divisors. A closed point p of EK is a
+Gal(K/K)-orbit in E(K), viewed as a reduced effective divisor of degree degK (p) := | supp(p)|. For
+f ∈ K(E)× and P ∈ E(K), we write ordP (f ) = vP (f ) ∈ Z for the normalized discrete valuation at
+P (with vP (0) := +∞, local ring OEK ,P , and maximal ideal mEK ,P ), and decompose the principal
+divisor divE (f ) = div0 (f ) − div∞ (f ) into disjoint effective zero and pole divisors. A nonconstant
+rational function g ∈ K(E) \ K defines a morphism g : EK → P1K ; equality g(S1 ) = g(S2 ) is
+understood in P1 (K) (including ∞ at poles of g).
+    For a finite extension F ′ /F of one-variable function fields and a place P | p, we write e(P | p)
+and f (P | p) for the ramification index and relative residue degree; for a nonconstant morphism
+ψ : C1 → C2 of smooth projective curves over K (of degree deg(ψ) := [K(C1 ) : ψ ∗ K(C2 )]), we
+write eR (ψ) := e(R | ψ(R)) and ψ ∗ ([y]) := R∈ψ−1 (y) eR (ψ)[R], so deg(ψ ∗ (D)) = deg(ψ) deg(D) [15,
+                                               ∑︁
+
+Proposition II.2.6].
+    Let ΩC denote the 1-dimensional K(C)-space of rational differentials on a smooth projective
+curve C/K. A nonconstant morphism ψ : C1 → C2 is separable if and only if ψ ∗ : ΩC2 → ΩC1 is
+nonzero, and for f ∈ K(C) \ K one has df ̸= 0 if and only if f ∈     / K(C)p where p = char(K) > 0 [15,
+Corollary II.2.12 and Proposition II.4.2]. If u is a local uniformizer at S ∈ C(K) and ω0 ∈ ΩC \ {0}
+satisfies ordS (ω0 ) = 0, then vS (dg/du) ≥ 0 for all g ∈ OC,S [15, Proposition II.4.3]. Writing any
+                                                            ×
+f ∈ K(C)× as f = ur ε with r = vS (f ) ∈ Z and ε ∈ OC,S         gives df /du = ur−1 (rε + u dε/du), so
+
+                                  vS (df /ω0 ) = vS (df /du) ≥ vS (f ) − 1,                           (2.1)
+
+with equality whenever p ∤ vS (f ), and vS (df /ω0 ) ≥ 0 whenever vS (f ) ≥ 0. In particular, if vS (f ) ≥ 1
+and vS (df /ω0 ) = 0, then vS (f ) = 1.
+     Finally, we freely use standard facts on quasi-projective varieties over an algebraically closed
+field K [6, Chapter I, §§1–6], [15, Chapter II, §§1–2]: every irreducible component of the zero locus
+of a nonzero regular function on an irreducible quasi-projective surface (such as open subsets of
+EK × EK ) is an irreducible curve of dimension 1; every irreducible projective curve C admits a
+surjective birational normalization ν : C˜︁ → C from a smooth projective curve C˜︁ that is finite-to-one
+
+
+                                                     7
+and bijective over the smooth locus C sm ; and every intermediate subfield between φ∗ K(C2 ) and
+K(C1 ) corresponds to a factorization C1 → C → C2 through a smooth projective curve C.
+
+2.2    Computational primitives
+We record the standard Las Vegas and deterministic primitives used in our complexity estimates;
+for completeness, a concise proof in the multitape Turing model is given in Appendix A. On the
+read-once random tape of Definition 1.1, sequential Las Vegas calls consume disjoint blocks of
+random bits following almost-surely finite stopping times, so by the strong Markov property their
+randomness is mutually independent.
+
+Lemma 2.1 (Exact sampling and polynomial-time algebraic primitives). On a uniform randomized
+multitape Turing machine:
+
+ (1) Unbiased sampling and Wald’s identity: Given M ∈ Z≥1 of bit-length b = ⌊log2 M ⌋ + 1,
+     a Las Vegas routine SampleUniform(M ) outputs a strictly uniform element of {0, . . . , M − 1}
+     in expected O(b) bit operations. For any i.i.d. sequence (Ci , Ai )i≥1 in [0, ∞] × {0, 1} with
+     E[C1 ] < ∞ and pacc := Pr[A1 = 1] > 0, the stopping index τ := inf{i ≥ 1 : Ai = 1} satisfies
+     Pr[τ < ∞] = 1, E[τ ] = 1/pacc , and E[ τi=1 Ci ] = E[C1 ]/pacc .
+                                           ∑︁
+
+
+ (2) Integer, finite-field, and subfield-embedding arithmetic: For integers of absolute value
+     ≤ M (M ≥ 2, β := ⌈log2 M ⌉), ring operations, division with remainder, and the extended
+     Euclidean algorithm xgcd(u, v) (returning (d, s, t) with d = gcd(u, v) = su+tv, |s| ≤ max(1, |v|),
+     |t| ≤ max(1, |u|)) take deterministic O(β 2 ) bit operations, and modular powering ae mod M
+     (0 ≤ e ≤ M ) takes deterministic O(β 3 ).
+                                                                       ′
+      In any explicitly presented finite field FQ′ of order Q′ = pd with element bit-length Λ′ :=
+      d′ ⌈log2 p⌉ (presented over Fp or as a bounded-depth iterated relative extension), addition and
+      subtraction cost deterministic O(Λ′ ), multiplication and inversion cost deterministic O((Λ′ )2 ),
+      powering ue (0 ≤ e ≤ Q′ ) costs deterministic O(⌈log2 (e + 2)⌉(Λ′ )2 ) ⊆ O((Λ′ )3 ), and exact
+      uniform sampling costs expected O(Λ′ ). An explicit field embedding ι : F ↪→ Eext (stored as the
+      dF × dEext Fp -matrix of generator powers, or as constant inclusion in a relative extension)
+      is tabulated from the generator image in O(dF d2Eext ⌈log2 p⌉2 ), evaluated in O(ΛF ΛEext ), and
+      composed with ι′ : Eext ↪→ E3 by matrix multiplication in O(dF dEext d3 ⌈log2 p⌉2 ) bit operations.
+                                        ∼
+      An explicit coordinate map Eext − → F [Eext :F ] with respect to an F -basis (stored via the inverse
+      change-of-basis matrix in GLdEext (Fp ), or by direct coefficient readout in a relative extension)
+      evaluates in deterministic O(Λ2Eext ) bit operations.
+
+ (3) Polynomial arithmetic and Las Vegas factorization: Over FQ′ as in (2), ring operations,
+     division with remainder, and monic gcd on polynomials in FQ′ [X] of degree ≤ D (D ≥ 1)
+                                                           ′
+     take deterministic O(D2 (Λ′ )2 ) bit operations; X Q mod A takes deterministic O(D2 (Λ′ )3 );
+     deterministic irreducibility testing of a monic degree-D polynomial takes O(D3 (Λ′ )3 ); complete
+     zero-error Las Vegas factorization of A ∈ FQ′ [X] (deg A = D) takes expected O(D3 (Λ′ )3 ); and
+     generating a monic irreducible of degree D takes expected O(D4 (Λ′ )3 ).
+
+ (4) Sorting and Gaussian elimination: Deterministic merge-sort orders N0 records of bit-
+     length brec in O(max(1, N0 )⌈log2 (N0 + 2)⌉brec ) bit operations, with linear-scan deduplication
+     or sorted merge-join emitting Nout matches in O((N1 + N2 + Nout + 1)brec ). On an r × c
+     matrix over FQ′ (r, c ≥ 1), deterministic Gaussian elimination computes the rank, reduced row-
+     echelon form, and a solution (or inconsistency certificate) to Mx = b in O(rc min(r, c)(Λ′ )2 )
+
+
+                                                    8
+      bit operations, a basis of ker(M) in O(max(r, c)3 (Λ′ )2 ) (and in O(rc min(r, c)(Λ′ )2 ) when
+      c ≤ r + 1), and M−1 (when r = c) in O(r3 (Λ′ )2 ).
+
+2.3    External theorems from arithmetic geometry
+For convenient reference, we collect the five classical results cited in Sections 3–6.
+Theorem A (Cyclic ordinary elliptic curves; [18, Theorem 4.1(1)], [11, Theorems 1a and 3]). Let
+                                                                  √
+q = pr be a prime power, and let N0 ∈ Z satisfy |q + 1 − N0 | ≤ 2 q and gcd(q + 1 − N0 , p) = 1.
+Then there exists an ordinary elliptic curve E/Fq with E(Fq ) ∼
+                                                              = Z/N0 Z.
+Theorem B (Arithmetic of elliptic curves; [15]). Let E be an elliptic curve over a perfect field K
+of characteristic p > 0 with origin OE ∈ E(K).
+ (1) (Riemann–Roch and Abel–Jacobi, Corollary II.5.5(c), Proposition II.5.8, and Corollary III.3.5):
+     Setting L(D) := {f ∈ K(E)× : divE (f ) + D ≥ 0} ∪ {0} for D ∈ DivK (E), one has L(0) = K
+     and dimK L(D) = deg(D) whenever deg(D) ≥ 1. A divisor P nP [P ] ∈ DivK (E) is principal
+                                                               ∑︁
+
+     if and only if P nP = 0 and P [nP ]P = OE in E(K).
+                   ∑︁            ∑︁
+
+ (2) (Multiplication-by-d and isogenies, Theorem III.6.2, Corollary III.6.3, and Corollary III.6.4):
+     For every d ∈ Z, deg([d]) = d2 (with deg([0]) := 0),                                 ≥ 1. On
+                                                                              ≤ d2 for d √︁
+                                                            √︁ and |E[d](K)| √︁
+     EndK (E), deg is a positive definite quadratic form, so deg(ϕ1 + ϕ2 ) ≤ deg(ϕ1 )+ deg(ϕ2 ).
+ (3) (Fixed points of ordinary automorphisms, Theorem III.10.1, Theorem V.3.1, and Appendix A,
+     Proposition A.1.2): If E is ordinary (|E[p](K)| = p, equivalently j(E) ̸= 0 when p ∈ {2, 3}),
+     then |AutK (E)| ∈ {2, 4, 6}. Every ζ ∈ AutK (E) \ {idE } is such that ζ − idE is a nonzero
+     isogeny of degree mζ ∈ {1, 2, 3, 4} (by (2), since deg ζ = deg([−1]) = 1), so every P ∈ E(K)
+     fixed by ζ satisfies [mζ ]P = (ζˆ︁ − idE )(ζ − idE )(P ) = OE and hence [12]P = OE .
+                                                                                   √
+ (4) (Hasse’s bound, Theorem V.1.1): If K = FQ , then ⃓|E(FQ )| − (Q + 1)⃓ ≤ 2 Q.
+                                                              ⃓                ⃓
+
+Theorem C (Function fields in one variable; [16]). Let K be a perfect field and F/K a one-variable
+function field with exact full constant field K.
+ (1) (Degrees and constant extensions, Theorem 1.4.11, Proposition 3.6.1, Lemma 3.6.2, and
+     Theorem 3.6.3): Every h ∈ F \ K satisfies deg(div0 (h)) = deg(div∞ (h)) = [F : K(h)]. For
+     any algebraic extension K ′ /K, the constant extension F K ′ /K ′ has exact constant field K ′ ,
+     satisfies [F K ′ : EK ′ ] = [F : E] for any intermediate function field E ⊆ F with [F : E] < ∞,
+     is unramified over F at every place, and preserves genus: g(F K ′ /K ′ ) = g(F/K). Conversely,
+     for any finite extension F0 /K(Z) with algebraic closure K1 of K in F0 , one has [K1 : K] =
+     [F0 : K(Z)]/[F0 K : K(Z)]; in particular, [F0 K : K(Z)] ≤ [F0 : K(Z)], with equality forcing
+     K1 = K.
+ (2) (Galois splitting, composita, and Artin–Schreier covers, Theorem 3.7.1, Proposition 3.7.8,
+     Theorem 3.9.1, and Corollary 3.9.3): If F/E is finite Galois with common full constant field K,
+     then Gal(F/E) acts transitively on the r places of F over any place p of E, with common e, f
+     satisfying ref = [F : E]. By Abhyankar’s lemma, a place of E is unramified in a compositum
+     F1 F2 /E of finite separable extensions (and in the Galois closure of F1 /E) if and only if it
+     is unramified in each factor. When char(K) = p > 0, if u ∈ E admits a place p and z ∈ E
+     with m := −vp (u − (z p − z)) > 0 and p ∤ m, then W p − W − u is irreducible and separable
+     over E and p is totally ramified in the resulting extension; conversely, any place p admitting
+     z ∈ E with vp (u − (z p − z)) ≥ 0 is unramified in any irreducible Artin–Schreier extension
+     W p − W = u.
+
+                                                   9
+ (3) (Castelnuovo’s inequality, Theorem 3.11.3): If F = F1 F2 with common full constant field K,
+     [F : Fi ] = ni < ∞, and gi = g(Fi /K), then g(F/K) ≤ n1 g1 + n2 g2 + (n1 − 1)(n2 − 1) (without
+     any separability or tameness assumption).
+
+ (4) (Hasse–Weil bound, Theorem 5.2.3): If K = FQ is the exact full constant √      field of F , the
+     number N1 (F ) of degree-1 places of F/K satisfies |N1 (F ) − (Q + 1)| ≤ 2g(F ) Q.
+
+ (5) (Hurwitz formula and Dedekind’s different, Theorems 3.4.13 and 3.5.1): For a finite separable
+     extension F ′ /F with common perfect constant field K, 2g(F ′ /K) − 2 = [F ′ : F ](2g(F/K) −
+     2) + deg Diff(F ′ /F ), where each coefficient of Diff(F ′ /F ) satisfies d(P | p) ≥ e(P | p) − 1 ≥ 0.
+     In particular, every separable morphism of smooth projective curves has finite branch locus,
+     and deg Diff(F ′ /F ) = 0 forces F ′ /F to be everywhere unramified.
+
+Theorem D (Effective polynomial Dirichlet theorem; [17, Theorem 5.1]). Let M ∈ Fq [X] have
+degree dM ≥ 1, let A ∈ Fq [X] satisfy gcd(A, M ) = 1, and put Φq (M ) := |(Fq [X]/(M ))× |. For every
+D ≥ 1, the count πq (D; M, A) of monic irreducibles P ∈ Fq [X] of degree D with P ≡ A (mod M )
+satisfies                   ⃓                          ⃓
+                            ⃓                   qD     ⃓  dM + 1 D/2
+                            ⃓πq (D; M, A) −            ⃓≤         q    .
+                            ⃓                          ⃓
+                            ⃓                D Φq (M ) ⃓     D
+
+Theorem E (Local decomposition of separable extensions; [12, Chapter II, §§2–3]). Let (K, v)
+be a discretely valued field with completion K,ˆ︂ and let L = K(ξ) be a finite separable extension
+with minimal polynomial µ(T ) ∈ K[T ]. The normalized discrete valuations w of L extending
+v are in bijection with the monic irreducible (separable) factors µw (T ) ∈ K[T ˆ︂ ] of µ(T ), with
+ˆ︁ w ∼
+L      K[T ]/(µw (T )), deg µw = [L
+     = ˆ︂                         ˆ︁ w : ˆ︂
+                                         K] = e(w | v)f (w | v), and w|v e(w | v)f (w | v) = [L : K].
+                                                                    ∑︁
+
+In particular, when K = K
+                        ˆ︂ is complete, v extends uniquely to a valuation ṽ : L× → Q with ṽ| × = v,
+                                                                                              K
+and for every subextension K ⊆ F0 ⊆ L with ramification index e0 , one has ṽ(F0× ) = e10 Z and
+e0 | [F0 : K].
+
+
+3    Sparse Linearized Pencils and the Group AGLN (Fq0 )
+We begin with the purely algebraic half of our monodromy calculation, showing that a generic
+one-parameter pencil of sparse Fq0 -affine polynomials has geometric Galois group equal to all of
+AGLN (Fq0 ) as soon as the exponents 0, N − 1, and N are present and q0 ≥ 3. First we recall Moore’s
+determinant and its affine variant, which will also govern the linear systems HD,P in Section 4.
+
+Lemma 3.1 (Moore’s determinant and Fq0 -linear/affine independence). Let K be a field containing
+the finite field Fq0 of order q0 = ps .
+                                                                                                             q j−1
+ (1) For every r ≥ 1 and z1 , . . . , zr ∈ K, the Moore matrix Mq0 (z1 , . . . , zr ) := (zi 0 )1≤i,j≤r
+     satisfies                                                ⎛                  ⎞
+                                                         r                                 j−1
+                         det Mq0 (z1 , . . . , zr ) =
+                                                        ∏︂          ∏︂                     ∑︂
+                                                                                   ⎝zj −         ci zi ⎠ ,
+                                                        j=1 (c1 ,...,cj−1 )∈Fj−1           i=1
+                                                                             q0
+
+     and vanishes if and only if z1 , . . . , zr are Fq0 -linearly dependent.
+                                                                  q a+j−1
+ (2) For every r ≥ 1 and a ≥ 0, the shifted matrix (zi 0                    )1≤i,j≤r is invertible over K if and only
+     if z1 , . . . , zr are Fq0 -linearly independent.
+
+
+                                                           10
+  (3) Call z1 , . . . , zr ∈ K Fq0 -affinely independent if no nonzero (γ1 , . . . , γr ) ∈ Frq0 satisfies ri=1 γi =
+                                                                                                            ∑︁
+
+      0 and ri=1 γi zi = 0, and set AFq0 (z1 , . . . , zr ) := { ri=1 αi zi : αi ∈ Fq0 , ri=1 αi = 1} (of
+               ∑︁                                                 ∑︁                             ∑︁
+
+      cardinality ≤ q0r−1 ). Then the r × r affine Moore matrix
+                                                                                    q r−2
+                                                         ⎛                                  ⎞
+                                                                     q0
+                                                            ⎜1 z1 z1      ···      z1 0 ⎟
+                                                            ⎜ .. .. ..    ..          .. ⎟
+                                   q0 (z1 , . . . , zr ) := ⎜
+                                  Maff
+                                                            ⎝. .     .       .         . ⎟  ⎠
+                                                                                    q r−2
+                                                              1 zr zrq0   ···      zr 0
+      is invertible over K if and only if z1 , . . . , zr are Fq0 -affinely independent. When this holds, a
+                                  r−1                                                                       q r−1
+      vector (1, w, wq0 , . . . , wq0 ) ∈ K r+1 (w ∈ K) lies in the K-span of {(1, zi , ziq0 , . . . , zi 0 ) : 1 ≤
+      i ≤ r} if and only if w ∈ AFq0 (z1 , . . . , zr ), with unique coefficients αi ∈ Fq0 summing to 1.
+Proof. (1) Work over Fq0 [Z1 , . . . , Zr ] and induct on r ≥ 1; the base case r = 1 is det(Z1 ) = Z1 . For
+r ≥ 2, viewing P (Zr ) := det Mq0 (Z1 , . . . , Zr ) over R := Fq0 [Z1 , . . . , Zr−1 ], cofactor expansion along
+row r shows that P (Zr ) has degree q0r−1 and leading coefficient ∆r−1 := det Mq0 (Z1 , . . . , Zr−1 ) ̸= 0.
+                            j−1
+By Fq0 -linearity of u ↦→ uq0 , substituting Zr = Lc := r−1     i=1 ci Zi makes row r equal to        i=1 ci (rowi )
+                                                             ∑︁                                     ∑︁r−1
+
+for each of the q0 distinct elements Lc ∈ R (c ∈ Fq0 ). Comparing degrees and leading coefficients
+                 r−1                                      r−1
+
+in Frac(R)[Zr ] gives P (Zr ) = ∆r−1 c∈Fr−1       (Zr − Lc ), completing the induction; specializing Zi ↦→
+                                         ∏︁
+                                               q0
+zi ∈ K yields both claims.
+                       a                                                         q a+j−1                             a
+   (2) Since u ↦→ uq0 is a ring endomorphism of the field K, det(zi 0            ) = (det Mq0 (z1 , . . . , zr ))q0 ,
+which is nonzero if and only if det Mq0 (z1 , . . . , zr ) ̸= 0.
+   (3) Choosing (α2 , . . . , αr ) ∈ Fr−1
+                                      q0 determines α1 = 1 −       i=2 αi , so |AFq0 (z1 , . . . , zr )| ≤ q0 . For
+                                                                                                            r−1
+                                                                 ∑︁r
+
+                                                                                            q j−2   q j−2           j−2
+r = 1, det(1) = 1; for r ≥ 2, subtracting row 1 from rows 2, . . . , r and using zi 0 −z10 = (zi −z1 )q0
+yields det Maffq0 (z1 , . . . , zr ) = det Mq0 (z2 − z1 , . . . , zr − z1 ). By (1), this vanishes  if and only if
+  i=2 γi (zi − z1 ) = 0 for some (γ2 , . . . , γr ) ∈ Fq0 \ {0}, which (setting γ1 := −       i=2 γi ) is equivalent
+∑︁r                                                    r−1                                  ∑︁r
+
+to Fq0 -affine dependence of z1 , . . . , zr . When z1 , . . . , zr are Fq0 -affinely independent, the r rows
+            q r−1                                                      r−1
+(1, zi , . . . , zi 0 ) are K-linearly independent, so (1, w, . . . , wq0 ) lies in their K-span if and only if
+det Maff  q0 (z1 , . . . , zr , w) = 0, i.e.,   i=1 γi zi +γr+1 w = 0 and   i=1 γi +γ∑︁
+                                                                                     r+1 = 0 for some nonzero tuple
+                                              ∑︁r                         ∑︁r
+
+in Fq0 . Affine independence of z1 , . . . , zr forces γr+1 ̸= 0, giving w = ri=1 αi zi with αi := −γi /γr+1
+     r+1
+
+uniquely.
+
+Lemma 3.2 (Transvection generation of GL(V )). Let V be a vector space of dimension N ≥ 2
+over a field F, with dual V ∨ , and for φ ∈ V ∨ and u ∈ ker(φ) define the transvection Tφ,u (v) :=
+v + φ(v)u ∈ SL(V ). If a subgroup G ≤ GL(V ) acts irreducibly on V , contains {Tφ0 ,u : u ∈ ker(φ0 )}
+for some φ0 ∈ V ∨ \ {0}, and satisfies det(G) = F× , then G = GL(V ).
+Proof. Let S := {0} ∪ {φ ∈ V ∨ \ {0} : Tφ,u ∈ G for all u ∈ ker(φ)}, with the contragredient G-action
+(g · φ)(v) := φ(g −1 v). Since Tcφ,u = Tφ,cu for c ∈ F× and gTφ,g−1 u′ g −1 = Tg·φ,u′ for g ∈ G and
+u′ ∈ ker(g · φ), the set S is closed under F-scaling and under G. It is also closed under addition:
+if φ1 , φ2 ∈ S are linearly independent, then ker(φ1 ) ̸⊆ ker(φ2 ), so we can pick w ∈ ker(φ1 ) with
+φ2 (w) = −1; then g := Tφ1 ,w ∈ G satisfies
+
+                               (g · φ2 )(v) = φ2 v − φ1 (v)w = φ2 (v) + φ1 (v),
+                                                 (︁              )︁
+
+
+whence φ1 + φ2 ∈ S. Thus S is a nonzero G-invariant subspace of V ∨ . Its annihilator S ⊥ = {v ∈
+V : φ(v) = 0 ∀φ ∈ S} is a proper G-invariant subspace of V , hence {0} by irreducibility, so S = V ∨ .
+    Fix a basis (e1 , . . . , eN ) of V with dual basis (e∗1 , . . . , e∗N ). For all i ̸= j and c ∈ F, since e∗j ∈ S
+and cei ∈ ker(e∗j ), G contains every elementary matrix Ei,j (c) = Te∗j ,cei . These generate SLN (F):
+
+                                                         11
+for k = N, N − 1, . . . , 2, any A ∈ SLN (F) whose last N − k rows and columns match IN can
+be given a nonzero (k, k)-entry (via Ek,i (1) for some i < k if ak,k = 0), then (1, k)-entry 1 via
+E1,k ((1 − a1,k )/ak,k ), then (k, k)-entry 1 via Ek,1 (1 − ak,k ), and then cleared along column k and
+row k, ending at diag(det A, 1, . . . , 1) = IN . Thus SL(V ) ⊆ G, and since det(G) = F× , we conclude
+G = GL(V ).
+
+Lemma 3.3 (Geometric Galois group AGLN (Fq0 ) of sparse Fq0 -affine pencils). Let k be a field
+containing Fq0 (q0 = ps ≥ 3) with algebraic closure k. Let N ≥ 2, let {0, N −1, N } ⊆ I ⊆ {0, . . . , N },
+and for r ∈ {0, 1} let
+                                          i                                        i
+                (T ) :=                             Ar (T ) :=             ar,i T q0 −1 ,       Lr (T ) := Lhom (T ) + δr
+                            ∑︂                                       ∑︂
+           Lhom
+            r                     ar,i T q0 ,                                                               r
+                            i∈I                                      i∈I
+
+in k[T ]. Assume that the pencil LZ (T ) := L0 (T ) + ZL1 (T ) ∈ k[Z][T ] satisfies:
+(A1) a0,N a1,0 − a1,N a0,0 ̸= 0;
+
+(A2) a0,N a1,N −1 − a1,N a0,N −1 ̸= 0;
+
+(A3) gcdk[T ] (A0 (T ), A1 (T )) = 1;
+
+(A4) gcdk[T ] (L0 (T ), L1 (T )) = 1.
+
+Then LZ (T ) is separable of degree q0N over K := k(Z), its splitting field F1geom over K satisfies
+
+                                                Gal F1geom /k(Z) ∼ = AGLN (Fq0 ),
+                                                   (︁           )︁
+
+
+and the splitting field F1 of LZ (T ) over k(Z) has Gal(F1 /k(Z)) embedding into AGLN (Fq0 ).
+Proof. Step 1 (Möbius normalization and affine structure). Set (︁∆1 := a0,N     a1,0 − a1,N a0,0 ̸= 0 and
+                                                                  a     a1,N )︁
+∆2 := a0,N a1,N −1 − a1,N a0,N −1 ̸= 0. By (A1), the matrix Γ := a0,N
+                                                                    0,0 a1,0    lies in GL2 (k); writing
+         −1 (︁ a1,0 −a1,N )︁
+Γ = ∆1 −a0,0 a0,N =: α10 α11 , set
+ −1
+                             (︁ α00 α01 )︁
+
+
+                                                                                                                  a0,0 + a1,0 Z
+   (︄      )︄                (︄           )︄          (︄         )︄                    (︄           )︄
+     P0 (T )        −1 ⊤          A0 (T )                 L′0 (T )             −1 ⊤         L0 (T )
+                := (Γ   )                 ,                           := (Γ        )                ,     W :=                  .
+     P1 (T )                      A1 (T )                 L′1 (T )                          L1 (T )              a0,N + a1,N Z
+
+Then k(W ) = k(Z) (sending the zero of the leading coefficient to W = ∞ and that of the linear
+coefficient to W = 0, so as to isolate a single wild-ramification slope at W = ∞), K = k(W ), and
+LZ (T ) = (a0,N + a1,N Z)L′ (W, T ) where L′ (W, T ) := L′0 (T ) + W L′1 (T ) = M (W, T ) + δ0′ + δ1′ W has
+homogeneous part M (W, T ) := T (P0 (T ) + W P1 (T )) of the normalized form
+                                                      N                                         i
+                              M (W, T ) = T q0 +                            (ui + vi W ) T q0 + W T
+                                                                 ∑︂
+
+                                                              i∈I\{0,N }
+
+with vN −1 = ∆−1  1 ∆2 ̸= 0 by (A2). Thus LZ (T ) and L (W, T ) share the same roots and splitting
+                                                          ′
+
+field over k(Z) and over K. Because (Γ−1 )⊤ ∈ GL2 (k) and polynomial gcd is invariant under field
+extension, (A3)–(A4) give gcdk[T ] (P0 , P1 ) = 1 and gcdk[T ] (L′0 , L′1 ) = 1.
+    Since p | q0 , we have ∂T M (W, T ) = ∂T L′ (W, T ) = W ̸= 0, so both M (W, T ) and L′ (W, T ) are
+monic separable of degree q0N over K. By Fq0 -linearity of y ↦→ M (W, y), the root set V of M (W, T )
+in K sep is an N -dimensional Fq0 -vector space, and fixing any root ρ0 of L′ (W, T ) gives the full
+root set R = ρ0 + V of L′ (W, T ) and F1geom = K(V, ρ0 ). Every automorphism σ in Gal(F1geom /K)
+(or in Gal(F1 /k(Z)), since Fq0 ⊆ k) acts on ρ0 + V by σ(ρ0 + v) = ρ0 + t(σ) + ℓ(σ)(v) with
+
+                                                                     12
+t(σ) := σ(ρ0 ) − ρ0 ∈ V and ℓ(σ) := σ|V ∈ GL(V ), giving injective group homomorphisms from both
+Gal(F1geom /K) and Gal(F1 /k(Z)) into V ⋊ GL(V ) ∼    = AGLN (Fq0 ).
+     Step 2 (Linear part GL(V ) via local wild inertia at W = ∞). Identify G := Gal(K(V )/K) with
+a subgroup of GL(V ). First, P0 (T ) + W P1 (T ) is monic in T and linear in W (with P1 (0) = 1 ̸= 0);
+by Gauss’s lemma over the UFD k[W ], any nontrivial factorization in K[T ] would take the form
+B1 (T )(C0 (T )+W C1 (T )) with deg B1 ≥ 1, contradicting gcdk[T ] (P0 , P1 ) = 1. Hence P0 (T )+W P1 (T )
+is irreducible over K, so G acts transitively on V \ {0} and therefore irreducibly on V .
+     Next set w := W −1 , embed K into K∞ := k((w)) with valuation vw (vw (w) = 1) and ring of
+integers O∞ := k[[w]], and embed K(V ) ↪→ K∞    sep over K, identifying G
+                                                                             ∞ := Gal(K∞ (V )/K∞ ) with
+a subgroup of G. Every y ∈ V is a root of the separable Fq0 -linear polynomial
+                                                  N                           i
+              H(w, T ) := wM (w−1 , T ) = wT q0 +               (vi + wui ) T q0 + T ∈ O∞ [T ].
+                                                           ∑︂
+
+                                                      i∈I\{0,N }
+
+
+Since vN −1 ̸= 0 and ∂T H(0, T ) = 1, the reduction H(0, T ) has q0N −1 distinct roots r1 , . . . , rqN −1 ∈ k.
+                                                                                                      0
+Each rν lifts to a root r̃ν ∈ O∞ of H(w, T ) with r̃ν ≡ rν (mod w): indeed, starting at y0 := rν ,
+the iteration yj+1 := yj − H(w, yj ) satisfies H(w, yj ) ∈ wj+1 O∞ by induction, since for ηj :=
+−H(w, yj ) ∈ wj+1 O∞ additivity gives H(w, yj+1 ) = H(w, ηj ) − ηj ∈ wq0 (j+1) O∞ ⊆ wj+2 O∞ . Thus
+W∞ := V ∩ K∞ contains {r̃1 , . . . , r̃qN −1 }.
+                                        0
+   Extend vw uniquely to K∞ (V )× → Q via Theorem E (with residue field k). Any y ∈ V
+with vw (y) ≥ 0 reduces to some rν , and then η := y − r̃ν ∈ V has vw (η) > 0; if η ̸= 0, then η =
+     N                           i
+−wη q0 − i∈I\{0,N } (vi +wui )η q0 has right-hand valuation ≥ q0 vw (η) > vw (η), a contradiction. Hence
+         ∑︁
+                                                                                                          N −1
+every y ∈ V \ {r̃1 , . . . , r̃qN −1 } satisfies vw (y) < 0. In H(w, y) = 0, the term (vN −1 + wuN −1 )y q0
+                           0
+                                            ×
+has valuation q0N −1 vw (y) (as vN −1 ∈ k ), every term with i ≤ N − 2 has strictly larger valuation
+≥ q0i vw (y) > q0N −1 vw (y), and the leading term has valuation 1 + q0N vw (y). By the ultrametric
+inequality, the two smallest valuations must agree, giving
+                                                       1
+                                       vw (y) = − N −1       ∈
+                                                             / Z.
+                                                 q0 (q0 − 1)
+
+Thus W∞ = {r̃1 , . . . , r̃qN −1 } has dimension N − 1. Fix y∞ ∈ V \ W∞ , so V = W∞ ⊕ Fq0 y∞ .
+                           0
+By Theorem E, the ramification index of K∞ (y∞ )/K∞ is divisible by q0N −1 (q0 − 1), whence
+|G∞ | ≥ [K∞ (y∞ ) : K∞ ] ≥ q0N −1 (q0 − 1). Conversely, every σ ∈ G∞ fixes W∞ pointwise and sends
+y∞ to λ(σ)y∞ + u(σ) for a unique pair (λ(σ), u(σ)) ∈ F×   q0 × W∞ . By cardinality, σ ↦→ (λ(σ), u(σ))
+is a bijection. Taking φ0 ∈ V ∨ with ker(φ0 ) = W∞ and φ0 (y∞ ) = 1, the pairs (1, u) yield all
+transvections Tφ0 ,u (u ∈ ker(φ0 )) and the pairs (λ, 0) yield all determinants λ ∈ F× q0 . Lemma 3.2
+therefore gives G = GL(V ).
+     Step 3 (Translation subgroup V via central scalars). Under Gal(F1geom /K) ↪→ V ⋊ GL(V ), the
+kernel T0 := Gal(F1geom /K(V )) is an additive subgroup of V normalized by G = GL(V ). Since
+GL(V ) acts transitively on V \ {0}, either T0 = V (completing the proof) or T0 = {0}. Suppose
+T0 = {0}, so ρ0 ∈ K(V ), and set c(g) := g(ρ0 ) − ρ0 ∈ V for g ∈ GL(V ), satisfying the cocycle
+rule c(gh) = c(g) + g(c(h)). Since q0 ≥ 3, we may pick ζ ∈ F×    q0 \ {1} and set z := ζ idV (showing
+H 1 (GL(V ), V ) = 0, which is why we take q0 > 2 even when p = 2). For every g ∈ GL(V ),
+commuting zg = gz gives c(z) + ζc(g) = c(g) + g(c(z)), so with w0 := (ζ − 1)−1 c(z) ∈ V we have
+g(ρ0 − w0 ) = ρ0 − w0 . By Galois theory, r := ρ0 − w0 lies in K = k(W ) and satisfies L′ (W, r) = 0.
+                                                                                                    N
+Writing r = A(W )/B(W ) in lowest terms with B monic and multiplying L′ (W, A/B) = 0 by B q0
+                N  N −1     N                                                             N
+shows that B q0 −q0     | Aq0 , forcing B = 1 and r ∈ k[W ]. If d := degW r ≥ 1, then rq0 has degree
+
+                                                      13
+dq0N while every other term of L′ (W, r) has W -degree ≤ 1 + dq0N −1 < dq0N (since q0N − q0N −1 ≥ 6),
+a contradiction. Thus r ∈ k, so L′0 (r) + W L′1 (r) = 0 forces L′0 (r) = L′1 (r) = 0, contradicting
+gcdk[T ] (L′0 , L′1 ) = 1. Hence T0 = V and Gal(F1geom /K) ∼
+                                                           = AGLN (Fq0 ).
+
+   We close this section with Jordan’s classical criterion, which supplies the symmetric group SNR
+on the cofactor side.
+
+Lemma 3.4 (Jordan’s theorem for a transposition). Let G ≤ Sym(Ω) be a primitive transitive
+permutation group on a finite set Ω of size M ≥ 2. If G contains a transposition (a b), then
+G = Sym(Ω).
+
+Proof. Declare x ∼ y on Ω if x = y or (x y) ∈ G. This relation is reflexive, symmetric, and transitive
+(since (x z) = (x y)(y z)(x y) for distinct x, y, z), and G permutes its equivalence classes because
+g(x y)g −1 = (g(x) g(y)). The class of a contains {a, b}, so by primitivity it equals Ω. Thus G
+contains all transpositions, hence equals Sym(Ω).
+
+
+4     Elliptic Curve Geometry and the Cofactor Monodromy Group
+      SNR
+We now construct the ordinary elliptic presentation (E/Fq , Q, I ), set up the sparse Frobenius
+function space WP and its vanishing subspace HD,P , and prove that for almost all choices of
+(P, R∗ , U, V ) the pencil LZ (T ) = LU (T ) + ZLV (T ) satisfies (A1)–(A4) of Lemma 3.3 while the
+residual cofactor cover φ = −U/V : E → P1 has geometric monodromy SNR with a simple double
+point over Z = 0. All arguments are characteristic-free, treating p = 2, p = 3, and p ≥ 5 on equal
+footing.
+
+4.1    Elliptic presentations and the parallelogram law
+Lemma 4.1 (Canonical ordinary elliptic presentations and point sampling). Let p ≥ 2 be a prime,
+n ≥ 5 an integer, and q = pr ≥ 16n2 (r ≥ 1), with Fq = Fp [T ]/(hq (T )) explicitly presented.
+
+ (1) Canonical models: Every ordinary elliptic curve over Fq is Fq -isomorphic to a smooth
+     projective plane cubic E/Fq with origin OE = (0 : 1 : 0) and affine equation
+
+                             E : y 2 + a1 xy = x3 + a2 x2 + a4 x + a6      (ai ∈ Fq )                  (4.1)
+
+      of the following canonical form (each defining a smooth ordinary curve):
+
+       • p = 2: a1 = 1, a4 = 0, a2 ∈ Fq , a6 ∈ F×
+                                                q , with unique nonzero 2-torsion point T2 :=
+               q/2
+          (0, a6 ) ∈ E(Fq );
+       • p = 3: a1 = a4 = 0, a2 , a6 ∈ F×
+                                        q , with three distinct nonzero 2-torsion points W1 , W2 , W3 ∈
+         E(Fq );
+       • p ≥ 5: a1 = a2 = 0, a4 , a6 ∈ Fq with 4a34 + 27a26 ̸= 0 and gcd(q + 1 − |E(Fq )|, p) = 1, with
+         three distinct nonzero 2-torsion points W1 , W2 , W3 ∈ E(Fq ).
+
+      Negation is −(x1 , y1 ) = (x1 , −y1 − a1 x1 ); for affine points P1 = (x1 , y1 ) and P2 = (x2 , y2 ) ̸=
+      −P1 , one has P1 +P2 = (x3 , y3 ) with x3 = µ2 +a1 µ−a2 −x1 −x2 and y3 = µ(x1 −x3 )−y1 −a1 x3 ,
+      where µ = (y2 − y1 )/(x2 − x1 ) if x1 ̸= x2 and µ = (3x21 + 2a2 x1 + a4 − a1 y1 )/(2y1 + a1 x1 ) if
+      P1 = P2 . Putting η := 2y + a1 x (so η = x for p = 2 and η = 2y for p ≥ 3), the differential
+
+                                                     14
+      ω := dx/η satisfies divE (ω) = 0 and τS∗ ω = ω for every translation τS (R) := R + S. Moreover,
+      for any S = (xS , yS ) ∈ E(Fq ) \ E[2], putting cS := −(2yS + a1 xS ) ̸= 0,
+
+                  B2,S (X) := xS X 2 + (a4 + x2S + 2a2 xS − a1 yS )X + (2a6 + a4 xS ),
+                                                             )︁2
+                ΨS (X, Y ) := (X − xS )2 Y − B2,S (X)              + cS a1 X (X − xS )2 Y − B2,S (X)
+                               (︁                                          (︁                          )︁
+
+                                    − c2S (X 3 + a2 X 2 + a4 X + a6 ),
+
+      every R = (X, y) ∈ E(Fq ) \ {OE , S, −S} satisfies (X − xS )2 x(R + S) = cS y + B2,S (X) and
+                                                          2
+      ΨS (X, x(R + S)) = 0; conversely, every (X, Y ) ∈ Fq with X ̸= xS and ΨS (X, Y ) = 0 arises
+      as (x(R), x(R + S)) for some R ∈ E(Fq ) \ {OE , S, −S}.
+
+ (2) Las Vegas construction of (E, Q, I ): Given (p, n, Fq ), a zero-error Las Vegas algorithm
+     running in expected O(q 4 (log2 q)3 ) bit operations outputs a canonical ordinary curve E/Fq
+                                                      √           √
+     with exact point count NE := |E(Fq )| ∈ [( q − 1)2 , ( q + 1)2 ] (so NE < 2q), a point
+     Q = (xQ , yQ ) ∈ E(Fq ) of exact order n, a monic irreducible polynomial Mx ∈ Fq [X] of degree
+     n, and YI ∈ Fq [X] of degree < n such that in Fqn := Fq [X]/(Mx (X)) with x0 := X mod Mx
+     and y0 := YI (x0 ), the point I0 := (x0 , y0 ) ∈ E(Fqn ) satisfies ϕq (I0 ) = I0 + Q. The orbit
+     I := n−1 u=0 [ϕq (I0 )] =   u=0 [I0 + [u]Q] is a degree-n closed point of EFq , and a point R ∈
+            ∑︁      u          ∑︁n−1
+
+     E(Fq ) \ {OE } lies in supp(I ) if and only if Mx (x(R)) = 0 and y(R) = YI (x(R)).
+
+ (3) Unbiased point sampling: For any explicitly presented finite extension k/Fq with |k| ≥ 16
+     and explicit embedding Fq ↪→ k, a zero-error Las Vegas routine SamplePoint(E, k) outputs a
+     strictly uniform point in E(k) \ {OE } in expected O((log2 |k|)3 ) bit operations.
+
+Proof. (1) The canonical Fq -rational Weierstrass reductions for j(E0 ) ̸= 0 in characteristics 2 and
+3 and for general curves in characteristic p ≥ 5 are given in [15, Appendix A, Proposition A.1.1]:
+explicitly, starting from y 2 + α1 xy + α3 y = x3 + α2 x2 + α4 x + α6 , when p = 2 ordinarity forces α1 ̸= 0,
+and (x, y) = (α12 x2 + α3 /α1 , α13 (y2 + β4 )) eliminates α3 and β4 , leaving y22 + x2 y2 = x32 + a2 x22 + a6
+                                                                             q/2
+with ∆ = a6 ̸= 0, j = a−16 ̸= 0, and unique nonzero 2-torsion point (0, a6 ); when p = 3, substituting
+y = y1 + α1 x + α3 gives y12 = x3 + β2 x2 + β4 x + β6 with β2 ̸= 0 by ordinarity (j = β26 /∆ ̸= 0),
+and x = x2 + β4 /β2 cancels the linear term, leaving y12 = x32 + a2 x22 + a6 with ∆ = −a32 a6 ̸= 0,
+j = −a32 /a6 ̸= 0, and three simple roots of x3 + a2 x2 + a6 ; when p ≥ 5, standard square and
+cube completion yields y12 = x32 + a4 x2 + a6 with 4a34 + 27a26 ̸= 0, which is ordinary if and only
+if p ∤ (q + 1 − |E(Fq )|) [15, Theorem V.3.1 and Exercise 5.10]. The group law and the nowhere-
+vanishing translation-invariant differential ω = dx/η follow from [15, III.2.3(d), Proposition III.1.5,
+and Proposition III.5.1]. For S = (xS , yS ) ∈  / E[2] and R = (X, y) ∈  / {OE , S, −S}, clearing (X − xS )2
+in x(R + S) = µ2 + a1 µ − a2 − X − xS and substituting y 2 = −a1 Xy + X 3 + a2 X 2 + a4 X + a6
+cancels −a1 Xy and X 3 , giving (X − xS )2 x(R + S) = cS y + B2,S (X); solving for y and substituting
+back into the Weierstrass equation gives ΨS (X, x(R + S)) = 0, and reversing that substitution gives
+the converse whenever X ̸= xS .
+                                                                 √
+    (2) Set N1 := ⌊(q + 1)/n⌋n and N2 := N1 − n. Since q ≥ 4n, both satisfy 0 ≤ q + 1 − Ni <
+         √
+2n ≤ 21 q. If p | n then N1 ≡ 0 ̸≡ 1 (mod p), while if p ∤ n then N1 − N2 = n ̸≡ 0 (mod p), so at
+least one N ∈ {N1 , N2 } satisfies p ∤ (q + 1 − N ). By Theorem A and (1), some canonical ordinary
+curve E/Fq has E(Fq ) ∼   = Z/N Z and hence contains a point Q of exact order n. Trial-dividing
+n and scanning the ≤ q 2 smooth canonical models (counting E(Fq ) in O(q 2 (log2 q)2 ) per curve,
+checking p ∤ (q + 1 − NE ) and n | NE , and testing [n]P = OE with [n/ℓ]P ̸= OE for all primes ℓ | n)
+                                                                                        √
+finds (E, NE , Q) deterministically in O(q 4 (log2 q)2 ) bit operations, with NE ≤ ( q + 1)2 < 2q since
+q ≥ 400.
+
+                                                        15
+                                                                    √
+    By Theorem B(4) and q ≥ 400, |E(Fq2 )| ≥ (q − 1)2 > ( q + 1)2 ≥ |E(Fq )|, so ϕq − idE :
+E → E is nonconstant and hence surjective on E(Fq ). Choose P1 = (x1 , y1 ) ∈ E(Fq ) with
+ϕq (P1 ) = P1 + Q. Then ϕiq (P1 ) = P1 + [i]Q, so [Fq (x1 , y1 ) : Fq ] = ord(Q) = n. We cannot have
+                                                                                    n/2
+[Fq (x1 , y1 ) : Fq (x1 )] = 2: otherwise n is even and x(P1 + [n/2]Q) = xq1           = x1 = x(P1 ), forcing
+either [n/2]Q = OE or [2]P1 = −[n/2]Q ∈ E(Fq ) (whence [2]Q = ϕq ([2]P1 ) − [2]P1 = OE ), both
+contradicting ord(Q) = n ≥ 5. Hence Fq (x1 ) = Fq (x1 , y1 ) has degree n over Fq , and x1 is a
+root of the monic polynomial GQ (X) := ΨQ (X, X q ) ∈ Fq [X] of degree 2q + 4 (as Q ∈                / E[2] and
+P1 ∈/ E(Fq )). Factor GQ (X) over Fq via Lemma 2.1(3) in expected O(q 3 (log2 q)3 ) bit operations;
+for each degree-n irreducible factor M , form KM := Fq [X]/(M (X)) with x0 := X mod M (note
+    / Fq , so x0 ̸= xQ ), set y0 := c−1             2 q
+x0 ∈                                   Q ((x0 − xQ ) x0 − B2,Q (x0 )) = YI (x0 ), and verify (x0 , y0 ) ∈ E(KM )
+and (xq0 , y0q ) = (x0 , y0 ) + Q. The minimal polynomial of x1 passes, and any passing Mx has distinct
+                            n−1
+roots x0 , xq0 , . . . , xq0 , so Mx (x(R)) = 0 and y(R) = YI (x(R)) characterize supp(I ).
+     (3) In each trial, sample x∗ ∈ k uniformly and a bit b ∈ {0, 1} independently, and factor
+Y 2 + a1 x∗ Y − (x3∗ + a2 x2∗ + a4 x∗ + a6 ) over k via Lemma 2.1(3) in expected O((log2 |k|)3 ) bit
+operations to find its root set S(x∗ ) ⊆ k. Reject if S(x∗ ) = ∅; if S(x∗ ) = {y1 }, return (x∗ , y1 ) when
+b = 1 and reject when b = 0; if S(x∗ ) = {y1 , y2 } (ordered lexicographically), return (x∗ , y1 ) if b = 0
+and (x∗ , y2 ) if b = 1. Every point in E(k) \ {OE } is output with probability       √︁ exactly 1/(2|k|) per
+trial, so the total acceptance probability is (|E(k)| − 1)/(2|k|) ≥ (|k| − 2 |k|)/(2|k|) ≥ 1/4 (as
+|k| ≥ 16). By Lemma 2.1(1), the output is uniform on E(k) \ {OE } in expected O((log2 |k|)3 ) bit
+operations.
+
+Lemma 4.2 (Parallelogram law for curve morphisms to E). Let E be a smooth elliptic curve
+over an algebraically closed field K of characteristic p ≥ 2 in one of the three canonical forms of
+Lemma 4.1(1), and let C/K be a smooth projective curve. On the abelian group MorK (C, E) under
+pointwise addition on E, set deg(ψ) := 0 if ψ is constant and deg(ψ) := [K(C) : ψ ∗ K(E)] otherwise.
+For all ψ1 , ψ2 ∈ MorK (C, E), P0 ∈ E(K), and r ∈ Z:
+
+ (1) deg(ψ1 + P0 ) = deg(−ψ1 ) = deg(ψ1 ), deg(ψ1 + ψ2 ) + deg(ψ1 − ψ2 ) = 2 deg(ψ1 ) + 2 deg(ψ2 ),
+     and deg([r]ψ1 ) = r2 deg(ψ1 );
+
+ (2) ⟨ψ1 , ψ2 ⟩ := deg(ψ1 + ψ2 ) − deg(ψ
+                                     √︁ 1 ) − deg(ψ2 ) is symmetric
+                                                                                                         2
+                                                                      √︁ Z-bilinear, satisfies ⟨ψ1 , ψ2 ⟩ ≤
+                                                                    and
+     4 deg(ψ1 ) deg(ψ2 ), and gives deg(ψ1 + ψ2 ) ≤ deg(ψ1 ) + deg(ψ2 ).
+                                                          √︁
+
+
+Proof. Post-composing with the curve automorphisms τP0 and [−1] preserves deg, so the parallelo-
+gram law is immediate if ψ1 or ψ2 is constant; if ψ1 ∓ ψ2 = P0 is constant, then ψ1 ± ψ2 = [2]ψ2 ± P0
+has degree deg([2]) deg(ψ2 ) = 4 deg(ψ2 ) = 2 deg(ψ1 ) + 2 deg(ψ2 ) by Theorem B(2). Assume now
+that ψ1 , ψ2 , ψ1 + ψ2 , ψ1 − ψ2 are all nonconstant. Since [K(E) : K(x)] = 2, every nonconstant
+ψ ∈ MorK (C, E) satisfies 2 deg(ψ) = deg(div∞ (x ◦ ψ)) = − z∈C(K) min(0, vz (x ◦ ψ)) by Theo-
+                                                                      ∑︁
+
+rem C(1).
+   Set xi := x ◦ ψi , yi := y ◦ ψi , F (X) := X 3 + a2 X 2 + a4 X + a6 , Fi := F (xi ) = yi2 + a1 xi yi (i = 1, 2),
+and x± := x ◦ (ψ1 ± ψ2 ) in K(C). Because ψ1 ̸= ±ψ2 , we have Φ0 := (x1 − x2 )2 ̸= 0. Writing
+G := x1 x2 (x1 + x2 ) + 2a2 x1 x2 + a4 (x1 + x2 ) + 2a6 and H := 2y1 y2 + a1 (x1 y2 + x2 y1 ), the chord
+formula for ψ1 ± ψ2 gives Φ0 x+ = G − H and Φ0 x− = G + H + a21 x1 x2 (replacing y2 by −y2 − a1 x2
+sends −H to H + a21 x1 x2 ). Adding yields
+
+            Φ1 := Φ0 (x+ + x− ) = 2x1 x2 (x1 + x2 ) + (a21 + 4a2 )x1 x2 + 2a4 (x1 + x2 ) + 4a6 .
+
+For the product, H 2 + a21 x1 x2 H = 4F1 F2 + a21 (x21 F2 + x22 F1 ), x1 x2 G − x21 F2 − x22 F1 = −a6 Φ0 ,
+and in terms of σ1 = x1 + x2 and σ2 = x1 x2 (so Φ0 = σ12 − 4σ2 ) a direct expansion gives
+
+                                                       16
+G2 − 4F1 F2 = Φ0 (σ2 − a4 )2 − 4a6 (σ1 + a2 ) ; hence, dividing (G − H)(G + H + a21 x1 x2 ) by Φ0 ,
+                   (︁                              )︁
+
+
+                        Φ2 := Φ0 x+ x− = (x1 x2 − a4 )2 − 4a6 (x1 + x2 + a2 ) − a21 a6 .
+
+    At any)︁ place z ∈ C(K), inspecting the signs of vz (x+ ) and vz (x− ) gives min 0, vz (x+ + x− ),
+                                                                                                    (︁
+
+vz (x+ x− ) = min(0, vz (x+ )) + min(0, vz (x− )), so minj=0,1,2 vz (Φj ) = vz (Φ0 ) + min(0, vz (x+ )) +
+min(0, vz (x− )). We claim this minimum also equals 2 min(0, e1 ) + 2 min(0, e2 ), where ei := vz (xi ):
+
+ • If e1 , e2 ≥ 0, then Φ0 , Φ1 , Φ2 ∈ Oz , and they cannot all vanish at z: if x1 = x2 =: u, then for
+   p = 2 we have Φ1 = u2 and Φ2 = u4 + a6 (a6 ̸= 0); for p = 3, (u − a2 )Φ1 − Φ2 = −a22 u2 with
+   Φ1 (0) = a6 (a2 , a6 ̸= 0); and for p ≥ 5, Φ1 = 4F (u) and Φ2 = (3u2 + a4 )2 − 8uF (u), whose
+   common vanishing contradicts 4a34 + 27a26 ̸= 0.
+
+ • If e1 < 0 ≤ e2 (or symmetrically e2 < 0 ≤ e1 ), then vz (Φ0 ) = 2e1 while every monomial of
+   Φ1 , Φ2 has valuation ≥ 2e1 .
+
+ • If e1 , e2 < 0, then vz (Φ0 ) ≥ 2 min(e1 , e2 ) > 2e1 + 2e2 , vz (Φ1 ) > 2e1 + 2e2 , and Φ2 is dominated
+   by x21 x22 of valuation 2e1 + 2e2 .
+
+Summing vz (Φ0 ) + min(0, vz (x+ )) + min(0, vz (x− )) = 2 min(0, e1 ) + 2 min(0, e2 ) over z ∈ C(K) and
+using z vz (Φ0 ) = 0 proves the parallelogram law. Induction on |r| via deg([r]ψ) = 2 deg([r − 1]ψ) +
+       ∑︁
+
+2 deg(ψ) − deg([r − 2]ψ) then gives deg([r]ψ) = r2 deg(ψ). Standard polarization (summing the
+parallelogram law on (ψ1 + ψ2 , ψ3 ) and (ψ1 + ψ3 , ψ2 ) and subtracting it on (ψ1 , ψ2 − ψ3 )) yields
+⟨ψ1 + ψ2 , ψ3 ⟩ = ⟨ψ1 , ψ3 ⟩ + ⟨ψ2 , ψ3 ⟩, hence Z-bilinearity. Finally, 0 ≤ deg([a]ψ1 + [b]ψ2 ) = a2 d1 +
+abβ0 + b2 d2 (di := deg(ψi ), β0 := ⟨ψ1 , ψ2 ⟩) for all a, b ∈ Z gives β02 ≤ 4d1 d2 (take
+                                                                                      √ (a, b)
+                                                                                            √ = (−β0 , 2d1 )
+if d1 ≥ 1, and (−β0 (d2 + 1), 1) if d1 = 0), so deg(ψ1 + ψ2 ) = d1 + β0 + d2 ≤ ( d1 + d2 )2 .
+
+4.2    The sparse Frobenius space WP and good translations
+Definition 4.3 (Standing elliptic descent setup). Throughout the rest of Sections 4 and 5, fix:
+
+ • a prime p ≥ 2, integers s ≥ 3 and B ≥ 4, λ := 2B ≥ 8, m := 2B + 4 = λ + 4 ≥ 12, q0 := ps ≥ 8,
+   an integer t ≥ m + 2 ≥ 14, and q := q0t = pst ;
+
+ • an integer n ≥ 5 with q ≥ 16n2 and λ < n, together with a canonical ordinary elliptic
+   presentation (E/Fq , Q, I ) of Fqn as in Lemma 4.1(2) (NE = |E(Fq )| < 2q, ord(Q) = n,
+   I0 = (x0 , y0 ) ∈ supp(I ), ω = dx/η);
+
+ • N := t + m − 1 and NR := 2(q0m + q0m−1 ) − λ (note NR > 2q0m ≥ 2 · 812 );
+
+ • a finite extension k/Fq inside k := Fq , and the q-Frobenius ϕq (u, v) := (uq , v q ) on E(k).
+
+For any P ∈ E(k) with Q′ (P ) := Q + ϕq (P ) − P ̸= OE , put xP := x ◦ τP and x̃P := x ◦ τQ+ϕq (P ) =
+xP ◦τQ′ (P ) in k(E), which have disjoint double poles at −P and −Q−ϕq (P ) respectively. Comparing
+                                                                                               qj         qj
+pole orders at −P and −Q − ϕq (P ) shows that the 2m + 2 functions 1, xP0 (0 ≤ j ≤ m), and x̃P0
+(0 ≤ j ≤ m− 1) are k-linearly independent in k(E). Let WP ⊂ k(E) be their k-span, with coordinate
+functionals d0 , b0 , . . . , bm , c0 , . . . , cm−1 (extended k-linearly to WP ⊗k k), so every f ∈ WP reads
+                                                 m                      m−1
+                                                                qj                      qj
+                                 f = d0 (f ) +          bj (f ) xP0 +         cj (f ) x̃P0 .
+                                                 ∑︂                     ∑︂
+
+                                                 j=0                    j=0
+
+
+
+
+                                                           17
+Because t ≥ m + 2, the 2m + 1 exponents I := {0, . . . , m} ∪ {t, . . . , t + m − 1} ⊂ {0, . . . , N } are
+distinct and include {0, N − 1, N }. Associate to f ∈ WP the polynomials
+               m−1
+                               t+j
+                                         m
+                                                         j                  Lhom
+                                                                             f   (T )
+     (T ) :=         cj (f )T q0     +         bj (f )T q0 ,   Af (T ) :=                     Lf (T ) := Lhom (T ) + d0 (f ).
+               ∑︂                        ∑︂
+Lhom
+ f                                                                                    ,                   f
+               j=0                       j=0
+                                                                               T
+
+When bm (f ) ̸= 0 and cm−1 (f ) ̸= 0, one has div∞ (f ) = 2q0m [−P ]+2q0m−1 [−Q−ϕq (P )] of degree NR +λ.
+Finally, for any k-rational reduced effective divisor D = λi=1 [Di ] disjoint from {−P, −Q − ϕq (P )},
+                                                             ∑︁
+
+define the vanishing subspaces
+
+        HD,P (k) := {f ∈ WP : f (Di ) = 0 ∀i},                       HD,P := {f ∈ WP ⊗k k : f (Di ) = 0 ∀i}.
+
+(The cushion +4 in m = λ + 4 reserves enough interior coordinates b2 , . . . , bm−1 to absorb up to
+λ + 2 point-evaluation constraints without touching d0 , b0 , bm , c0 , cm−2 , cm−1 , and keeps λ < m − 1
+for affine Moore projections on both xP and x̃P .)
+
+Lemma 4.4 (Good translations and base-point-freeness of HD,P ). Let D = λi=1 [Di ] ∈ Divk (E) be
+                                                                                                  ∑︁
+
+reduced and effective, with support disjoint from {OE } ∪ supp(I ). There is a subset Ebad (D) ⊆ E(k)
+with |Ebad (D)| ≤ 40λqq02λ such that every P ∈ E(k) \ ({OE } ∪ Ebad (D)) (called D-good) satisfies:
+
+ (1) −P and −Q−ϕq (P ) are distinct and avoid supp(D)∪supp(I ), and Q′ := Q+ϕq (P )−P ∈ E(k)
+     satisfies [d]Q′ ̸= OE for all 1 ≤ d ≤ 12;
+
+ (2) both (xP (D1 ), . . . , xP (Dλ )) and (x̃P (D1 ), . . . , x̃P (Dλ )) are Fq0 -linearly independent (hence
+     Fq0 -affinely independent);
+
+ (3) HD,P = HD,P (k) ⊗k k has dimension m + 6, and (d0 , b0 , b1 , cm−2 , cm−1 ) : HD,P (k) ↠ k 5 is
+     surjective;
+
+ (4) the base locus of HD,P is exactly {D1 , . . . , Dλ }: for every R′ ∈ E(k) \ (supp(D) ∪ {−P, −Q −
+     ϕq (P )}), some f ∈ HD,P satisfies f (R′ ) ̸= 0.
+
+Proof. We form Ebad (D) := 5j=1 Ej ⊆ E(k) as follows. First, let E1 consist of −S and ϕ−1  q (−Q − S)
+                                     ⋃︁
+
+for all S ∈ supp(D)∪supp(I ), so |E1 | ≤ 2λ+2n. Second, let E2 := {P ∈ E(k) : [d](Q+ϕq (P )−P ) =
+OE for some 1 ≤ d ≤ 12}; each fiber of ϕq −idE is a coset of E(Fq ) of size NE < 2q, so Theorem B(2)
+gives |E2 | ≤ NE 12 d=1 d = 650NE < 1300q. Avoiding E1 ∪ E2 gives
+                         2                                             (1).
+                  ∑︁
+
+    Third, for each γ ∈ Fq0 \ {0}, the functions uγ (P ) :=           i=1 γi x(P + Di ) and vγ (P ) :=
+                              λ                                    ∑︁λ
+
+  i=1 γi x(ϕq (P ) + Q + Di ) are nonzero (having uncancelled poles of orders 2 and 2q at −Di0
+∑︁λ
+
+and ϕ−1q (−Q − Di0 ) for any γi0 ̸= 0) of pole degrees ≤ 2λ and ≤ 2λq. Letting E3 be the union of
+their zeros across the (q0λ − 1)/(q0 − 1) < q0λ projective classes of γ gives |E3 | ≤ 2λ(q + 1)q0λ , and
+avoiding E1 ∪ E3 yields (2).
+    To check (3) for P ∈   / E1 ∪ E2 ∪ E3 , first note Galois descent: because D is Gal(k/k)-stable,
+expanding the evaluations of the k-basis of WP at D1 , . . . , Dλ in a power basis of a finite Galois
+extension k ′ /k of definition for the Di cuts out both HD,P (k) and HD,P as kernels of the same
+matrix over k (by invertibility of the conjugate Vandermonde matrix), so HD,P = HD,P (k) ⊗k k.
+                                                                              q2          q λ+1
+By (2) and Lemma 3.1(2), the λ × λ evaluation matrix of xP0 , . . . , xP0 (note λ + 1 = m − 3 < m)
+on D1 , . . . , Dλ is invertible. Thus dimk HD,P (k) = (2m + 2) − λ = m + 6, and we may prescribe
+(d0 , b0 , b1 , cm−2 , cm−1 ) arbitrarily (setting all other free coordinates to 0) and solve uniquely for
+(b2 , . . . , bλ+1 ), proving surjectivity onto k 5 .
+
+
+                                                                18
+    For E4 and E5 , set Aλ := {α ∈ Fλq0 : λi=1 αi = 1} (|Aλ | = q0λ−1 ), let ei be the i-th standard
+                                                  ∑︁
+
+basis vector, and define Xα (P ) := λi=1 αi x(P + Di ) and Yβ (P ) := λi=1 βi x(ϕq (P ) + Q + Di ).
+                                         ∑︁                                    ∑︁
+
+Write Q′ (P ) = (xQ′ (P ), yQ′ (P )); since ϕq − idE is separable (pulling ω back to −ω ̸= 0), P0 :=
+                                                  √
+(ϕq − idE )∗ (−Q) is reduced of degree NE ∈ [( q − 1)2 , 2q), and div∞ (xQ′ ) = 2P0 , div∞ (yQ′ ) = 3P0 .
+Since deg(xQ′ ) = 2NE > q > 2λ ≥ deg(Xα ), each Xα − xQ′ is nonzero with at most 2λ + 4q zeros;
+their union E4 over Aλ has size |E4 | ≤ (2λ + 4q)q0λ−1 .
+    Next, for each (α, β) ∈ A2λ \ {(ei , ei ) : 1 ≤ i ≤ λ}, consider hα,β (P ) := ΨQ′ (P ) (Xα (P ), Yβ (P )) ∈
+k(E). Suppose for contradiction that hα,β = 0. Then by the converse in Lemma 4.1(1), for every
+P ∈ E(k) \ (E1 ∪ E2 ∪ E4 ) there exists RP ∈ E(k) \ {−P, −Q − ϕq (P )} satisfying x(RP + P ) = Xα (P )
+and x(RP + Q + ϕq (P )) = Yβ (P ). Because each fixed P admits at most 2 such R, the Zariski
+closure in Ek2 of this locus contains an irreducible curve C dominating the first factor. Letting
+π1 , π2 : C˜︁ → Ek be the projections from its normalization (d1 := deg π1 ≥ 1), we have
+
+                    x ◦ (π2 + π1 ) = Xα ◦ π1 ,              x ◦ (π2 + ϕq ◦ π1 + Q) = Yβ ◦ π1 .           (4.2)
+
+Let kα := |{i : αi ̸= 0}| ≥ 1 and kβ := |{i : βi ̸= 0}| ≥ 1. If π2 is constant, say π2 = R0 , matching
+a pole ϕ−1
+        q (−Q − Dj ) of Yβ (βj ̸= 0) forces R0 = Dj , and then (4.2) reads uα−ej = vβ−ej = 0,
+giving α = β = ej , a contradiction. Thus d2 := deg π2 ≥ 1. Comparing degrees in (4.2) gives
+deg(π2 + π1 ) = kα d1 ≤ λd1 and deg(π2 + ϕq ◦ π1 +      √ Q) = √ kβ qd1 . √
+                                                                          Applying Lemma 4.2 first to
+π2 = (π2 + π1 ) − π1 and then to π2 + ϕq ◦ π1 yields d2 ≤ ( λ + 1) d1 and
+                             √︂                               √   √
+                                              qd1 +     d2 ≤ ( q + λ + 1) d1 ,
+                                             √︁        √︁                √︁
+                                  kβ qd1 ≤
+              √      √             √                                √
+so ( kβ − 1) q ≤ λ + 1. Since q ≥ 4n, λ < n, n ≥ 5, and 2 − 1 > 2/5, having kβ ≥ 2 would
+    √︁
+                √            √
+give ( kβ − 1) q > 85 n > λ + 1. Hence kβ = 1, so β = ej for a unique j, and the second identity
+      √︁
+
+of (4.2) forces π2 + ϕq ◦ π1 + Q = ±(Dj + ϕq ◦ π1 + Q). The + sign makes π2 = D√︁     j constant;√the −
+                                                                              √
+sign gives π2 = [−2]ϕq ◦ π1 − Dj − [2]Q of degree d2 = 4qd1 , contradicting 2 q = d2 /d1 ≤ λ + 1.
+Thus hα,β ̸= 0.
+    Inspecting the degree in ΨQ′ (Xα , Yβ ) (with deg div∞ (B2,Q′ (Xα )) ≤ 6 deg P0 + 4λ) bounds its
+pole divisor by 12P0 + 4 div∞ (Xα ) + 2 div∞ (Yβ ), of degree < 24q + 8λ + 4λq ≤ 32λq (as λ ≥ 8).
+Letting E5 be the union of zeros of all < q02λ−2 functions hα,β gives |E5 | ≤ 32λqq02λ−2 . Since q0 ≥ 8,
+λ ≥ 8, and q ≥ 400, summing |E1 | + · · · + |E5 | gives < 40λqq02λ .
+    Finally, if P is D-good and some R′ ∈   / supp(D) ∪ {−P, −Q − ϕq (P )} satisfied f (R′ ) = 0 for
+                                                                                                         q λ−1
+all f ∈ HD,P , then evR′ ∈ spank (evD1 , . . . , evDλ ) on WP ⊗k k. Restricting to (1, xP , . . . , xP0          )
+                        q λ−1
+and (1, x̃P , . . . , x̃P0 ) via (2) and Lemma 3.1(3) gives xP (R′ ) = Xα (P ) and x̃P (R′ ) = Yβ (P ) for
+unique α, β ∈ Aλ . If (α, β) = (ei , ei ), then R′ ̸= Di forces R′ + P = −(Di + P ) and then
+−(Di + P ) + Q′ = ±(Di + P + Q′ ), contradicting either R′ ̸= Di or [2]Q′ ̸= OE . Otherwise
+S := R′ + P ∈   / {OE , Q′ , −Q′ } (by P ∈/ E4 ) yields hα,β (P ) = ΨQ′ (x(S), x(S + Q′ )) = 0, contradicting
+  / E5 .
+P ∈
+
+4.3    Hasse derivatives, simple double points, and the group SNR
+Before controlling bitangent pairs and indecomposability, we isolate a short characteristic-free
+remark on off-diagonal fiber products of separable functions on E.
+Remark 4.5 (Off-diagonal fiber curves). Let ψ ∈ k(E)\k be separable with disjoint zero and pole sets
+on Ek (in canonical Weierstrass form (4.1)), and let Zψoff := {(A1 , A2 ) ∈ Ek2 \ ∆E : ψ(A1 ) = ψ(A2 )}
+(equality in P1 (k)). Covering Zψoff by (Ek \ ψ −1 (∞))2 \ ∆E (cut out by ψ(A1 ) − ψ(A2 ) = 0)
+
+                                                            19
+and (Ek \ ψ −1 (0))2 \ ∆E (cut out by ψ(A1 )−1 − ψ(A2 )−1 = 0) shows that every irreducible
+component C of the closure Zψoff ⊂ Ek2 has dimension 1, and dominates both factors (since ψ
+has finite fibers). Moreover, C ̸= ∆E : pick A∗ = (x∗ , y ∗ ) ∈ E(k) \ (ψ −1 (∞) ∪ E[2]) where dψ/ω
+is nonzero, and write ψ = Pψ (x, y)/Qψ (x, y) with Qψ (x∗ , y ∗ ) ̸= 0. On the open neighborhood
+Uψ ⊂ (Ek \ (ψ −1 (∞) ∪ {OE }))2 of (A∗ , A∗ ) where Qψ (x1 , y1 )Qψ (x2 , y2 )(y1 + y2 + a1 x1 ) ̸= 0,
+subtracting the Weierstrass equations expresses y1 − y2 = (x1 − x2 )ME (A1 , A2 ) regularly with
+ME (A∗ , A∗ ) = (dy/dx)(A∗ ), and hence ψ(A1 ) − ψ(A2 ) = (x1 − x2 )Hψ (A1 , A2 ) with Hψ ∈ OUψ (Uψ )
+satisfying Hψ (A∗ , A∗ ) = (dψ/dx)(A∗ ) = (dψ/ω)(A∗ )/η(A∗ ) ̸= 0. Every point of Uψ \∆E has x1 ̸= x2 ,
+so Uψ \ {Hψ = 0} is an open neighborhood of (A∗ , A∗ ) disjoint from Zψoff , proving (A∗ , A∗ ) ∈
+                                                                                                / Zψoff .
+
+Lemma 4.6 (Second Hasse derivative and good tangency points). Let D be as in Lemma 4.4, fix a
+D-good point P ∈ E(k) with Q′ = Q + ϕq (P ) − P , and set ηP := η ◦ τP , η̃P := η ◦ τQ+ϕq (P ) , and
+gP := η̃P /ηP ∈ k(E)× (viewed as a morphism Ek → P1k ).
+
+ (1) Second Hasse derivative: For every R ∈ E(k)\({−P, −Q−ϕq (P )}∪(E[2]−P )), the function
+     TR := xP − xP (R) is a local uniformizer at R, and in O
+                                                           ˆ︁E ,R = k[[TR ]] every f ∈ WP ⊗k k
+                                                              k
+     expands as
+
+                     f = f (R) + b0 (f ) + gP (R) c0 (f ) TR + δ2 (R) c0 (f ) TR2 + O(TR3 ),
+                                   (︁                     )︁
+
+
+     where δ2 ∈ k(E)× is independent of f and has at most 13 zeros in E(k).
+
+ (2) Bitangent bound: For each (α0 , . . . , αλ ) ∈ Fλ+1
+                                                     q0 , at most 20 points R1 ∈ E(k) \ ({−P, −Q −
+     ϕq (P )} ∪ (E[2] − P )) admit a point R2 ∈ E(k) \ {R1 , −P, −Q − ϕq (P )} with gP (R2 ) = gP (R1 )
+     and xP (R2 ) = α0 xP (R1 ) + λi=1 αi xP (Di ).
+                                  ∑︁
+
+
+ (3) Good tangency points: There is a subset Rbad (D, P ) ⊆ E(k) of size |Rbad (D, P )| ≤
+     25q0λ+1 + 2n such that every R∗ ∈ E(k) \ ({OE } ∪ Rbad (D, P )) satisfies:
+
+      (R1) R∗ ∈/ supp(D) ∪ {−P, −Q − ϕq (P )} ∪ supp(I ) ∪ (E[2] − P ) ∪ (E[2] − Q − ϕq (P )) (so
+           gP (R∗ ) ∈ k × );
+      (R2) δ2 (R∗ ) ̸= 0, and gP (R∗ ) ̸= gP (Di ) in P1 (k) for all 1 ≤ i ≤ λ;
+      (R3) (xP (D1 ), . . . , xP (Dλ ), xP (R∗ )) is Fq0 -linearly independent;
+      (R4) the set
+
+                       M(R∗ ) := R2 ∈ E(k) \ {R∗ , −P, −Q − ϕq (P )} : gP (R2 ) = gP (R∗ )
+                                   {︁                                                          }︁
+
+
+             satisfies |M(R∗ )| ≤ 5, is disjoint from supp(D), and for every R2 ∈ M(R∗ ) the tuple
+             (xP (D1 ), . . . , xP (Dλ ), xP (R∗ ), xP (R2 )) is Fq0 -linearly independent.
+
+Proof. (1) Since dxP = ηP ω, dx̃P = η̃P ω = gP dxP , and ηP (R) ̸= 0 for R ∈       / {−P } ∪ (E[2] − P ),
+we have ordR (TR ) = 1 and O    ˆ︁E ,R = k[[TR ]] [12, Chapter II, §4, Theorem 2]. Expand x̃P =
+                                   k
+x̃P (R) + δ1 (R)TR + δ2 (R)TR2 + O(TR3 ); differentiating yields δ1 (R) = (dx̃P /dxP )(R) = gP (R). Since
+                         qj        qj
+q0 ≥ 8 > 2, all powers xP0 and x̃P0 with j ≥ 1 equal their value at R plus O(TR8 ), giving the stated
+expansion of f .
+   To identify δ2 and bound its zeros, put S := R+P and g0 := (η ◦τQ′ )/η ∈ k(E)× (so gP = g0 ◦τP ).
+
+ • Case p ≥ 3: Differentiating gP = δ1 (R) + 2δ2 (R)TR + O(TR2 ) gives δ2 = h2 ◦ τP with h2 :=
+   1 dg0   1 dg0
+   2 dx = 4y ω ∈ k(E). Since Q ∈
+                                  ′ / E[2], g = (y ◦ τ ′ )/y has divisor 3[O ] + ∑︁3 [W −
+                                              0         Q                     E       i=1  i
+
+
+                                                     20
+   Q′ ] − 3[−Q′ ] − 3i=1 [Wi ] with all eight points distinct. By (2.1), vWi (h2 ) = −2 − 1 = −3
+                       ∑︁
+
+   (so h2 ̸= 0), v−Q′ (h2 ) ≥ −4, vOE (h2 ) ≥ 2 − (−3) = 5, and vS (h2 ) ≥ 0 elsewhere. Thus
+   deg div∞ (δ2 ) ≤ 3 · 3 + 4 = 13.
+
+• Case p = 2: Here E : y 2 +xy = x3 +a2 x2 +a6 (a6 ̸= 0) and Q′ = (x1 , y1 ) with x1 ∈ k × . The chord
+  formula simplifies in characteristic 2 to x◦τQ′ = x1 +x21 (x+x1 )−1 +(x1 y +y1 x)(x+x1 )−2 . At any
+  S0 = (u0 , v0 ) ∈
+                  / {OE , T2 , −Q′ } with uniformizer T := x + u0 , expanding y = v0 + i≥1 κi T i ∈
+                                                                                          ∑︁
+
+  k[[T ]] inside y 2 + xy = x3 + a2 x2 + a6 yields κ1 = (u20 + v0 )/u0 , κ2 = u0 + 1 + a6 u−3 0 , and
+  u0 κ3 = u0 + a6 u−30 . Motivated   by  the formula for κ2 , set
+
+                                   x21       x1 (x + 1 + a6 x−3 ) x1 y + y1 x
+                        h2 :=              +                     +            ∈ k(E).
+                                (x + x1 )3        (x + x1 )2       (x + x1 )4
+
+   If S0 ̸= Q′ (a := u0 + x1 ̸= 0), expanding (a + T )−1 = a−1 + a−2 T + a−3 T 2 + O(T 3 ) and
+   (a + T )−2 = a−2 + a−4 T 2 + O(T 4 ) extracts the T 2 -coefficient x21 a−3 + x1 κ2 a−2 + (x1 v0 +
+   y1 u0 )a−4 = h2 (S0 ). At S0 = Q′ (u0 = x1 , x + x1 = T ), we have x1 y + y1 x = x21 T +
+   x1 κ2 T 2 + (x1 + a6 x−3
+                         1 )T + x1 κ4 T + O(T ) and (using (1 + w)
+                              3         4        5                      −3 = 1 + w + O(w 4 ) over F )
+                                                                                                      2
+                                            −3
+   x1 (x + 1 + a6 x−3 ) = x1 κ2 + (x1 + a6 x1 )T + O(T 4 ), so the T −3 , T −2 , T −1 terms in h2 cancel
+   identically, leaving h2 = x1 κ4 + O(T ), which again matches the T 2 -coefficient x1 κ4 of x ◦ τQ′ .
+   Finally, v−Q′ (h2 ) = −4 (since (x1 y + y1 x)(−Q′ ) = x21 ̸= 0, proving h2 ̸= 0), vT2 (h2 ) = −6,
+   vOE (h2 ) = 2, and vS (h2 ) ≥ 0 elsewhere, so δ2 := h2 ◦ τP has pole degree 10 ≤ 13.
+
+  (2) Set c :=     i=1 αi xP (Di ) and Sj := Rj + P (S1 ̸= S2 , S1 , S2 ∈
+                 ∑︁λ
+                                                                        / {OE , −Q′ }).
+
+• Case p = 2: Here g0 = (x ◦ τQ′ )/x has divisor 2D0 where D0 := [T2 − Q′ ] + [OE ] − [−Q′ ] − [T2 ].
+  Since (T2 − Q′ ) + OE − (−Q′ ) − T2 = OE , Theorem B(1) gives D0 = divE (h) for a degree-2
+                                    ×
+  function h, so g0 = κh2 (κ ∈ k ) and g0 (S2 ) = g0 (S1 ) ⇐⇒ h(S2 ) = h(S1 ). The nontrivial
+  involution σ(S) := T2 − Q′ − S preserves D0 , hence h ◦ σ = h (as µ2 = 1 =⇒ µ = 1 in
+  characteristic 2). Since deg(h) = 2 = |⟨σ⟩|, the extension k(E)/k(h) is Galois with group ⟨σ⟩,
+  so every fiber satisfies h−1 (h(S1 )) = {S1 , σ(S1 )} by Theorem C(2), forcing S2 = T2 − Q′ − S1 .
+  Then x(T2 − Q′ − S1 ) − α0 x(S1 ) − c = 0, a nonzero function (with a double pole at T2 − Q′ ̸= OE )
+  of pole degree ≤ 4, giving at most 4 points R1 .
+
+• Case p ≥ 3: Here g0 = (y ◦ τQ′ )/y is separable of degree 6 (as vW1 (g0 ) = −1) with disjoint zero
+  and pole sets. Let Z be the closure in Ek2 of Z0 := {(S1 , S2 ) ∈ (Ek \ {OE , −Q′ })2 \ ∆E : g0 (S1 ) =
+  g0 (S2 )}. By Remark 4.5, the irreducible components C1 , . . . , Cr of Z are curves distinct from ∆E
+  whose normalizations C˜︁ν → Cν have surjective projections π1,ν , π2,ν : C˜︁ν → Ek . Differentiating
+  g0 ◦ π1,ν = g0 ◦ π2,ν shows that π1,ν∗ ω = 0 ⇐⇒ π ∗ ω = 0; they cannot both be inseparable since
+                                                             2,ν
+    ∗ k(E) and π ∗ k(E) generate k(C
+  π1,ν                                      ˜︁ν ) ̸= k(C
+                                                       ˜︁ν )p , so both πi,ν are separable. Picking a general
+                     2,ν
+  S ∗ ∈ E(k) outside g0−1 (branch(g0 )), the branch loci of πi,ν , and the images under πi,ν of the
+  finitely many points of C˜︁ν outside the preimage of Cνsm ∩ Z0 or above Cν ∩ Cµ (µ ̸= ν), the map
+                                  −1
+  z̃ ↦→ π3−i,ν (z̃) injects rν=1 πi,ν (S ∗ ) into g0−1 (g0 (S ∗ )) \ {S ∗ } of size 5, so rν=1 deg(πi,ν ) ≤ 5 for
+                           ⨆︁                                                            ∑︁
+
+  i = 1, 2.
+   On each C˜︁ν , we claim ξν := x ◦ π2,ν − α0 (x ◦ π1,ν ) − c ̸= 0. If ξν = 0, then α0 ̸= 0 (else π2,ν is
+   constant) and both π1,ν , π2,ν have degree ≤ 2. Comparing pole orders of g0 ◦ π1,ν = g0 ◦ π2,ν
+                  −1
+   at any q ∈ π1,ν   (−Q′ ) forces π2,ν (q) = −Q′ , because −3eq (π1,ν ) ∈ {−3, −6} is disjoint from
+   −eq (π2,ν ) ∈ {−1, −2} (the pole orders at Wi ). Likewise, writing F (X) = X 3 + a2 X 2 + a4 X + a6 ,
+   if F (α0 X + c) ̸= α03 F (X) then F (α0 X + c) has a root r0 ∈        / {x(W1 ), x(W2 ), x(W3 )}, and
+   picking q with x(π1,ν (q )) = r0 puts π2,ν (q ) ∈ {W1 , W2 , W3 } (pole order ∈ {−1, −2}) while
+              ′               ′                   ′
+
+
+
+                                                      21
+    forcing π1,ν (q′ ) = −Q′ (pole order ∈ {−3, −6}), impossible. Hence F (α0 X + c) = α03 F (X),
+    so π2,ν = ζ ◦ π1,ν for some ζ ∈ Autk (E) \ {idE } (as Cν ̸= ∆E ) satisfying ζ(−Q′ ) = −Q′ ,
+    contradicting [12]Q′ ̸= OE by Theorem B(3). Thus ξν ̸= 0 has at most 2 deg(π1,ν ) + 2 deg(π2,ν )
+    zeros, summing over ν to at most 20 points R1 .
+
+    (3) Define Rbad (D, P ) as the union of: (i) the ≤ λ + n + 10 points in (R1); (ii) the ≤ 13 zeros
+of δ2 and λi=1 gP−1 (gP (Di )) (≤ 6λ points, as deg gP ≤ 6); (iii) x−1
+                                                                    P (spanFq0 (xP (D1 ), . . . , xP (Dλ )))
+          ⋃︁
+
+(≤ 2q0λ points); and (iv) the ≤ 20 points from (2) for each tuple in Fλ+1
+                                                                      q0  (≤ 20q0λ+1 points). Since
+q0 ≥ 8 and 8 ≤ λ < n, the total size is at most 20q0λ+1 + 2q0λ + 7λ + n + 23 < 25q0λ+1 + 2n, and
+(R1)–(R4) hold immediately.
+
+Lemma 4.7 (Abundance of simple-double-point functions). For a D-good P ∈ E(k) and R∗ ∈
+E(k) \ ({OE } ∪ Rbad (D, P )), the subspace
+
+                  Htan (k) := f ∈ HD,P (k) : f (R∗ ) = 0 and b0 (f ) + gP (R∗ ) c0 (f ) = 0
+                               {︁                                                             }︁
+
+
+has dimk Htan (k) = m + 4. A uniformly random U ∈ Htan (k) satisfies, with probability at least
+1 − 9/|k|, both:
+
+ (1) d0 (U ), b0 (U ), c0 (U ), bm (U ), cm−1 (U ) ∈ k × ; and
+                                             R −2
+ (2) divE (U ) = D + 2[R∗ ] + N            ν=1 [Sν ] − 2q0 [−P ] − 2q0
+                                                            m           m−1
+                                                                            [−Q − ϕq (P )] for pairwise distinct
+                                    ∑︁
+
+     points D1 , . . . , Dλ , R∗ , S1 , . . . , SNR −2 , −P, −Q − ϕq (P ) ∈ E(k).
+
+(We call such U (D, P, R∗ )-good.)
+
+Proof. Set Htan := Htan (k) ⊗k k. By (R3) and Lemma 3.1(2), the (λ + 1) × (λ + 1) evaluation
+             q2        q λ+2
+matrix of xP0 , . . . , xP0 (λ + 2 = m − 2) on (D1 , . . . , Dλ , R∗ ) is invertible, and those coordinates
+do not enter b0 + gP (R∗ )c0 = 0. Hence dimk Htan (k) = (2m + 2) − (λ + 2) = m + 4, and each of
+d0 , bm , cm−1 , c0 is nonzero on Htan (with b0 = −gP (R∗ )c0 and gP (R∗ ) ∈ k × ). Likewise, for each of
+the ≤ 5 points R2 ∈ M(R∗ ), (R4) and Lemma 3.1(2) on the λ + 2 = m − 2 coordinates (b2 , . . . , bm−1 )
+yield f ∈ Htan with f (R2 ) = 1 (and b0 (f ) = c0 (f ) = 0), so evR2 |Htan ̸= 0. Any nonzero k-linear
+functional on W ⊗k k vanishes on at most |k|dimk W −1 elements of a finite-dimensional k-space W ,
+so by the union bound a uniform U ∈ Htan (k) avoids all ≤ 9 kernels with probability ≥ 1 − 9/|k|.
+     For such U , (1) holds and deg div0 (U ) = NR + λ. By Lemma 4.6(1) and (R2), ordR∗ (U ) = 2 (as
+δ2 (R∗ )c0 (U ) ̸= 0). If any S ∈ E(k) \ {R∗ , −P, −Q − ϕq (P )} had ordS (U ) ≥ 2, then U (S) = 0 and
+0 = (dU/ω)(S) = b0 (U )ηP (S) + c0 (U )η̃P (S) by (2.1). Since Q′ ∈        / E[2], ηP (S) and η̃P (S) cannot
+both vanish, and since b0 (U ), c0 (U ) ̸= 0 neither vanishes, giving gP (S) = −b0 (U )/c0 (U ) = gP (R∗ ),
+so S ∈ M(R∗ )—contradicting (R2) if S ∈ supp(D) and U (S) ̸= 0 otherwise. Thus all remaining
+zeros of U (including D1 , . . . , Dλ ) are simple.
+
+Lemma 4.8 (Indecomposability and geometric Galois group SNR ). Assume that n = ord(Q)
+does not divide c · e · [k : Fq ] for any 1 ≤ c, e ≤ λ. Then for every γ ∈ Fλq0 \ {0}, the function
+ ˆ︁γ (S) := λi=1 γi x(S + ϕq (Di )) − x(S + Q + Di ) is nonzero with at most 4λ zeros, and E6 (D) :=
+            ∑︁     (︁                                     )︁
+w
+   γ̸=0 {P ∈ E(k) : wˆ︁γ (ϕq (P )) = 0} satisfies |Ebad (D) ∪ E6 (D)| ≤ 40λqq02λ .
+⋃︁
+
+      Fix P ∈ E(k) \ ({OE } ∪ Ebad (D) ∪ E6 (D)), R∗ ∈ E(k) \ ({OE } ∪ Rbad (D, P )), and a (D, P, R∗ )-
+                                                      ∑︁ R −2
+good U ∈ Htan (k) with div0 (U ) = D + 2[R∗ ] + N        ν=1 [Sν ]. For a uniformly random V ∈ HD,P (k),
+with probability at least 1 − (2q0 + 3 + NR + 4)/|k|, the pair (U, V ) (called a good pencil) satisfies:
+                                    N    NR
+
+
+
+ (1) LZ (T ) := LU (T ) + ZLV (T ) satisfies (A1)–(A4) of Lemma 3.3, and bm (V ) ̸= 0;
+
+
+                                                         22
+  (2) V (R∗ ) ̸= 0 and V (Sν ) ̸= 0 for all ν, so φ := −U/V : Ek → P1k is separable of degree NR with
+                       ∑︁ R −2
+      φ∗ (0) = 2[R∗ ] + N ν=1 [Sν ];
+
+  (3) the cover φk : Ek → Pk1 is indecomposable, the Galois closure F2geom of k(E)/φ∗ k(Z) satisfies
+      Gal(F2geom /k(Z)) ∼
+                        = SNR with local Galois group at Z = 0 generated by a single transposition,
+      and the Galois closure F2 of k(E)/φ∗ k(Z) has Gal(F2 /k(Z)) embedding into SNR .
+Proof. If w ˆ︁γ = 0 for some γ ̸= 0 with support J0 := {i : γi ̸= 0}, canceling the double poles at
+−ϕq (Di ) against those at −Q−Dj induces a permutation σ of J0 with ϕq (Di ) = Dσ(i) +Q. Picking a
+cycle of length c ∈ {1, . . . , λ} gives ϕcq (Di1 ) = Di1 + [c]Q; meanwhile, since D ∈ Divk (E) with M :=
+[k : Fq ], some e ∈ {1, . . . , λ} satisfies ϕeM
+                                               q (Di1 ) = Di1 , whence Di1 = ϕq
+                                                                                 ceM (D ) = D + [ceM ]Q
+                                                                                        i1       i1
+and n | ceM , a contradiction. Thus w      ˆ︁γ ̸= 0 has ≤ 4λ zeros, projective scaling gives |E6 (D)| ≤ 4λq0λ ,
+and adding this to the five-term sum in Lemma 4.4 preserves the bound 40λqq02λ .
+    We assemble three groups of nonzero k-linear functionals on HD,P for V to avoid:
+    Group 1 (for (1)). By Lemma 4.4(3) and Lemma 4.7(1), the three functionals cm−1 (U )b0 −
+                                                                                                            ×
+b0 (U )cm−1 , cm−1 (U )cm−2 − cm−2 (U )cm−1 , and bm are nonzero on HD,P . For each root θ ∈ k
+of LU (θ) = 0 (≤ q0N roots, as d0 (U ) ̸= 0), V ↦→ LV (θ) is nonzero on HD,P : otherwise Lf (θ) =
+                                                                 q λ−1
+      µi f (Di ) on WP ⊗k k, so restricting to (1, xP , . . . , xP0 ) via Lemma 3.1(3) gives µi = αi ∈ Fq0
+∑︁λ
+  i=1 ∑︁
+with     i αi = 1 and θ =       i αi xP (Di ), and then evaluating at x̃P gives
+                                                                       i αi x(ϕq (Di ) + ϕq (P )) =
+                          ∑︁                                                  ∑︁
+                                                                                                 qλ
+θq = i αi x(Di + Q + ϕq (P )), contradicting P ∈
+                                               / E6 (D). By the same argument on (xP , . . . , xP0 )
+       ∑︁
+                                                                     ×
+via Lemma 3.1(1), V ↦→ AV (θ) is nonzero on HD,P for every root θ ∈ k of AU (θ) = 0 (≤ q0N − 1
+roots). Thus Group 1 comprises at most 2q0N + 2 nonzero functionals.
+    Group 2 (for (2)). By Lemma 4.4(4), the NR − 1 evaluations evR∗ , evS1 , . . . , evSNR −2 are nonzero
+on HD,P . When V avoids their kernels and bm (V ) ̸= 0, the ratio φ = −U/V satisfies ordR∗ (φ) = 2,
+ordSν (φ) = 1, and ordR (φ) ≤ 0 at all other points (including supp(D), −P , and −Q − ϕq (P )), so
+                 ∑︁ R −2
+φ∗ (0) = 2[R∗ ] + Nν=1 [Sν ], deg(φ) = NR , and φ is separable (as ordS1 (φ) = 1).
+                                                                                     α        β
+       Group 3 (for indecomposability). Any nontrivial factorization Ek −                       → P1k of φ yields two
+                                                                                          → P1k −
+disjoint α-fibers inside the fixed divisor div0 (U ) − D, and we rule out each resulting candidate
+α by picking a single off-diagonal fiber pair (A1 , A2 ) separated by HD,P . Explicitly, let FU be
+                                                                                                          ∑︁ R −2
+the set of ordered pairs (B1 , B2 ) of disjoint effective divisors with B1 + B2 ≤ 2[R∗ ] + N                ν=1 [Sν ],
+deg B1 = deg B2 =: dα ∈ [2, NR /2] dividing NR , and B1 − B2 = divE (α) principal with α : Ek → P1k
+separable. Counting coefficient choices (3 per Sν , 5 for R∗ ) gives |FU | ≤ 5 · 3NR −2 < 3NR . We claim
+that each such α admits distinct points A1 , A2 outside supp(D) ∪ {R∗ , S1 , . . . , SNR −2 , −P, −Q −
+ϕq (P )} with α(A1 ) = α(A2 ) such that evA1 , evA2 are k-linearly independent on HD,P —whence
+ℓα (V ) := U (A2 )V (A1 ) − U (A1 )V (A2 ) is nonzero on HD,P .
+       By Remark 4.5 (since α is separable of degree ≥ 2), the closure of {(A1 , A2 ) ∈ Ek2 \ ∆E :
+α(A1 ) = α(A2 )} contains an irreducible curve Cα ̸= ∆E dominating both factors. If evA1 , evA2
+were dependent on HD,P along Cα , then at all but finitely many (A1 , A2 ) ∈ Cα both (xP (D1 ),
+. . . , xP (Dλ ), xP (A1 )) and (x̃P (D1 ), . . . , x̃P (Dλ ), x̃P (A1 )) are Fq0 -affinely independent and evA2 lies
+                                                                                         qλ                       qλ
+in spank (evD1 , . . . , evDλ , evA1 ). Applying Lemma 3.1(3) on (1, xP , . . . , xP0 ) and (1, x̃P , . . . , x̃P0 )
+(λ < m − 1) and passing by finiteness of F2λ+2   q0 to the normalization C˜︁α yields distinct surjective
+morphisms ψ1 , ψ2 : C˜︁α → Ek (after translating by +P ), nonzero scalars α0 , β0 ∈ F×    q0 , and constants
+c, c̃ ∈ k such that
+
+                   x ◦ ψ2 = α0 (x ◦ ψ1 ) + c,        x ◦ (ψ2 + Q′ ) = β0 x ◦ (ψ1 + Q′ ) + c̃.                   (4.3)
+                                                                           (︁                 )︁
+
+
+Put K0fn := ψ1∗ k(E) ∼
+                     = k(E) and K1fn := k(C˜︁α ) = K0fn (ψ2 ) = K0fn (ψ2 + Q′ ).
+
+                                                         23
+ • If p ≥ 3, write F (X) = X 3 + a2 X 2 + a4 X + a6 . Should F (α0 X + c) = α03 F (X), then
+   ψ2 = ζ ◦ ψ1 for some ζ ∈ Autk (E) \ {idE }, and matching poles of the second relation in (4.3)
+   gives ζ(−Q′ ) = −Q′ , contradicting [12]Q′ ̸= OE . Otherwise gKum := F (α0 x + c) has a simple
+                                             √
+   zero at some S0 ∈ / E[2], so K1fn = K0fn ( gKum ) is a separable quadratic Kummer cover branched
+   precisely at the odd-valuation places of gKum (by Hensel’s lemma and Theorem E), namely
+   B = {S ∈ E(k) \ ({OE } ∪ E[2]) : F (α0 x(S) + c) = 0}, which √︁  satisfies 1 ≤ |B| ≤ 6 and ι1 (B) = B
+   for ι1 (S) := −S. By the second equation of (4.3), K1 = K0 ( F (β0 x(S + Q′ ) + c̃)), so ι2 (S) :=
+                                                          fn     fn
+
+   −S − [2]Q′ lifts to an automorphism of K1fn and also preserves B. Hence (ι1 ◦ ι2 )(S) = S + [2]Q′
+   permutes the nonempty set B of size ≤ 6, forcing [2r]Q′ = OE for some 1 ≤ r ≤ 6, contradicting
+   [d]Q′ ̸= OE for 1 ≤ d ≤ 12.
+
+ • If p = 2, we cannot have (α0 , c) = (1, 0) (else ψ2 = −ψ1 , and matching poles in (4.3) gives
+   −Q′ = Q′ ). Putting w2 := y(ψ2 )/x(ψ2 ) turns y 2 + xy = x3 + a2 x2 + a6 into the Artin–Schreier
+   equation
+                                                                     a6
+                       w22 + w2 = u(S) := α0 x(S) + c + a2 + 2               .
+                                                               α0 x(S)2 + c2
+    We determine its branch locus B via Theorem C(2). At OE , the uniformizer T = x/y satisfies
+                                                                                 1/2          1/2
+    1/y = T 3 + T 4 + O(T 5 ) and hence x = T −2 + T −1 + O(1), so u − (α0 T −1 )2 − α0 T −1 =
+             1/2
+    (α0 + α0 )T −1 + O(1); thus OE ∈ B ⇐⇒ α0 ̸= 1. If c ̸= 0, at the two points ±S˜︁1 ∈              /
+                                                                          1/2 −1 −1 2     1/2 −1 −1
+    {OE , T2 } with x = c/α0 , uniformizer T1 = x + c/α0 gives u − (a6 α0 T1 ) − a6 α0 T1 =
+      1/2                                                                           1/2
+    a6 α0−1 T1−1 + O(1), so ±S˜︁1 ∈ B. If c = 0 (so α0 ∈  / {0, 1}), at T2 = (0, a6 ) the uniformizer
+                1/2                  1/2                                     1/2
+    ϖ := y +a6 satisfies ϖ2 = x(a6 +ϖ +a2 x+x2 ) and thus x−1 = a6 ϖ−2 +ϖ−1 +O(1), giving
+                                                                                    1/2       −1/2
+    u = a26 α0−2 ϖ−4 +a6 α0−2 ϖ−2 +O(1); subtracting z 2 +z for z := a6 α0−1 ϖ−2 +a6 (α0−1 +α0 )ϖ−1
+                                     1/2 −1     −1/2
+    leaves a simple pole of residue a6 (α0 + α0 ) ̸= 0, so T2 ∈ B. All other points are unramified.
+    Hence B equals {OE , T2 }, {±S˜︁1 }, or {OE , ±S˜︁1 }, so K1fn /K0fn is separable quadratic with
+    |B| ∈ {2, 3} and ι1 (B) = B; the second relation of (4.3) presents K1fn /K0fn as an Artin–Schreier
+    cover invariant under ι2 (S) = −S − [2]Q′ , so S ↦→ S + [2]Q′ permutes B, forcing [2r]Q′ = OE
+    for some 1 ≤ r ≤ 3, again a contradiction.
+
+   Across Groups 1–3 there are < 2q0N +3NR +NR +4 nonzero functionals, so a uniform V ∈ HD,P (k)
+avoids all of them with the claimed probability. Suppose it does, and suppose φk = β ◦ α : Ek →
+C → P1k with dα := deg α ≥ 2 and dβ := deg β ≥ 2. By Theorem C(5), g(C) ∈ {0, 1}. If g(C) = 1,
+then α is unramified, so eα(R∗ ) (β) = 2 yields dα ≥ 2 double points in φ∗ (0), impossible. Thus
+C=∼ P1 ; moreover β ∗ (0) must be reduced (any point of multiplicity ≥ 2 pulls back to degree ≥ 4 of
+      k
+                                           ∑︁d
+multiplicity ≥ 2 in φ∗ (0)), say β ∗ (0) = µ=1 β
+                                                 [yµ ] (dβ ≥ 2). Then (B1 , B2 ) := (α∗ (y1 ), α∗ (y2 )) ∈ FU ,
+and composing α with a Möbius transformation sending (y1 , y2 ) ↦→ (0, ∞) matches the chosen α′ up
+to scaling, so α(A1 ) = α(A2 ) implies φ(A1 ) = φ(A2 ) and hence ℓα′ (V ) = 0, a contradiction.
+     Therefore φk is indecomposable, so k(E)/K (K := k(Z)) admits no proper intermediate subfield.
+Because k is perfect and is the full constant field of k(E) (as OE ∈ E(k)), Theorem C(1) gives
+[k(E) : k(Z)] = [k(E) : K] = NR (whence k(E)/k(Z) is separable, since k(E)/K is separable
+by (2)), and the minimal polynomial µ(T ) ∈ k(Z)[T ] of a primitive element remains irreducible
+and separable of degree NR over K; let Ω be its root set. Then G2 := Gal(F2geom /K) ≤ Sym(Ω) is
+transitive with maximal point stabilizer, hence primitive, and Gal(F2 /k(Z)) ↪→ Sym(Ω). Over the
+                                                                ∑︁ R −2
+completion K0 := k((Z)) at Z = 0, since φ∗ (0) = 2[R∗ ] + N       ν=1 [Sν ] and k is algebraically closed,
+                                       ∏︁NR −2
+Theorem E factors µ(T ) = Q∗ (T ) ν=1 (T − αν ) in K0 [T ] with αν ∈ K0 and Q∗ (T ) irreducible
+and separable of degree 2 (for every p ≥ 2, including the wildly ramified case p = 2). The splitting
+field of µ over K0 is therefore a quadratic Galois extension generated by the transposition swapping
+
+
+                                                      24
+the two roots of Q∗ and fixing every αν . Embedding F2geom ↪→ K0sep places this transposition in G2 ,
+so Lemma 3.4 yields G2 = Sym(Ω) ∼   = SNR .
+
+
+5     Simultaneous Splitting and One-Step Elimination
+We now combine the linearized monodromy group AGLN (Fq0 ) of Lemma 3.3 with the cofactor
+monodromy group SNR of Lemma 4.8 to count specializations z ∈ k for which both factors split
+completely over k, and deduce our single-step degree-elimination algorithm.
+
+Lemma 5.1 (Exact constant field, Castelnuovo bound, and splitting count). In the setup of
+Lemma 4.8, let (U, V ) ∈ Htan (k) × HD,P (k) be a good pencil, and set G := AGLN (Fq0 ) × SNR ,
+                  (︁∏︁ −1 N      j )︁
+of order |G| = q0N N  j=0 (q0 − q0 ) (NR )!. Call z ∈ k (U, V )-splitting if fz := U + zV ∈ HD,P (k)
+satisfies:
+
+  (1) bm (fz ), cm−1 (fz ), and b0 (fz ) are all nonzero;
+                             ∏︁qN
+  (2) Lfz (T ) = cm−1 (fz ) ℓ=1
+                              0
+                                 (T − γℓ ) for pairwise distinct γ1 , . . . , γqN ∈ k, and each degree-2
+                                                                                0
+      effective divisor Dℓ := div0 (xP − γℓ ) has support disjoint from supp(I );
+
+  (3) divE (fz ) = D + N      ν=1 [Aν ] − 2q0 [−P ] − 2q0
+                                            m           m−1
+                                                            [−Q − ϕq (P )] for pairwise distinct points
+                           ∑︁  R
+
+      A1 , . . . , ANR ∈ E(k) \ ({OE , −P, −Q − ϕq (P )} ∪ supp(D) ∪ supp(I )).
+
+Then the number Nsplit of (U, V )-splitting elements z ∈ k satisfies
+
+                                     |k|
+                         Nsplit ≥        − 2(N + NR + 1) |k|1/2 − (2NR + n + 10).
+                                     |G|
+
+In particular, if |k| ≥ max 64(N + NR + 1)2 |G|2 , 4(2NR + n + 10)|G| , then Nsplit ≥ |k|/(2|G|).
+                                (︁                                             )︁
+
+
+Proof. Inside a separable closure of K := k(Z) containing (k(Z))sep , let F1 be the splitting field
+of LZ (T ) = LU (T ) + ZLV (T ) over k(Z), let F2 = k(Z)(Ω) be the Galois closure of k(E)/φ∗ k(Z)
+(with Z = φ = −U/V ), and let F := F1 F2 , with constant extensions Figeom = Fi k and F geom =
+F k = F1geom F2geom .
+    First note a local lifting fact: for any field κ ⊇ k and any z0 ∈ k with cm−1 (fz0 ), b0 (fz0 ) ∈ k × ,
+put u := Z − z0 and O := κ[[u]]. Then α(Z) := cm−1 (Z)−1 b0 (Z) ∈ O× , and any root γ̄ ∈ κ of
+ ˜︁ 0 , T ) := cm−1 (fz )−1 Lf (T ) lifts to a root ρ̃ ∈ O of L(Z,
+L(z                                                              ˜︁    T ) := cm−1 (Z)−1 LZ (T ) with ρ̃ ≡ γ̄
+                       0      z0
+
+(mod u): setting y0 := γ̄ (︁and yj+1 := yj + ηj with  ηj := −α(Z)−1 L(Z, ˜︁   yj ), Fq0 -linearity of Lhom
+                                                                                                       Z    gives
+L(Z, yj+1 ) = cm−1 (Z) LZ (ηj ) − b0 (Z)ηj ∈ u
+                         −1   hom                      q  (j+1) O ⊆ u O by induction, so (yj ) converges
+                                                                      j+2
+                                                 )︁
+ ˜︁                                                     0
+
+u-adically to ρ̃.
+    Step 1 (Linear disjointness and exact constant field k). Apply the local lift to κ = k and z0 = 0:
+since cm−1 (U ), b0 (U ) ∈ k × , L(0,
+                                 ˜︁   T ) is separable of degree q0N over k, so all q0N roots of L(Z,    ˜︁    T)
+                                                                              sep
+lie in k[[Z]] ⊂ K0 := k((Z)). Under a K-embedding F               geom  ↪→ K0 , we therefore have E0 :=
+F1geom ∩ F2geom ⊆ F1geom ⊆ K0 . By Lemma 4.8(3), Gal(K0 F2geom /K0 ) restricts to a transposition
+in Gal(F2geom /K) ∼   = SNR , which therefore lies in the normal subgroup Gal(F2
+                                                                                              geom
+                                                                                                   /E0 ) ⊴ SNR .
+                                                                      geom
+Since conjugate transpositions generate SNR , we get Gal(F2                 /E0 ) = SNR and E0 = K. By
+Lemmas 3.3 and 4.8(3), [F geom : K] = [F1geom : K][F2geom : K] = |G|, while Gal(F/k(Z)) ↪→
+Gal(F1 /k(Z)) × Gal(F2 /k(Z)) embeds into G. Theorem C(1) gives
+
+                         |G| = [F geom : K] ≤ [F : k(Z)] = |Gal(F/k(Z))| ≤ |G|,
+
+
+                                                       25
+forcing equality throughout; hence k is the exact full constant field of F and g(F/k) = g(F geom /k).
+     Step 2 (Castelnuovo genus bound). Pick an Fq0 -basis (v1 , . . . , vN ) of the root space of Lhom
+                                                                                                    Z (T ) =
+T (AU (T ) + ZAV (T )) and a root ρ0 of LZ (T ). Since bm (V ) ̸= 0, both AV and LV have positive
+degree, so (A3) gives AV (vi ) ̸= 0 (hence Z = −AU (vi )/AV (vi ) and K(vi ) = k(vi ) has genus 0
+and degree q0N − 1 over K), and (A4) gives LV (ρ0 ) ̸= 0 (hence K(ρ0 ) = k(ρ0 ) has genus 0 and
+degree q0N ). Put L(i) := K(v1 , . . . , vi ) and di := [L(i) : K]. For 2 ≤ i ≤ N , Theorem C(3)
+on L(i) = L(i−1) K(vi ) with n1 = di /di−1 ≤ q0N − q0i−1 < q0N − 1 and n2 = di /(q0N − 1) gives
+g(L(i) ) ≤ (di /di−1 )g(L(i−1) ) + n1 n2 < (di /di−1 )g(L(i−1) ) + di , so g(L(N ) ) ≤ (N − 1)dN by induction;
+one more application to F1geom = L(N ) K(ρ0 ) yields g(F1geom ) < N q0N dN = N |AGLN (Fq0 )|.
+     On the cofactor side, list Ω = {ξ1 , . . . , ξNR }; each K(ξj ) ∼
+                                                                     = k(E) has genus 1 and degree NR > 2
+over K. Setting M (j) := K(ξ1 , . . . , ξj ) and Ej := [M (j) : K], we have g(M (1) ) = 1 < E1 , and for
+2 ≤ j ≤ NR Theorem C(3) with n1 = NR − j + 1 ≤ NR − 1 and n2 = Ej /NR gives g(M (j) ) <
+(Ej /Ej−1 )g(M (j−1) )+Ej (1/NR +(NR −1)/NR ) = (Ej /Ej−1 )g(M (j−1) )+Ej , so g(F2geom ) ≤ NR (NR )!.
+Applying Theorem C(3) to F geom = F1geom F2geom yields g(F/k) = g(F geom /k) < (N + NR + 1)|G|.
+     Step 3 (Hasse–Weil count). Exclude from k the set Zexcl of all z ∈ k such that: (E1)
+b0 (fz )cm−1 (fz )bm (fz ) = 0 (≤ 3 values, as each is nonzero at z = 0); (E2) z ∈ φ({OE } ∪ supp(D) ∪
+supp(I )) (≤ λ + n + 1 values); or (E3) z = φ(R) for some zero R outside supp(D) ∪ {−P, −Q −
+ϕq (P )} of ΩU,V := (U dV − V dU )/ω ̸= 0 (since div∞ (dU/ω) and div∞ (dV /ω) are bounded by
+3[−P ] + 3[−Q − ϕq (P )], ΩU,V has pole degree ≤ NR + λ + 6, giving ≤ NR + λ + 6 values). Including
+p∞ , at most Bexcl ≤ 1 + 3 + (λ + n + 1) + (NR + λ + 6) = NR + 2λ + n + 11 ≤ 2NR + n + 10 degree-1
+places of k(Z) are excluded.
+     Let z ∈ k \ Zexcl be such that the place pz = (Z − z) lies below at least one degree-1 place P
+of F/k. Every geometric point R ∈ φ−1        k
+                                                  (z) avoids −P and −Q − ϕq (P ) by (E1) (and bm (V ) ̸=
+0), avoids {OE } ∪ supp(D) ∪ supp(I ) by (E2), has V (R) ̸= 0 by Lemma 4.8(2), and satisfies
+(d(φ − z)/ω)(R) = V (R)−2 ΩU,V (R) ̸= 0 by (E3), so eR (φk ) = 1; thus pz is unramified in F2 /k(Z)
+by Theorem C(1)–(2). Reducing the monic factorization of cm−1 (Z)−1 LZ (T ) modulo P yields q0N
+roots γ1 , . . . , γqN ∈ k of Lfz (T ), pairwise distinct since ∂T Lfz = b0 (fz ) ̸= 0. Applying our local
+                     0
+lift with κ = k and z0 = z splits cm−1 (Z)−1 LZ (T ) into distinct linear factors over k((Z − z)),
+so pz is also unramified in F1 /k(Z) by Theorems E and C(2), hence unramified in F/k(Z) with
+exactly |G| degree-1 places above it. In particular, φ∗ (z) splits into NR distinct k-rational points
+A1 , . . . , ANR , giving (3). For every S ∈ supp(I ), we have x̃P (S) = xP (S)q and fz (S) ̸= 0 (by (E2)
+if V (S) ̸= 0, and by Lemma 4.8(2) if V (S) = 0), so Lfz (xP (S)) = fz (S) ̸= 0, giving (2). Thus z is
+(U, V )-splitting.
+     Since each excluded degree-1 place of k(Z) lies below at most |G| places of F/k, Theorem C(4)
+and Step 2 yield |G|(Nsplit + Bexcl ) ≥ N1 (F ) > |k| − 2(N + NR + 1)|G||k|1/2 ; dividing by |G|
+completes the proof.
+
+   To turn splitting elements into multiplicative relations in F×                                    ∼
+                                                                q n , note that because Pic (E)(Fq ) =
+                                                                                           0
+
+E(Fq ) has order NE , multiplying any degree-0 Fq -rational divisor A disjoint from supp(I ) by NE
+makes it principal, say NE A = divE (fA ) with fA unique up to F×  q . Evaluation A ↦→ fA (I0 ) mod Fq
+                                                                                                     ×
+
+therefore factors through the subgroup PI ,1 below (and motivates both Lemma 6.1 and stripping
+the primes dividing NE (q − 1) in Section 6.2).
+
+Lemma 5.2 (Galois norm congruence). In the setup of Definition 4.3, let Fq (E)×     I be the group of
+functions in Fq (E) regular and nonvanishing on supp(I ), let DivFq (E, I ) be the group of degree-0
+                    ×                                               0
+
+Fq -rational divisors disjoint from supp(I ), set PI ,1 := {divE (H) : H ∈ Fq (E)×
+                                                                                 I , H(I0 ) = 1}, and
+write A := A − deg(A)[OE ] for divisors A disjoint from supp(I ). Write Nk/k′ for the Galois norm
+        0
+
+on both function fields and divisor groups.
+
+
+                                                     26
+ (1) Suppose P ∈ E(k) \ {OE } has −P ̸= −Q − ϕq (P ) and {−P, −Q − ϕq (P )} ∩ supp(I ) = ∅, and
+                                         ∏︁qN
+      f ∈ WP satisfies Lf (T ) = c ℓ=1    (T − γℓ ) (c ∈ k × , γℓ ∈ k) and divE (f ) = D + N
+                                                                                           ν=1 [Aν ] −
+                                        0                                                   R
+                                                                                                  ∑︁
+
+      2q0 [−P ] − 2q0 [−Q − ϕq (P )] (D ∈ Divk (E), Aν ∈ E(k)), with supp(D), {Aν }, and every
+        m           m−1
+
+      Dℓ := div0 (xP − γℓ ) disjoint from supp(I ). Then in Div0Fq (E, I ),
+                          N
+                         q0                     NR
+        Nk/Fq (D) ≡            Nk/Fq (Dℓ )0 −        Nk/Fq ([Aν ])0
+                         ∑︂                     ∑︂
+                    0
+
+                         ℓ=1             ν=1
+                           + (2q0 − 2q0 )Nk/Fq ([−P ])0 + 2q0m−1 Nk/Fq ([−Q − ϕq (P )])0
+                                m     N
+                                                                                                (mod PI ,1 ).
+
+ (2) For any tower Fq ⊆ k ′ ⊆ k and any closed point P of Ek lying over the closed point p′ of
+     Ek′ , one has Nk/k′ (P) = fP p′ with fP := ([k : k ′ ] degk (P))/ degk′ (p′ ) ∈ Z≥1 , so degk′ (p′ ) | [k :
+     k ′ ] degk (P) and Nk/Fq (P)0 = fP Nk′ /Fq (p′ )0 .
+Proof. (1) For each τ ∈ Gal(k/Fq ) (acting on coefficients in k and commuting with ϕq ), we have
+(xP )(τ ) = xτ (P ) and (x̃P )(τ ) = x ◦ τQ+ϕq (τ (P )) . Since I is Fq -rational and avoids all zeros and
+poles of f and Lf (xP ), both f (τ ) and (Lf (xP ))(τ ) are regular and nonvanishing on supp(I ), and
+ϕq (I0 ) = I0 + Q gives (xτ (P ) (I0 ))q = x(I0 + Q + ϕq (τ (P ))) = (x̃P )(τ ) (I0 ). Raising to the q0j -
+th power yields (Lf (xP ))(τ ) (I0 ) = f (τ ) (I0 ). Multiplying over τ ∈ Gal(k/Fq ), the quotient H :=
+                                                                                         ∑︁qN
+Nk/Fq (f )/Nk/Fq (Lf (xP )) lies in Fq (E)×
+                                          I with H(I0 ) = 1. Since divE (Lf (xP )) =  ℓ=1 Dℓ −2q0 [−P ],
+                                                                                       0             N
+
+taking the divisor of H and applying (·) yields the stated congruence.
+                                            0
+
+   (2) For S ∈ supp(P), as τ runs over Gal(k/k ′ ) and σ over Gal(k(S)/k), τ̃ σ runs once over
+Gal(k(S)/k ′ ), in which the stabilizer Gal(k(S)/k ′ (S)) of S has size [k(S) : k ′ ]/[k ′ (S) : k ′ ] = fP .
+Hence Nk/k′ (P) = fP p′ , and transitivity of norms completes the proof.
+
+Lemma 5.3 (Las Vegas single-step elimination). In the setup of Definition 4.3, assume n ∤ ceM
+for all 1 ≤ c, e ≤ λ, where k = FqM satisfies
+
+    |k| ≥ max 64(N + NR + 1)2 G2ub , 800λqq02λ , 600q0λ+1 + 40n, 40(2q0N + 3NR + NR + 4)                    (5.1)
+               (︁                                                                                      )︁
+
+              N (N +1)
+with Gub := q0        NRNR . Suppose k and its quadratic extension k (2) = F|k|2 are explicitly presented
+over Fp with explicit embeddings Fq0 ↪→ k, Fq ↪→ k, k ↪→ k (2) and an explicit Fq0 -basis and coordinate
+         ∼
+map k −      q0 . There exist a zero-error Las Vegas algorithm Eliminate(k, Pin ) and an absolute
+         → FtM
+constant C1 > 0 such that, given any closed point Pin ̸= [OE ] of Ek of degree din ≤ λ disjoint from
+supp(I ) (represented by a point Sin ∈ E(Lin ) in an explicit extension Lin /k of degree ≤ λ with
+explicit embedding and k-coordinate map):
+ (1) on halting, it outputs (Q1 , e1 ), . . . , (QL , eL ) with L ≤ 2q0N + NR + λ + 2, eu ∈ Z, |eu | ≤ 2q0N ,
+     and closed points Qu ̸= [OE ] of Ek of degree ∈ {1, 2} (presented in E(k) or E(k (2) ) \ E(k))
+     disjoint from supp(I ), satisfying Nk/Fq (Pin )0 ≡ L         u=1 eu Nk/Fq (Qu ) (mod PI ,1 );
+                                                                                    0
+                                                                ∑︁
+
+
+ (2) its expected cost is at most Gub (q0N M log2 q)C1 bit operations uniformly over all valid inputs.
+Proof. Observe that |G| < Gub , |E(k)| − 1 ≥ 12 |k|, and Gub > q0t = q > n, so (5.1) implies the
+threshold of Lemma 5.1. Compute din = min{v ≥ 1 : ϕv|k| (Sin ) = Sin } and put spad := λ − din . Using
+SamplePoint(E, k), draw spad distinct points P1pad , . . . , Pspad
+                                                                pad
+                                                                    ∈ E(k) \ ({OE } ∪ supp(Pin ) ∪ supp(I ))
+(each draw succeeds with probability > 1/2), forming the reduced degree-λ divisor D := Pin +
+∑︁spad pad
+  u=1 [Pu ].
+    Now repeat the following independent trial until acceptance, restarting on any rejection:
+
+                                                           27
+ (a) Sample P ← SamplePoint(E, k) and set Q′ := Q + ϕq (P ) − P ; reject if [2]Q′ = O(︁E or
+     {−P, −Q − ϕq (P )} meets supp(D) ∪ supp(I ). Compute a k-basis of HD,P (k) = ker f ↦→
+     (f (Sin ), f (P1pad ), . . . , f (Pspad  ))   over k; reject if dimk HD,P (k) ̸= m + 6.
+                                                )︁
+                                          pad
+
+
+ (b) Sample R∗ ← SamplePoint(E, k); reject if R∗ ∈ supp(D) ∪ {−P, −Q − ϕq (P )} ∪ supp(I ) or
+     η(R∗ + P )η(R∗ + Q + ϕq (P )) = 0. Set g∗ := η(R∗ + Q + ϕq (P ))/η(R∗ + P ) and compute a
+     k-basis of Htan (k); reject if dimk Htan (k) ̸= m + 4.
+
+ (c) Sample (U, V, z) ∈ Htan (k) × HD,P (k) × k uniformly and set fz := U + zV ; reject if
+     bm (fz )cm−1 (fz )b0 (fz ) = 0.
+
+ (d) Cofactor splitting: In RE := k[X, Y ]/(Y 2 + a1 XY − F0 (X)) (F0 (X) := X 3 + a2 X 2 + a4 X + a6 ),
+                  j
+     compute Y q0 = uj (X) + vj (X)Y (0 ≤ j < m) by repeated powering (deg uj , deg vj ≤ 32 q0j ).
+                             j                  j   (︁ qj                       j
+     Substitute x(S + Q′ )q0 = (X − xQ′ )−2q0 cQ0′ (uj + vj Y ) + B2,Q′ (X)q0 from Lemma 4.1(1) into
+                                                                                    )︁
+                  m−1
+     (X − xQ′ )2q0 fz (S − P ) (S = (X, Y )) to rewrite it as αz (X) + βz (X)Y ∈ RE (deg αz ≤
+     q0m + 2q0m−1 , deg βz ≤ 2q0m−1 ), and form its norm Nz (X) := αz2 − a1 Xαz βz − βz2 F0 ∈ k[X]
+     of degree < 3NR ; reject if Nz = 0. Factor Nz (X) over k, lift each root ξ ∈ k to all
+     S = (ξ, y) ∈ E(k), and collect into a deduplicated set Az all resulting A = S − P —together
+     with A = Q′ −P —that avoid {OE , −P, −Q−ϕq (P )}∪supp(D)∪supp(I ) and satisfy fz (A) = 0.
+     Reject unless |Az | = NR .
+
+ (e) Linearized splitting: Form the (tM ) × (tM ) matrix Lz over Fq0 of the Fq0 -linear operator
+           fz (u) on k. By Gaussian elimination over Fq0 , reject unless dimFq0 ker(Lz ) = N and
+     u ↦→ Lhom
+     Lhom
+      fz  (u0 ) = −d0 (fz ) is solvable; list the q0 distinct roots γℓ ∈ u0 + ker(Lz ) ⊆ k.
+                                                   N
+
+
+ (f) Output: For each γℓ , factor Pγℓ (Y ) := Y 2 +a1 γℓ Y −F0 (γℓ ) over k: if it splits as (Y −y1 )(Y −y2 )
+     with y1 , y2 ∈ k (possibly equal), record [(γℓ , y1 )−P ] and [(γℓ , y2 )−P ] with weight +1 (dropping
+     [OE ]); if irreducible, find a root y1 ∈ k (2) \ k and record the degree-2 closed point of (γℓ , y1 ) − P
+     with weight +1 (rejecting in either case if any point lies in supp(I )). Append ([A], −1)
+     for each A ∈ Az , ([−P ], 2q0m − 2q0N ), ([−Q − ϕq (P )], 2q0m−1 ) (if ̸= OE ), and ([Pupad ], −1) for
+     1 ≤ u ≤ spad , and return.
+
+    Zero-error soundness. On acceptance, div∞ (fz ) = 2q0m [−P ] + 2q0m−1 [−Q − ϕq (P )] has degree
+λ + NR , while fz vanishes on D and the NR distinct points of Az outside supp(D), forcing
+div0 (fz ) = D + A∈Az [A]. Moreover Lfz (T ) has degree q0N and vanishes on the q0N distinct elements
+                ∑︁
+
+γℓ ∈ k, so Lemma 5.2(1) yields (1) after subtracting the padding points.
+    Expected time. By (5.1) and Lemmas 4.4–5.1, P ∈  / Ebad (D)∪E6 (D), R∗ ∈/ Rbad (D, P ), (D, P, R∗ )-
+goodness of U , and good-pencil status of (U, V ) each hold with conditional probability ≥ 9/10,
+and then z is (U, V )-splitting with probability ≥ 1/(2|G|) > 1/(2Gub ). Every (U, V )-splitting
+z passes all checks (note Nz = (αz + βz Y )(αz − a1 Xβz − βz Y ) ̸= 0 in k(E) since fz ̸= 0 and
+[−1]∗ (Y ) = −Y − a1 X, and every Aν ̸= Q′ − P satisfies Nz (x(Aν + P )) = 0). Hence each trial
+accepts with probability > (9/10)4 /(2Gub ) > 1/(4Gub ). By Lemma 2.1, with Λk = O(M log2 q),
+λ < m < NR < 4q0N , and n < q0N , steps (a)–(c) cost expected O((m3 + n)Λ3k ), step (d) costs
+expected O(NR3 Λ3k + NR nΛ2k ), step (e) costs deterministic O(tM mΛ3k + Λ3k + q0N N Λ2k ), and step (f)
+costs expected O(q0N (n + N )Λ3k ), giving per-trial expected cost (q0N M log2 q)O(1) . Lemma 2.1(1)
+gives (2).
+
+
+
+
+                                                        28
+6     Recursive Descent, Composite Linear Algebra, and Proof of
+      Theorem 1.2
+6.1    Factor base, B-adic descent, and factoring-free linear algebra
+Three ingredients close the algorithm: replacing n by n′ = ℓ∗ n for a small prime ℓ∗ > λ enforces the
+non-divisibility hypothesis n′ ∤ ceMj at every tower level; stripping only the small primes dividing
+NE (q − 1) isolates an unfactored cyclic subgroup GL ≤ F×   q n′
+                                                                 on which evaluation modulo PI ,1 is
+exact; and pairing random descents with basis-shifted descents produces a full-rank relation matrix
+over Z/ML Z (solved by SL2 (Z) row operations without factoring ML ) regardless of how Descent
+distributes its outputs across the redundant factor base ˜︁
+                                                          F.
+Lemma 6.1 (Factor base enumeration and evaluation). Let (E/Fq , Q, I ) be as in Lemma 4.1(2)
+(p ≥ 2, n ≥ 5, q = pr ≥ 16n2 , NE = |E(Fq )| < 2q, I0 ∈ E(Fqn )), let M0 ≥ 1, and suppose
+  (2)                                                                        (2)
+k0 = Fq2M0 is explicitly presented over Fp with an explicit embedding Fq ↪→ k0 and Fq -coordinate
+       (2) ∼
+       → F2M
+map k0 −  q
+            0 . Then the factor base
+
+
+                     ˜︁ := p closed point of E : p ∈
+                                                   / {[OE ], I }, degFq (p) | 2M0
+                           {︁                                                           }︁
+                     F                        Fq
+
+satisfies 1 ≤ K := |F|   ˜︁ < 2q 2M0 , and in deterministic time at most q 2M0 (qM0 n)C2 (for an absolute
+constant C2 > 0) one can list F         ˜︁ = {p1 , . . . , pK } as disjoint ϕq -orbits in E(k (2) ) and compute
+                                                                                                 0
+α1 , . . . , αK ∈ F×
+                   q n such  that each  α i = fpi (I0 )  for some  f pi ∈ Fq (E)×
+                                                                                I with  div E (fp i ) = NE pi .
+                                                                                                            0
+
+                                   (2)
+Proof. Since [Q] ∈ F
+                   ˜︁ and |E(k )| ≤ (q M0 + 1)2 < 2q 2M0 , we have 1 ≤ K < 2q 2M0 . Enumerate
+                              0
+   (2)
+E(k0 ) \ {OE } deterministically—for p = 2, by solving (v/u)2 + (v/u) = u + a2 + a6 u−2 over
+                                           (2)                         q 2M0 /2
+F2 via Lemma 2.1(4) for each u ∈ (k0 )× together with (0, a6                 ); for p ≥ 3, by sorting and
+merge-joining {(v 2 , v)} with {(u3 + a2 u2 + a4 u + a6 , u)}—discard supp(I ), represent each ϕq -orbit
+by its lexicographically least point, and sort-deduplicate to obtain F.   ˜︁ Also tabulate E(Fq ) \ {OE }
+                                              (2)
+together with its embedded image in E(k0 ).
+    First define a deterministic routine MillerEval(R) for R ∈ E(Fq ) returning gR,NE (I0 ) for some
+gR,NE ∈ Fq (E)×  I with divE (gR,NE ) = NE ([R] − [OE ]) (taking gOE ,NE := 1). For P1 , P2 ∈ E(Fq ),
+put hP1 ,P2 := 1 if OE ∈ {P1 , P2 }, hP1 ,P2 := x − x(P1 ) if P2 = −P1 ̸= OE , and otherwise hP1 ,P2 :=
+(y − y1 − µ(x − x1 ))/(x − x3 ) where P3 = (x3 , y3 ) = P1 + P2 and µ is the chord/tangent slope. Then
+divE (hP1 ,P2 ) = [P1 ]+[P2 ]−[P1 +P2 ]−[OE ], and hP1 ,P2 ∈ Fq (E)×
+                                                                   I since its numerator and denominator
+lie in L(3[OE ])Fq and 3 < 5 ≤ n = degFq (I ). Setting gR,1 := 1 and gR,a+b := gR,a gR,b h[a]R,[b]R
+gives divE (gR,k ) = k[R] − [[k]R] − (k − 1)[OE ] by induction, hence NE ([R] − [OE ]) at k = NE
+(since [NE ]R = OE ). Evaluating along the binary expansion of NE costs O((log2 NE )(n log2 q)2 ) bit
+operations.
+    Now take p ∈ F       ˜︁ of degree d | 2M0 with representative Sp ∈ E(k (2) ). If d = 1, match Sp
+                                                                                0
+with its preimage R ∈ E(Fq ) \ {OE } and set αp := MillerEval(R). If d ≥ 2, the Riemann–Roch
+space L((d + 1)[OE ]) has Fq -basis {xi : 2i ≤ d + 1} ∪ {xi y : 2i + 3 ≤ d + 1} with distinct pole
+orders {0, 2, 3, . . . , d + 1}. By Gaussian elimination over Fq , extract a nonzero generator hp of
+the 1-dimensional kernel L((d + 1)[OE ] − p) = ker(h ↦→ h(Sp )), of pole order kp ∈ {d, d + 1}
+at OE . If kp = d, then divE (hp ) = p0 , hp ∈ Fq (E)×      I (as p ̸= I ), and we set αp := hp (I0 )
+                                                                                                       NE .
+
+If kp = d + 1, then div0 (hp ) = p + [Rp ] for the unique Rp ∈ E(Fq ) \ {OE } with hp (Rp ) = 0
+(found by scanning E(Fq ) \ {OE }); then fp := hN         E −1              ×
+                                                        p gRp ,NE ∈ Fq (E)I has divisor NE p , and we
+                                                                                                0
+
+set αp := hp (I0 )NE MillerEval(Rp )−1 . Summing over all K < 2q 2M0 points takes deterministic time
+q 2M0 (qM0 n)O(1) .
+
+                                                      29
+Lemma 6.2 (Wan lift and recursive B-adic descent). In the setup of Definition 4.3 (writing
+n′ := ord(Q) ≥ 5, so q ≥ 16(n′ )2 and λ = 2B < n′ ), let M0 , J ≥ 1, set Mj := M0 B j (0 ≤ j ≤ J),
+and assume that MJ ≥ 4n′ , that n′ ∤ ceMj for all 1 ≤ c, e ≤ λ and 0 ≤ j ≤ J, and that |k0 | = q M0
+satisfies (5.1) (for n′ ). Suppose we have precomputed:
+                                                                                                          (2)
+ • an explicit tower Fq0 ⊂ Fq ⊂ k0 ⊂ · · · ⊂ kJ (kj = FqMj ) and quadratic extensions kj ⊂ kj , with
+                                                                              (2)                 (2)           (2)
+    commuting explicit subfield embeddings (Fq0 , Fq ↪→ kj , kj ↪→ kj , kj−1 ↪→ kj , kj , Fq ↪→ k0 )
+                                           ∼    tM           (2) ∼ 2B ;
+                                    → Fq0 j and kj
+    and explicit coordinate maps kj −                           −
+                                                                → kj−1
+
+                   F = {p1 , . . . , pK } and values α1 , . . . , αK ∈ F×
+ • the factor base ˜︁                                                   q n′
+                                                                             from Lemma 6.1;
+                                           ′
+ • a divisor ML ≥ 2 of Mnorm := (q n −1)/(q −1) coprime to both Cco := Mnorm /ML and NE (q −1),
+   the inverse νL := (NE (q − 1)Cco )−1 mod ML , the order-ML cyclic subgroup GL := (F×
+                                                                                      q n′
+                                                                                           )(q−1)Cco ,
+                  (q−1)Cco νL
+    and δi := αi                ∈ GL (1 ≤ i ≤ K).
+Put W := 2q0N + NR + λ + 2. There exist a zero-error Las Vegas algorithm Descent(u) and an
+absolute constant C3 > 0 that, given any u ∈ GL , return (e1 , . . . , eK ) ∈ {0, . . . , ML − 1}K verified to
+                   ei
+satisfy u = K                                    J+1 G K(q N M log q)C3 .
+            ∏︁
+              i=1 δi in expected time at most W        ub     0       J     2
+
+Proof. Represent u ∈ (Fq [X]/(Mx ))× by A ∈ Fq [X] \ {0} of degree < n′ , so gcd(A, Mx ) = 1, and
+set Dpoly := BMJ ≥ 16n′ . Repeatedly draw a uniform R ∈ Fq [X] of degree < Dpoly − n′ and
+                                                    ′
+test P (X) := A(X) + Mx (X)(X Dpoly −n + R(X)) for irreducibility over(︁ Fq until P is irreducible.
+                                                                                   −1                  ′
+By Theorem D, each draw is irreducible with probability at least Dpoly                  1 − (n′ + 1)q n −Dpoly /2 ≥
+                                                                                                                 )︁
+
+1/(2Dpoly ), taking expected O(Dpoly       4     (log2 q)3 ) bit operations. Factor P over kJ to extract one
+degree-B irreducible factor PJ (so NkJ /Fq (PJ (x)) = P (x)), form Ktop := kJ [X]/(PJ (X)) with θ :=
+X mod PJ , and factor the Weierstrass quadratic Wθ (Y ) over Ktop . Since [Fq (θ) : Fq ] = Dpoly > 3
+                            v        v
+excludes E[2] and P (xq0 ) = uq ̸= 0 excludes supp(I ), div0 (PJ (x)) is either a sum of two degree-B
+closed points of EkJ (if Wθ splits) or one degree-2B closed point presented in Ktop [Y ]/(Wθ ) (if Wθ
+is irreducible), giving a list Ltop of ≤ 2 closed points with divE (P (x)) = P∈Ltop NkJ /Fq (P)0 .
+                                                                                        ∑︁
+
+     Initialize e = (0, . . . , 0) ∈ {0, . . . , ML − 1}K , and define DescendNode(j, Pin , µ) recursively for
+0 ≤ j ≤ J: call Eliminate(kj , Pin ) to obtain (Q1 , c1 ), . . . , (QL , cL ) (L ≤ W , each Qu represented by
+            (2)
+Su ∈ E(kj ) of degree du ∈ {1, 2} over kj ). If j ≥ 1, for each u determine the closed point p′u of
+Ekj−1 below Qu of degree d′u = min{v ≥ 1 : ϕv|kj−1 | (Su ) = Su } | Bdu (≤ 2B = λ), set fu := (Bdu )/d′u ,
+and recurse on (j − 1, p′u , µcu fu mod ML ). If j = 0, match the ϕq -orbit of each Su (of size d′u | M0 du ,
+hence d′u | 2M0 ) to its unique piu ∈ F,     ˜︁ put fu := (M0 du )/d′ , and add µcu fu to ei modulo ML . Run
+                                                                       u                       u
+                                                                        ei
+DescendNode(J, P, 1) for each P ∈ Ltop , verify u = K              i=1 δi , and return e.
+                                                                 ∏︁
+
+     By reverse induction via Lemmas 5.3(1) and 5.2(2), there exist Zi ≡ ei (mod ML ) and
+H ∈ Fq (E)×        with H(I0 ) = 1 such that divE (P (x)) =                   i=1 Zi pi + divE (H). Then Φ :=
+                                                                            ∑︁K       0
+                I ∏︁
+                         −Zi
+P (x)NE H −NE K     i=1 fpi      ∈ Fq (E)×I has divE (Φ) = 0, so Φ = κ ∈ Fq by Theorem B(1). Eval-
+                                                                                      ×
+                                          Zi                                                     ∏︁K ei
+uating at I0 gives uNE = κ K        i=1 αi ; raising to (q − 1)Cco νL kills κ and gives u =        i=1 δi . Finally,
+                                  ∏︁
+
+the local work per node has expectation ≤ Tloc := Gub K(q0N MJ log2 q)O(1) , and conditioning on
+L ≤ W (using fresh independent random bits in each recursive call) gives Tj ≤ Tloc + W Tj−1 , so
+TJ < 2W J Tloc , yielding the stated expected time.
+
+Lemma 6.3 (Distribution-free full rank and unimodular solver).
+ (1) (Cf. [10, Lemma 4.1].) Let F be a finite field, K ≥ 1, ℓ ≥ 2, (b1 , . . . , bK ) the standard basis
+     of FK , and u1 , . . . , uKℓ , vj,s (1 ≤ j ≤ K, 1 ≤ s ≤ ℓ) mutually independent draws from an
+
+                                                        30
+      arbitrary distribution D on FK . Then {ut } ∪ {bj + vj,s } spans FK with probability at least
+      1 − 2K · 2−ℓ .
+
+ (2) For M ≥ 2 and R ≥ K ≥ 1, a deterministic algorithm SolveModM(M, E, a) running in
+     O(RK 2 (log2 M )2 ) bit operations takes E ∈ {0, . . . , M − 1}R×K and a ∈ {0, . . . , M − 1}R , is
+     guaranteed to return (OK, y) (y ∈ {0, . . . , M − 1}K ) whenever rowspanFp′ (E mod p′ ) = FK p′ for
+     every prime p | M , and whenever it returns (OK, y) guarantees δj = γ (1 ≤ j ≤ K) in any
+                   ′                                                             y j
+
+                                              Er,j
+     order-M cyclic group G where K                 = γ ar holds for all 1 ≤ r ≤ R (otherwise returning
+                                     ∏︁
+                                       j=1 δj
+     FAIL).
+Proof. (1) Set p(S) := Prw∼D [w ∈ S], Ut := spanF (u1 , . . . , ut ) (U0 := {0}), and W0 := UKℓ . If
+p(W0 ) < 1/2, then dim W0 ≤ K − 1, so some block a ∈ {1, . . . , K} satisfies Uaℓ = U(a−1)ℓ and
+p(U(a−1)ℓ ) < 1/2; conditioning on U(a−1)ℓ bounds each block event by 2−ℓ , so Pr[p(W0 ) < 1/2] ≤
+K · 2−ℓ . When p(W0 ) ≥ 1/2, for each j the probability that vj,s ∈             / W0 for all 1 ≤ s ≤ ℓ is
+(1 − p(W0 )) ≤ 2 ; if every j has some vj,sj ∈ W0 , then bj = (bj + vj,sj ) − vj,sj lies in the total
+              ℓ       −ℓ
+
+span for all j. A union bound gives failure probability ≤ 2K · 2−ℓ .
+    (2) If rowspanFp′ (E mod p′ ) = FK       p′ for every prime p | M , lifting modulo (p ) by induction
+                                                                 ′                        ′ c
+
+on c and combining across prime powers (p′ )e ∥ M by the Chinese Remainder Theorem gives
+rowspanZ/M Z (E) = (Z/M Z)K . Starting from [A | c] ← [E | a], for k = 1, . . . , K: first, for each
+i = k + 1, . . . , R(︁ with v :=    Ai,k ̸= 0, put u := Ak,k , compute (d, s, t) ← xgcd(u, v), and replace
+                        s   t )︁(︁ rowk )︁
+(rowk , rowi ) by −v/d     u/d     rowi mod M (determinant 1, setting Ak,k = d and Ai,k = 0, with all
+intermediate two-term sums of absolute value < 2M 2 ); then compute (dk , sk , tk ) ← xgcd(Ak,k , M ),
+output FAIL if dk ̸= 1, and otherwise scale rowk by sk mod M so Ak,k = 1. Finally, clear all
+entries above the diagonal by back-substitution modulo M and return (OK, (c1 , . . . , cK )). Every step
+                   ∏︁ A
+preserves both j δj r,j = γ cr and (during forward elimination) rowspanZ/M Z (A), so full row span
+forces gcd(Ak,k , M ) = 1 at every pivot and termination yields δj = γ cj in O(RK 2 (log2 M )2 ) bit
+operations.
+
+Lemma 6.4 (Factoring-free Las Vegas DLP from a descent oracle). In the setup of Lemma 6.2, let
+Tdesc bound the worst-case expected time of Descent. Given gL , hL in a subgroup HL ≤ GL of known
+order L | ML , a zero-error Las Vegas algorithm returns either xL ∈ {0, . . . , L − 1} with gLxL = hL or
+                               E            E
+Eg ∈ {1, . . . , ML − 1} with gL g = 1 and hL g ̸= 1, in expected bit operations
+               (︂                                                                           )︁)︂
+             O (log2 ML ) log2 (2K log2 ML ) KTdesc + K 3 (log2 ML )2 + K(n′ log2 q)3
+                                                (︁
+                                                                                                   .
+
+Proof. Set ℓ := ⌈log2 (8K(⌈log2 ML ⌉ + 1))⌉ and R := 2Kℓ. Repeat until a phase succeeds: sample
+w ∈ F×  q n′
+             uniformly and set γ := w(q−1)Cco (uniform on GL ); draw 2Kℓ independent uniform exponents
+aτ , aj,σ ∈ {0, . . . , ML − 1} (1 ≤ τ ≤ Kℓ, 1 ≤ j ≤ K, 1 ≤ σ ≤ ℓ), call uτ ← Descent(γ aτ ) and vj,σ ←
+Descent(δj−1 γ aj,σ ), assemble the R × K relation matrix Mrel with rows uτ and (bj + vj,σ ) mod ML
+and right-hand side a = (aτ ; aj,σ ), and invoke SolveModM(ML , Mrel , a), exiting on (OK, (y1 , . . . , yK ))
+after checking δi = γ yi for all i.
+     If p1 < · · · < pκ are the distinct prime divisors of ML , then κ ≤ log2 ML and pν ≥ ν + 1, so
+φ(ML )/ML ≥ κν=1 ν+1       ν
+                              = (κ + 1)−1 ≥ (log2 ML + 1)−1 . Conditioned on γ generating GL , every γ aτ
+                   ∏︁
+
+and δj−1 γ aj,σ is independently uniform on GL , so {uτ } ∪ {vj,σ } are i.i.d.; by Lemma 6.3(1) and a
+union bound over the κ primes pν | ML , Mrel has full row rank modulo every pν with probability
+≥ 1 − κ · 2K · 2−ℓ > 3/4. Thus each phase succeeds with probability > 43 (log2 ML + 1)−1 .
+     Upon exit, since the δi generate GL (Lemma 6.2) and each δi ∈ ⟨γ⟩, we automatically have
+ord(γ) = ML . Run e(g) ← Descent(gL ) and e(h) ← Descent(hL ), giving gL = γ Yg and hL = γ Yh with
+
+                                                     31
+             (g)                              (h)
+Yg := i ei yi mod ML and Yh := i ei yi mod ML , and compute (Dg , sg , tg ) ← xgcd(Yg , ML ).
+       ∑︁                                ∑︁
+
+If Dg | Yh , then xL := sg (Yh /Dg ) mod L satisfies gLxL = hL (as gLL = 1); if Dg ∤ Yh , then
+                                              E            E
+Eg := ML /Dg ∈ {1, . . . , ML − 1} satisfies gL g = 1 and hL g = γ Yh ML /Dg ̸= 1 (since ML ∤ Yh ML /Dg
+and ord(γ) = ML ). Lemma 2.1(1) yields the expected running time.
+
+6.2    Specification of Algorithm SuperQuasiPolyDLP
+On input a valid DLP instance I = (p, n, f, g, h):
+
+  1. Base case: Compute ℓ1 , ℓ2 , ℓ3 , ℓp , s, B as in Theorem 1.2(2) when n ≥ 16. If n < 16, ℓ3 < 10,
+     or B < 4, scan zx = g x for x = 0, 1, . . . , pn − 2: halt with (LOG, x) upon hitting zx = h, or halt
+     with (NOT_IN_SUBGROUP, x) upon hitting zx = 1 for x ≥ 1 (verifying g x = 1 and hx ̸= 1, since
+     ⟨g⟩ is the unique order-x subgroup of the cyclic group F×      pn ).
+
+  2. Parameters (now ℓ3 ≥ 10 and B ≥ 4): Set λ := 2B, m := 2B +4, q0 := ps , let ℓ∗ ∈ (λ, λ!+1]
+     be the least prime divisor of λ! + 1 (found by trial division), and put n′ := ℓ∗ n. Choose the least
+     t ≥ 1 with q0t ≥ 16(n′ )2 , and set r := st, q := q0t = pr , N := t + m − 1, NR := 2(q0m + q0m−1 ) − λ,
+                     N (N +1) NR
+     and Gub := q0              NR . Choose the least M     ˜︂0 ≥ 1 with q M
+                                                                           ˜︁0
+                                                                               ≥ 64(N + NR + 1)2 G2ub , set
+     M0 := M ˜︂0 + 1
+                          ˜︁0 (so ℓ∗ ∤ M0 ), choose the least J ≥ 1 with M0 B ≥ 4n , and set Mj := M0 B
+                     ℓ ∗ |M
+                                                                               J    ′                      j
+
+     (0 ≤ j ≤ J).
+
+  3. Elliptic presentation and embedding: Construct Fq0 and Fq over Fp and an explicit
+     embedding ι0 : Fq0 ↪→ Fq by root finding (Lemma 2.1(2)–(3)). Run Lemma 4.1(2) on (p, n′ , Fq )
+     to obtain (E/Fq , NE , Q, Mx , YI , I0 ) and Fqn′ = Fq [X]/(Mx (X)). Since n | rn′ , factor f (X)
+      over Fqn′ to define ι : Fpn ↪→ Fqn′ , and set ĝ := ι(g), ĥ := ι(h).
+
+  4. Small-prime part: Factor Ksm := NE (q − 1) < 2q 2 by trial division into distinct primes
+     r1 < · · · < rv , and strip all powers of r1 , . . . , rv from pn − 1 to write pn − 1 = S · L with
+                  e
+     S = vµ=1 rµµ and gcd(L, S · NE (q − 1)) = 1. Put gS := g L , hS := hL . For each µ with
+          ∏︁
+                                                                                        a
+                             e           S           S                         a       r µ
+      eµ ≥ 1, set Sµ := S/rµµ , gµ := gS µ , hµ := hSµ , and find ord(gµ ) = rµµ . If hµµ ̸= 1, verify and
+                                       a                         x
+      return (NOT_IN_SUBGROUP, LSµ rµµ ). Otherwise solve gµµ = hµ digit-by-digit in base rµ using
+      Pohlig–Hellman and Shanks baby-step giant-step [13] (sorted and matched via Lemma 2.1(4)
+                       √
+      with step size ⌈ rµ ⌉), and combine via CRT to obtain xS ∈ {0, . . . , S − 1} with gSxS = hS . If
+      L = 1, verify g xS = h and halt with (LOG, xS ).
+
+  5. Large-cofactor part (L ≥ 2): Set gL := ĝ S and hL := ĥS in F×
+                                                                   q n′
+                                                                        , and note L | Mnorm :=
+         ′
+      (q n − 1)/(q − 1). Starting from Cco ← Mnorm /L, repeatedly replace Cco by Cco / gcd(Cco , L)
+      until gcd(Cco , L) = 1, and set ML := Mnorm /Cco ≥ L. Then ML has the exact same prime
+      divisors as L, so gcd(ML , Cco ) = gcd(ML , NE (q − 1)) = 1, and gL , hL ∈ GL := (F×
+                                                                                         qn
+                                                                                           ′)
+                                                                                             (q−1)Cco .
+
+      Compute νL := (NE (q − 1)Cco )−1 mod ML .
+                                   (2)
+      Construct kj = FqMj and kj    = Fq2Mj over Fp (0 ≤ j ≤ J), find one-step embeddings Fq ↪→ k0 ,
+                          (2)
+      kj−1 ↪→ kj , kj ↪→ kj by root finding and compose their matrices to obtain a commuting system
+                                                                                 (2)         (2)
+      of tower embeddings, and for each pair (Fq0 , kj ), (kj−1 , kj ), (kj−1 , kj ), (Fq , k0 ) extract a
+      relative basis greedily from powers of the field generator and invert the resulting change-of-basis
+      matrix in GL(Fp ) to form the explicit coordinate maps. Run Lemma 6.1 to obtain F        ˜︁ and αi ,
+                 (q−1)Cco νL
+      set δi := αi           , and invoke Lemma 6.4 on (gL , hL ) with Descent from Lemma 6.2.
+
+
+                                                     32
+                                      E               E
+       • If it returns Eg with gL g = 1 and hL g ̸= 1, set dL := gcd(Eg , L) ∈ {1, . . . , L − 1}; verify
+         and halt with (NOT_IN_SUBGROUP, SdL ).
+       • If it returns xL with gLxL = hL , compute σS S + σL L = 1 via xgcd, set x := (xS σL L +
+         xL σS S) mod (pn − 1), verify g x = h, and halt with (LOG, x).
+
+6.3    Proof of Theorem 1.2
+Proof of Theorem 1.2. Every exit verifies its output directly in F× pn (in Step 5, dL = u1 Eg + u2 L
+gives g SdL = 1 while dL | Eg forces h     SdL ̸= 1; and in the CRT branch both (g x h−1 )L = 1 and
+(g h ) = 1, so g = h). Step 1 halts deterministically whenever n < 16, ℓ3 < 10, or B < 4.
+  x −1  S           x
+
+    Assume now that n ≥ 16, ℓ3 ≥ 10, and B ≥ 4. Then ℓ2 ≥ 1024, ℓ1 ≥ 21024 , and ln n ≥
+2 ln 2 > 12 ℓ42 (as 2k > k 4 for k ≥ 1024). Also s ≥ 3, q0 ≥ 8, λ = 2B ≥ 8, m = 2B + 4 ∈ [12, 3B],
+ ℓ2
+
+sℓp ∈ [100, ℓ2 /128], B ≤ ℓ2 /3200, s ln p < ℓ2 /100, and
+                                                3      1              1/8
+                       log2 (q0m ) ≤ msℓp ≤       ℓ2 < ℓ2 =⇒ q0m < ℓ1 ≤ (log2 n)1/8 .
+                                               32      8
+Since ℓ∗ ≤ λ! + 1 ≤ λλ + 1, we have ln ℓ∗ ≤ 2B ln(2B) + 1 ≤ 4B ln B < ℓ2 ln ℓ2 < 2 · 10−6 ln n,
+so ln n < ln n′ ≤ ln n + 4B ln B < 1.0001 ln n. By minimality of t, 2 ln n + ln 16 < ln q < 2 ln n′ +
+ln 16 + s ln p < 2 ln n + 8B ln B + ln 16 + ℓ2 < 2 ln n + 3ℓ2 ln ℓ2 , giving t > 200(ln n)/ℓ2 > m + 2 and
+                                                               1/8                        1/4
+N = t + m − 1 ∈ 2s ln     n 2.002 ln n
+                                         . Since 2q0m < NR < 4ℓ1 , we have NR ln NR < ℓ1 < ln n, while
+                    (︁                 ]︁
+                       ln p , s ln p
+                   2
+                  n)
+N 2 s ln p > 4(ln
+              s ln p > 10 ln n, yielding
+                         9
+
+
+                            4(ln n)2                                         4.02(ln n)2
+               109 ln n <            < ln Gub = N (N + 1)s ln p + NR ln NR <             .
+                             s ln p                                             s ln p
+Because the prime ℓ∗ > λ > B divides n′ and avoids M0 , we have n′ ∤ ceM0 B j for all 1 ≤ c, e ≤ λ and
+j ≥ 0. Moreover 800λqq02λ < n7 < Gub , 600q0λ+1 + 40n′ < n3 < Gub , and 40(2q0N + 3NR + NR + 4) <
+200Gub < |k0 |, so (5.1) and all hypotheses of Lemmas 4.1 and 5.3–6.4 hold, proving (1).
+    For (2), minimality of M ˜︂0 and M0 ≤ M    ˜︂0 + 1 give M0 ln q ≤ 2 ln Gub + 2 ln(8(N + NR +
+                8.1(ln n)2                                                                    n)2
+1)) + 2 ln q ≤ s ln p (so M0 < 2 ln n), and hence ln K < 2M0 ln q + ln 2 ≤ 16.3(ln      s ln p . Since
+                                                                                            ′
+M0 B < 2ℓ2 ln n < n < 4n′ , we have J ≥ 2, MJ < 4Bn′ < n3 , and J + 1 < ln(4n )
+                                                                          ln B + 2 ≤ ln B + 4B + 4.
+                                                                                     ln n
+
+Meanwhile W < 3q0 q gives ln W < ln q + ms ln p + ln 3 < 2 ln n + 8B ln B + 3ℓ2 , and since
+                     m−1
+
+B < ℓ2 < 2 ln ln n and 40ℓ32 < ln n, multiplying yields
+                                                   2
+                              (J + 1) ln W ≤          (ln n)2 + O (ln n)(ln ln n) .
+                                                                 (︁              )︁
+                                                 ln B
+Because s ln p ≥ ln22 ℓ23 > 34, q < n4 , ℓ∗ < n, MJ < n3 , and ℓp ≤ ℓ2 /128 = O(ln ln n), Steps 2–4
+(including trial division and Pohlig–Hellman/BSGS up to Ksm < 2n8 ) and the tower setup in Step 5 all
+                                                                                                        n)2
+run in expected exp(O(ln n)) bit operations. Factor base generation costs ≤ exp 16.3(ln                     +O(ln n) ,
+                                                                                           (︁                       )︁
+                                                                                                  s ln p
+each Descent call has ln Tdesc ≤ ln2B + s20.4  ln p (ln n) + O((ln n)(ln ln n)), and Lemma 6.4 adds ln K to
+                                                            2
+                                       (︁           )︁
+
+ln Tdesc (reaching s36.7
+                      ln p ) alongside ln(K ) ≤ s ln p (ln n) . Both are strictly bounded by (1.1), where
+                                              3        48.9       2
+
+ ln B (ln n) comes from the descent tree W
+   2        2                                      J+1 and 60 (ln n)2 conservatively bounds the composite
+                                                              s ln p
+linear algebra K 3 and the factor-base overhead in KTdesc .
+      For (3) and (4), if nν → ∞ and (ln pν )/(ln ln nν ) → 0, then ℓ3 → ∞, sℓp = o(ℓ2 ) so
+B → ∞, and s ln pν ≥ ln22 ℓ23 → ∞ (checking both ℓ23 ≥ 3ℓp via ℓp ≤ 2 log2 pν and ℓ23 < 3ℓp ),
+so (1.1) gives exp(o((ln nν )2 )) = (pν nν )o(log nν ) . When ln pν ≤ 41 (ln ln ln nν )2 (in particular for
+fixed p), eventually ℓp < 13 ℓ23 , s = ⌈ℓ23 /ℓp ⌉, sℓp < 43 ℓ23 , 60/(s ln pν ) = O((ln ln ln nν )−2 ), and B ≥
+(ln ln nν )/(100(ln ln ln nν )2 ), so ln B ≥ (1−o(1)) ln ln ln nν and (1.1) yields exp ln2+o(1)
+                                                                                              ln ln nν (ln nν ) .
+                                                                                                               2
+                                                                                        (︁                       )︁
+
+
+                                                          33
+A       Proof of Lemma 2.1
+Proof of Lemma 2.1. For comprehensive textbook treatments of finite-field and polynomial arith-
+metic, see Shoup [14] and Cantor–Zassenhaus [3]; we verify the exact bounds needed on a multitape
+Turing machine.
+     (1) Since {τ ≥ i} = i−1     j=1 {Aj = 0} has probability (1 − pacc )
+                                                                           i−1 (so Pr[τ = ∞] = 0) and is
+                              ⋂︁
+                                                                   ∑︁∞
+independent of Ci , monotone convergence gives E[ i=1 Ci ] = i=1 E[C1 ](1 − pacc )i−1 = E[C1 ]/pacc
+                                                       ∑︁τ
+
+(and E[τ ] = 1/pacc for Ci = 1). For SampleUniform(M ), repeatedly read b uniform bits as ai ∈
+{0, . . . , 2b −1} and accept if ai < M ; then pacc = M/2b ≥ 1/2, each k < M is output with probability
+   i≥1 (1 − pacc )
+∑︁                 i−1 2−b = 1/M , and the expected cost is ≤ 2 · O(b) = O(b).
+
+     (2) Schoolbook integer arithmetic and long division take O(β 2 ) bit operations; in the Euclidean
+algorithm on a0 ≥ b0 > 0, each quotient qi of bit-length ki costs O(βki ) with i ki = O(β),
+                                                                                             ∑︁
+
+maintaining Bezout cofactors |si | ≤ b0 and |ti | ≤ a0 in total time O(β 2 ), and binary exponentiation
+takes O(β 3 ) [14, §§3.3–4.3]. The same degree-telescoped Euclidean analysis over Fp (and recursively
+over a finite base field FQ ) performs multiplication and inversion in FQ′ = FQ [Y ]/(g(Y )) in
+O(e2 Λ2 ) = O((Λ′ )2 ) bit operations, binary powering ue in O(⌈log2 (e + 2)⌉(Λ′ )2 ), and uniform
+sampling via d′ calls to SampleUniform(p) in expected O(Λ′ ). For ι : Fp [U ]/(gF ) ↪→ Fp [V ]/(gEext )
+sending U ↦→ θ, forming the rows 1, θ, . . . , θdF −1 of Mι takes dF − 1 multiplications in Eext
+(O(dF d2Eext ⌈log2 p⌉2 )), evaluation computes cMι in O(ΛF ΛEext ), matrix composition Mι Mι′ costs
+O(dF dEext d3 ⌈log2 p⌉2 ), and multiplying by B−1 ∈ GLdEext (Fp ) recovers F -basis coordinates in
+O(Λ2Eext ) (all bounds holding trivially for constant inclusions and coefficient readout in bounded-
+depth relative extensions).
+     (3) Schoolbook arithmetic, division, and degree-telescoped monic gcd in FQ′ [X] use O(D2 )
+                                                                                                    ′
+operations in FQ′ , hence O(D2 (Λ′ )2 ) bit operations, and binary powering computes Y1 := X Q mod A
+                                          ′
+in O(D2 (Λ′ )3 ). Iterating Yk+1 := YkQ mod A (1 ≤ k ≤ D) certifies irreducibility of a monic degree-D
+polynomial A via YD ≡ X (mod A) and gcd(A, Yk − X) = 1 for all k | D with k < D, in O(D3 (Λ′ )3 )
+bit operations. To factor a monic A of degree D ≥ 1 [3], compute g0 := gcd(A, A′ ): if A′ = 0,
+                            ∑︁ Q′ /p
+extract the p-th root ( i ci X i )p = A and recurse; if 1 ≤ deg g0 < D, recursively factor g0 and
+                                                                                                ′ k
+A/g0 ; if g0 = 1, extract the product Ak of degree-k irreducible factors via gcd(A, X (Q ) − X) for
+k = 1, . . . , D in O(D3 (Λ′ )3 ), and split any Ak with rk := (deg Ak )/k ≥ 2 recursively by sampling
+                                                                                       ′ k
+uniform W of degree < deg Ak and taking gcd(Ak , S(W )), where S(W ) := W ((Q ) −1)/2 − 1 mod Ak
+                                                                       ′ )2k −1
+for odd p (splitting two CRT components with probability (Q          4(Q′ )2k
+                                                                                   8
+                                                                                ≥ 36  > 15 ) and S(W ) :=
+∑︁kd′ −1   i
+  i=0     W 2 mod Ak for p = 2 (splitting with probability 1 − 21−rk ≥ 1/2 by surjectivity of
+TrF(Q′ )k /F2 ). Since each split costs expected O((deg B)2 k(Λ′ )3 ) and v s2v ≤ r3 over any binary
+                                                                         ∑︁
+
+splitting tree of weight r (as r2 + a3 + b3 < r3 for a + b = r, a, b ≥ 1), strong induction on D
+together with final deterministic irreducibility and product checks gives zero-error factorization in
+expected O(D3 (Λ′ )3 ). Finally, for D ≥ 2, the number IQ′ (D) of monic degree-D irreducibles satisfies
+                       ∑︁⌊D/2⌋
+DIQ′ (D) ≥ (Q′ )D − j=1 (Q′ )j ≥ 12 (Q′ )D (for all Q′ ≥ 2), so uniform sampling with deterministic
+irreducibility testing succeeds in expected ≤ 2D trials and O(D4 (Λ′ )3 ) bit operations.
+    (4) Bottom-up two-way merge-sort across two auxiliary tapes finishes after t = ⌈log2 N0 ⌉
+sequential passes of cost O(N0 brec ) each (for N0 ≥ 2), and single-pass deduplication and block-
+rewinding merge-join follow in O((N1 + N2 + Nout + 1)brec ). Standard row-major Gauss–Jordan
+elimination over FQ′ performs at most min(r, c) pivot eliminations, each scanning r rows of length
+c in O(rc(Λ′ )2 ) bit operations, followed by direct readout of the c − rank(M) free-column kernel
+vectors (and the right half of [M | Ir ] when inverting), yielding the stated deterministic bounds.
+
+
+
+                                                   34
+References
+ [1] R. Barbulescu, P. Gaudry, A. Joux, and E. Thomé, A heuristic quasi-polynomial algorithm
+     for discrete logarithm in finite fields of small characteristic, in Advances in Cryptology—
+     EUROCRYPT 2014 (Copenhagen, 2014; P. Q. Nguyen and E. Oswald, eds.), Lecture Notes in
+     Comput. Sci., vol. 8441, Springer, Berlin, 2014, pp. 1–16.
+
+ [2] Y. Cai, V. Gupta, Y. Jiang, C. Liaw, A. Mehta, G. Velegkas, and D. Wang, Cogentic: Multi-
+     agent orchestration for automated proof discovery, arXiv preprint arXiv:2609.40324 (2026).
+
+ [3] D. G. Cantor and H. Zassenhaus, A new algorithm for factoring polynomials over finite fields,
+     Math. Comp. 36 (1981), no. 154, 587–592.
+
+ [4] F. Göloğlu and A. Joux, A simplified approach to rigorous degree 2 elimination in discrete
+     logarithm algorithms, Math. Comp. 88 (2019), no. 319, 2485–2496.
+
+ [5] R. Granger, T. Kleinjung, and J. Zumbrägel, On the discrete logarithm problem in finite fields
+     of fixed characteristic, Trans. Amer. Math. Soc. 370 (2018), no. 5, 3129–3145.
+
+ [6] R. Hartshorne, Algebraic Geometry, Grad. Texts in Math., vol. 52, Springer-Verlag, New York,
+     1977.
+
+ [7] T. Kleinjung and B. Wesolowski, A new perspective on the powers of two descent for discrete
+     logarithms in finite fields, in Proceedings of the Thirteenth Algorithmic Number Theory
+     Symposium (Madison, WI, 2018; R. Scheidler and J. Sorenson, eds.), Open Book Ser., vol. 2,
+     Math. Sci. Publ., Berkeley, CA, 2019, pp. 343–352.
+
+ [8] T. Kleinjung and B. Wesolowski, Discrete logarithms in quasi-polynomial time in finite fields
+     of fixed characteristic, J. Amer. Math. Soc. 35 (2022), no. 2, 581–624.
+
+ [9] G. Lido, A provably quasi-polynomial algorithm for the discrete logarithm problem in finite
+     fields of small characteristic, Finite Fields Appl. 111 (2026), Paper No. 102753.
+
+[10] C. Pomerance, Fast, rigorous factorization and discrete logarithm algorithms, in Discrete
+     Algorithms and Complexity (Kyoto, 1986; D. S. Johnson, T. Nishizeki, A. Nozaki, and H. S.
+     Wilf, eds.), Perspect. Comput., vol. 15, Academic Press, Boston, MA, 1987, pp. 119–143.
+
+[11] H.-G. Rück, A note on elliptic curves over finite fields, Math. Comp. 49 (1987), no. 179,
+     301–304.
+
+[12] J.-P. Serre, Local Fields, translated from the French by M. J. Greenberg, Grad. Texts in Math.,
+     vol. 67, Springer-Verlag, New York, 1979.
+
+[13] D. Shanks, Class number, a theory of factorization, and genera, in 1969 Number Theory
+     Institute (Stony Brook, NY, 1969; D. J. Lewis, ed.), Proc. Sympos. Pure Math., vol. 20, Amer.
+     Math. Soc., Providence, RI, 1971, pp. 415–440.
+
+[14] V. Shoup, A Computational Introduction to Number Theory and Algebra, 2nd ed., Cambridge
+     Univ. Press, Cambridge, 2009.
+
+[15] J. H. Silverman, The Arithmetic of Elliptic Curves, 2nd ed., Grad. Texts in Math., vol. 106,
+     Springer, Dordrecht, 2009.
+
+
+                                                35
+[16] H. Stichtenoth, Algebraic Function Fields and Codes, 2nd ed., Grad. Texts in Math., vol. 254,
+     Springer-Verlag, Berlin, 2009.
+
+[17] D. Wan, Generators and irreducible polynomials over finite fields, Math. Comp. 66 (1997),
+     no. 219, 1195–1212.
+
+[18] W. C. Waterhouse, Abelian varieties over finite fields, Ann. Sci. École Norm. Sup. (4) 2 (1969),
+     no. 4, 521–560.
+
+
+
+
+                                                 36
+

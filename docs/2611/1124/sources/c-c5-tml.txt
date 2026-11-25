@@ -1,0 +1,184 @@
+Training a Scalable Forecasting Agent (Guest Post with Mantic) - Thinking Machines Lab
+
+THINKING MACHINES [/]
+
+Inkling [/inkling/]Tinker [/tinker/]Connectionism [/blog/]News [/news/]Careers [/careers/]
+
+Home [/]Inkling [/inkling/]Tinker [/tinker/]Connectionism [/blog/]News [/news/]Careers [/careers/]
+
+Training a Scalable Forecasting Agent (Guest Post with Mantic)
+
+The Mantic team [https://www.mantic.com/] in collaboration with Thinking Machines Nov 24, 2026
+
+Introduction [#introduction]
+
+Scaling agentic forecasting environments [#scaling-agentic-forecasting-environments] 
+
+Large-scale, high-quality question generation [#large-scale-high-quality-question-generation]
+
+Low-latency, high-bandwidth, point-in-time tools [#low-latency-high-bandwidth-point-in-time-tools]
+
+Forecasting is a noisy optimization problem [#forecasting-is-a-noisy-optimization-problem]
+
+Intelligent forecasting capabilities emerge through training [#intelligent-forecasting-capabilities-emerge-through-training]
+
+Conclusion and next steps [#conclusion-and-next-steps]
+
+Citation [#citation]
+
+There are ~1,000 interesting global issues on major prediction markets, but the universe of would-be useful forecasts is orders of magnitude larger.Order of magnitude estimate from stripping out sports, crypto, and mention markets (see Polymarket [https://blog.mantic.com/p/backtesting-against-polymarket] research). As a demonstration, Figure 1 shows 100,000 forecasts for the S&P 500 under 50 different geopolitical and economic scenarios.
+
+A picture is worth 100,000 forecasts. 2027 revenue and EPS forecasts for every S&P 500 company under 50 scenarios, each made both as if the scenario happens and as if it doesn’t. Each bar is one forecast relative to the company’s baseline: blue higher, red lower.
+
+We made these forecasts with an agent we post-trained from Inkling 2 Small on Tinker. It is roughly as accurate as Fable 5.2 (medium) but 15× cheaper per forecast (Figure 2).
+
+Pareto-optimal forecasting with a fine-tuned version of Inkling 2 Small. Mean log score (the log of the probability placed on the outcome) against cost per forecast on 200 held-out numerical questions from Metaculus, Polymarket, Kalshi and our platform, all with prediction times after 15 September 2026, Inkling 2 Small’s knowledge cutoff.
+
+This run required improvements across our post-training stack to tackle data scarcity, point-in-time research throughput and latency, and noisy rewards. We built this stack on Tinker for three reasons: (a) it scales easily to thousands of concurrent rollouts, (b) async RL with StableReinforce speeds up experiment runtime by 3×, and (c) it’s cost-effective.
+
+Mantic’s vision is that large-scale AI forecasting – combined with the impressive accuracy of these systems – will unlock radically new applications of forecasting.In Summer 2026, two AI systems (including Mantic) outperformed [https://www.economist.com/science-and-technology/2026/09/16/artificial-intelligence-now-beats-some-of-the-best-human-forecasters] all 600+ human forecasters in a major competition, the Metaculus Cup, for the first time.
+
+Scaling agentic forecasting environments
+
+Forecasting involves two stages: research and prediction. In our previous post [/news/training-llms-to-predict-world-events/], we described training a model to make predictions given research done by other agents. Here, we post-train Inkling 2 Small to do both in a single agentic rollout. Each environment provides the agent with a forecasting question and tools to run point-in-time research, execute code, and submit a probability distribution.
+
+To unlock this work, we needed: (1) a much larger supply of high-quality questions than public platforms offer, and (2) research tools fast enough to serve thousands of concurrent rollouts.
+
+Large-scale, high-quality question generation
+
+Publicly available, high-quality forecasting questions are limited. Of ~848k numerical questions resolved on Metaculus, Polymarket and Kalshi in 2026, ~304k remain after removing duplicates, ~6.6k after removing off-topic questions (sports, weather and crypto prices), and ~3.9k after removing low-quality questions (what someone will say, video views, next-day prices).
+
+We started with popular prediction markets, but after deduplicating across platforms and filtering out off-topic and immaterial questions, a small fraction remained usable for training.
+
+To address the shortfall, we built a system that generates synthetic forecasting questions directly from the news with LLMs, analogous to Bosse et al. (2026) [https://arxiv.org/abs/2601.22444] and Turtel et al. (2026) [https://arxiv.org/abs/2601.06336]. We used this system to produce a pool of 45,000 questions for use in training. We focused on quantitative questions, such as “How many vessels will Japan’s Foreign Ministry have most recently reported as remaining in the Persian Gulf by 30 June 2026?” These generated questions are sufficiently on-distribution that performance generalizes to the held-out questions from prediction sites (Figure 4).
+
+Score improvements on Mantic-generated questions generalize to public forecasting questions. Score increases over the base model during RL training, on held-out Mantic-generated questions (blue) and on public questions from Metaculus, Polymarket and Kalshi (green).
+
+Low-latency, high-bandwidth, point-in-time tools
+
+The agent’s research tools return point-in-time data; that is, information (from e.g. news, Wikipedia, economic time series) that would have been accessible at the time the question was asked, and not later.
+
+Supporting thousands of concurrent rollouts with point-in-time tools. Each row is one training rollout’s question, and each dot a piece of data placed by the date it appeared. The agent’s tools return only data from before its prediction time (blue); later data, including the resolution (◇), stays hidden (gray).
+
+During training we generate rollouts in thousands of concurrent environments. At this scale, naively calling third-party data APIs would make the training runs too slow to be viable. Subject to the rate limits of our endpoints, the run described in this post would have taken around nine years to complete.
+
+Instead, we ingest data from these APIs continuously and store it in our own databases that we can access at low latency (Figure 5). For instance, we maintain [https://enterprise.wikimedia.com/blog/mantic-uses-wikimedia-enterprise/] a dedicated point-in-time copy of Wikipedia’s complete revision history: 1.32 TB of indexed and embedded text. The public Wikipedia API can only search today’s Wikipedia, and returns historical versions one page per request; our agent can run semantic searches over Wikipedia as it was on any past date, and read a whole batch of historical pages in a single query.
+
+Forecasting is a noisy optimization problem
+
+In probabilistic forecasting about real-world events, the rewards are stochastic. On any single question, an over-confident forecast can outperform a forecast that matches the true underlying distribution (see Figure 6 for an example).
+
+An overconfident forecast often scores higher. Outcomes are drawn one at a time from P*, the distribution of possible outcomes, and each is scored with the log score against a calibrated forecast p₁ (equal to P*) and an overconfident forecast p₂. Every outcome then joins the pile below in the color of whichever forecast scored higher. Across 250 simulated worlds, p₂ scores higher 60% of the time, yet p₁ is ahead by 1.16 nats on average.
+
+To address this stochasticity, we mix the outcome log score with an expected log score under a strong reference forecast generated by running an ensemble of frontier models through our harness on the same question.
+
+r=λ log⁡p(y)Ev∼R[]⏟outcome log score+(1−λ) Ev∼R[log⁡p(v)]⏟expected log score under the reference=λlog⁡p(y)    −    (1−λ) KL(R ∥ p)⏟forward KL to the reference  −  (1−λ) H(R)⏟constant across rollouts\begin{aligned}
+r &= \lambda\,\underbrace{\log p(y)\vphantom{\mathbb{E}_{v \sim R}\bigl[\bigr]}}_{\mathclap{\text{outcome log score}}}
+ + (1-\lambda)\,\underbrace{\mathbb{E}_{v \sim R}\bigl[\log p(v)\bigr]}_{\mathclap{\text{expected log score under the reference}}} \\[20pt]
+ &= \lambda \log p(y)
+ \;\;-\;\; (1-\lambda)\,\underbrace{\mathrm{KL}(R \,\|\, p)}_{\mathclap{\text{forward KL to the reference}}}
+ \quad\;-\;\quad \underbrace{(1-\lambda)\,H(R)}_{\mathclap{\text{constant across rollouts}}}
+\end{aligned}r​=λoutcome log scorelogp(y)Ev∼R​[]​​+(1−λ)expected log score under the referenceEv∼R​[logp(v)]​​=λlogp(y)−(1−λ)forward KL to the referenceKL(R∥p)​​−constant across rollouts(1−λ)H(R)​​​
+
+r=λ log⁡p(y)⏟outcome log score+(1−λ) Ev∼R[log⁡p(v)]⏟expected log scoreunder the reference=λlog⁡p(y)−(1−λ) KL(R ∥ p)⏟forward KLto the reference−(1−λ) H(R)⏟constant acrossrollouts\begin{aligned}
+r &= \lambda\,\underbrace{\log p(y)}_{\mathclap{\text{outcome log score}}}
+ + (1-\lambda)\,\underbrace{\mathbb{E}_{v \sim R}\bigl[\log p(v)\bigr]}_{\mathclap{\substack{\text{expected log score}\\\rule{0pt}{0.82em}\text{under the reference}}}} \\[30pt]
+ &= \lambda \log p(y)
+ - (1-\lambda)\,\underbrace{\mathrm{KL}(R \,\|\, p)}_{\mathclap{\substack{\text{forward KL}\\\rule{0pt}{0.82em}\text{to the reference}}}}
+ - \underbrace{(1-\lambda)\,H(R)}_{\mathclap{\substack{\text{constant across}\\\rule{0pt}{0.82em}\text{rollouts}}}}
+\end{aligned}r​=λoutcome log scorelogp(y)​​+(1−λ)expected log scoreunder the reference​Ev∼R​[logp(v)]​​=λlogp(y)−(1−λ)forward KLto the reference​KL(R∥p)​​−constant acrossrollouts​(1−λ)H(R)​​​
+
+Where ppp is the rollout’s forecast, yyy the resolved outcome, RRR the reference forecast and λ\lambdaλ the weight on the outcome.This expected score is just the negative forward KL from the reference to the model’s forecast, up to a constant shared by every rollout which drops out in the advantages.
+
+The reference forecast is used as an approximation to the optimal forecast given the information available to the model being trained. Using the expected log score under this reference as the reward reduces the stochasticity of a single question’s resolution and reflects only what the agent could have known. The tradeoff is a bias toward the frontier models’ errors. Mixing in the outcome log score keeps the reward anchored to real outcomes while preserving most of the reduction in stochasticity.
+
+Intelligent forecasting capabilities emerge through training
+
+We post-train on Tinker in several stages, at different reasoning efforts. We do asynchronous in-flight sampling for RL with StableReinforce — a Tinker method that keeps RL stable across long runs. We build on Inkling 2 Small because its base capabilities place it close to the forecasting Pareto frontier, it responds well [/news/inkling-2-small/#customizability] to fine-tuning, and trainer/sampler mismatch is low when served through Tinker. We keep the harness deliberately lightweight and non-prescriptive, so the agent learns its own strategies rather than following hardcoded ones.
+
+During training, the agent’s behavior evolves significantly (Figure 7).
+
+Research and modeling behaviors become more common through training. Share of forecasts showing each behavior from the start to the end of RL training.
+
+At low effort, the fine-tuned agent outperforms Inkling 2 Small Base’s forecasts at a lower cost by finding key pieces of information more efficiently. At high effort, the agent works more like a quantitative analyst: it researches exhaustively and writes code to analyze data before constructing its final distribution (Figure 8).
+
+The post-trained model does more efficient and deeper analysis. Cost and tokens of reasoning per forecast relative to Inkling 2 Small Base (effort 0.9), the share of forecasts that run 20 or more searches, and the share that run code in the Python sandbox two or more times, on training questions.
+
+Concretely, take one question: what would the Bank of Korea report as the August 2026 producer price index for coal and petroleum products? Base Inkling 2 Small made 25 tool calls and four code calls. It read the news, fit one straight line between the index and the oil price in won, and concluded the index would fall almost as fast as oil, submitting a median of 225. The fine-tuned Inkling 2 Small made 49 tool calls and nine code calls. It found that refinery price caps had been frozen and a fuel-tax cut ran to the end of July, then modeled the index month by month against Dubai crude and found that only about 0.38% of each 1% oil move reaches the index in the same month. It tested this against the 2022 oil crash, when the index fell 21% while oil fell 31%, and submitted a distribution with a median of 272, expecting a slow decline.
+
+Korea fuel price indexExeter council seatsKīlauea eruptions
+
+This pattern holds across forecasts, matching the trends shown in Figure 7. The base model reads a handful of news sources and sets its distribution by judgment. Mantic’s post-train grounds its forecast in data, builds explicit scenarios and models them in code where the question warrants it.
+
+Conclusion and next steps
+
+Our post-trained version of Inkling 2 Small extends the cost-accuracy frontier for forecasting, matching Fable 5.2 (medium) while being 15× cheaper per forecast. Achieving this result meant solving three problems that come with training an agentic forecaster end-to-end. First, public questions are scarce, so we generate our own, and test that improvements on these generalize to real questions. Second, live research APIs are too slow for RL at scale, so we serve point-in-time data from our own databases. And third, forecasting rewards are noisy, so we built a new reward function that includes a reference forecast.
+
+Looking ahead, we’re improving and scaling up our post-training stack: expanded forecasting-specific mid-training, novel approaches to long-horizon credit assignment, bigger datasets with sensible curricula, and scaled post-training compute. Our ambition is that every high-stakes decision, across the economy, will be better informed by large-scale AI forecasting.
+
+Citation
+
+Please cite this work as:
+
+Mantic in collaboration with Thinking Machines, "Training a Scalable Forecasting Agent",
+Thinking Machines Lab: News, Nov 2026.
+
+BibTeX:
+
+@article{mantic2026forecasting,
+ author = {{Mantic in collaboration with Thinking Machines}},
+ title = {Training a Scalable Forecasting Agent},
+ journal = {Thinking Machines Lab: News},
+ year = {2026},
+ note = {https://thinkingmachines.ai/news/training-a-scalable-forecasting-agent/}
+}
+
+prev [/news/inkling-2-mini/] back to top [#] 
+
+Models
+
+Inkling 2 Mini [/news/inkling-2-mini/]
+
+Inkling 2 Small [/news/inkling-2-small/]
+
+Inkling [/news/introducing-inkling/]
+
+Interaction [/blog/interaction-models/]
+
+Tinker
+
+Overview [/tinker/]
+
+Docs [https://tinker-docs.thinkingmachines.ai/tinker/]
+
+Status [https://status.thinkingmachines.ai/]
+
+Company
+
+About [/blog/the-future-worth-building-is-human/]
+
+Connectionism [/blog/]
+
+News [/news/]
+
+Careers [/careers/]
+
+Legal
+
+Terms of service [/legal/terms/]
+
+Privacy notice [/legal/privacy/]
+
+Security
+
+Disclosure policy [/security/disclosure-policy/]
+
+Connect
+
+X [https://x.com/thinkymachines]
+
+LinkedIn [https://www.linkedin.com/company/thinkingmachinesai/]
+
+YouTube [https://www.youtube.com/@thinkymachines]
+
+Thinking Machines Lab © 2026

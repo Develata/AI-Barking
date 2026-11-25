@@ -1,0 +1,97 @@
+https://platform.sand.ai/docs/get-started/
+Documentation navigation
+
+On this page
+
+Interface
+
+Production base URL
+
+Native API
+
+`https://api.sand.ai`
+
+Ark SDK (`base_url`)
+
+`https://api.sand.ai/compatible/ark/api/v3`
+
+## [Authentication](#authentication)
+
+Create a key in the [Open Platform Console](/app/keys/) and store it on your server as `SAND_API_KEY`. Authenticate API requests with a key from the organization that owns the resources.
+
+http
+
+```http
+Authorization: Bearer <API_KEY>
+```
+
+These examples use the native API. Use a model enabled for your organization, such as `magi-2`.
+
+## [Example 1. Generate a video from text](#example-1-generate-a-video-from-text)
+
+Send a single text prompt in `parts` to generate a five-second landscape video.
+
+bash
+
+```bash
+curl -sS "https://api.sand.ai/v2/generations" \
+  -H "Authorization: Bearer $SAND_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary '{
+    "model": "magi-2",
+    "parts": [{"type": "text", "text": "At dawn, waves break gently against the rocks as the camera slowly moves forward."}],
+    "duration": 5,
+    "aspectRatio": "16:9"
+  }'
+```
+
+## [Example 2. Generate a video with a local reference image](#example-2-generate-a-video-with-a-local-reference-image)
+
+**1\. Upload the reference image.** Replace `./reference.png` with your image path. A successful upload returns HTTP 200 and a numeric `id`. This command uses Python 3 to preserve the full integer and stores it in `ASSET_ID`.
+
+bash
+
+```bash
+ASSET_ID=$(
+  curl -fsS "https://api.sand.ai/v1/assets" \
+    -H "Authorization: Bearer $SAND_API_KEY" \
+    -F "file=@./reference.png" |
+  python3 -c 'import json, sys; print(json.load(sys.stdin)["id"])'
+)
+```
+
+**2\. Create the generation.** Run this request in the same shell. Include both the prompt and a `reference_image` item in `parts`. Pass the uploaded asset ID to `image.assetId` as a decimal string.
+
+bash
+
+```bash
+curl -sS "https://api.sand.ai/v2/generations" \
+  -H "Authorization: Bearer $SAND_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @- <<JSON
+{
+  "model": "magi-2",
+  "parts": [
+    {"type": "text", "text": "Keep the coastline and composition of the reference image and animate the waves gently."},
+    {"type": "reference_image", "image": {"assetId": "${ASSET_ID:?}"}}
+  ],
+  "duration": 5,
+  "aspectRatio": "16:9"
+}
+JSON
+```
+
+## [Retrieve the generation and download the video](#retrieve-the-generation-and-download-the-video)
+
+Both creation requests return HTTP 202 and a generation ID, for example `{"id":"987654321"}`. Replace `987654321` below with the **generation ID** returned by your request.
+
+bash
+
+```bash
+curl -sS "https://api.sand.ai/v2/generations/987654321" \
+  -H "Authorization: Bearer $SAND_API_KEY"
+```
+
+For one generation, poll every 10 seconds. For multiple generations, stagger the requests as described in [Rate limits, polling and retries](/docs/limits/#concurrency-and-polling). On `succeeded`, download the video from `output.videoUrl` without sending your API key. Stop polling on `failed` or `canceled`. For failures, inspect `error`.
+
+For an Ark SDK example, see [Volcengine Ark compatibility](/docs/ark-generations/).
