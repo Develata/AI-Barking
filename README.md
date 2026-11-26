@@ -74,6 +74,7 @@ AI 吠点是由 **[Develata](https://github.com/Develata)** 主理的独立内�
 | 2026 / 1122 | [1700万行代码证黎曼猜想，百万奖还没发](docs/2611/1122/doc_1122_publish.txt) | [配图说明](docs/2611/1122/images/README.md) | [来源入口](docs/2611/1122/sources/README.md) |
 | 2026 / 1123 | [7万行AI证明，没有数学家查过](docs/2611/1123/doc_1123_publish.txt) | [配图说明](docs/2611/1123/images/README.md) | [来源入口](docs/2611/1123/sources/README.md) |
 | 2026 / 1124 | [多家媒体称视频AI全球第一，换榜排第7](docs/2611/1124/doc_1124_publish.txt) | [配图说明](docs/2611/1124/images/README.md) | [来源入口](docs/2611/1124/sources/README.md) |
+| 2026 / 1125 | [额度更快用完？OpenAI：上周少扣了](docs/2611/1125/doc_1125_publish.txt) | [配图说明](docs/2611/1125/images/README.md) | [来源入口](docs/2611/1125/sources/README.md) |
 
 正文采用可直接复制的纯文本，图片单独保存。阅读或发布时不需要依赖 Markdown 插图。
 

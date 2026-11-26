@@ -73,11 +73,6 @@
 
 | 期次 | 标签 | 事实 |
 |---|---|---|
-| 1122 | 智谱 | 智谱 GLM-5.4 先向编程套餐用户开放，官方称智能达到2-3T级模型 |
-| 1122 | OpenAI | OpenAI 首席科学家提议按困惑度等设上限、监控能力达标前不越过，未给数值 |
-| 1122 | Claude | 11月23日17:39至17:56，多款 Claude 模型报错率升高 |
-| 1122 | ChatGPT | 付费版 ChatGPT 的 GPT-6 对话间歇报错，24日0:38宣布恢复 |
-| 1122 | P vs NP | AI 智能体集体攻 P vs NP：网站称0时已查738个引理，结论未定 |
 | 1123 | 安全 | OpenAI、思科开源 Shirudo：Linux 上自测不重启拦下攻击，预发布 |
 | 1123 | Claude | Claude 插件页：卸载带连接器的插件不会断开连接器，须另行断开 |
 | 1123 | 代码审查 | Anthropic：Claude Ship 代码审查正式可用，另两个代理为测试版 |
@@ -90,6 +85,11 @@
 | 1124 | 世界模型 | 高德开源 ABot-World 小版，称单卡 RTX-5090 每秒21帧 |
 | 1124 | 翻译 | 腾讯开源 Hy-MT3 翻译模型，支持语种由38种增至102种 |
 | 1124 | 预测 | Mantic 称200道数值题自测，预测智能体得分约同中档 Fable-5.2 |
+| 1125 | 观点 | 学者 Aaronson 撰文称，首次打心底觉得 P≠NP 的证明不远了 |
+| 1125 | 数学 | OpenAI 内部模型写的手稿称推翻多项式 Hirsch 猜想 |
+| 1125 | 工程 | Anthropic 称把 API 从 Python 迁到 Rust，没停过服务 |
+| 1125 | 隐私 | OpenAI 称一小批客户在测 Private Inference（Alpha） |
+| 1125 | 购物 | 据《财富》报道，亚马逊与 Meta 在谈让 Muse 购物代理接入亚马逊 |
 
 ## 已发过
 
@@ -157,3 +157,4 @@
 | 1122 | 1700万行代码证黎曼猜想，百万奖还没发：【跟进1120】Lean FRO 与 Mathlib Initiative 联合声明（页面 2026-11-21 13:55 UTC）“hereby certify”黎曼猜想命题与 Alpöge 约1700万行 Lean 证明都正确；MIT Sutherland 复核页（11-23 14:35 UTC）记 Lean 默认内核 11-22 18:44 UTC 整份接受（单线程48小时），默认参数 paranoid 内核与 lake comparator 仍在跑；吠点：认证的是机器证明每步查过、证的是 Mathlib 里的 RH，声明末句“help explain the new ideas”；新周刊稿题“悬赏百万美元的难题先被AI破解”，Clay 规则须合格期刊发表满两年并获普遍接受才考虑，RH 页仍标“Active”（庞加莱为“Solved”）。声明署名 11-23 由“Lean and Mathlib communities, endorsed by …”改为两家机构（PR #154，未进正文）。MiniMax 内部模型 MIM 密码分析（博客 11-20 14:41 北京）：称对 NIST 往届候选做出实用破解、TII McEliece 挑战首解55个，末尾写“does not affect deployed cryptographic standards”；吠点：新智元稿题“中国AI刷爆全球纪录！比Claude快四万倍”、正文“比 Anthropic 的多GPU集群快了 43400 倍”，MiniMax 博客亦写 multi-GPU，但其论文写 43,400× 只是 TII-253 一题：Anthropic 的 Weis 用32线程 CPU 跑21.7小时、MiniMax 64核 1.80秒（对 GPU 纪录同题28,000×）；新智元写 ARADI“全面刷新理论攻击纪录”，README 写理论攻击到12轮、实用到8轮、完整16轮“remains unbroken”；“破解 NIST 候选”多条是参考实现漏洞（DRS 把 && 误写成 &），方案均已落选；风控：标题封面不写比 Claude 快。11-24 00:11 MiniMax 改 Blender 论文、00:22 回复并关闭两条 issue（未进正文） |
 | 1123 | 7万行AI证明，没有数学家查过：【VP≠VNP】Anthropic 在 anthropics/formal-math 公开署名“Claude (Anthropic)”的论文《VP ≠ VNP over every field》（70页）与约7.3万行 Lean（72,932 行，提交北京 11/24 04:04），称由内部研究用 Claude 模型发现；README 写“Both were written by AI models, and no human mathematician has checked the proof”“This does not settle P vs NP”；OpenAI 随后（提交时间晚约5小时）在 openai/math 公开同题《VP and VNP are different》（border 版下界，history 称 11/6 得出），两家互不引用；吠点：新智元稿题“Claude证出「代数版P≠NP」”，论文摘要写是 P≠NP 的代数类比但“does not settle that conjecture”、不适用于布尔电路；华尔街见闻稿题“全篇Lean机器验证通过”，Lean 只保证推导，命题是否写对论文附录 Q.1 写“judged only by AI readers”。【NariQ】Nari Labs（11/20）把 Qwen3.8-27B 量化为 3/2.5/2 比特 GGUF（3比特 10.1GB，原版 53.8GB），称长程代理、数学、看图与原版持平（作者自测）；对你：要自己部署，AMD/Intel 不支持，M3-Pro 3比特约3.8 tok/s；吠点：掘金速递“可直接对接llama.cpp等主流推理框架”，模型卡写原版 llama.cpp、Ollama、LM Studio 都加载不了、须用作者 fork；掘金写“消费级显卡甚至部分笔记本”，模型卡写 GeForce 未测，fork README 只记一张 RTX-5060-Ti 跑过、not qualified（尚未完成资格验证）。读者稿检查后删去“2.5比特档五项四项低于原版”一条 |
 | 1124 | 多家媒体称视频AI全球第一，换榜排第7：【MAGI-2】Sand.ai 北京11/25凌晨发布视频模型 MAGI-2，新浪财经等稿题“AA榜全球第一”；Artificial Analysis 视频榜（北京11/26凌晨读）MAGI-2 只在图生视频带音频、无音频两张榜第一，文生视频无音频第2、带音频暂列第7（1150，与第8、9名同分），AA 标“Provisional result”；图生带音频 1163 对 Seedance 2.5 1158，误差均±14，名次区间都是1–3；官方博客只报四项任务平均 Elo 1150.3；官网列 VidMuse，发布帖写 Higgsfield 独家，官方接口0.08美元/秒、暂不支持充值；“0.5元/秒、Seedance 1/10”只见媒体稿，未进正文。【Copilot 论文】arXiv 2611.31083（MIT Raymond、微软研究院 Dillon，北京11/24凌晨，预印本）用 GitHub 采购记录配 Revelio 招聘数据看5414家大企业，以既定合同审查时点为工具变量：提前采用者季度技术岗招聘降29%（95%区间约−61%到+9%）、初级软件工程师约40%（约−72%到+1%），均为按第一阶段放大的 Wald 估计；同口径简约式初级软件岗季度约−10%显著，月度技术岗−7.6%显著，季度技术岗简约式不显著；离职无明显增加；样本企业2022→2024年季度技术岗招聘总共降29%（55.3→39.2），论文三种假设下 Copilot 占10%、19%或51%；中文聚合稿题“Copilot使初级工程师招聘降约40%”；作者称小公司可能反应不同 |
+| 1125 | 额度更快用完？OpenAI：上周少扣了：OpenAI 员工 Tibo（北京11/26 10:50）称 GPT-6.2 上线时计费出错、多数用户的 Astra 与 Sol 额度被少扣，修正后同样的活“Comparing to last week”Astra 快40%、Sol 快25%用到上限，仍应（should）比 GPT-6-Astra、GPT-6.1-Sol 耐用，其他模型不受影响，过去少扣的不追缴；吠点：智东西稿题“额度爆砍接近一半？”，原帖没给额度绝对数，按两种读法上周10件活的额度现约6到7件；基线是上周少扣时、“仍比上一代耐用”无数字，套餐页 Plus 每5小时估计（GPT-6.2 Astra 6–50 条）11/18 与 11/26 存档相同；TechCrunch 11/25 稿讲 Chat 与 Work 合并、与计费修正无关。【跟进1122】黎曼证明短版：Anthropic 的 Luke Sernau（北京11/26 04:42 建仓 lsernau/grh-lean）公开 Claude 重写的 RH/GRH Lean 证明，紧凑版约7.6万行、可读版约30万行，README“shorter rewriting … many steps are proved by other arguments”“written by Claude (AI)”“passed machine checks only … No mathematician has read it through”，MIT Sutherland 复核两版编译、公理与命题一致；吠点：量子位稿题“暴砍了99.5%”是重写版对原版（分子代码行、分母总行），社区在原版上删了五天多有效代码只从约1462万行到约1100万行；rh-shrink“只剩2.0%”是社区仓库 main 11/26 06:24 整个换成可读版。扫描错误：Hirsch 的“HN 494”是 Google Cogentic 帖、Aaronson 博文被扫描按自家台账排除。 |
