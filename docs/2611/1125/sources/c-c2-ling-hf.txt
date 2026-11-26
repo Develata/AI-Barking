@@ -1,0 +1,332 @@
+inclusionAI/Ling-3.2-air · Hugging Face
+
+ Hugging Face [/] 
+ Search models, datasets, users... Ctrl K
+
+ Models [/models]
+
+ Datasets [/datasets]
+
+ Spaces [/spaces]
+
+ Buckets [/storage]
+
+ Docs [/docs]
+
+ Enterprise [/enterprise]
+
+Pricing [/pricing]
+
+ More 
+
+Website
+
+ Tasks [/tasks] 
+
+ HuggingChat [/chat] 
+
+ Collections [/collections] 
+
+ Languages [/languages] 
+
+ Organizations [/organizations] 
+
+Community
+
+ Blog [/blog] 
+
+ Posts [/posts] 
+
+ Daily Papers [/papers] 
+
+ Hardware [/hardware] 
+
+ Learn [/learn] 
+
+ Discord [/join/discord] 
+
+ Forum [https://discuss.huggingface.co/] 
+
+ GitHub [https://github.com/huggingface] 
+
+Solutions
+
+ Team & Enterprise [/enterprise] 
+
+ Hugging Face PRO [/pro] 
+
+ Enterprise Support [/support] 
+
+ Inference Providers [/inference/models] 
+
+ Inference Endpoints [/inference-endpoints] 
+
+ Storage Buckets [/storage] 
+
+Log In [/login]
+
+Sign Up [/join]
+
+ [/inclusionAI] 
+ inclusionAI [/inclusionAI] 
+/
+
+Ling-3.2-air [/inclusionAI/Ling-3.2-air] 
+
+ Like 242
+
+Follow
+ inclusionAI 4.1k
+
+ Safetensors 
+ [/models?library=safetensors]
+ bailing_moe_v3_vl 
+ [/models?other=bailing_moe_v3_vl]
+ custom_code 
+ [/models?other=custom_code]
+ Eval Results 
+ [/models?other=eval-results]
+ fp8 
+ [/models?other=fp8]
+
+ License: mit 
+
+ Model card [/inclusionAI/Ling-3.2-air] Files Files and versions 
+ xet
+ [/inclusionAI/Ling-3.2-air/tree/main] Community 
+10
+ [/inclusionAI/Ling-3.2-air/discussions]
+
+ More actions 
+
+ Copy to bucket 
+
+Introduction [#introduction] 
+
+Model Overview [#model-overview] 
+
+Quickstart [#quickstart] 
+
+SGLang (Recommended) [#sglang-recommended] 
+
+Run Inference [#run-inference]
+
+vLLM [#vllm] 
+
+Environment Preparation [#environment-preparation]
+
+Run Inference [#run-inference-1]
+
+🤗 Hugging Face [https://huggingface.co/inclusionAI] | 🤖 ModelScope [https://www.modelscope.cn/models/inclusionAI/Ling-3.2-air]
+
+ [#introduction]
+
+ Introduction
+
+We introduce Ling-3.2-air, an open-weight model that shares the same native multimodal architecture as Ling-3.0-flash-VL [https://huggingface.co/inclusionAI/Ling-3.0-flash-VL]. Compared with its predecessor, Ling-3.2-air shows stronger performance in workflow automation and reasoning over professional documents. Its AutomationBench-AA score rises from 15.7% to 61%, while its GDP.pdf all-pass rate increases from 8.4% to 16%. On AA-Briefcase v1.1, its Elo rating rises from 987 to 1340, a gain of 353 points. On Terminal-Bench 4.0, its pass rate on terminal-based tasks rises from 0% to 27%. Overall, Ling-3.2-air scores 23 on the Artificial Analysis Intelligence Index v5.0.1.
+
+Specialized evaluations highlight Ling-3.2-air’s performance in quantitative data analysis and legal work. On Harvey LAB-AA v1.1, it earns an 87.7% criterion pass rate. Its all-pass rate is 8.3% before the material hallucination check and 0.8% after it.
+
+ [#model-overview]
+
+ Model Overview
+
+The model summary information and architecture diagram are as follows:
+
+ArchitectureHybrid-linear MoE
+
+Parameter ScaleTotal 124B, Activated 5.5B
+
+Transformer Layers35 KDA + 7 Gated MLA (5:1)
+
+Number of Dense Layers2
+
+Number of Routed Experts512
+
+Number of Shared Experts1
+
+Number of Activated Experts8
+
+Attention Heads32
+
+Hidden Size2560
+
+Expert Intermediate Size768
+
+Dense Intermediate Size6144
+
+Vocabulary Size157184
+
+ [#quickstart]
+
+ Quickstart
+
+ [#sglang-recommended]
+
+ SGLang (Recommended)
+
+The day-0 SGLang image includes Ling-3.2-air support, MTP (NEXTN) speculative decoding, and Hopper decode optimizations:
+
+docker pull lmsysorg/sglang:dev-Ling-3.0-flash-VL
+
+ [#run-inference]
+
+ Run Inference
+
+Recommended recipe with 256K context, on 4× 141GB-class GPUs (H20-3e / H200) or 4-GPU Blackwell nodes (B300 / GB300):
+
+docker run --rm --gpus all --ipc=host --shm-size 32g \
+ -p 30000:30000 \
+ lmsysorg/sglang:dev-Ling-3.0-flash-VL \
+ python3 -m sglang.launch_server \
+ --model-path inclusionAI/Ling-3.2-air \
+ --tp 4 \
+ --context-length 262144 \
+ --speculative-algorithm NEXTN \
+ --trust-remote-code \
+ --reasoning-parser auto \
+ --tool-call-parser auto \
+ --host 0.0.0.0 \
+ --port 30000
+
+On 80GB cards (H100 / H800), scale out to --tp 8. The reasoning and tool-call parsers resolve automatically to ling3 from the chat template; you can also set them explicitly with --reasoning-parser ling3 --tool-call-parser ling3.
+
+Client
+
+It is recommended to use the sampling parameters (temperature=1.0, top_p=0.95, top_k=20) and set enable_thinking to true for better performance.
+
+curl -s http://localhost:30000/v1/chat/completions \
+ -H "Content-Type: application/json" \
+ -d '{
+ "model": "inclusionAI/Ling-3.2-air",
+ "messages": [{
+ "role": "user",
+ "content": [
+ {"type": "image_url", "image_url": {"url": "https://example.com/image.png"}},
+ {"type": "text", "text": "Describe this image in one sentence."}
+ ]
+ }],
+ "chat_template_kwargs": {"enable_thinking": true},
+ "stream": true,
+ "temperature": 1.0,
+ "top_k": 20,
+ "top_p": 0.95
+ }'
+
+Video input uses {"type": "video_url", "video_url": {"url": "..."}} in the same message shape.
+
+ [#vllm]
+
+ vLLM
+
+ [#environment-preparation]
+
+ Environment Preparation
+
+pip install uv
+
+uv venv ~/my_ling_env
+
+source ~/my_ling_env/bin/activate
+
+git clone https://github.com/inclusionAI/vllm-ling-v3.git
+
+cd vllm-ling-v3
+
+VLLM_USE_PRECOMPILED=1 uv pip install --editable . --torch-backend=auto
+
+ [#run-inference-1]
+
+ Run Inference
+
+Server
+
+vllm serve "$MODEL_PATH" \
+ --port "$PORT" \
+ --trust-remote-code \
+ --served-model-name auto \
+ --tensor-parallel-size 4 \
+ --gpu-memory-utilization 0.85 \
+ --enable-prefix-caching \
+ --mamba-cache-mode align \
+ --enable-auto-tool-choice \
+ --tool-call-parser ling3 \
+ --reasoning-parser ling3 \
+ --speculative-config '{"method":"mtp","num_speculative_tokens":3}'
+
+Client
+
+It is recommended to use the sampling parameters (temperature=1.0, top_p=0.95, top_k=20) and set enable_thinking to true for better performance.
+
+curl -s http://${MASTER_IP}:${PORT}/v1/chat/completions \
+ -H "Content-Type: application/json" \
+ -d '{
+ "model": "auto",
+ "messages": [{
+ "role": "user",
+ "content": [
+ {"type": "image_url", "image_url": {"url": "https://example.com/image.png"}},
+ {"type": "text", "text": "Describe this image in one sentence."}
+ ]
+ }],
+ "chat_template_kwargs": {"enable_thinking": true},
+ "stream": true,
+ "temperature": 1.0,
+ "top_k": 20,
+ "top_p": 0.95
+ }'
+
+Downloads last month
+
+1,467
+
+Safetensors [https://huggingface.co/docs/safetensors]
+
+Model size
+
+128B params
+
+Tensor type
+
+BF16 
+·
+F32 
+·
+F8_E4M3 
+·
+
+Chat template
+
+Files info
+
+ Inference Providers NEW [https://huggingface.co/docs/inference-providers]
+
+This model isn't deployed by any Inference Provider. 🙋 6 Ask for provider support [/spaces/huggingface/InferenceSupport/discussions/13729]
+
+ Model tree for inclusionAI/Ling-3.2-air [/docs/hub/model-cards#specifying-a-base-model]
+
+Quantizations
+
+ 22 models [/models?other=base_model:quantized:inclusionAI/Ling-3.2-air]
+
+ Collection including inclusionAI/Ling-3.2-air
+
+Ling 3.2
+
+ Collection
+
+ 1 item • Updated 3 days ago • 12
+ [/collections/inclusionAI/ling-32]
+
+ Evaluation results [https://huggingface.co/docs/hub/eval-results] 
+
+harborframework/terminal-bench [/datasets/harborframework/terminal-bench] · Terminalbench 4 View evaluation results [/inclusionAI/Ling-3.2-air/discussions/6] leaderboard [/datasets/harborframework/terminal-bench?eval_result=inclusionAI/Ling-3.2-air&leaderboard_task_id=terminalbench_4] 
+
+ [/datasets/harborframework/terminal-bench?eval_result=inclusionAI%2FLing-3.2-air&leaderboard_task_id=terminalbench_4&leaderboard_max_params=128B] 27
+
+ System theme 
+
+Company
+ TOS [/terms-of-service] Privacy [/privacy] About [/huggingface] Careers [https://apply.workable.com/huggingface/] [/] 
+Website
+ Models [/models] Datasets [/datasets] Spaces [/spaces] Pricing [/pricing] Docs [/docs]

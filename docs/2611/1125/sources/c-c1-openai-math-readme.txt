@@ -1,0 +1,438 @@
+GitHub - openai/math · GitHub
+
+ Skip to content [#start-of-content]
+
+Navigation Menu
+
+ [/]
+
+Sign in [/login?return_to=https%3A%2F%2Fgithub.com%2Fopenai%2Fmath]
+
+Products
+
+Platform
+
+GitHubRepository hosting, code review, and collaboration [https://github.com/platform]
+
+CopilotAI coding agent for tasks, projects, and automated work [https://github.com/features/copilot]
+
+Build & Ship
+
+ActionsCI/CD and automation [https://github.com/features/actions]
+
+Code QualityQuality analysis, fixes, and enforcement [https://github.com/features/code-quality]
+
+CodespacesCloud development environments [https://github.com/features/codespaces]
+
+Secure
+
+Code SecurityVulnerability detection and remediation [https://github.com/security/advanced-security/code-security]
+
+Secret ProtectionSecret scanning and leak prevention [https://github.com/security/advanced-security/secret-protection]
+
+All Features [https://github.com/features]
+
+Developers
+
+Learn
+
+Documentation [https://docs.github.com/en]
+
+Training [https://learn.github.com/skills]
+
+Certifications [https://learn.github.com/credentials]
+
+Build
+
+Build with Copilot [https://github.com/features/ai]
+
+Customize Copilot [https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-copilot-overview]
+
+Integrations [https://github.com/marketplace]
+
+Explore
+
+Trending repos [https://github.com/trending]
+
+GitHub Sponsors [https://github.com/open-source/sponsors]
+
+Developer articles [https://github.com/resources/articles]
+
+Changelog
+
+ChangelogYour source for the latest features, improvements, and fixes across GitHub products, all in one place. [https://github.blog/changelog/]
+
+Businesses
+
+By Stage
+
+Enterprises [https://github.com/enterprise]
+
+Team [https://github.com/team]
+
+Startups [https://github.com/enterprise/startups]
+
+Nonprofits [https://github.com/solutions/industry/nonprofits]
+
+By Industry
+
+Healthcare [https://github.com/solutions/industry/healthcare]
+
+Financial services [https://github.com/solutions/industry/financial-services]
+
+Manufacturing [https://github.com/solutions/industry/manufacturing]
+
+Government [https://github.com/solutions/industry/government]
+
+See all industries [https://github.com/solutions/industry]
+
+Evaluate GitHub
+
+Why GitHub [https://github.com/why-github]
+
+Customer Stories [https://github.com/customer-stories]
+
+Business insights [https://github.com/solutions/executive-insights]
+
+Trust Center [https://github.com/trust-center]
+
+Add-ons
+
+GitHub Advanced SecurityEnterprise-grade code security [https://github.com/security/advanced-security]
+
+Copilot for businessEnterprise-grade AI features [https://github.com/features/copilot/copilot-business]
+
+Premium SupportEnterprise-grade 24/7 support [https://github.com/enterprise/premium-support]
+
+Resources
+
+Learn & Connect
+
+Documentation [https://docs.github.com/en]
+
+Resource center [https://github.com/resources]
+
+Blog [https://github.blog/]
+
+Events & webinars [https://github.com/resources/events]
+
+Community Forum [https://github.com/orgs/community/discussions]
+
+Customer Stories [https://github.com/customer-stories]
+
+Integrations [https://github.com/marketplace]
+
+Support
+
+Customer support [https://help.github.com/]
+
+Training [https://learn.github.com/skills]
+
+GitHub Status [https://www.githubstatus.com/]
+
+Company
+
+About [https://github.com/about]
+
+Partners [https://github.com/partners]
+
+Changelog [https://github.blog/changelog/]
+
+GitHub Universe
+
+GitHub UniverseThe event for developers, by developers — talks, workshops, and what’s next for GitHub. [https://githubuniverse.com/]
+
+Pricing [https://github.com/pricing]
+
+Search/
+
+Sign in [/login?return_to=https%3A%2F%2Fgithub.com%2Fopenai%2Fmath]
+Sign up [/signup?ref_cta=Sign+up&ref_loc=header+logged+out&ref_page=%2F%3Cuser-name%3E%2F%3Crepo-name%3E&source=header-repo&source_repo=openai%2Fmath]
+Appearance settings
+
+ You signed in with another tab or window. Reload to refresh your session.
+ You signed out in another tab or window. Reload to refresh your session.
+ You switched accounts on another tab or window. Reload to refresh your session.
+
+Dismiss alert
+
+{{ message }}
+
+openai [/openai]
+
+math [/openai/math]
+
+Repository navigation
+
+Code [/openai/math]
+
+Pull requests [/openai/math/pulls]
+Only collaborators can create PRs
+Actions [/openai/math/actions]
+
+Security and quality [/openai/math/security]
+
+Insights [/openai/math/insights]
+
+More items
+
+ [/openai/math] 
+
+math [/openai/math]
+Public
+
+Notifications [/login?return_to=%2Fopenai%2Fmath]You must be signed in to change notification settings
+
+Fork2k (2k) [/login?return_to=%2Fopenai%2Fmath]
+
+Star18.5k (18.5k) [/login?return_to=%2Fopenai%2Fmath]You must be signed in to star a repository
+
+About
+
+No description, website, or topics provided.
+
+Resources
+
+Readme [#readme-ov-file]
+
+Apache-2.0 license [#Apache-2.0-1-ov-file]
+
+Activity [/openai/math/activity]
+
+Custom properties [/openai/math/custom-properties]
+
+Stars
+
+18.5k stars
+
+Watchers
+
+512 watching
+
+Forks
+
+2.0k forks [/openai/math/forks]
+
+Report repository [/contact/report-content?content_url=https%3A%2F%2Fgithub.com%2Fopenai%2Fmath&report=openai+%28user%29]
+
+main
+
+Branches [/openai/math/branches]Tags [/openai/math/tags]
+
+ [/openai/math/branches] [/openai/math/tags]
+
+Go to file
+
+Code
+Open more actions menu
+
+Latest commit
+
+History
+13 Commits [/openai/math/commits/main/]
+
+ [/openai/math/commits/main/]13 Commits
+
+Folders and files
+
+NameName
+Last commit message
+
+Last commit date
+
+.github/workflows [/openai/math/tree/main/.github/workflows]
+
+.github/workflows [/openai/math/tree/main/.github/workflows]
+
+lean [/openai/math/tree/main/lean]
+
+lean [/openai/math/tree/main/lean]
+
+preprints [/openai/math/tree/main/preprints]
+
+preprints [/openai/math/tree/main/preprints]
+
+reasoning_traces [/openai/math/tree/main/reasoning_traces]
+
+reasoning_traces [/openai/math/tree/main/reasoning_traces]
+
+CONTENTS.md [/openai/math/blob/main/CONTENTS.md]
+
+CONTENTS.md [/openai/math/blob/main/CONTENTS.md]
+
+LICENSE [/openai/math/blob/main/LICENSE]
+
+LICENSE [/openai/math/blob/main/LICENSE]
+
+README.md [/openai/math/blob/main/README.md]
+
+README.md [/openai/math/blob/main/README.md]
+
+history.md [/openai/math/blob/main/history.md]
+
+history.md [/openai/math/blob/main/history.md]
+
+overview.pdf [/openai/math/blob/main/overview.pdf]
+
+overview.pdf [/openai/math/blob/main/overview.pdf]
+
+overview.tex [/openai/math/blob/main/overview.tex]
+
+overview.tex [/openai/math/blob/main/overview.tex]
+
+View all files
+
+Repository files navigation
+
+README [#]
+
+Apache-2.0 license [#]
+
+More items
+
+Readme
+ [#readme]
+
+This repository contains mathematical manuscripts and supporting proof artifacts produced by an unnamed internal OpenAI model.
+
+As part of model development, we evaluate our models on open research problems. We expanded these evaluations after performance on our existing mathematical evaluations saturated. Some outputs build upon earlier results produced by the models.
+
+This collection includes results at different stages of verification. Not all have accompanying Lean formalizations. We will continue to update this repository with Lean formalizations as we obtain them.
+
+Some of the unformalized results could have issues. We will endeavor to fix any such issues quickly.
+We are also exploring community-hosted repositories for these materials.
+
+In our view, these manuscripts are best understood as a form of raw research data, rather than polished academic papers. We defer to the math community completely on matters of credit, precedence, and concurrent work.
+
+Navigating the collection
+ [#navigating-the-collection]
+
+The current catalogue contains 730 manuscripts organized into 375 families. A family groups related papers, which may include a principal result, companion arguments, consequences, or alternative proofs. Each family is classified by mathematical discipline.
+
+Start with the overview [/openai/math/blob/main/overview.pdf] for descriptions of the families.
+
+Use the manuscript map [/openai/math/blob/main/CONTENTS.md] to find individual papers and their supporting materials.
+
+The preprints/ [/openai/math/blob/main/preprints] directory contains PDFs, source files, and manuscript-specific citation and build instructions.
+
+The Lean library [/openai/math/blob/main/lean/README.md] and formalization catalogue [/openai/math/blob/main/lean/formalization.yaml] describe the available formal proofs, their associated papers, and verification configurations. See the Comparator instructions [/openai/math/blob/main/lean/ComparatorChallenges/README.md] for additional checking instructions. The repository has ~42% top-line results formalized.
+
+Updates to the repo are described in the history [/openai/math/blob/main/history.md].
+
+Reasoning summaries
+ [#reasoning-summaries]
+
+We are also releasing abridged summaries of the model's reasoning, covering the following results:
+
+Family
+Subject
+
+007
+Ordinary two-point correlations of multiplicative functions [/openai/math/blob/main/reasoning_traces/ordinary-two-point-correlations.pdf]
+
+017
+The irrationality exponent of π [/openai/math/blob/main/reasoning_traces/irrationality-exponent-of-pi.pdf]
+
+087
+Symmetric and general Mahler conjectures [/openai/math/blob/main/reasoning_traces/symmetric-and-general-mahler-conjectures.pdf]
+
+102
+Ordinary NP-hardness at the basic semidefinite threshold [/openai/math/blob/main/reasoning_traces/basic-semidefinite-threshold-np-hardness.pdf]
+
+159
+Quasipolynomial bounds for arithmetic progressions [/openai/math/blob/main/reasoning_traces/quasipolynomial-arithmetic-progressions.pdf]
+
+197
+Kaplansky's direct-finiteness conjecture in characteristic two [/openai/math/blob/main/reasoning_traces/kaplansky-direct-finiteness-characteristic-two.pdf]
+
+221
+The Mézard–Parisi formula for diluted spin glasses [/openai/math/blob/main/reasoning_traces/mezard-parisi-formula.pdf]
+
+271
+Spontaneous magnetization in the quantum Heisenberg ferromagnet [/openai/math/blob/main/reasoning_traces/spontaneous-magnetization-quantum-heisenberg-ferromagnet.pdf]
+
+287
+Isomorphism of free group factors [/openai/math/blob/main/reasoning_traces/free-group-factor-isomorphism.pdf]
+
+362
+The three-dimensional relativistic Vlasov–Maxwell system [/openai/math/blob/main/reasoning_traces/relativistic-vlasov-maxwell.pdf]
+
+How the results were produced
+ [#how-the-results-were-produced]
+
+The vast majority of results were obtained with the same procedure using an unreleased internal OpenAI model. On average, each result used three hours of ChatGPT Pro thinking compute with that model. Over the course of the evaluation, the model was posed approximately 4,000 problems. Aggregating the output into result families and manuscripts and requiring an appropriate level of significance led to the catalog outlined above.
+
+Exceptions to this fixed procedure include work on a zero-free region for the Riemann zeta function and proof of the Hodge Conjecture for CM abelian varieties. Additionally, the writeup for the Re(s) > 11/12 zero-free region for the Riemann zeta function was human edited for readability.
+
+Versions and citations
+ [#versions-and-citations]
+
+We will preserve the public release history of this collection. Corrections and revisions will be recorded as new versions, with previously released versions remaining accessible.
+
+To cite the individual manuscript, use the BibTeX block in its directory.
+
+About
+
+No description, website, or topics provided.
+
+Resources
+
+Readme [#readme-ov-file]
+
+Apache-2.0 license [#Apache-2.0-1-ov-file]
+
+Activity [/openai/math/activity]
+
+Custom properties [/openai/math/custom-properties]
+
+Stars
+
+18.5k stars
+
+Watchers
+
+512 watching
+
+Forks
+
+2.0k forks [/openai/math/forks]
+
+Report repository [/contact/report-content?content_url=https%3A%2F%2Fgithub.com%2Fopenai%2Fmath&report=openai+%28user%29]
+
+Releases
+
+Packages
+
+Used by
+
+Contributors
+
+Languages
+
+Footer
+
+ [https://github.com]
+
+ © 2026 GitHub, Inc.
+
+Footer navigation
+
+ Terms [https://docs.github.com/site-policy/github-terms/github-terms-of-service]
+
+ Privacy [https://docs.github.com/site-policy/privacy-policies/github-privacy-statement]
+
+ Security [https://github.com/security]
+
+ Status [https://www.githubstatus.com/]
+
+ Community [https://github.community/]
+
+ Docs [https://docs.github.com/]
+
+ Contact [https://support.github.com?tags=dotcom-footer]
+
+ Manage cookies
+
+ Do not share my personal information
+
+ You can’t perform that action at this time.

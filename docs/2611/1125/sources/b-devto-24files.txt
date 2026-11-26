@@ -1,0 +1,496 @@
+GRH proof's geometry is `fun _ _ _ => True`, in 24 files - DEV Community
+
+ Skip to content [#main-content]
+
+ [/]
+
+ Powered by Algolia
+
+ [https://www.algolia.com/developers/?utm_source=devto&utm_medium=referral]
+
+ Log in
+ [/enter?signup_subforem=1]
+
+ Create account
+ [/enter?signup_subforem=1&state=new-user]
+
+DEV Community
+
+ Add reaction
+
+ Like
+
+ Unicorn
+
+ Exploding Head
+
+ Raised Hands
+
+ Fire
+
+ Jump to Comments
+
+ Save
+
+ Boost
+
+Pick as gem
+
+ Copy link
+
+Copied to Clipboard
+
+ Share to X
+ [https://twitter.com/intent/tweet?text=%22GRH%20proof%27s%20geometry%20is%20%60fun%20_%20_%20_%20%3D%3E%20True%60%2C%20in%2024%20files%22%20by%20frank%20chu%20%23DEVCommunity%20https%3A%2F%2Fdev.to%2Ffrankchu%2Fgrh-proofs-geometry-is-fun-true-in-24-files-2n2b]
+
+ Share to LinkedIn
+ [https://www.linkedin.com/shareArticle?mini=true&url=https%3A%2F%2Fdev.to%2Ffrankchu%2Fgrh-proofs-geometry-is-fun-true-in-24-files-2n2b&title=GRH%20proof%27s%20geometry%20is%20%60fun%20_%20_%20_%20%3D%3E%20True%60%2C%20in%2024%20files&summary=The%20Lean%20community%20certified%20the%20GRH%20proof%20yesterday.%20I%20opened%20the%20source%3A%20the%20geometry%20predicate%20is%20fun%20_%20_%20_%20%3D%3E%20True%2C%20in%2024%20files.&source=DEV%20Community]
+
+ Share to Facebook
+ [https://www.facebook.com/sharer.php?u=https%3A%2F%2Fdev.to%2Ffrankchu%2Fgrh-proofs-geometry-is-fun-true-in-24-files-2n2b]
+
+ Share to Mastodon
+ [https://s2f.kytta.dev/?text=https%3A%2F%2Fdev.to%2Ffrankchu%2Fgrh-proofs-geometry-is-fun-true-in-24-files-2n2b]
+
+ Share Post via... [#]
+
+ Report Abuse [/report-abuse]
+
+ [https://media2.dev.to/dynamic/image/width=1000,height=420,fit=cover,gravity=auto,format=auto/https%3A%2F%2Fraw.githubusercontent.com%2Ffrankchu91%2FWhatTechPost%2Fmain%2Fpublished%2F2026-11-21-grh-geometry-true%2Fcover.png]
+
+ [/frankchu]
+
+ frank chu [/frankchu]
+
+ Posted on Nov 22
+
+ GRH proof's geometry is `fun _ _ _ => True`, in 24 files
+
+ #programming [/t/programming]
+ #math [/t/math]
+ #lean [/t/lean]
+ #discuss [/t/discuss]
+
+ [#grh-proofs-geometry-is-raw-fun-gt-true-endraw-in-24-files]
+ GRH proof's geometry is fun _ _ _ => True, in 24 files
+
+Yesterday the Lean and Mathlib communities certified Alpöge's 17.4-million-line GRH proof as correct. Today a paper says the certification proves nothing — because the geometry predicate the proof runs on is defined as fun _ _ _ => True. I opened the source. The definition is exactly where the paper says it is.
+
+ [#what-got-certified-in-numbers]
+ What got certified, in numbers
+
+The joint statement from the Lean and Mathlib communities (November 21) says: "We have full confidence that Alpöge's proof of the Riemann Hypothesis is correct." Andrew Sutherland's verification page at MIT is the receipts. The checks that finished:
+
+175,187 modules compile (Lean v4.33.1, Mathlib v4.33.1) pass, zero errors
+#print axioms for the five theorems propext, Classical.choice, Quot.sound only
+leanchecker kernel replay of every module 175,187 / 175,187, zero rejections
+nanoda (independent Rust kernel) on the full export accepts, 27 min 42 s on 80 threads
+con-leche master on the full export 1,468,418 declarations accepted, 3 min 15 s on 64 threads
+con-leche --compare (statement vs challenge) all five theorems "justified by the solution"
+lean4lean on every compiled module 175,187 / 175,187 (5 hit the default step limit, passed on rerun)
+exported proof 61,570,595,788 bytes unpacked
+
+That is a serious verification effort, run in about a day, and it is worth saying so before the rest of this article. The page also lists its caveats honestly: the build ran on cloud machines without a sandbox, the per-file .olean hashes depend on the build directory (/home/ubuntu/grh/src/lean), and the export was not compared against one produced by a sandboxed lake build.
+
+The same day, Jenny Lorraine Nielsen posted "Invalidity of the Alpoge Proposed Proof of the Riemann Hypothesis" on PhilArchive. (The same author also posted an invalidity claim against Masullo's all-human proof the same day; that one I did not examine.) Her abstract makes a specific, checkable claim: "The geometry predicate is defined to be True. The geometric witness is built from a model the code itself names degenerate."
+
+I checked the code. Here is what is literally in it.
+
+ [#the-definition-verbatim]
+ The definition, verbatim
+
+In Development/AbelianVarietyTheory/Definitions/AutomorphicMembership/OverIx.lean, two definitions sit six lines apart. The first is the real geometry predicate. The second is the one the proof actually uses:
+
+abbrev GeoP : Type 1 := ∀ D : D7, Formalism.L2.Pj.Core D → DivX D → Prop
+
+def geoOf (Q : ∀ D : D7, GlobalTheory.ShFam.KitClass D) : GeoP := fun D J X =>
+ (∃ c : ℕ, 0 < c ∧ GlobalTheory.ShFam.IsGeoOf (Q D) J c X) ∧ GlobalTheory.ShFam.Pad.HasTrueSurf X
+
+def anyGeometry : GeoP := fun _ _ _ => True
+
+geoOf demands something: some positive c with an actual geometric witness (IsGeoOf), plus a true surface (HasTrueSurf). anyGeometry demands nothing — it returns True for every input. Both have the same type, GeoP, so either one can be slotted in wherever a geometry predicate is expected.
+
+The closure that carries it across divisor changes is in NotGeoClFalse.lean, and it is exactly as the paper describes:
+
+inductive GeoCl (Γ : GeoP) : ∀ D : D7, Formalism.L2.Pj.Core D → DivX D → Prop
+ | base {D : D7} {J : Formalism.L2.Pj.Core D} {X : DivX D} : Γ D J X → GeoCl Γ D J X
+ | step {D : D7} (N : ∀ u, Submodule (𝓞 D.what₂.LL) (D.div.Nu u).V) (h : D.what₂.Word → ℝ)
+ {J : Formalism.L2.Pj.Core D} {X : DivX D} : GeoCl Γ D J X → GeoCl Γ (setDiv D N h) (coreS N h J) (divTr N h X)
+
+def geoCl (Γ : GeoP) : GeoP := GeoCl Γ
+
+With Γ := anyGeometry, the base constructor accepts trivial as a certificate for every input, and step carries that certificate across divisor changes. A certificate that can never fail is not a check.
+
+ [#how-far-it-reaches]
+ How far it reaches
+
+I ran git grep over the mirror I cloned yesterday (the same 1.7 GB mirror my previous article audited: 175,187 .lean files, 17,374,215 lines). Counts of files mentioning each predicate:
+
+anyGeometry 24 files
+geoOf 12 files
+
+geoCl anyGeometry is passed into the constructions that build the hypothesis bundle — the prmR parameter records, the parametersOfExtension calls, and the HypsAlt bundle paths. A sample from LinkedBundleConstructionExists.lean:
+
+prmR (NEa hL (GlobalTheory.HeightCounting.Up.NEo hL cDep) A) SExt.none (geoCl anyGeometry)
+
+And plugAll, the theorem Nielsen names, converts an inhabited hypothesis bundle into the all-character zero-free statement:
+
+theorem UpperTheory.Top.plugAll (hG : GlobalTheory.GLq.Green) (hV : UpperTheory.Top.VWin)
+ (h : Nonempty (Hyps (fun 𝒞 => Closed 𝒞 fun Fm _ => LinkN Fm) DRS)) : UpperTheory.EveryCharacter
+
+The final chain from Main.lean is short enough to read in full:
+
+Main.lean:4 theorem riemannHypothesis : RiemannHypothesis := rhOfAll
+MainTheorems.lean:9 theorem rhOfAll : RiemannHypothesis := Formalism.VW.rh_of_every allChi
+MainTheorems.lean:7 theorem allChi : UpperTheory.EveryCharacter := UpperTheory.FinalTheorems.everyCharacter
+MainConclusion.lean:10 theorem UpperTheory.FinalTheorems.everyCharacter : UpperTheory.EveryCharacter :=
+ UpperTheory.FinalTheorems.everyCharacter_of_row ...
+
+That last step goes through every_character_of_literature_of_vWin, whose own file contains no mention of anyGeometry. I traced the chain this far; I did not establish whether the Main.lean dependency path runs through the anyGeometry bundle constructions or through a different route. That is the open question, and it is the one that decides whether Nielsen's claim touches the final theorem or only a corner of the archive.
+
+Two more checks, for completeness. First, the paper says the geometric witness is "built from a model the code itself names degenerate." I grepped for degenerate across the tree: every hit is the standard mathematical term nondegenerate (nondegenerate trace forms, nondegenerate statements). I could not find a model named degenerate. That part of the claim I could not confirm. Second, the paper says the lemmas that would extract content from the geometric witnesses are never called — I did not verify call counts for those lemmas, so I am not repeating that claim as my own finding.
+
+ [#the-crux-what-a-kernel-can-and-cannot-check]
+ The crux: what a kernel can and cannot check
+
+Here is the part that makes this story interesting instead of just confusing. Both sides can be right at the same time, because they check different things:
+
+The Lean kernel and the independent checkers verify that a proof term has the type it claims — here, Mathlib's own RiemannHypothesis. The comparator verifies the proved statement matches the challenge statement. That is what the MIT page's table establishes, and it is real.
+
+Neither the kernel nor the comparator checks whether the definitions inside the proof carry the mathematics their names claim. A predicate defined as fun _ _ _ => True typechecks perfectly. A certificate built from it is a valid term. The kernel verifies derivations relative to the definitions it is given; it does not audit whether those definitions mean what their names suggest.
+
+If the Main.lean dependency path runs through the anyGeometry bundle, then the certification and the invalidity claim are both true: the term has Mathlib's type, and the geometry it claims to establish was never established. If the path does not run through it, then the True predicate is dead weight in a corner of a 17-million-line archive, and the proof stands. The 61 GB export and the four independent checkers cannot distinguish those two cases. Only reading the dependency chain can — and that is work no one has finished yet, a day after release.
+
+As of writing, I found no public response from Alpöge or the Lean community to Nielsen's paper. The author is not a known figure in the field, the paper is on PhilArchive rather than in a math venue, and it is not peer-reviewed. Treat it as a claim with verifiable parts, not a verdict. The verifiable parts check out: the definition is real, the contrast with geoOf is real, and the use is pervasive. The part that would settle it — the full dependency trace from Main.lean down to anyGeometry — is still open.
+
+Yesterday I wrote that the proof had 17.4 million lines and zero sorrys. Both are still true. Today I would add a third number: the geometry predicate is True, in 24 files. A proof with no sorry can still have a definition that says nothing. That is the lesson of this release, whichever way the dependency trace lands.
+
+ [#limitations-stated-plainly]
+ Limitations, stated plainly
+
+I read the source and ran git grep over the mirror cloned November 20; I did not build the project or replay the export. The mirror is byte-identical to the published archive apart from added Comparator files (per the MIT page), and I did not re-verify that hash.
+
+I verified Nielsen's central code claims (the anyGeometry definition, the GeoCl constructors, the plugAll statement, the file counts). I did not verify her claims about uncalled lemmas, the height equation, or the lattice witness, and I could not confirm the "degenerate model" wording.
+
+I traced the Main.lean chain to every_character_of_literature_of_vWin but did not complete the transitive dependency analysis to the anyGeometry bundle. I am not a number theorist and I am not ruling on whether the proof is valid — I am reporting what is in the code and what the checkers do and do not establish.
+
+Sources: Lean/Mathlib joint statement, "Lean verification of the Riemann Hypothesis" [https://leanprover-community.github.io/blog/posts/riemann-hypothesis/] (Nov 21, 2026); Andrew Sutherland, "Verification files for the Lean proof of the Riemann Hypothesis" [https://math.mit.edu/~drew/grh/] (updated Nov 21, 2026, 12:55 UTC); Jenny Lorraine Nielsen, "Invalidity of the Alpoge Proposed Proof of the Riemann Hypothesis" [https://philarchive.org/rec/NIEIOT-2] (PhilArchive, Nov 21, 2026); Jenny Lorraine Nielsen, "Invalidity of Masullo's Proof of the Riemann Hypothesis" [https://philpapers.org/rec/NIEIOM]. All code quotes are from the 1337isnot1337/riemann-hypothesis-solved mirror of the November 20 release, as cloned November 20, 2026. My earlier repo audit: "17.4M lines, 0 sorry: I opened the GRH proof" [https://dev.to/frankchu/174m-lines-0-sorry-i-opened-the-grh-proof-2710] (Nov 20, 2026).
+
+ Top comments (4)
+
+ Subscribe
+
+ Submit
+ Preview
+ Dismiss [/404.html]
+
+ [https://dev.to/penfieldlabs]
+
+ Penfield
+
+ [https://dev.to/penfieldlabs]
+
+ Penfield
+
+ Penfield
+
+ [/penfieldlabs]
+
+ Follow
+
+ Named for the neurosurgeon who mapped memory. We give AI agents the same gift: persistent recall, connected knowledge, and permanent continuity.
+
+ Joined
+
+ Feb 2, 2026
+
+ •
+
+ Nov 23
+
+ [https://dev.to/frankchu/grh-proofs-geometry-is-fun-true-in-24-files-2n2b#comment-3m4bc]
+
+Copy link [https://dev.to/frankchu/grh-proofs-geometry-is-fun-true-in-24-files-2n2b#comment-3m4bc]
+
+ Hide
+
+You stopped at whether Main's dependency path runs through the anyGeometry constructions. It does.
+
+In James Shore's kernel dependency export, riemannHypothesis reaches anyGeometry in 8 edges, and 24 declarations in the RH closure depend on it. geoOf, IsGeoOf and HasTrueSurf are used by none of the five theorems. The axioms in the closure are the standard three, so none of this bears on whether the theorem is proved. It does mean the checked route is not the geometric argument the names suggest.
+
+Path, tables and commands: github.com/dial481/riemann-hypothe... [https://github.com/dial481/riemann-hypothesis-rosetta/blob/main/results/anygeometry.md]
+
+Your post is credited in the note. Thank you for asking the question precisely.
+
+ 1 like
+
+ Like
+
+ Reply
+
+ [https://dev.to/maria_smith_1cde45f6a07f5]
+
+ Maria Smith
+
+ [https://dev.to/maria_smith_1cde45f6a07f5]
+
+ Maria Smith
+
+ Maria Smith
+
+ [/maria_smith_1cde45f6a07f5]
+
+ Follow
+
+ Joined
+
+ Nov 25, 2026
+
+ •
+
+ Nov 25
+
+ [https://dev.to/frankchu/grh-proofs-geometry-is-fun-true-in-24-files-2n2b#comment-3meed]
+
+Copy link [https://dev.to/frankchu/grh-proofs-geometry-is-fun-true-in-24-files-2n2b#comment-3meed]
+
+ Hide
+
+Great forensic read on why inspecting definitions alongside #print axioms matters. Even when the kernel only reports propext, Classical.choice, and Quot.sound, vacuous predicates like fun _ _ _ => True show how easily syntactic checks can hide empty witnesses. In my own SFT V4 formalization (9,000+ Lean 4.35 files, 55,000+ theorems), I enforced literal zero axioms—no Classical.choice, propext, Quot.sound, or native_decide—plus BlindExperimentBoundary and GrandLockCertificateProof.lean so every derivation, down to α⁻¹ = 503846395469/3676744786 (+0.0086σ), is auditable end to end: github.com/MettaMazza/SFT-v4-LEAN-... [https://github.com/MettaMazza/SFT-v4-LEAN-VERIFIED] (Zenodo: 10.5281/zenodo.24320778).
+
+ 1 like
+
+ Like
+
+ Reply
+
+ [https://dev.to/startigerjln]
+
+ Jenny Lorraine Nielsen
+
+ [https://dev.to/startigerjln]
+
+ Jenny Lorraine Nielsen
+
+ Jenny Lorraine Nielsen
+
+ [/startigerjln]
+
+ Follow
+
+ Physicist, philosopher
+
+ Joined
+
+ Nov 22, 2026
+
+ •
+
+ Nov 22
+
+ [https://dev.to/frankchu/grh-proofs-geometry-is-fun-true-in-24-files-2n2b#comment-3m23n]
+
+Copy link [https://dev.to/frankchu/grh-proofs-geometry-is-fun-true-in-24-files-2n2b#comment-3m23n]
+
+ Hide
+
+Hey Frank,Thanks for looking into this and for the careful checks! Happy to clarify the points you raised.
+
+The geometry predicate actually used by the concluding construction is exactly
+
+anyGeometry : GeoP := fun _ _ _ => True
+
+(in OverIx.lean). It is not a non-vacuous geometry that has been mislabeled; the code defines it that way, and that is the term that is supplied. In EveryCharacterE.lean, hypsE constructs the Nonempty (Hyps ...) inhabitant required by plugAll and passes geoCl anyGeometry. The inductive wrapper GeoCl does not add any content: its base constructor accepts any proof of the underlying predicate, so GeoCl.base trivial works for every input once the predicate is True. That is the geometric field of the witness.The objects that assemble the divisor datum are named in a way that signals their degeneracy. The release itself uses the identifiers geoDegenerate, algDegenerate, padDegenerate, and mdlJunk (along with the related geoDegenerateNoTau, algJunk, padJunk, etc.). These appear in
+
+src/Formalism/LocalToGlobal/LatticeGeometry/Inhabited.lean.
+
+They are not neutral labels. In the definitions the positivity predicates are set to True, the index types for levels/components/surfaces are empty or PUnit, volumes and norms are zero, and the lattice-to-sections map iMj is the zero map. The lattice-side conditions (MjAre, LamAre, the constant match) hold by rfl / HEq.rfl because the seed was defined as a copy of the row-side data. The extraction lemmas that would pull non-trivial content from a genuine geometry (geoOf_surf, GeoTiedP.geoTied, GeoTiedP.formsTieX, degree_value_of_determinant, etc.) appear only at their own declarations; they are never called.The dependency that actually reaches the top-level theorem is direct:
+
+riemannHypothesis is rhOfAll
+
+which is Formalism.VW.rh_of_every allChi
+
+allChi is UpperTheory.FinalTheorems.everyCharacter
+
+which is everyCharacter_of_row applied to the Galois-representation statement
+
+which calls every_character_of_literature_of_vWin
+
+which calls every_character_of_theta_integrals_local_matching
+
+which obtains the character statement from plugAll
+
+and plugAll takes as its essential input the hypothesis bundle built by hypsE with geoCl anyGeometry.
+
+The height equation through which the divisor side enters (div.h u = hExpl6 ...) holds by rfl because setDiv overwrites the height function with the explicit formula itself. The geometric layer that was supposed to supply an independent height is the vacuous one, and the lemmas written to extract content from it are never invoked. The row-side geometry (InGeo on the GeoHalf datum) and the divisor-side geometry are never identified by a non-vacuous bridge; the pieces that would do the identification are the zero map, the certificate built on the degenerate model, and the unused tying lemmas.What the kernel checkers accept is therefore a closed term whose structural geometric and lattice witnesses are vacuously true. The formalization does not establish the geometric realization, or the lattice identification, that its own named structure calls for. The argument requires two independent sides; in the release the divisor side is the row side under another name, mediated by an assigned formula rather than by an independent geometric object. 
+
+Happy to point to the specific files and lines if you want to walk any part of the chain further.
+
+ 1 like
+
+ Like
+
+ Reply
+
+ [https://dev.to/harrytong]
+
+ Harry Tong
+
+ [https://dev.to/harrytong]
+
+ Harry Tong
+
+ Harry Tong
+
+ [/harrytong]
+
+ Follow
+
+ Currently I am the Principal Solutions Architect, Financial Services at InterSystems Corporation. I hold a B.S. and an M.S. degrees in Computer Science.
+
+ Joined
+
+ Nov 22, 2026
+
+ •
+
+ Nov 22
+
+ [https://dev.to/frankchu/grh-proofs-geometry-is-fun-true-in-24-files-2n2b#comment-3m3ck]
+
+Copy link [https://dev.to/frankchu/grh-proofs-geometry-is-fun-true-in-24-files-2n2b#comment-3m3ck]
+
+ Hide
+
+I have published a reproducible compiled-dependency audit addressing the geometry concerns raised by Jenny Lorraine Nielsen and Frank Chu.
+
+I independently compiled the pinned release on my Ubuntu server, then ran an AI-assisted dependency audit against all five headline RH/Dirichlet-GRH theorems.
+
+Audited source commit: 753431bfe28701f6f3937f664fcaf08daa139c03, using Lean 4.33.1.
+
+The findings:
+
+anyGeometry, several degenerate-model constructions, the zero-map construction divXFl, and the constructed height are reachable in all five stored dependency closures.
+
+The four named extraction lemmas are absent from those closures.
+
+The proposed route through hypsE₂ and plugAll is also absent. The final proof follows the newer nonempty_hyps_definite_side_of_closed_bound route, which still passes geoCl anyGeometry.
+
+All ten traversal passes report exactly propext, Classical.choice, and Quot.sound. The combined graph contains 1,478,243 declarations, with no missing referenced declarations.
+
+These results establish syntactic reachability. They do not establish that every referenced declaration is indispensable, or that a mathematical inference is invalid. They confirm several concrete observations in the criticism while correcting the proposed dependency route.
+
+My standalone Nanoda check passed. My Comparator run remains pending.
+
+The report, inspection code, and complete evidence are public:
+
+Detailed findings and exact dependency paths [https://github.com/harrytong/rh-verification/blob/main/RH_critics_dependency_findings.md]
+
+Reproducible audit script [https://github.com/harrytong/rh-verification/blob/main/run_rh_dependency_audit.py]
+
+Complete evidence ZIP, including logs and machine-readable results [https://github.com/harrytong/rh-verification/blob/main/compiled-dependency-evidence.zip]
+
+I welcome independent review of both the dependency walker and the interpretation of these findings.
+
+ 1 like
+
+ Like
+
+ Reply
+
+ Code of Conduct [/code-of-conduct]
+ •
+ Report abuse [/report-abuse]
+
+ frank chu
+
+ [/frankchu]
+
+ Follow
+
+ Work
+
+ Meta
+
+ Joined
+
+ Jul 21, 2026
+
+ More from frank chu [/frankchu]
+
+ 24 Check Point servers breached — the AI part is unproven
+
+ #programming
+ #security
+ #ai
+ #discuss
+
+ [/frankchu/24-check-point-servers-breached-the-ai-part-is-unproven-2fel]
+
+ Clojure's core has 17 unreported bugs — I reproduced 5
+
+ #programming
+ #clojure
+ #lean
+ #discuss
+
+ [/frankchu/clojures-core-has-17-unreported-bugs-i-reproduced-5-1764]
+
+ DEV Community [/] — A space to discuss and keep up software development and manage your software career
+
+ Home
+ [/]
+
+ DEV Challenges
+ [/challenges]
+
+ DEV++
+ [/++]
+
+ Videos
+ [/videos]
+
+ DEV Help
+ [/help]
+
+ Advertise on DEV
+ [/advertise]
+
+ Organization Accounts
+ [/organizations]
+
+ DEV Showcase
+ [/showcase]
+
+ About
+ [/about]
+
+ Contact
+ [/contact]
+
+ DEV Shop
+ [https://shop.forem.com/]
+
+ MLH
+ [https://mlh.io/]
+
+ Code of Conduct
+ [/code-of-conduct]
+
+ Privacy Policy
+ [/privacy]
+
+ Terms of Use
+ [/terms]
+
+Built on Forem [https://www.forem.com] — the open source [https://dev.to/t/opensource] software that powers DEV [https://dev.to] and other inclusive communities.
+
+Made with love and Ruby on Rails [https://dev.to/t/rails]. DEV Community © 2016 - 2026.
+
+ We're a place where coders share, stay up-to-date and grow their careers.
+
+ Log in
+ [/enter?signup_subforem=1]
+
+ Create account
+ [/enter?signup_subforem=1&state=new-user]

@@ -1,0 +1,279 @@
+Shorter GRH Lean proof: verification files
+
+Verification files for the shorter Lean proof of RH and GRH
+
+Source: github.com/lsernau/grh-lean [https://github.com/lsernau/grh-lean], commit 72fead10, published 25 November 2026.
+
+Andrew Sutherland (MIT), checks run with Claude Code. Page last updated 2026-11-26 02:50 UTC. All checks have finished.
+
+This page concerns the shorter proof only. The checks of the original 17-million-line proof are recorded on a separate page [../grh/].
+
+Summary
+
+The repository contains two Lean 4 projects, a “readable” edition (grh/, 803 files, about 300,000 lines of code) and a “compact” edition (grh-compact/, 794 files, about 76,000 lines of code). Each proves the same five theorems as the original proof: Mathlib's RiemannHypothesis and four statements about zeros of the Riemann zeta function and of Dirichlet L-functions. Both use Lean v4.35.0 and Mathlib at commit 56a00585.
+
+Both editions compile without errors, and in both the five theorems depend only on the axioms propext, Classical.choice and Quot.sound. Every module of both editions has been replayed through the Lean kernel. Exports of the five theorems made independently on two machines are byte-identical, and nanoda, con-leche and con-ron accept them for both editions. The --compare modes of con-leche and con-ron each confirm all five theorems against the challenge file.
+
+lake comparator --paranoid (Lean v4.35.0) reports “Your solution is okay!” for both editions. It builds the project in a sandbox, compares the five statements with the challenge file, checks the axioms, and then runs Lean's kernel and every external checker shipped with Lean: nanoda, lean4lean, con-leche, con-ron and the paranoid build of Lean's own checker. For the compact edition it passed independently on two machines. For the readable edition it passed on the larger machine; lean4lean needs 332 GB of memory for that edition, more than the smaller machine has, so the run there was stopped without a verdict (see the note below the table).
+
+What was verified
+
+All times are UTC. "Sandboxed" means the step ran with no network access and with only the project folder writable.
+
+CheckReadable editionCompact edition
+
+Sandboxed lake build of the whole project (machine A)pass
+9,852 jobs, no errors; 32 min 12 s, finished 23:05:36 (log [readable-build.log])pass
+9,843 jobs, no errors; 33 min 32 s, finished 23:06:56 (log [compact-build.log])
+
+#print axioms for the five theorems (the repository's scripts/PrintAxioms.lean)pass
+each depends on propext, Classical.choice, Quot.sound only (log [readable-axioms.log])pass
+each depends on propext, Classical.choice, Quot.sound only (log [compact-axioms.log])
+
+lake comparator --paranoid (Lean v4.35.0) on a fresh clone, machine B: build, statement comparison, axiom check, then in sequence nanoda, Lean paranoid kernel, lean4lean, nanoda again, con-leche, con-ron and Lean default kernelpass
+build inside the judge's sandbox passed (9,850 jobs); statement comparison and axiom check pass; nanoda, Lean paranoid kernel, lean4lean, nanoda (second pass), con-leche, con-ron and Lean default kernel all accept; “Your solution is okay!”; exit 0 at 02:47:54 on 26 November, 4 h 9 min 59 s after starting at 22:37:54, of which about 2 h 40 min was lean4lean (see the note below) (log [readable-lake-comparator-paranoid-remote.log])pass
+build inside the judge's sandbox passed (9,841 jobs); statement comparison and axiom check pass; nanoda, Lean paranoid kernel, lean4lean, nanoda (second pass), con-leche, con-ron and Lean default kernel all accept; “Your solution is okay!”; exit 0 at 00:49:14 on 26 November, 2 h 11 min 19 s after starting at 22:37:54 (log [compact-lake-comparator-paranoid-remote.log])
+
+lake comparator --paranoid (Lean v4.35.0), machine A, independent second runstopped, no verdict. Started 23:05:43. We stopped its lean4lean process at 00:48:16 on 26 November when it reached 70 GB on New.Variety.tiltTheory, because machine A has 128 GB (guard log [readable-memory-guard.log]). Every other stage accepted: nanoda (both passes), Lean paranoid kernel, con-leche, con-ron and Lean default kernel. The judge therefore ended at 01:34:10 with exit 1 and the message “lean4lean exited with 143”, the code for a process that was terminated; its earlier line “lean4lean kernel rejected the solution” reflects our stopping it, not a finding by lean4lean (log [readable-lake-comparator-paranoid-local.log]). See the note below.pass
+statement comparison and axiom check pass; nanoda, Lean paranoid kernel, lean4lean, nanoda (second pass), con-leche, con-ron and Lean default kernel all accept; “Your solution is okay!”; exit 0 at 01:39:22 on 26 November, 2 h 32 min 18 s after starting at 23:07:03 (log [compact-lake-comparator-paranoid-local.log])
+
+lake comparator without --paranoid (Lean v4.35.0), machine B: build, statement comparison, axiom check, nanoda and Lean default kernelpass
+statement comparison and axiom check pass; nanoda accepts; Lean default kernel accepts; “Your solution is okay!”; exit 0 at 00:46:56 on 26 November, after 39 min 3 s (log [readable-lake-comparator-remote.log])not run
+
+Lean kernel replay of every module (leanchecker, one process per module), sandboxed, machine Apass
+803 of 803 modules accepted; 12 min 0 s, finished 23:19:24 (results [readable-replay-leanchecker.results.txt])pass
+794 of 794 modules accepted; 12 min 8 s, finished 23:19:32 (results [compact-replay-leanchecker.results.txt])
+
+Exports made by lake comparator on machines A and B, comparedpass
+challenge and solution exports byte-identical on the two machines; solution 4,485,867,644 bytes, sha256 baf221c8…6fc1pass
+challenge and solution exports byte-identical on the two machines; solution 5,172,274,528 bytes, sha256 ab7b4223…115b
+
+con-leche --compare (branch compare, 5dc36dc1): challenge export against solution export, machine Bpass
+accepts: all five theorems “justified by the solution”; 216,571 solution and 52,173 challenge declarations accepted; exit 0 at 23:19:06 (log [readable-standalone-con-leche-compare.log])pass
+accepts: all five theorems “justified by the solution”; 204,583 solution and 52,173 challenge declarations accepted; exit 0 at 23:19:01 (log [compact-standalone-con-leche-compare.log])
+
+con-ron --compare (master, 3f22699b): challenge export against solution export, machine Bpass
+accepts: all five theorems “justified by the solution”; exit 0 at 23:19:16 (log [readable-standalone-con-ron-compare.log])pass
+accepts: all five theorems “justified by the solution”; exit 0 at 23:19:19 (log [compact-standalone-con-ron-compare.log])
+
+con-leche bundled with Lean v4.35.0, on the solution export, machine Bpass
+accepted 216,571 declarations (--verified); 1 min 16 s (log [readable-standalone-con-leche.log])pass
+accepted 204,583 declarations (--verified); 1 min 53 s (log [compact-standalone-con-leche.log])
+
+con-ron bundled with Lean v4.35.0, on the solution export, machine Bpass
+accepted 216,571 declarations (--verified); 1 min 9 s (log [readable-standalone-con-ron.log])pass
+accepted 204,583 declarations (--verified); 1 min 16 s (log [compact-standalone-con-ron.log])
+
+lean4lean bundled with Lean v4.35.0, on the solution export, machine Bpass
+checked 216,568 declarations; 2 h 35 min 5 s, exit 0 at 01:49:24 on 26 November; peak memory 332 GB. Of that time, 2 h 12 min went on the one definition New.Variety.tiltTheory (log [readable-standalone-lean4lean.log]). See the note below.pass
+checked 204,580 declarations; 28 min 39 s, exit 0 at 23:42:58 (log [compact-standalone-lean4lean.log])
+
+Lean default kernel (leanchecker --from-export), on the solution export, machine Bpass
+accepts; 29 min 29 s, exit 0 at 23:42:24 (log [readable-standalone-lean-default-kernel.log])pass
+accepts; 33 min 5 s, exit 0 at 23:46:00 (log [compact-standalone-lean-default-kernel.log])
+
+Machine A is a 16-core AMD Ryzen AI Max+ 395 with 128 GB of memory; machine B is a 192-core AWS r8a.48xlarge with 1.5 TB. The two machines ran from separate clones of the same commit. lake comparator builds the project itself inside its own bwrap sandbox, so the runs on machine B are independent of the builds on machine A; the runs on machine A reuse the build in the first row.
+
+The rows below the two lake comparator rows are separate runs of individual checkers on copies of the exports that lake comparator itself made on machine B (A = readable, B = compact in the scripts). They were run in parallel so that each result is available without waiting for the judge to reach that checker in its sequence. The lean4lean shipped with Lean v4.35.0 does not read this toolchain's compiled files (“incompatible header”), so lean4lean was run on the exports only, not module by module.
+
+lean4lean on the readable edition. lean4lean accepts both editions, but at very different cost. On the compact edition it finished in 28 min 39 s using 7 GB of memory. On the readable edition it took 2 h 35 min and 332 GB, of which 2 h 12 min (7,917,635 ms by its own report) went on the single definition New.Variety.tiltTheory (src/Lib/PadicComparison/Primitive/PeriodCoefficients.lean, line 650); the compact edition defines tiltTheory differently. Lean's own kernel, in its default and paranoid builds, checks the whole readable export in about half an hour with under 8 GB. In practice this means lake comparator --paranoid on the readable edition needs a machine with well over 332 GB of memory and about four hours. On machine A, which has 128 GB, we stopped lean4lean at 70 GB, so that run has no verdict.
+
+The statements
+
+The five theorems are stated in src/Statements.lean, which imports only Mathlib, and src/Main.lean. Statements.lean is byte-for-byte the same file in the two editions, and its four definitions are textually identical to those in the original proof's Statements.lean. The theorem names and the list of permitted axioms in comparator.json are also the same as in the original proof.
+
+theorem riemannHypothesis : RiemannHypothesis
+theorem riemannZeta_eq_zero_re : RiemannZetaZerosOnLine
+theorem LFunction_ne_zero_of_half_lt_re : DirichletLNonvanishingRightOfHalf
+theorem LFunction_eq_zero_re : DirichletLZerosOnLine
+theorem LFunction_eq_zero_re_of_isPrimitive : PrimitiveDirichletLZerosOnLine
+
+def RiemannZetaZerosOnLine : Prop :=
+ ∀ s : ℂ, riemannZeta s = 0 → (¬∃ n : ℕ, s = -2 * ((n : ℂ) + 1)) → s ≠ 1 → s.re = 1 / 2
+
+def DirichletLNonvanishingRightOfHalf : Prop :=
+ ∀ (N : ℕ) [NeZero N] (χ : DirichletCharacter ℂ N) (s : ℂ),
+ 1 / 2 < s.re → (χ ≠ 1 ∨ s ≠ 1) → DirichletCharacter.LFunction χ s ≠ 0
+
+def DirichletLZerosOnLine : Prop :=
+ ∀ (N : ℕ) [NeZero N] (χ : DirichletCharacter ℂ N) (s : ℂ),
+ 0 < s.re → s.re < 1 → DirichletCharacter.LFunction χ s = 0 → s.re = 1 / 2
+
+def PrimitiveDirichletLZerosOnLine : Prop :=
+ ∀ (N : ℕ) [NeZero N] (χ : DirichletCharacter ℂ N), χ.IsPrimitive →
+ ∀ s : ℂ, 0 < s.re → s.re < 1 → DirichletCharacter.LFunction χ s = 0 → s.re = 1 / 2
+
+The kernels check elaborated terms, not source text. This file [explicit-statements.out] prints the five statements as Lean v4.35.0 elaborates them with pp.all, so that no notation, coercion or implicit argument is hidden (script [explicit-statements.lean]); the output is identical in the two editions. For example, RiemannHypothesis elaborates to:
+
+def RiemannHypothesis : Prop :=
+∀ (s : Complex),
+ @Eq.{1} Complex (riemannZeta s) (@OfNat.ofNat.{0} Complex (nat_lit 0) (@Zero.toOfNat0.{0} Complex Complex.instZero)) →
+ Not
+ (@Exists.{1} Nat fun (n : Nat) =>
+ @Eq.{1} Complex s
+ (@HMul.hMul.{0, 0, 0} Complex Complex Complex (@instHMul.{0} Complex Complex.instMul)
+ (@Neg.neg.{0} Complex Complex.instNeg
+ (@OfNat.ofNat.{0} Complex (nat_lit 2)
+ (@instOfNatAtLeastTwo.{0} Complex (nat_lit 2) Complex.instNatCast RiemannHypothesis._proof_1)))
+ (@HAdd.hAdd.{0, 0, 0} Complex Complex Complex (@instHAdd.{0} Complex Complex.instAdd)
+ (@Nat.cast.{0} Complex Complex.instNatCast n)
+ (@OfNat.ofNat.{0} Complex (nat_lit 1) (@One.toOfNat1.{0} Complex Complex.instOne))))) →
+ @Ne.{1} Complex s (@OfNat.ofNat.{0} Complex (nat_lit 1) (@One.toOfNat1.{0} Complex Complex.instOne)) →
+ @Eq.{1} Real (Complex.re s)
+ (@HDiv.hDiv.{0, 0, 0} Real Real Real (@instHDiv.{0} Real (@DivInvMonoid.toDiv.{0} Real Real.instDivInvMonoid))
+ (@OfNat.ofNat.{0} Real (nat_lit 1) (@One.toOfNat1.{0} Real Real.instOne))
+ (@OfNat.ofNat.{0} Real (nat_lit 2)
+ (@instOfNatAtLeastTwo.{0} Real (nat_lit 2) Real.instNatCast RiemannHypothesis._proof_1)))
+
+Source scan
+
+Before building, both editions were searched for constructs that add assumptions, run code during compilation, or change how terms are checked. Neither contains any axiom declaration, native_decide, #eval, unsafe, opaque, implemented_by, extern, initialize, custom elab, macro or syntax, or any kernel-related option. The only uses of sorry are in Challenge.lean, where they stand in for the proofs to be compared. Every file imports only Mathlib or the project's own modules. This scan is a text search and is a precaution, not a proof; the axiom audit and the kernel checks above are what establish the result.
+
+Downloads
+
+Statements
+
+explicit-statements.out [explicit-statements.out] (7,580 bytes): the five statements as elaborated, with pp.all
+
+explicit-statements.lean [explicit-statements.lean] (393 bytes): the script that prints them
+
+Exports
+
+readable-solution.ndjson.zst [readable-solution.ndjson.zst] (573.8 MB): solution export of the readable edition, as made by lake comparator; 4,485,867,644 bytes uncompressed, sha256 baf221c81749bf4bcbd6cd56238adfb4e8e780c38ef92d6a7ab458d57df36fc1
+
+compact-solution.ndjson.zst [compact-solution.ndjson.zst] (664.1 MB): solution export of the compact edition; 5,172,274,528 bytes uncompressed, sha256 ab7b4223b9bd748a1aa68bdb63afb6d6264121fc834aadba7ba3d3796c32115b
+
+challenge.ndjson.zst [challenge.ndjson.zst] (46.7 MB): challenge export, the same for both editions; 354,827,875 bytes uncompressed, sha256 20eb99a04b40f6afe1b44931e7ee82b15208542517dc588ace9634acffc41694
+
+exports.sha256 [exports.sha256] (259 bytes): hashes of the three uncompressed exports
+
+Readable edition
+
+readable-build.log [readable-build.log] (57,352 bytes): sandboxed build log
+
+readable-axioms.log [readable-axioms.log] (1,254 bytes): axiom audit
+
+readable-timeline.txt [readable-timeline.txt] (184 bytes): start and finish times on machine A
+
+readable-lake-comparator-paranoid-remote.log [readable-lake-comparator-paranoid-remote.log] (65,588 bytes): lake comparator --paranoid, machine B
+
+readable-lake-comparator-paranoid-remote-timeline.txt [readable-lake-comparator-paranoid-remote-timeline.txt] (82 bytes): its start and finish times
+
+readable-lake-comparator-paranoid-local.log [readable-lake-comparator-paranoid-local.log] (7,902 bytes): lake comparator --paranoid, machine A
+
+readable-modules.txt [readable-modules.txt] (29,987 bytes): list of modules
+
+readable-replay-leanchecker.results.txt [readable-replay-leanchecker.results.txt] (42,081 bytes): per-module leanchecker results and times
+
+readable-replay-timeline.txt [readable-replay-timeline.txt] (178 bytes): replay start and finish times
+
+readable-export-timeline.txt [readable-export-timeline.txt] (158 bytes): export times, size and hash
+
+readable-standalone-con-leche-compare.log [readable-standalone-con-leche-compare.log] (2,603 bytes): con-leche --compare
+
+readable-standalone-con-ron-compare.log [readable-standalone-con-ron-compare.log] (1,339 bytes): con-ron --compare
+
+readable-standalone-con-leche.log [readable-standalone-con-leche.log] (858 bytes): bundled con-leche on the export
+
+readable-standalone-con-ron.log [readable-standalone-con-ron.log] (851 bytes): bundled con-ron on the export
+
+readable-standalone-lean4lean.log [readable-standalone-lean4lean.log] (6,264 bytes): bundled lean4lean on the export
+
+readable-standalone-lean-default-kernel.log [readable-standalone-lean-default-kernel.log] (857 bytes): Lean default kernel on the export
+
+readable-lake-comparator-remote.log [readable-lake-comparator-remote.log] (7,291 bytes): lake comparator without --paranoid, machine B
+
+readable-lake-comparator-remote-timeline.txt [readable-lake-comparator-remote-timeline.txt] (71 bytes): its start and finish times
+
+readable-memory-guard.log [readable-memory-guard.log] (95 bytes): record of our stopping lean4lean on machine A
+
+Compact edition
+
+compact-build.log [compact-build.log] (186,575 bytes): sandboxed build log
+
+compact-axioms.log [compact-axioms.log] (1,252 bytes): axiom audit
+
+compact-timeline.txt [compact-timeline.txt] (184 bytes): start and finish times on machine A
+
+compact-lake-comparator-paranoid-remote.log [compact-lake-comparator-paranoid-remote.log] (199,379 bytes): lake comparator --paranoid, machine B
+
+compact-lake-comparator-paranoid-remote-timeline.txt [compact-lake-comparator-paranoid-remote-timeline.txt] (82 bytes): its start and finish times
+
+compact-lake-comparator-paranoid-local.log [compact-lake-comparator-paranoid-local.log] (166,718 bytes): lake comparator --paranoid, machine A
+
+compact-modules.txt [compact-modules.txt] (27,457 bytes): list of modules
+
+compact-replay-leanchecker.results.txt [compact-replay-leanchecker.results.txt] (39,430 bytes): per-module leanchecker results and times
+
+compact-replay-timeline.txt [compact-replay-timeline.txt] (178 bytes): replay start and finish times
+
+compact-export-timeline.txt [compact-export-timeline.txt] (158 bytes): export times, size and hash
+
+compact-standalone-con-leche-compare.log [compact-standalone-con-leche-compare.log] (2,539 bytes): con-leche --compare
+
+compact-standalone-con-ron-compare.log [compact-standalone-con-ron-compare.log] (1,338 bytes): con-ron --compare
+
+compact-standalone-con-leche.log [compact-standalone-con-leche.log] (860 bytes): bundled con-leche on the export
+
+compact-standalone-con-ron.log [compact-standalone-con-ron.log] (851 bytes): bundled con-ron on the export
+
+compact-standalone-lean4lean.log [compact-standalone-lean4lean.log] (11,258 bytes): bundled lean4lean on the export
+
+compact-standalone-lean-default-kernel.log [compact-standalone-lean-default-kernel.log] (857 bytes): Lean default kernel on the export
+
+Scripts and source hashes
+
+sandbox.sh [sandbox.sh] (463 bytes): the offline sandbox wrapper used on machine A
+
+build.sh [build.sh] (423 bytes): build and axiom audit
+
+judge-local.sh [judge-local.sh] (674 bytes): lake comparator --paranoid on machine A
+
+judge-remote.sh [judge-remote.sh] (500 bytes): lake comparator --paranoid on machine B
+
+replay.sh [replay.sh] (745 bytes): per-module replay driver
+
+replay_in.sh [replay_in.sh] (503 bytes): the part of it that runs inside the sandbox
+
+export.sh [export.sh] (669 bytes): separate export
+
+source-files.sha256 [source-files.sha256] (192,400 bytes): hashes of every file in the repository at the commit checked
+
+standalone-checkers.sh [standalone-checkers.sh] (1,215 bytes): the separate checker runs on machine B
+
+judge-plain-remote.sh [judge-plain-remote.sh] (493 bytes): lake comparator without --paranoid on machine B
+
+memory-guard.sh [memory-guard.sh] (386 bytes): the script that stops lean4lean on machine A above 70 GB
+
+SHA-256 hashes of every file here are in SHA256SUMS [SHA256SUMS].
+
+Check it yourself
+
+On Linux with elan [https://github.com/leanprover/elan] and bubblewrap installed:
+
+git clone https://github.com/lsernau/grh-lean && cd grh-lean
+git checkout 72fead102f663d5c7a407964a13dc0cf9d977207
+cd grh-compact # or: cd grh
+lake exe cache get
+ulimit -s unlimited
+PATH="$(dirname "$(elan which lean)"):$PATH" lake comparator --paranoid
+
+Two practical points. lake comparator looks for the bundled checkers on the PATH, which is why the toolchain's bin folder is added above; without it the command stops at once with "nanoda kernel nanoda_bin was not found". On a machine with very many cores, lake exe cache get may need a higher open-file limit (ulimit -n 65536).
+
+Provenance
+
+Repository github.com/lsernau/grh-lean [https://github.com/lsernau/grh-lean], commit 72fead102f663d5c7a407964a13dc0cf9d977207, the only commit, cloned at 22:29 UTC on 25 November 2026. SHA-256 of git archive HEAD: 9138cf2f5862e64f823ed676e8d37333c0717e1a13cd8f74f6b735ab2d1ba57c. Hashes of all 1,625 files are in source-files.sha256 [source-files.sha256].
+
+Lean v4.35.0 (commit eb6cafb7) from the official release, installed with elan. All checkers used are the binaries shipped in that release.
+
+Mathlib at commit 56a005855ea17e0b0958f73ec801ae140b0a1679 with the dependency versions pinned in the repository's lake-manifest.json, which was not changed. Mathlib's compiled files came from the official cache (lake exe cache get); the checks that work from an export re-check everything the five theorems depend on, Mathlib included.
+
+No file in the repository was modified. The only files added were our own scripts and outputs, placed under .lake/.
+
+Caveats
+
+These checks show that Lean accepts proofs of the five stated theorems from the three standard axioms. They say nothing about whether the argument has been read or understood by a mathematician, and the repository itself says that it has passed machine checks only.
+
+A passing check establishes the statements as Lean elaborates them. Whether those statements say what the Riemann Hypothesis and the Generalized Riemann Hypothesis are understood to say is a matter of reading Statements.lean and Mathlib's definitions of riemannZeta, DirichletCharacter.LFunction and RiemannHypothesis.
+
+The repository is a single commit by its authors, who describe it as a shorter rewriting of the original proof. We checked the commit named at the top of this page and nothing else.
