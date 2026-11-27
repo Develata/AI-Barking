@@ -1,0 +1,322 @@
+---
+license: apache-2.0
+language:
+  - ru
+  - en
+library_name: transformers
+pipeline_tag: text-generation
+tags:
+  - custom_code
+  - mixture-of-experts
+  - vllm
+---
+
+# AliceAI-Foundation-80B-A3B-Base
+
+[Русская версия](./README.md)
+
+AliceAI-Foundation-80B-A3B-Base is a base language model with a hybrid
+architecture and MoE layers. The model has 80 billion parameters, of which
+3 billion are activated for each token, and supports a context length of up to
+262,144 tokens. The model was trained entirely from scratch.
+
+To build the model, we assembled a new training corpus, selected the architecture
+and hyperparameters, and prepared data for complex reasoning and tool use. We
+validated key design decisions through a series of separate training runs from
+scratch, each using 2 trillion tokens.
+
+On mathematics, coding, and other reasoning tasks, the model performs on par
+with larger open-source models and is particularly strong on Russian factual
+knowledge. Alongside the model weights, we release the factual benchmarks
+[WikiWebFacts](https://huggingface.co/datasets/yandex/WikiWebFacts) and
+[HardMultiQA](https://huggingface.co/datasets/yandex/HardMultiQA), which focus on
+Russian-language contexts, together with their evaluation protocols.
+
+<img src="./assets/benchmarks.png" alt="Benchmark comparison" width="800">
+
+## Model Overview
+
+- Type: autoregressive language model
+- Training stage: pre-training
+- Language model
+  - Number of parameters: 80B total, 3B activated
+  - Hidden size: 2048
+  - Vocabulary size: 129024
+  - Number of layers: 48
+  - Layer layout: 12 × (3 × (KDA → MoE) → 1 × (Gated Attention → MoE))
+  - KDA:
+    - Number of query heads: 32
+    - Number of KV heads: 32
+    - Query head dimension: 128
+    - KV head dimension: 128
+    - Convolution kernel size: 4
+  - Gated Attention:
+    - Number of query heads: 16
+    - Number of KV heads: 2
+    - Query head dimension: 256
+  - MoE:
+    - Number of experts: 512
+    - Top-K: 10 routed + 1 shared expert
+    - Expert intermediate size: 512
+  - MTP: 1 layer
+- Context length: 262144
+
+## Benchmarks
+
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:1000px;margin:0 auto;padding:16px 0">
+<p style="margin:0 0 12px;font-size:13px;line-height:1.5">Russian-language benchmark names are shown in <span style="color:#27834a;font-weight:600">green</span>; English-language benchmark names are shown in <span style="color:#496fa8;font-weight:600">blue</span>.</p>
+<p style="margin:0 0 14px;font-size:13px;line-height:1.5">All results in this section were obtained using our internal evaluation infrastructure, with inference performed in vLLM at t=0 for every model. The best result in each row is shown in bold.</p>
+<table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px">
+<colgroup>
+<col style="width:25%">
+<col span="5" style="width:15%">
+</colgroup>
+<thead><tr><th style="padding:10px 7px;text-align:left;font-weight:600;border-bottom:2px solid #d6a15f;color:#b7791f">Benchmark</th>
+<th style="padding:10px 7px;text-align:center;font-weight:500;border-bottom:2px solid #d6a15f;color:#b7791f;font-size:14px">AliceAI-Foundation-80B-A3B-Base</th>
+<th style="padding:10px 7px;text-align:center;font-weight:500;border-bottom:2px solid #d6a15f;color:#b7791f;font-size:14px">Qwen3.5-35B-A3B-Base</th>
+<th style="padding:10px 7px;text-align:center;font-weight:500;border-bottom:2px solid #d6a15f;color:#b7791f;font-size:14px">GLM-4.5-Air-Base (106B-A12B)</th>
+<th style="padding:10px 7px;text-align:center;font-weight:500;border-bottom:2px solid #d6a15f;color:#b7791f;font-size:14px">Nemotron-3-Super-120B-A12B-Base</th>
+<th style="padding:10px 7px;text-align:center;font-weight:500;border-bottom:2px solid #d6a15f;color:#b7791f;font-size:14px">DeepSeek-V4-Flash-Base (284B-A13B)</th></tr></thead>
+<tbody>
+<tr><td colspan="6" style="padding:8px 12px;font-weight:600;color:#b7791f;border-bottom:1px solid rgba(239,150,68,0.25);background:rgba(239,150,68,0.1)">Facts</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#27834a">WikiWebFacts</summary><div style="padding-top:6px;line-height:1.4">5-shot benchmark of factual knowledge in Russian.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>86.5</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">62.4</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">70.2</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">72.8</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">83.2</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#27834a">HardMultiQA</summary><div style="padding-top:6px;line-height:1.4">5-shot benchmark of factual knowledge in Russian.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>67.9</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">47.2</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">48.6</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">54.5</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">65.4</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#27834a">CultCat</summary><div style="padding-top:6px;line-height:1.4">4-shot benchmark of cultural knowledge. Read more in our <a href="https://habr.com/ru/companies/yandex/articles/868282/">article on Habr</a>.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>86.5</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">59.2</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">59.1</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">66.3</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">80.7</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#496fa8">TriviaQA</summary><div style="padding-top:6px;line-height:1.4">5-shot open benchmark of factual knowledge in English; LLM-as-a-judge is used instead of Exact Match.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">79.0</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">71.4</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">83.5</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>89.8</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">89.4</td></tr>
+<tr><td colspan="6" style="padding:8px 12px;font-weight:600;color:#b7791f;border-bottom:1px solid rgba(239,150,68,0.25);background:rgba(239,150,68,0.1)">Educational benchmarks</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#27834a">EduBench Russian</summary><div style="padding-top:6px;line-height:1.4">5-shot education benchmark built from queries submitted to Alice.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>74.2</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">42.9</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">39.0</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">44.0</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">67.7</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#27834a">EduBench Literature</summary><div style="padding-top:6px;line-height:1.4">5-shot education benchmark built from queries submitted to Alice.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>73.8</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">51.8</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">51.4</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">55.8</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">69.1</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#27834a">EduBench History</summary><div style="padding-top:6px;line-height:1.4">5-shot education benchmark built from queries submitted to Alice.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>82.0</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">65.9</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">62.8</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">70.2</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">76.9</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#27834a">EduBench English</summary><div style="padding-top:6px;line-height:1.4">5-shot education benchmark built from queries submitted to Alice.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">76.1</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">71.7</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">67.2</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">71.3</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>82.9</strong></td></tr>
+<tr><td colspan="6" style="padding:8px 12px;font-weight:600;color:#b7791f;border-bottom:1px solid rgba(239,150,68,0.25);background:rgba(239,150,68,0.1)">Expert knowledge</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#27834a">ExpertFactsQA Medicine</summary><div style="padding-top:6px;line-height:1.4">5-shot factual-knowledge benchmark created by domain experts.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>63.6</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">59.0</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">50.6</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">42.3</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">60.7</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#27834a">ExpertFactsQA Law</summary><div style="padding-top:6px;line-height:1.4">Challenging 5-shot factual-knowledge benchmark created by domain experts.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>49.6</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">27.9</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">22.5</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">24.3</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">40.5</td></tr>
+<tr><td colspan="6" style="padding:8px 12px;font-weight:600;color:#b7791f;border-bottom:1px solid rgba(239,150,68,0.25);background:rgba(239,150,68,0.1)">Exams</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#27834a">EGE CoT</summary><div style="padding-top:6px;line-height:1.4">5-shot benchmark based on multiple-choice Unified State Exam tasks across various subjects.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>90.5</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">84.7</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">77.8</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">84.3</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">90.3</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#496fa8">MMLU-Pro CoT</summary><div style="padding-top:6px;line-height:1.4">5-shot open benchmark of knowledge and reasoning across a broad range of subjects in English.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">66.8</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">63.2</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">58.4</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>69.9</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">66.5</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#496fa8">SuperGPQA CoT</summary><div style="padding-top:6px;line-height:1.4">5-shot open benchmark containing questions written by experts from different scientific fields.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">44.3</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">43.6</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">35.4</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>46.6</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">46.1</td></tr>
+<tr><td colspan="6" style="padding:8px 12px;font-weight:600;color:#b7791f;border-bottom:1px solid rgba(239,150,68,0.25);background:rgba(239,150,68,0.1)">Mathematics</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#496fa8">MATH-500</summary><div style="padding-top:6px;line-height:1.4">5-shot benchmark of mathematical problems; it uses LLM-as-a-judge and longer reasoning traces in the few-shot examples.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>91.1</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">81.9</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">60.2</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">84.8</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">80.7</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#27834a">EduBench Math</summary><div style="padding-top:6px;line-height:1.4">5-shot education benchmark built from queries submitted to Alice</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">79.3</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>80.0</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">56.9</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">69.7</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">76.3</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#27834a">EduBench Math University</summary><div style="padding-top:6px;line-height:1.4">5-shot education benchmark built from queries submitted to Alice.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>70.1</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">69.9</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">51.4</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">67.4</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">68.6</td></tr>
+<tr><td colspan="6" style="padding:8px 12px;font-weight:600;color:#b7791f;border-bottom:1px solid rgba(239,150,68,0.25);background:rgba(239,150,68,0.1)">Coding</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#496fa8">BigCodeBench 1-shot pass@1</summary><div style="padding-top:6px;line-height:1.4">1-shot, our implementation of BigCodeBench with improved tests.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">48.3</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">43.5</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">44.5</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">48.8</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>49.1</strong></td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#496fa8">LiveCodeBench v5-6 CoT 1-shot pass@1</summary><div style="padding-top:6px;line-height:1.4">1-shot open benchmark of challenging programming problems that require finding an algorithm and implementing it in code.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>50.5</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">50.4</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">22.6</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">50.4</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">38.1</td></tr>
+<tr><td colspan="6" style="padding:8px 12px;font-weight:600;color:#b7791f;border-bottom:1px solid rgba(239,150,68,0.25);background:rgba(239,150,68,0.1)">Long context</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#496fa8">FinQA 128k</summary><div style="padding-top:6px;line-height:1.4">5-shot long-context adaptation of the open-source FinQA benchmark, featuring financial-report analysis tasks.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>74.1</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">73.5</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">35.5</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">71.7</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>74.1</strong></td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#496fa8">LongMemEval 128k</summary><div style="padding-top:6px;line-height:1.4">5-shot open benchmark of finding and using information from long dialogue histories.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">64.6</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">55.6</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">50.6</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">64.8</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>68.0</strong></td></tr>
+</tbody>
+</table>
+</div>
+
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:1000px;margin:0 auto;padding:16px 0">
+<p style="margin:0 0 14px;font-size:13px;line-height:1.5">All results in this section were obtained using our internal evaluation infrastructure, with inference performed in vLLM at t=1 and repetition penalties (repetition_penalty=1, presence_penalty=1.5) for every model. The best result in each row is shown in bold.</p>
+<table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px">
+<colgroup>
+<col style="width:25%">
+<col span="3" style="width:25%">
+</colgroup>
+<thead><tr><th style="padding:10px 7px;text-align:left;font-weight:600;border-bottom:2px solid #d6a15f;color:#b7791f">Benchmark</th>
+<th style="padding:10px 7px;text-align:center;font-weight:500;border-bottom:2px solid #d6a15f;color:#b7791f;font-size:14px">AliceAI-Foundation-80B-A3B-Base</th>
+<th style="padding:10px 7px;text-align:center;font-weight:500;border-bottom:2px solid #d6a15f;color:#b7791f;font-size:14px">Qwen3.5-35B-A3B-Base</th>
+<th style="padding:10px 7px;text-align:center;font-weight:500;border-bottom:2px solid #d6a15f;color:#b7791f;font-size:14px">Nemotron-3-Super-120B-A12B-Base</th></tr></thead>
+<tbody>
+<tr><td colspan="4" style="padding:8px 12px;font-weight:600;color:#b7791f;border-bottom:1px solid rgba(239,150,68,0.25);background:rgba(239,150,68,0.1)">Complex reasoning</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#496fa8">AIME 2026 pass@32</summary><div style="padding-top:6px;line-height:1.4">0-shot problems from the American Invitational Mathematics Examination.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>96.7</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>96.7</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">90.0</td></tr>
+
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#496fa8">HMMT 2026 Feb pass@32</summary><div style="padding-top:6px;line-height:1.4">0-shot problems from the February Harvard–MIT Mathematics Tournament.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>96.9</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">87.9</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">66.7</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#496fa8">IMO Answerbench pass@8</summary><div style="padding-top:6px;line-height:1.4">0-shot problems from the International Mathematical Olympiad.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>88.7</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">84.5</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">64.5</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#496fa8">CodeForces CPP pass@8</summary><div style="padding-top:6px;line-height:1.4">0-shot competitive-programming problems from Codeforces in C++.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">68.9</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>73.7</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">56.6</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#496fa8">LiveCodeBench v5-6 pass@1</summary><div style="padding-top:6px;line-height:1.4">0-shot open benchmark of challenging programming problems.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>60.4</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">51.9</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">34.7</td></tr>
+<tr><td style="padding:7px 7px;padding-left:20px;border-bottom:1px solid rgba(128,128,128,0.15)"><details><summary style="cursor:pointer;white-space:normal;font-weight:600;color:#496fa8">LiveCodeBench v5-6 pass@8</summary><div style="padding-top:6px;line-height:1.4">0-shot open benchmark of challenging programming problems.</div></details></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)"><strong>82.9</strong></td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">82.1</td><td style="padding:7px;text-align:center;border-bottom:1px solid rgba(128,128,128,0.15)">59.8</td></tr>
+</tbody>
+</table>
+</div>
+
+
+## Usage
+
+### Transformers
+
+The model can be run with Transformers. The reference Transformers version is
+5.16.1. Running the KDA layers on GPU requires `flash-linear-attention` with
+KDA support:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install \
+  transformers[sentencepiece]==5.16.1 \
+  accelerate==1.14.0 \
+  flash-linear-attention==0.5.0
+```
+
+```python
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+model_id = "yandex/AliceAI-Foundation-80B-A3B-Base"
+
+tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(
+    model_id,
+    trust_remote_code=True,
+    dtype=torch.bfloat16,
+    device_map="auto",
+)
+
+prompt = "There are 256 coins of different weights. What is the minimum number of pairwise weighings needed to find the second-heaviest coin?"
+inputs = tokenizer(prompt.rstrip(), return_tensors="pt").to(model.device)
+output_ids = model.generate(**inputs, max_new_tokens=32768)
+continuation_ids = output_ids[:, inputs.input_ids.shape[1] :]
+print(tokenizer.decode(continuation_ids[0], skip_special_tokens=True))
+```
+
+### vLLM
+
+Two launch options are available:
+- Official vLLM nightly build without MTP.
+- Ready-to-use Docker image with MTP.
+
+#### Standard launch
+
+Install the nightly build from the `main` branch in a clean environment:
+
+```bash
+uv pip install -U vllm --torch-backend=auto --extra-index-url https://wheels.vllm.ai/nightly
+```
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2,3 vllm serve yandex/AliceAI-Foundation-80B-A3B-Base \
+  --port 8001 \
+  --trust-remote-code \
+  --tensor-parallel-size 4 \
+  --max-model-len auto \
+  --attention-backend FLASH_ATTN \
+  --attention-config.flash_attn_version=2
+```
+
+#### Docker image
+
+The image includes a vLLM build with MTP support for AliceAI. Docker and the NVIDIA Container Toolkit are required.
+
+```bash
+docker run --name alice-vllm --pull=always --gpus '"device=0,1,2,3"' --ipc=host \
+  -p 8001:8000 \
+  yamlbrand/alice-ai-vllm:latest \
+  yandex/AliceAI-Foundation-80B-A3B-Base \
+  --tensor-parallel-size 4 \
+  --max-model-len auto \
+  --attention-backend FLASH_ATTN \
+  --attention-config.flash_attn_version=2 \
+  --speculative-config '{"method":"mtp","num_speculative_tokens":1}'
+```
+
+To restart the stopped container while preserving its cache:
+
+```bash
+docker start -a alice-vllm
+```
+
+To use all GPUs, replace `--gpus '"device=0,1,2,3"'` with `--gpus all` and set the tensor-parallel size accordingly.
+
+#### Example request
+
+After starting the server with either option, send a request:
+
+```bash
+curl http://127.0.0.1:8001/v1/completions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "yandex/AliceAI-Foundation-80B-A3B-Base",
+    "prompt": "There are 256 coins of different weights. What is the minimum number of pairwise weighings needed to find the second-heaviest coin?",
+    "max_tokens": 32768,
+    "temperature": 0
+  }'
+```
+
+### Tokenizer
+
+The tokenizer is loaded as `LlamaTokenizer` from `tokenizer.model` and uses
+SentencePiece BPE. The `[COT_ENABLE]`, `[COT_START]`, and `[COT_END]` markers,
+as well as the tool-use markers, are ordinary atomic vocabulary tokens rather
+than Hugging Face special tokens.
+
+In `tokenizer_config.json`, `legacy` is explicitly set to `false` to preserve
+the expected whitespace handling. Do not override it with `true`.
+
+Benchmark preprocessing: To reproduce the reported benchmark results, 
+remove trailing whitespace from each fully assembled input prompt with 
+prompt = prompt.rstrip() before tokenization.
+
+### Fine-tuning for your tasks
+
+#### Data format
+
+To prepare the agentic data used during model training, we used the standard
+OpenAI Messages format. A trajectory is represented as a sequence of messages
+with the `system`, `user`, `assistant`, `tool`, and `meta` roles, while the
+definitions of the available tools are passed separately in the `tools` field.
+
+Before tokenization, each trajectory was rendered with
+[`chat_template.jinja`](finetune/chat_template.jinja). The template defines the
+role prefixes and the representation of reasoning traces, tool descriptions,
+function calls, and tool results. This is the textual representation in which
+the model encountered these data during training.
+
+For sft and RL, we recommend storing data in the OpenAI
+Messages format and rendering it with this template. This keeps the new data
+consistent with the format seen by the model during pretraining.
+
+We intentionally do not set this template as `chat_template` in
+`tokenizer_config.json`: Alice-AI-Foundation-80B-A3B-Base is a base model and therefore does
+not have a single conversational format that should be applied automatically
+during inference. The provided template is intended specifically for preparing
+fine-tuning data.
+
+#### LoRA fine-tuning example
+
+The repository includes a minimal PEFT fine-tuning example,
+[`finetune_lora.py`](finetune/finetune_lora.py). It loads a pinned revision of
+the `tatsu-lab/alpaca` dataset, computes the training loss only on responses,
+and saves only the LoRA adapter. A model of this size requires FSDP2; the
+example below is designed for four GPUs with 80 GB of memory each.
+
+```bash
+pip install \
+  transformers==5.16.1 \
+  accelerate==1.14.0 \
+  peft==0.20.0 \
+  datasets==5.0.1 \
+  flash-linear-attention==0.5.0
+
+pip install flash-attn==2.8.1 --no-build-isolation
+
+CUDA_VISIBLE_DEVICES=0,1,2,3 \
+PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
+accelerate launch \
+  --use_fsdp \
+  --num_processes 4 \
+  --num_machines 1 \
+  --dynamo_backend no \
+  --mixed_precision no \
+  --fsdp_version 2 \
+  --fsdp_reshard_after_forward true \
+  --fsdp_auto_wrap_policy TRANSFORMER_BASED_WRAP \
+  --fsdp_transformer_layer_cls_to_wrap AliceAIDecoderLayer \
+  --fsdp_cpu_ram_efficient_loading true \
+  --fsdp_sync_module_states true \
+  --fsdp_state_dict_type SHARDED_STATE_DICT \
+  finetune/finetune_lora.py \
+  --model yandex/AliceAI-Foundation-80B-A3B-Base \
+  --steps 100 \
+  --sequence-length 512 \
+  --output-dir alice-lora
+```
+
+Here, `--mixed_precision no` does not mean that the model uses FP32: the base
+weights are loaded in BF16, while PEFT stores the LoRA parameters in FP32.
+
+With RAM-efficient loading, only rank 0 loads the full checkpoint weights. The
+other processes construct the model on the meta device and receive their shards
+through FSDP2.

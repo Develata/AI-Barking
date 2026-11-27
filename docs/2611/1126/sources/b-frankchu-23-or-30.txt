@@ -1,0 +1,303 @@
+23 or 30 tools? Google's Gmail MCP can't decide - DEV Community
+
+ Skip to content [#main-content]
+
+ [/]
+
+ Powered by Algolia
+
+ [https://www.algolia.com/developers/?utm_source=devto&utm_medium=referral]
+
+ Log in
+ [/enter?signup_subforem=1]
+
+ Create account
+ [/enter?signup_subforem=1&state=new-user]
+
+DEV Community
+
+ Add reaction
+
+ Like
+
+ Unicorn
+
+ Exploding Head
+
+ Raised Hands
+
+ Fire
+
+ Jump to Comments
+
+ Save
+
+ Boost
+
+Pick as gem
+
+ Copy link
+
+Copied to Clipboard
+
+ Share to X
+ [https://twitter.com/intent/tweet?text=%2223%20or%2030%20tools%3F%20Google%27s%20Gmail%20MCP%20can%27t%20decide%22%20by%20frank%20chu%20%23DEVCommunity%20https%3A%2F%2Fdev.to%2Ffrankchu%2F23-or-30-tools-googles-gmail-mcp-cant-decide-59j3]
+
+ Share to LinkedIn
+ [https://www.linkedin.com/shareArticle?mini=true&url=https%3A%2F%2Fdev.to%2Ffrankchu%2F23-or-30-tools-googles-gmail-mcp-cant-decide-59j3&title=23%20or%2030%20tools%3F%20Google%27s%20Gmail%20MCP%20can%27t%20decide&summary=I%20asked%20Google%27s%20Gmail%20MCP%20server%20what%20tools%20it%20has%2C%2030%20times%20in%2011%20seconds.%2018%20times%20it%20said%2023%20tools.%2012%20times%20it%20said%2030%20%E2%80%94%20including%20send_message.&source=DEV%20Community]
+
+ Share to Facebook
+ [https://www.facebook.com/sharer.php?u=https%3A%2F%2Fdev.to%2Ffrankchu%2F23-or-30-tools-googles-gmail-mcp-cant-decide-59j3]
+
+ Share to Mastodon
+ [https://s2f.kytta.dev/?text=https%3A%2F%2Fdev.to%2Ffrankchu%2F23-or-30-tools-googles-gmail-mcp-cant-decide-59j3]
+
+ Share Post via... [#]
+
+ Report Abuse [/report-abuse]
+
+ [https://media2.dev.to/dynamic/image/width=1000,height=420,fit=cover,gravity=auto,format=auto/https%3A%2F%2Fraw.githubusercontent.com%2Ffrankchu91%2FWhatTechPost%2Fmain%2Fpublished%2F2026-11-26-gmail-mcp-tools%2Fcover.png]
+
+ [/frankchu]
+
+ frank chu [/frankchu]
+
+ Posted on Nov 27
+
+ 23 or 30 tools? Google's Gmail MCP can't decide
+
+ #programming [/t/programming]
+ #mcp [/t/mcp]
+ #gmail [/t/gmail]
+ #discuss [/t/discuss]
+
+ [#23-or-30-tools-googles-gmail-mcp-cant-decide]
+ 23 or 30 tools? Google's Gmail MCP can't decide
+
+I asked Google's Gmail MCP server what tools it has, 30 times in 11 seconds. 18 times it said 23 tools. 12 times it said 30 — including send_message, reply, and forward. Same endpoint, same request, two different answers.
+
+ [#the-setup]
+ The setup
+
+On November 24, Google made its eight hosted Workspace MCP servers generally available — Gmail, Drive, Docs, Sheets, Slides, Calendar, Chat, and Tasks — and published a new Workspace AI Tools Addendum. From February 1, 2027, any tool "driven by an AI Agent" must reach Workspace through those servers instead of calling the REST APIs directly. Agents that keep calling REST get capped at Standard Tier quotas no matter what they pay for.
+
+The headline limitation, reported everywhere this week, is that the Gmail server can't send email: it searches, reads, drafts, and labels, but send, reply, forward, and editing drafts are partner-only. Google's own developer release notes describe the Gmail MCP server the same way — search and read, create and retrieve drafts, manage labels, trash and spam. No send.
+
+I wanted to check that claim against the live server. The servers answer tools/list without an OAuth token, so the catalog is public. I probed all eight.
+
+ [#what-the-eight-servers-advertise]
+ What the eight servers advertise
+
+server endpoint tools (no auth)
+gmail gmailmcp.googleapis.com/mcp/v1 23 or 30 <- flip-flops
+drive drivemcp.googleapis.com/mcp/v1 9
+docs docsmcp.googleapis.com/mcp/v1 2
+sheets sheetsmcp.googleapis.com/mcp/v1 6
+slides slidesmcp.googleapis.com/mcp/v1 4
+calendar calendarmcp.googleapis.com/mcp/v1 9
+chat chatmcp.googleapis.com/mcp/v1 4
+tasks tasksmcp.googleapis.com/mcp/v1 9
+
+Seven of the eight are rock stable. Gmail is not.
+
+ [#the-flipflop-measured]
+ The flip-flop, measured
+
+My first tools/list call to Gmail hung — the server never closed the SSE stream. Sending initialize first fixed it (HTTP 200 in 0.42s, server identifies as StatelessServer, version ESF). After that, plain tools/list calls answered in ~0.3–0.6s.
+
+Then I ran the same request 30 times in a row, 11.0 seconds total:
+
+response count raw bytes send_message present?
+23 tools 18 88,436 no
+30 tools 12 149,735 yes
+
+The 30-tool answer always adds exactly the same 7 tools:
+
+send_message, reply, forward, update_draft,
+create_filter, list_filters, update_label
+
+I checked whether the answer depends on what I send. It doesn't — at least not on anything I varied. I alternated the MCP-Protocol-Version header across 2025-03-26, 2025-06-18, 2024-11-05, 2025-11-25, and no header at all, 12 calls: every group returned a mix. Drive, probed 10 times for comparison, returned 9 tools all 10 times. The flip-flop is Gmail-specific, server-side, and not header-driven. The boring explanation is load balancing across backends on different rollout versions; the interesting one is a staged rollout in progress. Either way, the catalog you get depends on which backend answers.
+
+One more detail: Google's Gmail quotas page lists eight partner-only tools — the seven above plus delete_label. delete_label never appeared in either variant. So the live catalog holds 7 of the 8 gated tools, and the documented public set is the 23-tool one. The 88,436-byte figure matches the 23-tool count published earlier this week exactly — that measurement was real, it was just one side of a coin flip.
+
+ [#what-i-could-not-test]
+ What I could not test
+
+Calling any tool without authentication returns the same error for public and gated tools alike:
+
+HTTP 401
+"Request is missing required authentication credential.
+Expected OAuth 2 access token, login cookie or other valid
+authentication credential."
+
+create_draft, send_message, and search_threads all fail identically, so I cannot tell from outside whether send_message actually executes for a non-partner with a valid token — Google's docs say it requires partner access, and I did not test with real credentials, because testing send means sending a real email. The honest statement is narrower than the headlines: the catalog is inconsistent, and the documentation says send is gated. Whether the gate holds at call time is untested by me.
+
+ [#why-this-matters-before-february-1]
+ Why this matters before February 1
+
+If your agent checks capabilities once at startup — the normal thing to do — it can conclude Gmail can send email, or that it can't, depending on which backend answered that one request. An agent that drafts a reply, gets your feedback, and then needs to revise the draft is stuck either way in the documented world (update_draft is gated), but in the 30-tool world it looks possible until the call fails.
+
+Two other numbers from Google's own pages are worth knowing before you migrate: Standard Tier MCP is capped at 5,000 requests per day per project, and a Gmail search counts as 10, so that's at most 500 searches a day. And the Addendum puts a 30-day cap on derived memory — embeddings and indexes built from Workspace data. The migration deadline is February 1, 2027; Scaled Tier billing starts April 1, 2027, with no free allowance for MCP.
+
+Google shipped a mandate with a deadline and a server whose own answer to "what can you do?" changes between requests. Check the catalog every time, or don't build against it at all.
+
+ [#caveats-stated-plainly]
+ Caveats, stated plainly
+
+All probes ran November 26, 2026, ~16:40 MST, unauthenticated, against https://<product>mcp.googleapis.com/mcp/v1. The flip-flop is a same-day observation and may already be gone — Google could finish the rollout tomorrow. I did not test authenticated calls and did not test whether the 7 gated tools execute for a non-partner. The February 1 mandate, the 5,000/day Standard cap, and the 30-day memory TTL are from Google's Workspace Updates blog, Cloud blog, and developer docs, not from my probes.
+
+ [#sources]
+ Sources
+
+Google Workspace Updates blog, "Simplifying agent access while keeping organizations in control," November 24, 2026: https://workspaceupdates.googleblog.com/2026/11/ [https://workspaceupdates.googleblog.com/2026/11/]
+
+Google Cloud Blog, "Deploying agents safely in your enterprise," November 25, 2026: https://cloud.google.com/blog/products/identity-security/deploying-agents-safely-in-your-enterprise [https://cloud.google.com/blog/products/identity-security/deploying-agents-safely-in-your-enterprise]
+
+Google Workspace developer release notes, November 24, 2026 (Gmail MCP server GA): https://developers.google.com/workspace/release-notes [https://developers.google.com/workspace/release-notes]
+
+Gmail API and MCP server quotas (partner-access footnote): https://developers.google.com/workspace/gmail/api/guides/quotas [https://developers.google.com/workspace/gmail/api/guides/quotas]
+
+Flavio Copes, "Google is requiring AI agents to use its Workspace MCP servers," November 26, 2026: https://flaviocopes.pages.dev/google-workspace-mcp/ [https://flaviocopes.pages.dev/google-workspace-mcp/]
+
+ Top comments (1)
+
+ Subscribe
+
+ Submit
+ Preview
+ Dismiss [/404.html]
+
+ [https://dev.to/userxnom]
+
+ Abdullah Naseer
+
+ [https://dev.to/userxnom]
+
+ Abdullah Naseer
+
+ Abdullah Naseer
+
+ [/userxnom]
+
+ Follow
+
+ Indie builder from Pakistan. First app: ShiftLog — free shift & profit tracker for gig workers
+
+ Joined
+
+ Oct 26, 2026
+
+ •
+
+ Nov 27
+
+ [https://dev.to/frankchu/23-or-30-tools-googles-gmail-mcp-cant-decide-59j3#comment-3mjbo]
+
+Copy link [https://dev.to/frankchu/23-or-30-tools-googles-gmail-mcp-cant-decide-59j3#comment-3mjbo]
+
+ Hide
+
+This is the kind of measurement that actually matters, because the failure mode is silent: an agent that lists capabilities once at startup can build a whole plan on a coin flip — in the 23-tool world it concludes send_message does not exist and routes around it, in the 30-tool world it plans around send_message and only learns at call time that the gate is still there. The initialize-first detail is easy to miss too: a tools/list that hangs on an unclosed SSE stream until you send initialize first is a protocol-level gotcha for anyone probing MCP servers raw. And delete_label never appearing while the quotas page lists it is exactly the doc-versus-live mismatch you only catch by probing. One question: did the two answers correlate with anything in the responses — different headers, timing, any hint of a rollout split — or was it pure noise across the 30 calls? And given this, would you cache tools/list at all, or re-list before every send attempt despite the extra round trip?
+
+ 1 like
+
+ Like
+
+ Reply
+
+ Code of Conduct [/code-of-conduct]
+ •
+ Report abuse [/report-abuse]
+
+ frank chu
+
+ [/frankchu]
+
+ Follow
+
+ Work
+
+ Meta
+
+ Joined
+
+ Jul 21, 2026
+
+ More from frank chu [/frankchu]
+
+ $549.99: the same 20TB drive was $249.99 in 2024
+
+ #programming
+ #hardware
+ #storage
+ #discuss
+
+ [/frankchu/54999-the-same-20tb-drive-was-24999-in-2024-2f2b]
+
+ 84 of 128: GPT-6.2 Astra beat Googlers' golf records
+
+ #ai
+ #llm
+ #programming
+ #discuss
+
+ [/frankchu/84-of-128-gpt-62-astra-beat-googlers-golf-records-mhn]
+
+ DEV Community [/] — A space to discuss and keep up software development and manage your software career
+
+ Home
+ [/]
+
+ DEV Challenges
+ [/challenges]
+
+ DEV++
+ [/++]
+
+ Videos
+ [/videos]
+
+ DEV Help
+ [/help]
+
+ Advertise on DEV
+ [/advertise]
+
+ Organization Accounts
+ [/organizations]
+
+ DEV Showcase
+ [/showcase]
+
+ About
+ [/about]
+
+ Contact
+ [/contact]
+
+ DEV Shop
+ [https://shop.forem.com/]
+
+ MLH
+ [https://mlh.io/]
+
+ Code of Conduct
+ [/code-of-conduct]
+
+ Privacy Policy
+ [/privacy]
+
+ Terms of Use
+ [/terms]
+
+Built on Forem [https://www.forem.com] — the open source [https://dev.to/t/opensource] software that powers DEV [https://dev.to] and other inclusive communities.
+
+Made with love and Ruby on Rails [https://dev.to/t/rails]. DEV Community © 2016 - 2026.
+
+ We're a place where coders share, stay up-to-date and grow their careers.
+
+ Log in
+ [/enter?signup_subforem=1]
+
+ Create account
+ [/enter?signup_subforem=1&state=new-user]

@@ -1,0 +1,136 @@
+Google gives AI agents 69 days to move to Workspace MCP · Vortner
+
+ vortner [/]
+
+ Product 
+
+ ConnectionsPlug in every tool, even without an AI connection [/connections]
+ RulesWho sees what, in one sentence [/rules]
+ Personal dataWhat the AI gets, field by field [/personal-data]
+ ApprovalsNothing goes live without the right yes [/approvals]
+ RecordWhat the AI did, and which rule decided [/record]
+ UsageWhere AI helps, and where people get stuck [/usage]
+
+ Integrations [/integrations]
+ How it works [/#how]
+ Security [/security]
+ Blog [/blog]
+
+DE [/de/blog]·EN
+
+ Book a call → [https://zeeg.me/paul17/vortner-15-minutes]
+
+ Product
+
+Connections [/connections]Rules [/rules]Personal data [/personal-data]Approvals [/approvals]Record [/record]Usage [/usage]
+
+Integrations [/integrations]How it works [/#how]Security [/security]Blog [/blog]Get updates [/updates]
+
+DE [/de/blog]·EN
+
+ Book a call → [https://zeeg.me/paul17/vortner-15-minutes]
+
+ ‹ All posts [/blog]
+
+Google gives AI agents 69 days to move to Workspace MCP
+
+By Paul Karrmann [/about]26 November 20269 min read
+
+ The rule this post argues for
+
+The AI can read the inbox, but only draft emails.
+
+Approved
+
+MCP is also the one path to Workspace data that Google bills from the first request on its paid tier.
+
+Disclosure: I build Vortner, a permission layer between company tools and AI clients. Google's new rules impact products like mine, which is why I read all of them. Nothing below depends on that. Every number comes from Google's own pages or from public package registries, and the method is at the end.
+
+On November 24, Google made its Workspace MCP servers generally available, introduced two usage tiers and published a Workspace AI Tools Addendum [https://workspace.google.com/terms/ai-tools]. The core rule, from the announcement [https://workspaceupdates.googleblog.com/2026/11/mcp-servers-cli-standardized-usage-tiers-now-available.html]: agents "must use MCP to access Workspace data, rather than calling Workspace REST APIs directly". Technical enforcement starts February 1, 2027.
+
+Some of what came with it is good. External agents have to identify themselves in OAuth, so admins can manage them like any other app. Admins can set rules that make users confirm sensitive actions, agent actions show up in audit logs, and existing DLP rules apply when someone uses an agent. If you've seen a prompt injection talk an agent into forwarding a mailbox, you want all of that.
+
+None of it needed the mandate or the meter, though. Agent identity is a checkbox on the OAuth client, "Use this client for an AI-powered agent", which Google's help page [https://support.google.com/cloud/answer/15549257] calls a self-declaration. It would work the same way on REST. Audit logs and DLP run on Google's side either way. The confirmation prompts are the only control that needs a hook in the protocol, and that could have been an admin setting along the lines of "agents in my org must use MCP". So I looked at what the mandate and the pricing do on their own.
+
+The path agents must take is the only one without a free allowance
+
+Workspace now has a free Standard tier and a paid Scaled tier. On Scaled, REST traffic gets a daily no-charge allowance per billing account: 70 million Light, 10 million Medium and 1 million Premium Gmail requests, with similar allowances for Drive and Calendar. You only pay above that. MCP on Scaled has no allowance at all. From April 1, 2027, every successful MCP request is billed, and the 5,000 free MCP requests a day you had on Standard go away when you move up.
+
+ [/blog/images/gws-mcp-01-free-allowance.png]
+Figure 1 · click to enlarge
+
+There's also an internal-use exception that lets a company's own projects get higher REST quotas without paying. It doesn't cover MCP [https://developers.google.com/workspace/guides/quota-usage-tiers]. A company that builds its own agent for its own mailboxes pays per call on top of its Workspace licences as soon as it outgrows the free 5,000 requests a day, while a plain script reading the same mailboxes doesn't.
+
+What a basic email assistant costs
+
+The free Standard tier caps MCP at 5,000 requests per day, per project, per product, shared by everyone on that project. Most Gmail MCP tools count as one request. search_threads and list_drafts count as ten, because they make several calls underneath. That makes the free tier 500 email searches a day for the whole project. Google's quota pages [https://developers.google.com/workspace/gmail/api/guides/quotas] also say failed tool calls are billed, because they come back as HTTP 200 with an error flag. REST billing only counts successful responses.
+
+To see what this means in practice, I modelled a modest assistant: 5 searches, 15 thread reads and 3 drafts per person per workday. That's 68 units per person, so 73 people use up the free tier. On Scaled, at Google's prices [https://developers.google.com/workspace/guides/quota-pricing] (searching and reading a thread are both Premium, $0.50 per 1,000), it comes to $0.73 per person per month.
+
+ [/blog/images/gws-mcp-02-email-assistant-cost.png]
+Figure 2 · click to enlarge
+
+That's $364 a month for 500 people and $3,641 for 5,000. Over REST, the same calls would cost nothing until about 43,000 people, even if every call were billed at the Premium rate. The workload is my guess. Plug in your own and the gap stays the same shape.
+
+To be fair to Google, these are small amounts, and nobody goes broke at $0.73 a head. The problem is the structure: the path agents are required to use is the one where the meter runs from the first call, and the company running the meter also decides which tools exist on that path. In Gmail's MCP, sending, replying and forwarding currently need partner access and aren't generally available.
+
+69 days
+
+ [/blog/images/gws-mcp-03-notice-period.png]
+Figure 3 · click to enlarge
+
+On May 1 [https://workspaceupdates.googleblog.com/2026/05/agent-tools-and-security-updates-for-workspace-developers.html], Google opened the Workspace MCP server as a public developer preview and pitched MCP as a standard way for agents to get context and tools. There was no requirement. The same post promised owners of existing projects at least 60 days' notice before quota changes. Google's tools-safety page, now folded into the usage tiers page (archived copy [https://web.archive.org/web/20261106184943/https://developers.google.com/workspace/tools-safety]), said billing changes would follow later in 2026 with 90 days of notice. Billing does get that: it starts April 1, 128 days after the announcement. The mandate was announced on November 24 and is enforced from February 1. That's 69 days: more than the 60, less than the 90, with the holidays in the middle.
+
+At least 290 open-source projects are in scope
+
+On November 26 I pulled npm, PyPI and the official MCP registry and looked for packages that describe themselves as MCP servers for Gmail, Drive, Calendar, Docs, Sheets, Slides, Chat or Tasks and depend on Google's REST client libraries. That gave 398 packages. After merging the ones that point at the same repository or carry the same description, and dropping republished mirrors, 292 distinct projects are left. Together they had about 184,000 downloads last week. The official MCP registry lists 128 Workspace servers. 35 of them are hosted remotely: 34 by third parties and one by Google, a documentation search server. None point at Google's Workspace data servers.
+
+ [/blog/images/gws-mcp-04-open-source.png]
+Figure 4 · click to enlarge
+
+These won't stop working on February 1 for someone running one on their own Cloud project, because REST keeps answering at Standard quotas. What changes is the contract. From February 1 the Addendum requires a Google MCP whenever the tool is driven by an AI agent and bans obfuscating your way out of that classification. An MCP server exists to be called by an agent, so there isn't much room to argue. For agents that stay on REST, the consequence Google's pages spell out is a cap at Standard tier quotas. The Addendum's clause that lets Google cut access immediately covers its listed data rules (storage, retention, scraping, training, lookalike products), not the MCP rule itself.
+
+The rest of the Addendum
+
+A few clauses matter more than they look:
+
+Workflows count as agents. The Addendum's definition of an AI agent covers goal-oriented AI systems and workflows that act on your behalf, supervised or not. An automation workflow with a model step in it plausibly falls under it.
+
+30 days, then it's gone. "Google Technical Information" can't be stored for more than 30 days. The Addendum lists vector embeddings, memory indexes, user profiles, organizational graphs and findings as examples. Neither that nor user data may be kept after the tool is disconnected. Any persistent search index or agent memory built over Drive or Gmail has to expire.
+
+No probing. Scraping or systematic probing of Google's MCP servers, their skills, documentation or outputs is banned beyond what a user's task needs.
+
+No training and no lookalikes. User data and Google Technical Information can't be used for training, fine-tuning or building eval datasets, or to build a product similar to a Workspace service.
+
+No field-level control. Google's MCP returns Google's output. The setup docs [https://developers.google.com/workspace/guides/configure-mcp-servers] don't describe any redaction, masking or pseudonymization, and the AI access restrictions [https://cloud.google.com/blog/products/identity-security/deploying-agents-safely-in-your-enterprise] Google says are coming block agents from whole messages, files or folders. If your company strips personal data field by field before it reaches a model, Google's path has no place to do that anymore. For European companies that's a data-minimization problem. It's also the part that hits my own product.
+
+If you run agents on Workspace, before February 1
+
+Give your agent features their own OAuth client and tick "Use this client for an AI-powered agent" on it. Google wants separate clients for agent and non-agent features, so ticking the box on a shared client isn't enough.
+
+Move agent traffic to Google's MCP servers. Expect different tools than the ones you built, since Google defines them now.
+
+Check MCP usage in the Cloud console, under the product's MCP API, Quotas & System Limits. Google says the Workspace dashboard doesn't show the 5,000-a-day limit. Searches count as ten.
+
+If you'll go past the free tier, plan for a billing account and per-call charges from April 1.
+
+Put a 30-day expiry on embeddings, agent memory and anything else derived from Workspace data, and purge it when a customer disconnects.
+
+Don't count on the internal-use exception for agents. It doesn't apply to MCP.
+
+Method
+
+Google's rules and prices: quota usage tiers, pricing and billing tiers, Gmail API and MCP quotas, Drive usage limits, MCP server setup guide, Workspace AI Tools Addendum, OAuth agent help page, tools-safety page (archived copy of November 6, since the page now redirects), Workspace Updates posts of May 1 and November 24, 2026. Read November 26, 2026. The quota and pricing pages were last updated November 24.
+
+Cost model: assumed workload of 5 search_threads, 15 get_thread and 3 create_draft calls per person per workday, 22 workdays a month, with Google's published weights (10, 1, 1) and buckets (Premium $0.50, Medium $0.20 per 1,000). REST comparison: one call per action, all billed as Premium against the 1,000,000 Premium allowance, which is a worst case. Failed calls, retries and other products aren't included. Not measured on real traffic.
+
+Open-source count: npm registry search with 12 terms; the full PyPI index (about 950,000 projects) filtered on names containing "mcp" plus a Workspace term, then on summaries; the official MCP registry. A package counts if it depends on googleapis, @googleapis/*, google-auth-library, google-api-python-client, google-auth, gspread or similar. Merged by GitHub repository and identical description; groups made up only of known republishing mirrors were dropped. A random sample of 25 matched packages were all Workspace MCP servers. Downloads are npm and pypistats last-week figures from November 26 and include CI, mirrors and bots. They're concentrated: one package accounts for 39% of them and the top five for 67%. Not counted: servers calling Google over plain HTTP, GitHub-only projects, private code. Script and package list: github.com/PK-Consulting/workspace-mcp-rest-snapshot [https://github.com/PK-Consulting/workspace-mcp-rest-snapshot].
+
+Not estimated: how many companies are affected. Google doesn't publish how many customers run agents on Workspace, and download counts don't translate into companies.
+
+ Next postWhat's worse: a stranger with your salary data, or with your candidate data? I tried both. I got both. [/blog/ai-recruiting-assistant-leaked-salaries]
+
+vortnerMade in Berlin. Runs in the EU.
+About [/about]Security and data protection [/security]MCP gateway [/mcp-gateway]Imprint [/imprint]Privacy [/privacy]LinkedIn [https://www.linkedin.com/company/vortner-de]
+
+DE [/de/blog]·EN
