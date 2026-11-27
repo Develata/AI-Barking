@@ -1,7 +1,7 @@
 //! `barking lint`: mechanical pre-publish checks for one issue directory.
 //!
 //! Only rules that can be decided exactly are errors. Judgment calls (is there a
-//! real 吠点? is a claim overstated?) stay with Develata and codex-reviewer.
+//! real 吠点? is a claim overstated?) stay with Develata and the independent reviewer.
 //! The constants below mirror EDITORIAL.md / AGENTS.md; change both together.
 
 use std::collections::BTreeSet;

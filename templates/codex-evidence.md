@@ -1,6 +1,6 @@
-# Codex 取证任务模板
+# 取证任务模板
 
-由 Claude 填写 `{…}` 后直接派给 Sonnet 子代理，或 Codex（Luna，effort max）执行，不经 Develata 搬运。执行方用 opencli / agent-reach 浏览、存档与截图。
+由主执行方填写 `{…}` 后直接派给取证子代理（当前 agent 的子代理或独立 CLI 会话，见 `docs/workflow/harness.md` 第 4 节）执行，不经 Develata 搬运。执行方用 `opencli` / `agent-reach` 与 `barking` 工具浏览、存档与截图。
 
 ---
 

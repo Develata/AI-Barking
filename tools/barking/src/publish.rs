@@ -385,6 +385,8 @@ fn compress_pngs(issue: &Issue) -> Result<Step, String> {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 let install = if cfg!(windows) {
                     "scoop install oxipng"
+                } else if cfg!(target_os = "macos") {
+                    "cargo binstall oxipng（或 brew install oxipng）"
                 } else {
                     "cargo binstall oxipng"
                 };

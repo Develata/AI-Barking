@@ -1,12 +1,14 @@
 //! `barking review`: assemble the cross-model review of an issue (EDITORIAL.md
-//! 核验流程 step 5, templates/cards/README.md step 5) and, with `--run`,
-//! hand it to Codex: through WSL on Windows, directly elsewhere.
+//! 核验流程 step 5, templates/cards/README.md step 5, docs/workflow/harness.md)
+//! and, with `--run`, hand it to the selected reviewer backend (`codex` or
+//! `claude`); `--reviewer print-only` only writes the prompt file for any
+//! external cross-family read-only session.
 //!
 //! This module only does the mechanical part: fill the prompt template, pick
 //! the images, convert paths for the host and build the command line. Reading the
 //! report, judging each finding and recording the verdict in `fact-check.md`
-//! stay with Claude; the reviewer must be independent, so nothing about the
-//! expected outcome goes into the prompt.
+//! stay with the main executor; the reviewer must be independent, so nothing
+//! about the expected outcome goes into the prompt.
 
 use std::fmt::Write as _;
 use std::fs::{self, OpenOptions};
@@ -21,19 +23,26 @@ use crate::repo::Issue;
 
 const VISUAL_TEMPLATE: &str = include_str!("../../../templates/cards/visual-review.md");
 const REVERSE_TEMPLATE: &str = include_str!("../../../templates/reverse-review.md");
-const USAGE: &str = "用法：barking review <期次目录> (--visual | --reverse [--full]) [--effort medium|high|xhigh|max] [--run]";
+const USAGE: &str = "用法：barking review <期次目录> (--visual | --reverse [--full]) [--reviewer codex|claude|print-only] [--effort medium|high|xhigh|max] [--run]";
 
-/// The strongest GPT model; the reviewer must be a different family from the
-/// drafting model (~/.claude/agents/codex-reviewer.md).
-const MODEL: &str = "gpt-6-astra";
-const EFFORTS: [&str; 4] = ["medium", "high", "xhigh", "max"];
-/// `medium` runs are capped at 20 minutes; above that Codex may research for
+/// Default GPT model for `--reviewer codex` (override via `BARKING_CODEX_MODEL`);
+/// the reviewer must be a different model family from the main executor
+/// (docs/workflow/harness.md).
+const DEFAULT_CODEX_MODEL: &str = "gpt-6.2-sol";
+/// Default Claude model for `--reviewer claude` (override via `BARKING_CLAUDE_MODEL`).
+const DEFAULT_CLAUDE_MODEL: &str = "opus";
+const CODEX_EFFORTS: [&str; 4] = ["medium", "high", "xhigh", "max"];
+const CLAUDE_EFFORTS: [&str; 3] = ["medium", "high", "max"];
+/// `medium` runs are capped at 20 minutes; above that research may run for
 /// hours, so there is no cap (`timeout 0`).
 const MEDIUM_TIMEOUT_SECS: u32 = 1200;
 const DEFAULT_DISTRO: &str = "Debian";
 const DEFAULT_WSL_CODEX: &str = "/home/deve/.bun/bin/codex";
-/// Native hosts find Codex on PATH unless `BARKING_CODEX` says otherwise.
+/// Native hosts find Codex / Claude on PATH unless overridden.
 const DEFAULT_NATIVE_CODEX: &str = "codex";
+const DEFAULT_CLAUDE: &str = "claude";
+const CLAUDE_REVERSE_TOOLS: &str = "Read,Grep,Glob,WebSearch,WebFetch";
+const CLAUDE_VISUAL_TOOLS: &str = "Read,Grep,Glob";
 /// Lines of the report echoed after `--run`.
 const REPORT_PREVIEW_LINES: usize = 40;
 /// EDITORIAL.md sections the visual reviewer needs as its rule book.
@@ -70,10 +79,31 @@ impl Mode {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Reviewer {
+    Codex,
+    Claude,
+    PrintOnly,
+}
+
+impl Reviewer {
+    fn parse(s: &str) -> Result<Self, String> {
+        match s {
+            "codex" => Ok(Reviewer::Codex),
+            "claude" => Ok(Reviewer::Claude),
+            "print-only" => Ok(Reviewer::PrintOnly),
+            _ => Err(format!(
+                "--reviewer 须为 codex、claude、print-only，得到「{s}」"
+            )),
+        }
+    }
+}
+
 #[derive(Debug)]
 struct Opts {
     dir: PathBuf,
     mode: Mode,
+    reviewer: Reviewer,
     effort: String,
     run: bool,
     /// `--reverse` only: list every tracked text file instead of the focused
@@ -111,7 +141,8 @@ pub fn run(args: &[String]) -> ExitCode {
 
 fn parse_args(args: &[String]) -> Result<Opts, String> {
     let (mut visual, mut reverse, mut run, mut full) = (false, false, false, false);
-    let mut effort = String::from("medium");
+    let mut reviewer = Reviewer::Codex;
+    let mut effort: Option<String> = None;
     let mut dir: Option<PathBuf> = None;
     let mut it = args.iter();
     while let Some(a) = it.next() {
@@ -120,8 +151,15 @@ fn parse_args(args: &[String]) -> Result<Opts, String> {
             "--reverse" => reverse = true,
             "--run" => run = true,
             "--full" => full = true,
-            "--effort" => effort = it.next().ok_or("--effort 缺少取值")?.clone(),
-            s if s.starts_with("--effort=") => effort = s["--effort=".len()..].to_string(),
+            "--reviewer" => {
+                let v = it.next().ok_or("--reviewer 缺少取值")?;
+                reviewer = Reviewer::parse(v)?;
+            }
+            s if s.starts_with("--reviewer=") => {
+                reviewer = Reviewer::parse(&s["--reviewer=".len()..])?;
+            }
+            "--effort" => effort = Some(it.next().ok_or("--effort 缺少取值")?.clone()),
+            s if s.starts_with("--effort=") => effort = Some(s["--effort=".len()..].to_string()),
             s if s.starts_with("--") => return Err(format!("未知选项 {s}")),
             _ => {
                 if dir.replace(PathBuf::from(a)).is_some() {
@@ -139,16 +177,36 @@ fn parse_args(args: &[String]) -> Result<Opts, String> {
     if full && mode != Mode::Reverse {
         return Err("--full 只用于 --reverse".into());
     }
-    if !EFFORTS.contains(&effort.as_str()) {
-        return Err(format!(
-            "--effort 须为 {}，得到「{effort}」",
-            EFFORTS.join("、")
-        ));
+    if reviewer == Reviewer::PrintOnly && run {
+        return Err("--reviewer print-only 只生成提示词文件，不能与 --run 同用".into());
     }
+    let effort = match (reviewer, effort) {
+        (Reviewer::Claude, None) => String::from("high"),
+        (_, None) => String::from("medium"),
+        (Reviewer::Claude, Some(e)) => {
+            if !CLAUDE_EFFORTS.contains(&e.as_str()) {
+                return Err(format!(
+                    "--reviewer claude 的 --effort 须为 {}，得到「{e}」",
+                    CLAUDE_EFFORTS.join("、")
+                ));
+            }
+            e
+        }
+        (_, Some(e)) => {
+            if !CODEX_EFFORTS.contains(&e.as_str()) {
+                return Err(format!(
+                    "--effort 须为 {}，得到「{e}」",
+                    CODEX_EFFORTS.join("、")
+                ));
+            }
+            e
+        }
+    };
     let dir = dir.ok_or("缺少期次目录")?;
     Ok(Opts {
         dir,
         mode,
+        reviewer,
         effort,
         run,
         full,
@@ -214,44 +272,119 @@ fn execute(opts: &Opts) -> Result<ExitCode, String> {
     println!("报告：{}", report_path.display());
     println!("{}", review.scope);
 
-    let (host, codex) = if cfg!(windows) {
-        let distro = std::env::var("BARKING_WSL_DISTRO").unwrap_or_else(|_| DEFAULT_DISTRO.into());
-        let codex = std::env::var("BARKING_WSL_CODEX").unwrap_or_else(|_| DEFAULT_WSL_CODEX.into());
-        if !codex.starts_with('/') {
-            return Err(format!(
-                "BARKING_WSL_CODEX 应为 WSL 内的绝对路径，现在是「{codex}」（Git Bash 会改写以 / 开头的变量值，设置时加 MSYS_NO_PATHCONV=1）"
-            ));
+    if opts.reviewer == Reviewer::PrintOnly {
+        println!("工作目录：{}", review.cwd.display());
+        if !review.images.is_empty() {
+            println!("待看图片（相对工作目录）：");
+            for img in &review.images {
+                println!("  - {img}");
+            }
         }
-        (Host::Wsl { distro }, codex)
-    } else {
-        let codex = std::env::var("BARKING_CODEX").unwrap_or_else(|_| DEFAULT_NATIVE_CODEX.into());
-        (Host::Native, codex)
-    };
-    let invocation = Invocation {
-        cwd: host.path(&review.cwd)?,
-        report: host.path(&report_path)?,
-        prompt: host.path(&prompt_path)?,
-        host,
-        codex,
-        effort: opts.effort.clone(),
-        secs: timeout_secs(&opts.effort),
-        images: review.images.clone(),
-        search: review.search,
+        println!(
+            "-- 仅生成提示词（--reviewer print-only）：请交给与主执行方不同模型家族（GPT / Claude / Gemini / DeepSeek）、不带本期上下文的只读会话，并将输出原样保存至上述报告路径（见 docs/workflow/harness.md）"
+        );
+        println!(
+            "-- 逐条核实报告意见后，结论记入 {}/sources/fact-check.md 的“{}”节",
+            issue.rel(),
+            opts.mode.heading()
+        );
+        return Ok(ExitCode::SUCCESS);
+    }
+
+    let secs = timeout_secs(&opts.effort);
+    let invocation = match opts.reviewer {
+        Reviewer::Codex => {
+            let model =
+                std::env::var("BARKING_CODEX_MODEL").unwrap_or_else(|_| DEFAULT_CODEX_MODEL.into());
+            if !safe_arg(&model) {
+                return Err(format!("BARKING_CODEX_MODEL「{model}」含非法字符"));
+            }
+            let (host, binary, timeout_bin) = if cfg!(windows) {
+                let distro =
+                    std::env::var("BARKING_WSL_DISTRO").unwrap_or_else(|_| DEFAULT_DISTRO.into());
+                let codex =
+                    std::env::var("BARKING_WSL_CODEX").unwrap_or_else(|_| DEFAULT_WSL_CODEX.into());
+                if !codex.starts_with('/') {
+                    return Err(format!(
+                        "BARKING_WSL_CODEX 应为 WSL 内的绝对路径，现在是「{codex}」（Git Bash 会改写以 / 开头的变量值，设置时加 MSYS_NO_PATHCONV=1）"
+                    ));
+                }
+                (Host::Wsl { distro }, codex, Some("timeout".to_string()))
+            } else {
+                let codex =
+                    std::env::var("BARKING_CODEX").unwrap_or_else(|_| DEFAULT_NATIVE_CODEX.into());
+                (Host::Native, codex, find_timeout())
+            };
+            Invocation {
+                cwd: host.path(&review.cwd)?,
+                report: host.path(&report_path)?,
+                prompt: host.path(&prompt_path)?,
+                host,
+                binary,
+                timeout_bin,
+                effort: opts.effort.clone(),
+                secs,
+                backend: Backend::Codex {
+                    model,
+                    images: review.images.clone(),
+                    search: review.search,
+                },
+            }
+        }
+        Reviewer::Claude => {
+            let model = std::env::var("BARKING_CLAUDE_MODEL")
+                .unwrap_or_else(|_| DEFAULT_CLAUDE_MODEL.into());
+            if !safe_arg(&model) {
+                return Err(format!("BARKING_CLAUDE_MODEL「{model}」含非法字符"));
+            }
+            let binary = std::env::var("BARKING_CLAUDE").unwrap_or_else(|_| DEFAULT_CLAUDE.into());
+            let host = Host::Native;
+            let tools = match opts.mode {
+                Mode::Reverse => CLAUDE_REVERSE_TOOLS,
+                Mode::Visual => CLAUDE_VISUAL_TOOLS,
+            };
+            Invocation {
+                cwd: host.path(&review.cwd)?,
+                report: host.path(&report_path)?,
+                prompt: host.path(&prompt_path)?,
+                host,
+                binary,
+                timeout_bin: find_timeout(),
+                effort: opts.effort.clone(),
+                secs,
+                backend: Backend::Claude { model, tools },
+            }
+        }
+        Reviewer::PrintOnly => unreachable!(),
     };
 
+    if invocation.secs > 0 && invocation.timeout_bin.is_none() {
+        println!(
+            "warn: 未找到 timeout / gtimeout（macOS 可运行 brew install coreutils 安装）；本次命令不限时"
+        );
+    }
     println!(
-        "模型 {MODEL}，effort {}，{}",
+        "复核方 {}，模型 {}，effort {}，{}",
+        invocation.backend.label(),
+        invocation.backend.model(),
         opts.effort,
-        match invocation.secs {
-            0 => "不限时".to_string(),
-            s => format!("限时 {s} 秒"),
+        match (invocation.secs, &invocation.timeout_bin) {
+            (0, _) => "不限时".to_string(),
+            (_, None) => "不限时（未装 timeout/gtimeout）".to_string(),
+            (s, Some(t)) => format!("限时 {s} 秒（{t}）"),
         }
     );
     println!("命令（可直接粘到 {} 运行）：", invocation.host.shell());
     println!("{}", invocation.display());
-    println!(
-        "-- 执行方是 GPT 时不要跑这条命令，也不要加 --run（同家族）：把上面的提示词交 Claude Opus，见 EDITORIAL.md“核验流程”的“执行方”"
-    );
+    match opts.reviewer {
+        Reviewer::Codex => println!(
+            "-- 主执行方是 GPT 时不要跑这条命令，也不要加 --run（同家族）：改用 --reviewer claude 或 --reviewer print-only，见 EDITORIAL.md“核验流程”"
+        ),
+        Reviewer::Claude => println!(
+            "-- 主执行方是 Claude 时不要跑这条命令，也不要加 --run（同家族）：改用 --reviewer codex 或 --reviewer print-only，见 EDITORIAL.md“核验流程”"
+        ),
+        Reviewer::PrintOnly => unreachable!(),
+    }
     println!(
         "-- 逐条核实报告意见后，结论记入 {}/sources/fact-check.md 的“{}”节",
         issue.rel(),
@@ -264,10 +397,11 @@ fn execute(opts: &Opts) -> Result<ExitCode, String> {
     run_and_report(&invocation, &report_path)
 }
 
-/// Run the command in the foreground (Codex's own output passes through),
+/// Run the command in the foreground (the reviewer's own output passes through),
 /// then show how it ended and the head of the report.
 fn run_and_report(inv: &Invocation, report: &Path) -> Result<ExitCode, String> {
-    println!("-- 开始运行（同步等待；Codex 通常需要数分钟）");
+    let who = inv.backend.label();
+    println!("-- 开始运行（同步等待；{who} 通常需要数分钟）");
     let started = Instant::now();
     let program = inv.host.program();
     let mut cmd = Command::new(program);
@@ -291,7 +425,7 @@ fn run_and_report(inv: &Invocation, report: &Path) -> Result<ExitCode, String> {
         .map(|b| String::from_utf8_lossy(&b).into_owned())
         .unwrap_or_default();
     if text.trim().is_empty() {
-        println!("报告不存在或为空：Codex 不可用或未完成，没有做成独立复核");
+        println!("报告不存在或为空：{who} 不可用或未完成，没有做成独立复核");
         return Ok(ExitCode::FAILURE);
     }
     let total = text.lines().count();
@@ -792,11 +926,11 @@ fn artifact_names(mode: Mode, serial: u32) -> (String, String) {
     }
 }
 
-// ---- Codex command ----------------------------------------------------
+// ---- Reviewer command -------------------------------------------------
 
-/// Where Codex runs. On Windows it goes through WSL, since the Windows-native
-/// Codex sandbox is unreliable (~/.claude/agents/codex-reviewer.md); on Linux
-/// Codex's own read-only sandbox works, so it runs directly.
+/// Where the reviewer runs. On Windows, Codex goes through WSL since its
+/// Windows-native sandbox is unreliable (docs/workflow/harness.md); Linux,
+/// macOS, and Claude CLI run directly via `bash`.
 enum Host {
     Wsl { distro: String },
     Native,
@@ -818,7 +952,7 @@ impl Host {
         }
     }
 
-    /// `path` as Codex will see it: a WSL path, or the absolute local path.
+    /// `path` as the reviewer will see it: a WSL path, or the absolute local path.
     fn path(&self, path: &Path) -> Result<String, String> {
         match self {
             Host::Wsl { distro } => wslpath(distro, path),
@@ -831,40 +965,88 @@ impl Host {
     }
 }
 
+/// Reviewer backend specifics; both share the same positional argument slots
+/// (`$0`..`$5`) so paths with spaces or quotes never enter the script string.
+enum Backend {
+    Codex {
+        model: String,
+        /// Relative to `cwd`.
+        images: Vec<String>,
+        /// Web search for external facts; a top-level `codex` flag.
+        search: bool,
+    },
+    Claude {
+        model: String,
+        tools: &'static str,
+    },
+}
+
+impl Backend {
+    fn label(&self) -> &'static str {
+        match self {
+            Backend::Codex { .. } => "Codex",
+            Backend::Claude { .. } => "Claude",
+        }
+    }
+
+    fn model(&self) -> &str {
+        match self {
+            Backend::Codex { model, .. } | Backend::Claude { model, .. } => model,
+        }
+    }
+}
+
 /// Everything the `bash -c` line needs; paths are already in the host's form.
 /// They travel as positional arguments (`$0`…`$5`), never spliced into the
 /// script, so spaces and quotes in them cannot break the command.
 struct Invocation {
     host: Host,
-    codex: String,
+    binary: String,
+    /// `timeout` on Linux/WSL or `gtimeout` on macOS (Homebrew coreutils);
+    /// `None` when neither is installed natively.
+    timeout_bin: Option<String>,
     cwd: String,
     report: String,
     prompt: String,
     effort: String,
     secs: u32,
-    /// Relative to `cwd`.
-    images: Vec<String>,
-    /// Web search for external facts; a top-level `codex` flag.
-    search: bool,
+    backend: Backend,
 }
 
 impl Invocation {
-    /// The bash script. Codex reads the prompt from stdin (`-`); `timeout 0`
-    /// means no limit. `--image=<file>` stays in the attached form so the
-    /// trailing `-` is not swallowed as another image.
+    /// The bash script. When `timeout_bin` is present, `exec <bin> "$5"` wraps
+    /// the CLI (`0` means no limit); when absent (e.g. macOS without
+    /// coreutils), the CLI runs directly without a timeout wrapper.
     fn script(&self) -> String {
-        let mut s = String::from(r#"cd "$1" && exec timeout "$5" "$0" "#);
-        if self.search {
-            s.push_str("--search ");
+        let mut s = match &self.timeout_bin {
+            Some(t) => format!(r#"cd "$1" && exec {t} "$5" "$0" "#),
+            None => String::from(r#"cd "$1" && exec "$0" "#),
+        };
+        match &self.backend {
+            Backend::Codex {
+                model,
+                images,
+                search,
+            } => {
+                if *search {
+                    s.push_str("--search ");
+                }
+                let _ = write!(
+                    s,
+                    r#"exec -m {model} -c "model_reasoning_effort=\"$4\"" -s read-only --skip-git-repo-check --ephemeral -C "$1" -o "$2" "#
+                );
+                for img in images {
+                    let _ = write!(s, "--image={img} ");
+                }
+                s.push_str(r#"- < "$3""#);
+            }
+            Backend::Claude { model, tools } => {
+                let _ = write!(
+                    s,
+                    r#"-p --model {model} --effort "$4" --tools "{tools}" --allowedTools "{tools}" --strict-mcp-config --no-session-persistence < "$3" > "$2""#
+                );
+            }
         }
-        let _ = write!(
-            s,
-            r#"exec -m {MODEL} -c "model_reasoning_effort=\"$4\"" -s read-only --skip-git-repo-check --ephemeral -C "$1" -o "$2" "#
-        );
-        for img in &self.images {
-            let _ = write!(s, "--image={img} ");
-        }
-        s.push_str(r#"- < "$3""#);
         s
     }
 
@@ -878,7 +1060,7 @@ impl Invocation {
         };
         argv.extend([
             self.script(),
-            self.codex.clone(),
+            self.binary.clone(),
             self.cwd.clone(),
             self.report.clone(),
             self.prompt.clone(),
@@ -898,6 +1080,50 @@ impl Invocation {
             Host::Native => "bash",
         };
         format!("{lead} {}", args.join(" "))
+    }
+}
+
+/// Find a GNU-compatible timeout command on `PATH` (`timeout`, or `gtimeout`
+/// installed via Homebrew coreutils on macOS).
+fn find_timeout() -> Option<String> {
+    let path = std::env::var_os("PATH")?;
+    let dirs: Vec<PathBuf> = std::env::split_paths(&path).collect();
+    find_in_dirs(&dirs, &["timeout", "gtimeout"])
+}
+
+fn find_in_dirs(dirs: &[PathBuf], names: &[&str]) -> Option<String> {
+    for &name in names {
+        for dir in dirs {
+            let candidate = dir.join(name);
+            if is_executable_file(&candidate) {
+                return Some(name.to_string());
+            }
+            if cfg!(windows) {
+                let exe = dir.join(format!("{name}.exe"));
+                if exe.is_file() {
+                    return Some(name.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+fn is_executable_file(path: &Path) -> bool {
+    let Ok(meta) = fs::metadata(path) else {
+        return false;
+    };
+    if !meta.is_file() {
+        return false;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        meta.permissions().mode() & 0o111 != 0
+    }
+    #[cfg(not(unix))]
+    {
+        true
     }
 }
 
@@ -1029,6 +1255,35 @@ gloss = "g"
         assert!(a(&["d", "--reverse", "--full"]).unwrap().full);
         assert!(!a(&["d", "--reverse"]).unwrap().full);
         assert!(a(&["d", "--visual", "--full"]).is_err());
+
+        // --reviewer defaults to codex, accepts claude and print-only.
+        assert_eq!(a(&["d", "--reverse"]).unwrap().reviewer, Reviewer::Codex);
+        let cl = a(&["d", "--reverse", "--reviewer", "claude"]).unwrap();
+        assert_eq!(
+            (cl.reviewer, cl.effort.as_str()),
+            (Reviewer::Claude, "high")
+        );
+        let cl_eq = a(&["d", "--visual", "--reviewer=claude", "--effort=medium"]).unwrap();
+        assert_eq!(
+            (cl_eq.reviewer, cl_eq.effort.as_str()),
+            (Reviewer::Claude, "medium")
+        );
+        assert!(
+            a(&[
+                "d",
+                "--reverse",
+                "--reviewer",
+                "claude",
+                "--effort",
+                "xhigh"
+            ])
+            .is_err()
+        );
+        let po = a(&["d", "--reverse", "--reviewer", "print-only"]).unwrap();
+        assert_eq!(po.reviewer, Reviewer::PrintOnly);
+        assert!(a(&["d", "--reverse", "--reviewer", "print-only", "--run"]).is_err());
+        assert!(a(&["d", "--reverse", "--reviewer", "gemini"]).is_err());
+        assert!(a(&["d", "--reverse", "--reviewer"]).is_err());
     }
 
     #[test]
@@ -1362,7 +1617,8 @@ text = "a"
             host: Host::Wsl {
                 distro: "Debian".into(),
             },
-            codex: "/home/deve/.bun/bin/codex".into(),
+            binary: "/home/deve/.bun/bin/codex".into(),
+            timeout_bin: Some("timeout".into()),
             cwd: "/mnt/e/gitclone/AI-Barking/docs/2610/1009".into(),
             report: "/mnt/c/Users/QQ/AppData/Local/Temp/barking-review/1009/visual-report.md"
                 .into(),
@@ -1370,8 +1626,11 @@ text = "a"
                 .into(),
             effort: effort.into(),
             secs: timeout_secs(effort),
-            images: images.iter().map(|s| s.to_string()).collect(),
-            search,
+            backend: Backend::Codex {
+                model: DEFAULT_CODEX_MODEL.into(),
+                images: images.iter().map(|s| s.to_string()).collect(),
+                search,
+            },
         }
     }
 
@@ -1384,7 +1643,7 @@ text = "a"
         );
         assert_eq!(
             inv.script(),
-            r#"cd "$1" && exec timeout "$5" "$0" exec -m gpt-6-astra -c "model_reasoning_effort=\"$4\"" -s read-only --skip-git-repo-check --ephemeral -C "$1" -o "$2" --image=images/00-tldr.png --image=images/41-x-raw.png - < "$3""#
+            r#"cd "$1" && exec timeout "$5" "$0" exec -m gpt-6.2-sol -c "model_reasoning_effort=\"$4\"" -s read-only --skip-git-repo-check --ephemeral -C "$1" -o "$2" --image=images/00-tldr.png --image=images/41-x-raw.png - < "$3""#
         );
         let argv = inv.argv();
         assert_eq!(&argv[..5], ["-d", "Debian", "-e", "bash", "-lc"]);
@@ -1400,7 +1659,7 @@ text = "a"
         let inv = invocation(&[], true, "max");
         let script = inv.script();
         assert!(
-            script.contains(r#""$0" --search exec -m gpt-6-astra"#),
+            script.contains(r#""$0" --search exec -m gpt-6.2-sol"#),
             "{script}"
         );
         assert!(!script.contains("--image"));
@@ -1434,7 +1693,7 @@ text = "a"
         let mut inv = invocation(&["images/00-tldr.png"], false, "medium");
         let script = inv.script();
         inv.host = Host::Native;
-        inv.codex = "codex".into();
+        inv.binary = "codex".into();
         inv.cwd = "/home/u/AI-Barking/docs/2610/1009".into();
         assert_eq!(inv.host.program(), "bash");
         let argv = inv.argv();
@@ -1446,6 +1705,82 @@ text = "a"
         let line = inv.display();
         assert!(line.starts_with("bash -c 'cd "), "{line}");
         assert!(!line.contains("wsl") && !line.contains("MSYS"), "{line}");
+    }
+
+    #[test]
+    fn claude_backend_and_gtimeout_variants() {
+        let claude_rev = Invocation {
+            host: Host::Native,
+            binary: "claude".into(),
+            timeout_bin: Some("gtimeout".into()),
+            cwd: "/Users/u/AI-Barking".into(),
+            report: "/tmp/r.md".into(),
+            prompt: "/tmp/p.md".into(),
+            effort: "high".into(),
+            secs: 0,
+            backend: Backend::Claude {
+                model: DEFAULT_CLAUDE_MODEL.into(),
+                tools: CLAUDE_REVERSE_TOOLS,
+            },
+        };
+        assert_eq!(
+            claude_rev.script(),
+            r#"cd "$1" && exec gtimeout "$5" "$0" -p --model opus --effort "$4" --tools "Read,Grep,Glob,WebSearch,WebFetch" --allowedTools "Read,Grep,Glob,WebSearch,WebFetch" --strict-mcp-config --no-session-persistence < "$3" > "$2""#
+        );
+
+        let claude_vis_no_timeout = Invocation {
+            host: Host::Native,
+            binary: "claude".into(),
+            timeout_bin: None,
+            cwd: "/Users/u/AI-Barking/docs/2610/1009".into(),
+            report: "/tmp/r.md".into(),
+            prompt: "/tmp/p.md".into(),
+            effort: "high".into(),
+            secs: 0,
+            backend: Backend::Claude {
+                model: DEFAULT_CLAUDE_MODEL.into(),
+                tools: CLAUDE_VISUAL_TOOLS,
+            },
+        };
+        assert_eq!(
+            claude_vis_no_timeout.script(),
+            r#"cd "$1" && exec "$0" -p --model opus --effort "$4" --tools "Read,Grep,Glob" --allowedTools "Read,Grep,Glob" --strict-mcp-config --no-session-persistence < "$3" > "$2""#
+        );
+    }
+
+    #[test]
+    fn find_in_dirs_prefers_timeout_then_gtimeout() {
+        let dir = std::env::temp_dir()
+            .join("barking-timeout-test")
+            .join(std::process::id().to_string());
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let make_exec = |name: &str| {
+            let p = dir.join(name);
+            fs::write(&p, "#!/bin/sh\n").unwrap();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mut perms = fs::metadata(&p).unwrap().permissions();
+                perms.set_mode(0o755);
+                fs::set_permissions(&p, perms).unwrap();
+            }
+        };
+        assert_eq!(
+            find_in_dirs(std::slice::from_ref(&dir), &["timeout", "gtimeout"]),
+            None
+        );
+        make_exec("gtimeout");
+        assert_eq!(
+            find_in_dirs(std::slice::from_ref(&dir), &["timeout", "gtimeout"]).as_deref(),
+            Some("gtimeout")
+        );
+        make_exec("timeout");
+        assert_eq!(
+            find_in_dirs(std::slice::from_ref(&dir), &["timeout", "gtimeout"]).as_deref(),
+            Some("timeout")
+        );
+        fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

@@ -1919,6 +1919,9 @@ pub(crate) fn find_chrome() -> Result<PathBuf, String> {
         r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
         "/usr/bin/google-chrome",
         "/usr/bin/chromium",
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/Applications/Chromium.app/Contents/MacOS/Chromium",
+        "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
     ]
     .iter()
     .map(PathBuf::from)
@@ -2126,6 +2129,8 @@ pub(crate) fn run_ocr(
         .map_err(|e| {
             let install = if cfg!(windows) {
                 "scoop install tesseract tesseract-languages"
+            } else if cfg!(target_os = "macos") {
+                "brew install tesseract tesseract-lang"
             } else {
                 "sudo apt install tesseract-ocr tesseract-ocr-chi-sim"
             };

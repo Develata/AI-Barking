@@ -1,6 +1,6 @@
 # 卡片视觉复核提示词
 
-`barking card` 渲染、Claude 自查之后，交给跨模型的视觉复核。用法见同目录 README.md“视觉复核”。下面 `---` 以下是提示词，Claude 填好 `{…}` 后写入临时文件。
+`barking card` 渲染、主执行方自查之后，交给与主执行方不同模型家族的独立复核方做视觉复核。用法见同目录 README.md“视觉复核”与 `docs/workflow/harness.md`。下面 `---` 以下是提示词，由 `barking review --visual` 填好 `{…}` 后写入临时文件。
 
 ---
 

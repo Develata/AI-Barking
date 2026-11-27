@@ -34,27 +34,25 @@
 5. 视觉复核（必做，跨模型）：
 
    ```bash
-   cargo run --release --manifest-path tools/barking/Cargo.toml -- review docs/<YYMM>/<MMDD> --visual
+   cargo run --release --manifest-path tools/barking/Cargo.toml -- review docs/<YYMM>/<MMDD> --visual --reviewer <codex|claude|print-only>
    ```
 
-   它按 `visual-review.md` 填好提示词（附图清单 = 省流卡、速览图、每个主帖的事件卡与吠点卡、封面、每张批注图及其 `-raw` 底图，末尾附 `EDITORIAL.md` 的“省流卡与批注截图”“速览”两节），写进临时目录，并打印交给 Codex（`gpt-6-astra`，effort `medium`，只读；Windows 经 WSL，Linux 直接调用本机 Codex，见 `docs/workflow/hosts.md`）的完整命令；加 `--run` 则直接执行（Codex 慢，放后台运行，等完成通知后读报告）。等价的手工命令，每张图一个 `--image=` 参数（1029 期起图在 `images/publish/`）。Linux：
+   按 `EDITORIAL.md`“核验流程”的四家模型家族互斥表选择与主执行方不同家族的 `--reviewer`（默认 `codex`）。工具按 `visual-review.md` 填好提示词（附图清单 = 省流卡、速览图、每个主帖的事件卡与吠点卡、封面、每张批注图及其 `-raw` 底图，末尾附 `EDITORIAL.md` 的“省流卡与批注截图”“速览”两节），写进临时目录，并打印对应后端的完整命令；`codex` / `claude` 后端加 `--run` 可直接执行（复核耗时数分钟，放后台运行，等完成通知后读报告）；`print-only` 只生成提示词文件并列出图片路径，供 Gemini / DeepSeek 等其他独立只读会话使用。
 
-   ```bash
-   cd "<期次目录>" && timeout 1200 codex exec -m gpt-6-astra -c 'model_reasoning_effort="medium"' -s read-only --skip-git-repo-check --ephemeral -C . -o "<报告路径>" --image=images/00-tldr.png --image=images/01-x.png --image=images/01-x-raw.png - < "<提示词路径>"
-   ```
+   等价的手工命令（1029 期起图在 `images/publish/`，各系统差异见 `docs/workflow/hosts.md` 与 `docs/workflow/harness.md`）：
+   - **Codex（GPT 家族）**，Linux / macOS（macOS 无 `timeout` 时换 `gtimeout`）：
+     ```bash
+     cd "<期次目录>" && timeout 1200 codex exec -m gpt-6.2-sol -c 'model_reasoning_effort="medium"' -s read-only --skip-git-repo-check --ephemeral -C . -o "<报告路径>" --image=images/00-tldr.png --image=images/01-x.png --image=images/01-x-raw.png - < "<提示词路径>"
+     ```
+     Windows（经 WSL，路径用 `wsl -d Debian -e wslpath -a` 转换）：
+     ```bash
+     MSYS_NO_PATHCONV=1 wsl -d Debian -e bash -lc 'cd "$1" && exec timeout 1200 "$0" exec -m gpt-6.2-sol -c "model_reasoning_effort=\"medium\"" -s read-only --skip-git-repo-check --ephemeral -C "$1" -o "$2" --image=images/00-tldr.png --image=images/01-x.png --image=images/01-x-raw.png - < "$3"' /home/deve/.bun/bin/codex "<期次目录的 WSL 路径>" "<报告的 WSL 路径>" "<提示词的 WSL 路径>"
+     ```
+   - **Claude（Claude 家族）**，在期次目录运行，由复核方用 `Read` 逐张看提示词列出的图（工具限为只读）：
+     ```bash
+     claude -p --model opus --effort high --tools "Read,Grep,Glob" --allowedTools "Read,Grep,Glob" --strict-mcp-config --no-session-persistence < "<提示词路径>" > "<报告路径>"
+     ```
 
-   Windows（路径用 `wsl -d Debian -e wslpath -a` 转换）：
-
-   ```bash
-   MSYS_NO_PATHCONV=1 wsl -d Debian -e bash -lc 'cd "$1" && exec timeout 1200 "$0" exec -m gpt-6-astra -c "model_reasoning_effort=\"medium\"" -s read-only --skip-git-repo-check --ephemeral -C "$1" -o "$2" --image=images/00-tldr.png --image=images/01-x.png --image=images/01-x-raw.png - < "$3"' /home/deve/.bun/bin/codex "<期次目录的 WSL 路径>" "<报告的 WSL 路径>" "<提示词的 WSL 路径>"
-   ```
-
-   Codex 不可用或超时时，改派 Sonnet 子代理按同一提示词看图复核，并在记录中注明复核方。Claude 逐条核实意见再改，结论记入 `sources/fact-check.md`。
-
-   执行方是 GPT 时（见 `EDITORIAL.md`“核验流程”的“执行方”），复核者改为 Claude Opus：不加 `--run`，在期次目录里把打印的提示词文件交给 Claude Code，由它用 Read 逐张看提示词列出的图（工具限为只读）；Claude 也不可用时按同一节的“降级”办，并在记录中注明复核方：
-
-   ```bash
-   claude -p --model opus --effort high --tools "Read,Grep,Glob" --allowedTools "Read,Grep,Glob" --strict-mcp-config --no-session-persistence < "<提示词路径>" > "<报告路径>"
-   ```
+   首选跨家族复核方不可用或超时时，按 `EDITORIAL.md`“核验流程”与 `docs/workflow/harness.md` 第 1 节先切另一跨家族复核方，确实不可用才走降级并在记录中注明复核方。主执行方逐条核实意见再改，结论记入 `sources/fact-check.md`。
 6. `barking lint`：省流卡与速览主帖条目的文字须在正文同一行中逐字出现，速览其余条目须逐字列在事实清单“速览”一节且级别与措辞相符，第 N 张事件卡须与正文第 N 个主帖小节的事实段逐段逐字一致、一段不缺（1028 期起缺事件卡也报错），第 N 张吠点卡须与正文第 N 段“吠点：”逐条逐字一致、一条不缺（1027 期起缺吠点卡也报错；均为 error）；事件卡或吠点卡没列进正式配图、没按主帖顺序、事件卡没排在同主帖吠点卡之前、所在行没注明公众号不插，cards.toml 改过而图未重渲、省流卡不在正式配图第一行、`fact-check.md` 没有“视觉复核”记录，均给 warn。1029 期起另查 `images/publish/`：两张封面在、文件序号从 01 连续、“正式配图”表逐行列 `publish/NN-….png` 且顺序与文件名排序一致、`publish/` 里没有表外文件或旧编号残留（均为 error），事件卡与吠点卡一行没注明公众号不插给 warn；某个主帖没有批注图给 warn。
 7. `images/README.md` 的正式配图表（1029 期起）逐行列 `publish/NN-….png`，与 `images/publish/` 里按名称排序的文件完全一致，封面不进表，在封面节说明；省流卡、速览聚合图在最前（速览专帖只有速览图），其后按主帖顺序，每个主帖先列事件卡、再列吠点卡（两行都注明“公众号不插”），再列它的批注图；批注图替代原截图；`<名>-raw.png` 底图列入备用图（用途写“批注底图”）。1028 及更早期次是平铺名：省流卡列第 1 行、速览聚合图第 2 行，不带 `publish/`。1002 期起，包括卡片在内的全部图片都不入 Git，发布后由 `barking offsite --upload` 存 OpenList（路径与 SHA-256 见 `sources/offsite.tsv`）；日后重渲，先从 OpenList 同一路径取回底图。

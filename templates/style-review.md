@@ -1,22 +1,26 @@
 # 读者稿检查模板
 
-规则见 EDITORIAL.md“文风”与“核验流程”第 4 步。正文定稿后、与第一轮反向核验并行跑一次。检查者要与起草者不同家族、不带本期上下文：Claude 起草时用下面的 Codex 命令，GPT 起草时用下面的 Claude Sonnet 命令（不开任何工具，不给它仓库路径和事实清单）。它只读，不改稿，不核事实；采纳与否由 Claude 逐条判断，按“文风”一节修改。
+规则见 `EDITORIAL.md`“文风”与“核验流程”第 4 步，四家模型家族互斥表见 `docs/workflow/harness.md`。正文定稿后、与第一轮反向核验并行跑一次。检查者必须与主执行方不同模型家族、不带本期上下文（不开任何工具，不给它仓库路径和事实清单）。它只读，不改稿，不核事实；采纳与否由主执行方逐条判断，按“文风”一节修改。
 
 ## 命令
 
 `{OUT}` 为草稿目录下的新子目录。把下面 `---` 之间的提示词填好（`{标题候选}` 取自 `sources/titles.md`，每行一个；`{正文}` 是 `doc_<MMDD>_publish.txt` 全文，去掉第一行标题）写入 `{OUT}/prompt.md`：
 
-```bash
-codex exec -m gpt-6-astra -c 'model_reasoning_effort="medium"' -s read-only --skip-git-repo-check --ephemeral -C "{OUT}" -o "{OUT}/report.md" - < "{OUT}/prompt.md"
-```
-
-这是 Linux 写法；Windows 把 `-s read-only` 换成 `-s danger-full-access`（Windows 原生 Codex 沙箱不可靠，见 `docs/workflow/hosts.md`）。
-
-GPT 起草时改用（在 `{OUT}` 里运行）：
+**GPT 复核（Codex CLI，默认最新 Sol；主执行方为 Claude / Gemini / DeepSeek 时使用）**：
 
 ```bash
-claude -p --model sonnet --effort high --tools "" --strict-mcp-config --no-session-persistence < "{OUT}/prompt.md" > "{OUT}/report.md"
+codex exec -m gpt-6.2-sol -c 'model_reasoning_effort="medium"' -s read-only --skip-git-repo-check --ephemeral -C "{OUT}" -o "{OUT}/report.md" - < "{OUT}/prompt.md"
 ```
+
+这是 Linux / macOS 写法；Windows 把 `-s read-only` 换成 `-s danger-full-access`（Windows 原生 Codex 沙箱不可靠，见 `docs/workflow/hosts.md`）。
+
+**Claude 复核（Claude CLI，默认最新 Opus；主执行方为 GPT / Gemini / DeepSeek 时使用，在 `{OUT}` 里运行）**：
+
+```bash
+claude -p --model opus --effort high --tools "" --strict-mcp-config --no-session-persistence < "{OUT}/prompt.md" > "{OUT}/report.md"
+```
+
+**Gemini / DeepSeek 复核（备选）**：把 `{OUT}/prompt.md` 全文交给对应跨家族、无工具、无本期上下文的独立会话，输出原样保存为 `{OUT}/report.md`。
 
 约 2 分钟。把 `{OUT}/report.md` 存为本期 `sources/style-review.md`，在末尾补一节“采纳”：逐条写采纳或不采纳及理由。
 
