@@ -73,13 +73,6 @@
 
 | 期次 | 标签 | 事实 |
 |---|---|---|
-| 1123 | 安全 | OpenAI、思科开源 Shirudo：Linux 上自测不重启拦下攻击，预发布 |
-| 1123 | Claude | Claude 插件页：卸载带连接器的插件不会断开连接器，须另行断开 |
-| 1123 | 代码审查 | Anthropic：Claude Ship 代码审查正式可用，另两个代理为测试版 |
-| 1123 | 就业 | Anthropic 访谈58家美国客户（非随机）：2/3自报因 AI 少招人 |
-| 1123 | 安全评测 | 英国 AISI：同一 AI 监控器换攻击生成法，成功攻击漏报0.2%到23% |
-| 1123 | 购物 | a16z 测购物 AI 代理：允许游客结账的网店，81%的运行走到表单末尾 |
-| 1123 | 量子 | DeepMind 智能体改进量子算法，称所需资源可能仍超首批纠错量子机 |
 | 1124 | 音乐 | Tidal 称12月9日起拒收并下架完全 AI 生成的曲目，AI 辅助的仍可上 |
 | 1124 | 数学 | OpenAI 预印本称矩阵乘法指数在任意域上恰为9/4，形式化只覆盖无除法电路 |
 | 1124 | 世界模型 | 高德开源 ABot-World 小版，称单卡 RTX-5090 每秒21帧 |
@@ -90,6 +83,13 @@
 | 1125 | 工程 | Anthropic 称把 API 从 Python 迁到 Rust，没停过服务 |
 | 1125 | 隐私 | OpenAI 称一小批客户在测 Private Inference（Alpha） |
 | 1125 | 购物 | 据《财富》报道，亚马逊与 Meta 在谈让 Muse 购物代理接入亚马逊 |
+| 1126 | DeepSeek | 据凤凰网科技报道，DeepSeek 灰度显示本轮估算价，个人聊天仍免费 |
+| 1126 | 开源 | 小红书开源 3D 框架，公开6414条 SFT 记录，论文5045条经验证轨迹 |
+| 1126 | Gemini | 谷歌支持称已修复 Gemini 网页版 Chrome 高内存，该回复未说明原因 |
+| 1126 | SAP | 据亚洲新闻台援引彭博报道，SAP 考虑裁员重组；SAP 回应亚洲新闻台称未定案 |
+| 1126 | 科研 | Cogentic 用 Gemini-4 生成整数分解论文已公开，非谷歌官方产品 |
+| 1126 | Kimi | Kimi 科研首期开放理、工及交叉申请，入选最高15万元非现金，12月8日截 |
+| 1126 | 混元 | 据 IT之家报道，腾讯混元发 Hy3D-3.6，供专业 3D 创作 |
 
 ## 已发过
 
@@ -158,3 +158,4 @@
 | 1123 | 7万行AI证明，没有数学家查过：【VP≠VNP】Anthropic 在 anthropics/formal-math 公开署名“Claude (Anthropic)”的论文《VP ≠ VNP over every field》（70页）与约7.3万行 Lean（72,932 行，提交北京 11/24 04:04），称由内部研究用 Claude 模型发现；README 写“Both were written by AI models, and no human mathematician has checked the proof”“This does not settle P vs NP”；OpenAI 随后（提交时间晚约5小时）在 openai/math 公开同题《VP and VNP are different》（border 版下界，history 称 11/6 得出），两家互不引用；吠点：新智元稿题“Claude证出「代数版P≠NP」”，论文摘要写是 P≠NP 的代数类比但“does not settle that conjecture”、不适用于布尔电路；华尔街见闻稿题“全篇Lean机器验证通过”，Lean 只保证推导，命题是否写对论文附录 Q.1 写“judged only by AI readers”。【NariQ】Nari Labs（11/20）把 Qwen3.8-27B 量化为 3/2.5/2 比特 GGUF（3比特 10.1GB，原版 53.8GB），称长程代理、数学、看图与原版持平（作者自测）；对你：要自己部署，AMD/Intel 不支持，M3-Pro 3比特约3.8 tok/s；吠点：掘金速递“可直接对接llama.cpp等主流推理框架”，模型卡写原版 llama.cpp、Ollama、LM Studio 都加载不了、须用作者 fork；掘金写“消费级显卡甚至部分笔记本”，模型卡写 GeForce 未测，fork README 只记一张 RTX-5060-Ti 跑过、not qualified（尚未完成资格验证）。读者稿检查后删去“2.5比特档五项四项低于原版”一条 |
 | 1124 | 多家媒体称视频AI全球第一，换榜排第7：【MAGI-2】Sand.ai 北京11/25凌晨发布视频模型 MAGI-2，新浪财经等稿题“AA榜全球第一”；Artificial Analysis 视频榜（北京11/26凌晨读）MAGI-2 只在图生视频带音频、无音频两张榜第一，文生视频无音频第2、带音频暂列第7（1150，与第8、9名同分），AA 标“Provisional result”；图生带音频 1163 对 Seedance 2.5 1158，误差均±14，名次区间都是1–3；官方博客只报四项任务平均 Elo 1150.3；官网列 VidMuse，发布帖写 Higgsfield 独家，官方接口0.08美元/秒、暂不支持充值；“0.5元/秒、Seedance 1/10”只见媒体稿，未进正文。【Copilot 论文】arXiv 2611.31083（MIT Raymond、微软研究院 Dillon，北京11/24凌晨，预印本）用 GitHub 采购记录配 Revelio 招聘数据看5414家大企业，以既定合同审查时点为工具变量：提前采用者季度技术岗招聘降29%（95%区间约−61%到+9%）、初级软件工程师约40%（约−72%到+1%），均为按第一阶段放大的 Wald 估计；同口径简约式初级软件岗季度约−10%显著，月度技术岗−7.6%显著，季度技术岗简约式不显著；离职无明显增加；样本企业2022→2024年季度技术岗招聘总共降29%（55.3→39.2），论文三种假设下 Copilot 占10%、19%或51%；中文聚合稿题“Copilot使初级工程师招聘降约40%”；作者称小公司可能反应不同 |
 | 1125 | 额度更快用完？OpenAI：上周少扣了：OpenAI 员工 Tibo（北京11/26 10:50）称 GPT-6.2 上线时计费出错、多数用户的 Astra 与 Sol 额度被少扣，修正后同样的活“Comparing to last week”Astra 快40%、Sol 快25%用到上限，仍应（should）比 GPT-6-Astra、GPT-6.1-Sol 耐用，其他模型不受影响，过去少扣的不追缴；吠点：智东西稿题“额度爆砍接近一半？”，原帖没给额度绝对数，按两种读法上周10件活的额度现约6到7件；基线是上周少扣时、“仍比上一代耐用”无数字，套餐页 Plus 每5小时估计（GPT-6.2 Astra 6–50 条）11/18 与 11/26 存档相同；TechCrunch 11/25 稿讲 Chat 与 Work 合并、与计费修正无关。【跟进1122】黎曼证明短版：Anthropic 的 Luke Sernau（北京11/26 04:42 建仓 lsernau/grh-lean）公开 Claude 重写的 RH/GRH Lean 证明，紧凑版约7.6万行、可读版约30万行，README“shorter rewriting … many steps are proved by other arguments”“written by Claude (AI)”“passed machine checks only … No mathematician has read it through”，MIT Sutherland 复核两版编译、公理与命题一致；吠点：量子位稿题“暴砍了99.5%”是重写版对原版（分子代码行、分母总行），社区在原版上删了五天多有效代码只从约1462万行到约1100万行；rh-shrink“只剩2.0%”是社区仓库 main 11/26 06:24 整个换成可读版。扫描错误：Hirsch 的“HN 494”是 Google Cogentic 帖、Aaronson 博文被扫描按自家台账排除。 |
+| 1126 | Gmail接口已列发信，默认没确认发不了：【Gmail MCP】11/26 Tech Stackups 发文称 Gmail MCP 不能发信；谷歌推 Workspace MCP 与 CLI，27 日晚总览列 9 个服务器，明年 2/1 起代理访问 Workspace 数据须用 MCP 或 CLI、直连 REST 限标准档（个人免费每日每项目每产品 5000 次，搜会话计 10 次）；27 日晚实测主端点 `/mcp/v1` 与 `gwscli gmail --help` 均列含 `send_message` 等 30 工具（未测带鉴权实际发信），备用 `/mcp/v1self` 仅 25 工具（能写草稿、无发信/回复/转发）；吠点：26 日 Suncly 测 23 工具、旧文档写须合作方权限，27 日早 Frank Chu 无鉴权同轮测得 23 与 30 交替；代理发信默认须用户批准（CLI 终端确认，管理员策略允许最多存 90 天、亦可放行），无确认仍失败，非合作方实发待鉴权实测；动察写“阉割收费版”，选 Scaled 明年 4/1 起 Gmail/日历/网盘 MCP 免额 0、首笔成功起计且不享组织内部提额例外。【Claude 限能与反蒸馏】11/25 MagicPath CEO 称 Claude 破坏科研，Sweeney 称集合论被当蒸馏拦下；Anthropic 称 Fable-5.2/Mythos-5.2 训练期限制部分研发能力（算子架构等，约 Opus-5.5），推理不改该能力，少数主题明面回退 Opus-5，未影响代理式编程与传统机器学习研究；网页与 Claude Code 回退有提示且可关切换；吠点：51CTO 写“研发时降智”“全给阉割”，动区 27 日称“尚未回應指控”，员工 Arbus 回 Schirano 称 6 月 Fable-5 降级已修，官号曾就隐性措施道歉；Sweeney 26 日称仅批反蒸馏、肯定 Claude，文档写正常机器学习可触竞争类拦截，所查公开资料无该案认定；API 自动回退须配置，推理提取无推荐回退、未输出即拒也计费；Artificial Analysis 榜标默认回退，所查两份方法页未写回退计分。 |
