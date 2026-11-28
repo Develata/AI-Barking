@@ -1,0 +1,2208 @@
+                                            Xiaomi Auto World Model 2.0: Causal World Models
+                                            for Real-World Driving and Embodied Intelligence
+                                            Xiaomi Auto World Model Team
+
+                                            We present Xiaomi Auto World Model 2.0, a unified streaming causal world model for Physical AI.
+                                            The model is built around two core capabilities: modeling and generating causal physical evolution
+                                            in the real world, and unifying heterogeneous conditioning inputs within a shared framework for
+                                            view-consistent generation. Concretely, our architecture integrates View-Temporal Attention (VTA)
+                                            to capture cross-view spatial dependencies and temporal dynamics, together with Multi-view Rotary
+                                            Position Encoding (RoPE) to encode positional relationships across views and time. We further
+
+
+
+
+arXiv:2611.01677v1 [cs.AI] 1 Nov 2026
+                                            introduce WorldRec 2.0, which reconstructs static and dynamic 3D Gaussians from multi-view, multi-
+                                            temporal observations in a single forward pass and uses their renderings as explicit scene context to
+                                            preserve geometry and appearance during long-horizon generation. Heterogeneous conditioning inputs
+                                            are fused through VAE-based latent feature concatenation within a shared representation space. We
+                                            incorporate Gated Linear Attention (GLA) into the temporal layers of VTA for efficient streaming
+                                            inference, reducing computational cost and KV cache memory usage during multi-view rollouts. To
+                                            strengthen physical-dynamics modeling, we develop a physical-interaction data pipeline covering
+                                            diverse interactions and long-tailed events. From Pre-train onward, these data are combined with
+                                            large-scale videos and heterogeneous visual modalities to learn visual, geometric, and dynamic priors.
+                                            During Mid-train, quality-aware mixed training across diverse view configurations further improves the
+                                            model’s ability to capture how actions and object states shape subsequent scene evolution. Following
+                                            distillation-based Post-train, we apply the resulting model to closed-loop simulation, closed-loop
+                                            training, and World Action Model (WAM) applications. These applications demonstrate its ability to
+                                            generate physically consistent future states and support world-state prediction, policy learning, and
+                                            action generation for Physical AI.
+
+                                            Date: November 2026
+                                            Project: https://xiaomiautoworldmodel.github.io/CausalWorldModel/
+
+
+
+                                          Xiaomi Auto World Model 2.0                     Sim. for Training      Sim. for Evaluation     World Action Model
+
+
+
+
+                                           T2V                                                           I2V
+
+
+
+
+                                           CI2V                                                          I2V
+
+
+
+
+                                          WI2V                                                          WI2V
+
+
+
+
+                                           I2A                                                           I2A
+
+
+
+                                        Figure 1 Xiaomi Auto World Model 2.0 supports unified, streaming causal world modeling across general video
+                                        generation, autonomous driving, and embodied robotics. Examples include text-to-video and image-to-video generation,
+                                        controllable prediction across varying views, and action-conditioned rollouts for embodied manipulation. The resulting
+                                        world model can serve as a simulator for both training and evaluation, and as a component in a WAM.
+1     Introduction
+World models (Zhou et al., 2026c; Team et al., 2026c; Wu et al., 2025a; Team et al., 2026b; Wan et al.,
+2025; Agarwal et al., 2026; Huang et al., 2026a; Wu et al., 2026; Zhu et al., 2026a; Xu et al., 2026a; Yang
+et al., 2026b; Hu et al., 2026b,a,c,a) aim to generate the evolution of a scene at future time steps based
+on environmental observations, actions, or task instructions. For Physical AI agents such as autonomous
+vehicles and embodied robots, this capability is fundamental to anticipatory decision-making and closed-loop
+control. Before changing lanes, avoiding obstacles, or performing emergency braking, a vehicle must anticipate
+the motion of surrounding traffic participants and its potential consequences. Similarly, before grasping,
+pushing, or placing an object, a robot must infer how its actions will change the state of the object and
+the spatial configuration of the scene. Therefore, an effective world model should do more than generate
+visually plausible future frames. It should also capture the relationships among actions, object states, and
+environmental changes, and predict the physical consequences induced by different control conditions.
+    Recent video world models have made substantial progress in predicting and generating future dynamics,
+with growing applications in autonomous driving (Wang et al., 2024a,b; Gao et al., 2024b; Ren et al., 2025;
+Zhang et al., 2026; Basant et al., 2026; Zheng et al., 2026; Gao et al., 2024a; Guan et al., 2026; Lu et al., 2026;
+Luo et al., 2026; Zhu et al., 2026b; Ji et al., 2025; Jin et al., 2025; Guo et al., 2025; Zeng et al., 2025; Zhou
+et al., 2026b) and embodied intelligence (Wu et al., 2023b; Xu et al., 2026e; Gao et al., 2026; Bi et al., 2026; Ye
+et al., 2026; Xu et al., 2026c,d). Nevertheless, as summarized in Tab. 1, existing models provide limited unified
+support for various domains, view configurations, control inputs, and downstream applications. Building
+a general-purpose world model for Physical AI therefore requires addressing two fundamental challenges.
+First, physical interactions in the real-world follow a highly long-tailed distribution (Wang et al., 2025b;
+Collaboration et al., 2023). Naturally collected videos are dominated by routine and frequently occurring
+events, providing limited coverage of rare but safety-critical interactions such as collisions, emergency evasive
+maneuvers, and object failures. Scaling conventional video data alone is therefore insufficient for learning
+the diverse physical consequences. Second, Physical AI systems operate under heterogeneous observation
+and conditioning configurations, ranging from single-camera inputs to multi-camera systems with different
+layouts and scene contexts (Russell et al., 2025; Team et al., 2024; Tan et al., 2026). Models designed for
+fixed view configurations and conditioning formats generalize poorly across scenarios. Meanwhile, scaling to
+more views and longer temporal contexts substantially increases computational and memory requirements,
+limiting long-horizon closed-loop generation. Our goals are:
+
+    Goal 1. Model and generate the causal evolution in the real world.
+    Goal 2. Unify heterogeneous conditioning across variable-view configurations.
+    Goal 3. Enable diverse downstream Physical AI applications.
+
+    We therefore present Xiaomi Auto World Model 2.0, a unified streaming causal world model for Physical
+AI. Fig. 1 highlights the model’s unified capabilities across general video generation, autonomous driving,
+and embodied robotics. With variable-view configurations and heterogeneous conditioning inputs, our model
+enables controllable generation for simulation-based training and evaluation, as well as WAM applications (Li
+et al., 2026a; Xia et al., 2026).
+    To improve physical-dynamics modeling, we construct a physical-interaction data pipeline that integrates
+real-world driving and robotics data with physically causal data. The physically causal subset draws on
+simulator engines, video generators, and public media, covering physically grounded interactions and long-tailed
+events. From the Pre-Train stage onward, these data are jointly trained with large-scale general-purpose videos
+and diverse visual representations, enabling the model to acquire general visual and dynamic priors, strengthen
+its geometric understanding, and form an initial representation of physical evolution. During Mid-Train,
+quality-aware training on high-quality data spanning diverse view configurations further strengthens the
+modeling of how actions and object states shape subsequent scene evolution, improving the representation
+and generation of real-world physical interactions and long-tailed dynamics while preserving generalization
+across scenes and observation settings.
+    We introduce a unified generation framework for heterogeneous conditioning inputs and variable-view future-
+scene generation in a shared latent space. View-Temporal Attention (VTA) captures cross-view dependencies
+
+
+                                                        2
+Table 1 Comparison of recent world models in terms of generation horizon, camera number, control, domain, downstream
+usage, and real-time. Cam. denotes camera pose; action denotes action sequences (including robot action sequences
+and WASD inputs); Interact. denotes open-interaction world models; Sim. denotes closed-loop simulation or training;
+policy indicates whether future action sequences are predicted.
+
+                                     Generation    Camera
+Method                                                          Control       Domain      Applications     Real-time
+                                      Duration      views
+LingBotWorld (Team et al., 2026c)     Minutes        1V       Cam.,action     General       Interact.         ✓
+DreamXWorld (Team et al., 2026b)      Minutes        1V       Cam.,action     General       Interact.         ✓
+CausalWM(Xu et al., 2026e)            Seconds       1–4V         Action        Robot          Sim.            –
+HorizonDrive (Zhang et al., 2026)     Minutes        1V          Layout       Driving         Sim.            –
+OmniDreams(Basant et al., 2026)       Minutes      1/4/7V        Layout       Driving     Sim.,policy         ✓
+X-World(Zheng et al., 2026)             ∼24 s        7V          Layout       Driving         Sim.            ✓
+Ours(1.0)(Zhou et al., 2026c)         Minutes      1V/3V        Layout        Driving         Sim.            ✓
+                                                              Cam., action,              Interact.,Sim.,
+Ours(2.0)                             Minutes       1–7V                      Phys. AI                        ✓
+                                                                layout                       policy
+
+
+and temporal dynamics across varying view configurations, while Multi-view Rotary Position Encoding (RoPE)
+encodes positional relationships across views and time. Heterogeneous conditioning inputs are mapped into
+compatible latent representations and fused through VAE-based feature concatenation. Through this interface,
+we incorporate WorldRec 2.0 as explicit 3D scene memory grounded in real observations. It reconstructs
+static and dynamic 3D Gaussians from multi-camera, multi-temporal observations in a single forward pass,
+using scene-structured registers for efficient information exchange among point-aligned queries. Renderings at
+target camera poses and timestamps provide geometry-aware priors that anchor geometry, appearance, and
+cross-view correspondence in observed regions, while the generator completes appearance and motion details
+beyond the observations. Together, these components support single-view, autonomous-driving multi-view,
+and embodied multi-view generation within a shared architecture, with flexible conditioning and consistent
+scene representations across views and time.
+    Building on these designs, we develop a unified causal world model that supports variable-view generation
+and flexible conditioning. To improve the efficiency of long-horizon multi-view rollouts, we incorporate Gated
+Linear Attention (GLA) into the temporal attention layers of VTA, reducing the computational complexity
+and the memory overhead associated with state caching during inference. Distillation-based post-training
+further improves streaming efficiency and supports stable generation over extended sequences. This reduces
+the computational and memory costs of multi-view rollouts, allowing the model to continuously generate
+future scenes and extend short-term prediction to streaming world simulation over longer time horizons. We
+evaluate the Post-trained model across three downstream settings. First, for simulation-based evaluation,
+we assess its general generation and world-modeling capabilities through general video generation on PAI-
+Bench-G (Zhou et al., 2026a), synchronized multi-view generation under long-tailed and physically causal
+scenarios, scene perception via depth prediction and referring video segmentation, and camera-pose control
+on WorldScore (Duan et al., 2025), TartanAir (Wang et al., 2020), and RealCam-Vid (Zheng et al., 2025).
+We further use the model as a controllable world simulator to evaluate multi-view driving generation on
+nuScenes (Caesar et al., 2019), embodied interaction generation on TriWorldBench (Liu et al., 2026a), and
+long-horizon driving simulation on internal data. Second, for simulation-based training, the model generates
+future states and interaction feedback in closed-loop rollouts to support policy learning. We evaluate the
+resulting policy on NAVSIM (Dauner et al., 2024), using 1000 representative test scenes. Finally, for WAM
+applications, we transfer the learned visual-dynamics and physical-interaction representations to downstream
+decision-making and control, evaluating autonomous-driving planning on NAVSIM (Dauner et al., 2024),
+embodied manipulation on LIBERO Plus (Fei et al., 2025). We additionally evaluate WorldRec 2.0 on the
+Waymo Open Dataset (Xu et al., 2026b), use nuScenes (Caesar et al., 2019) and Argoverse 2 (Wilson et al.,
+2023) for cross-dataset evaluation, while reporting qualitative results on the internal MiData dataset. Together,
+these experiments evaluate the model’s generation quality, physical and geometric consistency, controllability,
+simulation capability, and downstream utility across diverse Physical AI scenarios.
+
+
+
+                                                          3
+2      Data
+Data are essential for model training. To train a causal world model that respects physical causal laws, we
+built multi-view datasets that emphasize physical causality. We partition data sources into three categories: (i)
+general data, comprising camera, text, and video data; (ii) physical-world data, comprising autonomous-driving
+and robotics data; and (iii) physical-casual data. General data provide broad priors on visual appearance,
+geometric structure, language, and motion patterns. Physical-world data ground these priors in embodied
+observations and actions. Physical-causal data further include safety-critical corner cases and counterfactual
+trajectories that are underrepresented in naturally collected data. All data modalities are subjected to a
+unified cleaning and re-annotation pipeline. For high-quality physical world data, we also estimate associated
+multi-modal conditional annotations, including geometric representations, segmentation masks, and scene
+layout attributes. The following sections introduce data sources and their curation pipelines, followed by data
+filtering, re-captioning, and condition annotation creation, as summarized in Fig. 2.
+
+      (a) General Data                                                      (d) Data Engine
+                              Open Source Data                                              Basic Filtering
+             SeKai, SpatialVID, RealCam-Vid, MiraData, and …….
+
+
+
+                                                                                          Scoring & Caption
+                                                                                           Score
+                                                                                           Model
+    (b) Physical World Data
+                                                                                        Condition Preparation
+              Robotics Data                          Driving Data
+
+                                                                                       Aligned Training Samples
+                                                                                RGB
+
+                                                                                       Driving simulation data
+                                                                               Layout                         MiniMax-H3
+    (c) Physical Causal Data
+                                                                               Depth
+    Simulator Engine Data     Video Generator Data      Public Media Data
+
+                                                                                Seg.
+
+                                                                               Scene
+                                                                                ctx.
+
+
+Figure 2 Overview of our data pipeline. We integrate three data categories: general data, physical world driving and
+robotics data, and physical causal data. The collected videos undergo basic filtering, scoring, and captioning. We
+further prepare world-control conditions for the corresponding data subsets, including layouts, and scene contexts, to
+support causal world model training.
+
+
+
+2.1      General Data
+Before domain-specific specialization, we use large-scale general data to learn priors about visual appearance,
+language, motion dynamics, and scene structure. These data are organized into camera, text, and video
+sources and are independent of the downstream driving and robotics domains.
+     Leveraging the broad availability of video data, we curate raw videos and superimpose high-fidelity
+multimodal annotations. To jointly optimize dataset coverage and experimental controllability, we integrate
+(i) internet-scale web videos to capture long-tail variation in scenes, objects, and motion patterns, and (ii)
+structured open-source datasets that provide reliable metadata and support evaluation under more stringent,
+domain-specific conditions.
+
+Web-crawled Data. We follow established collection protocols used in recent video foundation models.
+Specifically, we adopt Pandas 70M (Chen et al., 2024b) as the primary source and apply strict filtering criteria
+
+
+                                                                    4
+to ensure minimum visual quality and temporal consistency. In addition to their scale, these videos often
+include textual descriptions that provide weak semantic supervision, thereby exposing the model to a broad
+distribution of everyday events and dynamics.
+
+Open-source Data. We target datasets that provide explicit supervisory signals that are typically absent in
+unconstrained web content, including camera poses, geometry-related conditions, and driving or embodiment
+metadata. These data sources focus on operationally grounded domains, such as egocentric, autonomous
+driving, and robotic manipulation, and thus complement the breadth of web video with well-defined constraints.
+Concretely, we aggregate video data from SpatialVID-HQ (Wang et al., 2026a), Sekai (Li et al., 2026b),
+RealCam-Vid (Zheng et al., 2025), and TartanAir (Wang et al., 2020).
+
+2.2     Physical World Data
+Physical-world data connect visual observations to embodied states, actions, and consequences. They comprise
+autonomous-driving data and robotics data.
+
+2.2.1   Driving Data
+The autonomous-driving data provide multi-view camera streams and vehicle-centric signals, including driving
+trajectories, maps, and sensor metadata. Specifically, we use PhysicalAI-Autonomous-Vehicles (Wang et al.,
+2025b), nuPlan (Caesar et al., 2021), nuScene (Caesar et al., 2019), and our self-collected MiData. PhysicalAI-
+Autonomous-Vehicles captures a broad range of traffic densities, weather conditions, obstacles, and interactions
+with vulnerable road users. Its sensor suite includes synchronized multi-camera and LiDAR recordings for
+all clips, with radar data available for approximately half of the clips. MiData is primarily collected by our
+data-acquisition fleet and spans heterogeneous operational design domains. Spatially, it includes urban and
+rural roads, highways, underground garages, and parking lots. Temporally, it covers different times of day and
+multiple seasons. Each MiData sequence contains 11 synchronized camera streams recorded at 30 Hz and one
+LiDAR stream, together with ego-vehicle state measurements. Sequences are partitioned into approximately
+30 s clips, and a cloud-based automatic labeling system is applied to produce core scene annotations, including
+object detection, lane-boundary detection, traffic-sign recognition and traffic-light recognition.
+
+2.2.2   Robotics Data
+Robotics data cover egocentric observations and robot-manipulation episodes, together with actions, proprio-
+ception, object states, and language instructions when available. We include datasets used for vision-language-
+action training, such as AgiBot World Beta (Bu et al., 2025), DROID (Khazatsky et al., 2024), EgoDex (Hoque
+et al., 2026), Galaxea Open-World Dataset (Jiang et al., 2026a), InternData-A1 (Tian et al., 2026), Open
+X-Embodiment (Collaboration et al., 2023), RoboCOIN (Wu et al., 2025b), RoboMIND (Wu et al., 2024),
+and RoboTwin 2.0 (Chen et al., 2025a). Collectively, these datasets span real-world and simulated collections,
+single-arm and bimanual embodiments, tabletop and open-world scenes, and both human egocentric and
+robot-centric views. They provide large-scale heterogeneous supervision, ranging from tens of thousands to
+millions of trajectories, thousands of hours of video, and hundreds of tasks, skills, and scenes, with language
+annotations where available. We align their observations and controls with the same temporal and geometric
+annotation interface. These data extend the physical-world category from road interactions to contact-rich
+manipulation and support transfer to embodied tasks.
+
+2.3     Physical Causal Data
+Although general data and physical world data exhibit substantial diversity, they frequently underrepresent
+emergency events that occur in the physical world, including vehicular collisions and other rare or highly
+specialized incidents. To mitigate this limitation, we curate (i) simulator engine data and (ii) video generator
+data to construct these corner-cases and counterfactual simulation.
+
+Simulator Engine Data. To address the limited prevalence of extreme physical interactions in real-world
+driving corpora, such as collisions, roadway departures, and aggressive maneuvers, we construct a large-scale,
+multi-view synthetic dataset using the simulator engine, including: Blender (Blender Online Community,
+
+
+                                                       5
+2025), UE5 (Epic Games, 2022), and CARLA (Dosovitskiy et al., 2017), following (Zhou et al., 2026b).
+Blender and UE5 is used to generate higher-quality multi-view video and geometric conditions. CARLA is a
+high-fidelity autonomous-driving simulation platform that supports controlled generation of road networks,
+vehicles, traffic participants, and diverse environmental conditions, including weather. We build upon the route
+configurations provided by Bench2Drive (Jia et al., 2024) and introduce localized behavioral perturbations
+while keeping the underlying maps, traffic participants, weather settings, and background traffic behavior
+unchanged. This protocol yields two subsets: CARLA Ego and CARLA Adv. In CARLA Ego, we directly
+perturb the behavior of the ego vehicle. In CARLA Adv, we instantiate an additional vehicle near the ego
+vehicle and perturb its behavior, such that the resulting physical challenges primarily arise from interactions
+between the two vehicles. Although the data produced by physics simulators exhibit good physical consistency,
+they are limited to specific traffic scenarios, thereby restricting diversity. To address this, we employ advanced
+video generators for data simulation.
+
+Video Generator Data. To complement the scenario coverage of physics-based simulation, we construct a
+long-tail driving dataset with open-sourced video diffusion model. Starting from 10,000 unique forward-facing
+driving clips and their scene descriptions, we independently sample road environments, traffic conditions,
+weather and illumination, visibility constraints, hazardous objects, event progression, and ego-vehicle responses,
+and combine them into structured generation prompts. We use three complementary generation modes: T2VA
+provides text-only scene conditioning, I2VA uses the first frame of the source clip to preserve the initial scene
+layout and camera view, and Ref2VA uses a 1s reference sequence to retain scene structure, traffic motion,
+and camera dynamics while introducing new hazards or physical interactions. All prompts are reviewed
+for semantic and physical consistency, including weather–illumination compatibility, road structure, object
+motion, occlusion causality, vehicle reaction time, braking distance, and temporal continuity. The prompts
+that fail these checks are repaired before generation. Before using them for training, we manually review the
+generated videos and filter out low-quality or inconsistent samples.
+
+2.4    Data Engine
+After collecting the aforementioned data, we proceed quality filtering, scoring, captioning, and condition
+preparation.
+
+Initial Quality Filtering. We first apply a coarse filtering stage to exclude videos that are technically
+invalid or exhibit obvious visual degradation. Web-crawled videos frequently have inconsistent or mislabeled
+metadata, poor visual quality, or undesirable overlays. Consequently, we screen samples using basic structural
+and visual criteria, including extreme aspect ratios, insufficient frame counts, and discrepancies between the
+observed visual content and the associated metadata. We also remove pseudo-high-definition videos, such as
+low-resolution videos upsampled to a higher nominal resolution or incorrectly annotated as high-resolution.
+Videos with excessive on-screen text, subtitles, watermarks, or other salient overlays are also discarded. Clips
+exhibiting severe blur, including Gaussian-like blurring artifacts, are further excluded. Moreover, each video is
+converted to the YUV color space, and clips with extreme luminance distributions are filtered out to eliminate
+markedly underexposed or overexposed content.
+
+High-Quality Scoring. After the initial filtering stage, we apply a second-stage curation to retain video
+clips with high visual quality, sufficient motion, and stable temporal dynamics. We first assess perceptual
+quality from both aesthetic and imaging perspectives. Overall video quality is quantified using DOVER (Wu
+et al., 2023a), and clips with a DOVER score below 0.4 are excluded. In addition, we evaluate imaging quality
+with COVER (He et al., 2024), which targets degradations such as compression artifacts and transmission-
+induced distortions. Samples exhibiting pronounced image-quality impairments are removed. Next, we
+characterize clip-level motion properties. We use the VMAF motion score (Li et al., 2016) as a surrogate
+for global motion magnitude and retain only samples with scores in the range [2, 14]. This criterion filters
+out near-static content with insufficient motion as well as clips dominated by excessively rapid or unstable
+motion. We further apply heuristic constraints on camera trajectory. Specifically, we discard clips that (i)
+contain multiple view reversals exceeding 150◦ within a 10-second clip, (ii) exhibit inter-frame view-angle
+changes greater than 60◦ , or (iii) include abrupt camera translations whose short-term displacement exceeds
+five times the mean translation magnitude computed over the entire video. Finally, we manually inspect
+
+
+
+                                                        6
+the remaining clips to remove residual failure cases that are not reliably captured by automated metrics.
+This review emphasizes overall visual integrity and temporal coherence, thereby ensuring that the retained
+high-quality data are suitable for mid-train and post-train.
+
+Captioning. For the videos retained after quality curation, we apply a unified segmentation and re-
+captioning pipeline. We uniformly sample all videos at 16 Hz and divide them into non-overlapping clips of
+93 frames, corresponding to approximately 5.8 s per clip. Clips at the end of a video containing fewer than
+50 frames are discarded to avoid generating excessively short training samples. Each resulting clip is then
+passed to Qwen3.8 (Qwen Team, 2026) for automated re-captioning. We adopt a two-stage pipeline that
+first produces a structured scene analysis and then converts this analysis into a dense, temporally coherent
+narrative description. Given a sequence of video frames, Qwen3.8 first completes the Scene Analysis stage
+and subsequently generates the Final Narrative conditioned on the structured analysis. The two outputs are
+enclosed by the <scene_draft> and <final_prompt> tags, respectively.
+    In the first stage, Qwen3.8 examines the clip frame by frame and populates a predefined JSON schema
+describing its observable visual and temporal content. The structured representation captures the major
+subjects and their appearance, pose, location, orientation, actions, and state changes, together with the
+surrounding environment, lighting, aesthetics, cinematography, visual style, contextual information, textual
+elements, temporal segments, transitions, and audio content. Temporal annotations use a unified M:SS-M
+format, with timestamps measured relative to the beginning of the clip. The annotation follows a strict
+observation-based policy: only visually or audibly observable information is recorded, and no unobserved
+details are inferred or hallucinated. Fields that cannot be determined are left empty. Basic video metadata,
+including resolution, aspect ratio, duration, and frame rate, is not generated by the model and is instead
+injected automatically from the source video. The resulting structured representation serves as a normalized
+intermediate description for the subsequent narrative generation stage.
+    In the second stage, Qwen3.8 rewrites the structured scene analysis into a dense narrative caption. The
+output is written as a single paragraph consisting of multiple coherent sentences, without lists or bullet points.
+The narrative is required to cover the major subjects, scene setting, temporally ordered actions, relevant
+background elements, lighting conditions, cinematographic characteristics, and temporal structure of the clip.
+For each video clip, the re-captioning pipeline produces two complementary outputs: a structured JSON
+scene analysis and a dense narrative caption. The former provides machine-readable descriptions of visual
+attributes, temporal events, cinematography, and other structured information, while the latter provides a
+fluent and temporally coherent natural-language description. Together, these representations provide both
+structured supervision and dense textual descriptions.
+
+Condition Preparation. Each training sample is paired with two types of conditions: a camera-view pose
+pi and a world control wi . The world control has three forms: Driving layouts, Robotic layouts, and Scene
+contexts. For the camera-view pose, we use the poses provided by structured datasets whenever available. For
+samples without camera metadata, we estimate the pose with DA3 (Lin et al., 2026). We also include data
+collected in game engines and Unreal Engine, which provide high-quality camera poses and complement the
+estimated poses. Driving layouts are built from 3D object detections, lane detections, traffic-light recognition,
+and traffic-sign recognition. We obtain these annotations through auto-labeling for our private MiData
+collection. Public datasets generally provide the corresponding labels, which we convert to a common format.
+We then render the aligned annotations with the Cosmos-Transfer tools (Ren et al., 2025). Robotic layouts are
+constructed primarily from the Robotwin dataset for training and evaluation on TriWorldBench (Liu et al.,
+2026b). Given the robot arm’s action sequence and configuration, we render its state from the corresponding
+URDF model. Scene contexts are designed to improve consistency in driving closed-loop simulation. For an
+input clip, the feed-forward reconstruction method in Sec. 3.5 first produces a dynamic 3D Gaussian Splatting
+(3DGS) scene. During simulation, each new trajectory is rendered from the corresponding novel views of this
+scene, and the resulting per-frame renders serve as world control so that the causal DiT can preserve the
+geometry and appearance of the original scene. During training, we create input-target pairs by degrading
+the ground-truth render at the original view. These degradations approximate the distribution of novel-view
+renders from dynamic 3DGS and are applied to a small subset of the driving data (5%). We use three simple
+degradation types: object-support degradation reduces and irregularizes the opacity of tracked objects to
+mimic incomplete reconstruction, occlusion-cone holes remove parts of the static background that were hidden
+in the source views, and depth degradation perturbs depths and boundaries to mimic novel-view errors.
+
+
+                                                        7
+                                                                                               Public Media Data
+                                                                                               Simulator Engine Data
+        Panda-70M-Filtered                                                                     Video Generator Data                                                                                            Physical World AD Data
+                                                                                                                                            12.5
+                                                       Physical                                                                                                                                                Physical World Robotics Data
+                                                      Causal Data                                                                                                                                              General Data
+                 TartanAir                  Ge
+                                            Danera                                             MiData                                       10.0
+                                                                                  s-                                                                                                                           Physical Causal Data
+                                                                             omou
+              RealCam-Vid
+
+
+
+
+                                                                                                                           Percentage (%)
+                                               ta l
+                     SeKai                                             Autonng Data
+                                                                       Drivi
+                                                        12.6M                                                                                7.5
+                 MiraData                              Segments
+                SpatialVID                                     W Phy                           Physical-AI-AV
+                                                                or si
+                        1X                                        ld ca                                                                      5.0
+                                                                    Da l                       nuScenes
+                                                                      ta
+         AgiBot World Beta                  Rob                                                nuPlan
+                  DROID                         otic
+                                                    sD                                         RoboTwin 2.0                                  2.5
+                                                         ata
+                  EgoDex                                                                       RoboMIND
+Galaxea Open-World Dataset                                                                     RoboCOIN
+             InternData-A1
+                                                                                                                                             0.0
+                                                                                               Open X-Embodiment                                            100        200           300           400          500        600
+
+              (a) Dataset sample count distribution.                                                                                                    (b) Caption token count distribution.
+                                                                                                                                              Unknown
+  Unknown
+
+                                                                                                                                                   Indoor
+  Transport
+                                                                                                                                Outdoor Nature
+     Indoor
+
+                                         Outdoor                                                                                              Transport
+Heavy Snow                                                     Unknown
+                                         Nature
+                                                                                                                                                                                                  Domestic
+                                                                                                                                            Heavy Snow                 Outdoor
+ Light Snow                    Outdoor                                                                                                                                                                                             Unknown
+                                                                             Foreign                                                                                    Urban
+                                Urban
+                                                                                                         Domestic                            Light Snow
+      Foggy                                    5              3                                                                                                                                                                    Foreign
+                                             Scene        Geography                                                                                                                 5           3
+                                                                                                                                             Heavy Rain                           Scene     Geography
+Heavy Rain
+                        Unknown                                     6                                                                              Foggy      Unknown
+                                           8                                           Empty                                                                                                        6            Empty
+ Light Rain                                                       Crowd                                                                                                         8
+                                         Weather                                                                                                                                                  Crowd
+                             Cloudy                               Density                                                                    Light Rain                       Weather
+                                                                                                         Moderate                                                                                 Density
+                                                         5                                                                                                        Cloudy                                                           Moderate
+                                                       Time                                                                                                                                 5
+                                                                                                                                                                                          Time
+                                Sunny                                         Sparse                     Crowded                                                                                                                   Crowded
+                                                                                                                                                                                                             Sparse
+                                                                                                                                                                      Sunny
+      Dawn                                                                                               Unknown                                                                                                                   Unknown
+                                                           Day                                                                                                                   Night           Day
+       Dusk                                                                                              Dense                                                                                                                     Dense
+                                                                                                                                                   Dawn
+
+  Unknown
+                                                                                                                                              Unknown
+
+      Night
+                                                                                                                                                    Dusk
+
+
+
+               (c) Scene distribution of general data.                                                                               (d) Scene distribution of physical world driving data.
+
+Figure 3 Overview of the dataset distribution. We report the sample count distribution, caption token count distribution,
+and scene composition of the general and physical-world autonomous-driving data. Robotics data are omitted because
+they are predominantly collected in a small number of indoor settings.
+
+
+2.5           Dataset Distribution Analysis
+To support the effective mixing of data from different sources in subsequent training stages and guide the
+selection of data mixture proportions and training configurations, we further analyze the final training dataset
+distribution from three perspectives: sample count, caption length, and scene composition. As shown in
+Fig. 3a, our training corpus contains 12.6M training clips in total, in which physical world autonomous-driving
+data account for the largest share, followed by a substantial amount of physical-world robotics data and
+general-purpose data. Fig. 3b shows the distribution of caption token count. For most data sources, captions
+contain between 150 and 450 tokens, whereas robotics data tend to have shorter captions because their scenes
+are simpler and contain fewer objects and interactions.
+    For scene composition, we analyze the general and physical-world autonomous-driving subsets along
+five dimensions: scene type, geographic location, crowd density, time of day, and weather condition. These
+dimensions contain five, three, six, five, and eight categories, respectively. Each dimension includes an explicit
+unknown category for cases where the corresponding attribute cannot be reliably inferred from the caption. As
+shown in Fig. 3c and Fig. 3d, physical driving data are dominated by outdoor-urban scenes (88.8%), followed
+by transport scenes (9.8%), whereas general data provide broader scene coverage, including outdoor-urban
+(55.1%), outdoor-nature (27.6%), and indoor scenes (12.4%). Sunny or cloudy conditions account for 65.9% of
+physical driving samples and 65.3% of general samples. Daytime footage is more prevalent in general data
+(74.1%), while nighttime footage represents a larger fraction of physical driving data (27.5%). In terms of
+crowd density, scenes labeled as empty or sparse, indicating no or few people, account for 97.7% of physical
+driving samples and 90.0% of general samples. The geographic distributions also differ: physical driving
+
+
+
+                                                                                                                       8
+data are primarily domestic (72.8%), whereas general data contain 39.9% foreign and 5.0% domestic samples,
+with the remaining 55.0% assigned to unknown. Physical-world robotics data and physical causal data are
+omitted from the scene-composition plots. Robotics data are predominantly collected in a limited number of
+indoor settings and therefore exhibit little scene diversity, whereas physical causal data are generated from
+carefully designed and controlled scene configurations whose distributions are intentionally specified rather
+than naturally sampled.
+
+
+3     Causal World Model
+To better serve Physical AI applications such as closed-loop evaluation and closed-loop training, a world
+model should satisfy three requirements: interactivity, real-time performance, and controllability. Interactivity
+means the model can be rolled out step-by-step in an autoregressive manner, generating the next short-horizon
+future conditioned on the current state and control inputs. Real-time performance means each generation
+step must finish within the time budget of the simulated step, so the closed-loop system is not blocked by
+model inference. Controllability means the generated futures should faithfully follow the provided control
+conditions (e.g., actions, world states, or camera poses), while remaining realistic and consistent with the
+data distribution. These three requirements jointly impose a major challenge for model design: improving
+quality and controllability often calls for larger models or more denoising steps, which increases latency and
+can undermine both real-time performance and interactivity. To address this challenge, we make dedicated
+efforts on both (i) the model architecture and condition injection, and (ii) a multi-stage progressive training
+pipeline with distillation-based acceleration.
+    In this section, we first introduce the overall architecture of our Causal World Model (Sec. 3.1) as shown
+in Fig. 4, followed by the unified architecture adopted during pre-training (Sec. 3.2), the condition injection
+strategy used in mid-training (Sec. 3.3), and distillation in post-training (Sec. 3.4).
+
+3.1    Architecture
+Our Causal World Model adopts the architecture, weights, and VAE encoder of Wan2.2-5B (Wan et al., 2025),
+while introducing a series of modifications to the model architecture and multimodal condition injection.
+Formally, we denote the model inputs as the text description c, the initial-frame image I0 , the world control
+wi , and the camera view pose pi . With these inputs, the Causal World Model is defined as
+                                                             T
+                                                             Y
+                        uθ (x1:T | w1:T , p1:T , I0 , c) =         uθ (xi | x1:i−1 , w1:i , p1:i , I0 , c) .   (1)
+                                                             i=1
+
+    To unify modeling across application settings with different camera counts and world-control types, we
+introduce a series of improvements to the base model. In DiT, we employ VTA and GLA to model multi-view
+inputs more effectively and improve efficiency, and we use Fused RPoPE to encode camera-view pose control.
+To maintain stronger geometric and appearance consistency in closed-loop evaluation and closed-loop training,
+we further provide scene context with the new WorldRec2.0 algorithm.
+
+3.2    Pre-train
+During pre-training, we aim to endow the model with generalizable video generation capabilities. We attribute
+such generalization primarily to large-scale training data; therefore, to maximize data utilization and coverage,
+we restrict this stage to single-view T2V and I2V tasks. However, the subsequent Mid-train and Post-train
+stages involve heterogeneous conditional inputs and multi-view generation. To keep a unified architecture
+throughout all stages, we incorporate the required architectural changes already during pre-training, including
+the world control injection, the VTA module and the GLA module.
+
+World Control Injection. Our Causal World Model adopts a lightweight and general approach to inject
+world control into the model. Since the world control wi has the same dimensionality as the target xi , we
+directly encode wi into the latent space using the same VAE and concatenate it with the target xi before
+feeding them into the model. We re-initialize the projection layer to ensure that the token dimension fed
+into the DiT Transformer (Peebles and Xie, 2023) matches that of the base model, thereby maximizing the
+
+
+                                                              9
+  01     Causal DiT Backbone                                                           02    Unified Condition Injection                                                                    03    Streaming DMD
+                                                                                        Initial Frame                                                                                                    Multi-view Long-video Input
+                                 Latent Tokens
+                                                                                                                                                       Timestep=0
+
+                                                                                              General              Driving                  Robot                                                                      Read
+                                                                                                                                                                                              🔥Student DiT                        KV cache
+               Multi-view RoPE + Fused-PRoPE                                            World Control                                                                                                                                   Update
+                                                                                                                                                                                                               Long-video Rollout
+                                                                                                                                                       VAE Encode
+                                                                                                                                                                    Causal
+                                                                                             Ø                                                                                               Segment 3              Segment 2       Segment 1
+         VA           T-GLA          VA        T-SFA          VA        T-GLA                                                                                        DiT
+                                …                         …
+         CA             CA           CA         CA            CA           CA               Empty     Dri. Layouts Rob. Layouts Scene Ctx.
+                                                                                                                                                                                                           Random Gradient Sampling
+         FFN           FFN          FFN         FFN           FFN          FFN                                                                         Fused-RoPE
+                                … block 2n                … block 2n                                                                                                                          Chunk 1     Chunk 2      Chunk 3    ……      Chunk N
+        block 0       block 1                block 4n+1                block 2n+1
+                                                                             ×L         Camera Pose                        Text                                                              w.o. grad   w.o. grad    w.o. grad           w. grad
+                                                                                                                                                       Cross Attn
+       T-GLA      Temporal Gated Linear Attn          T-SFA    Temporal Softmax Attn
+                                                                                                                                                                                              ❄Teacher DiT                        DMD loss
+        CA        Cross Attn                           VA      View Attn
+
+
+
+                                                                                              (a) Unified architecture of the Causal World Model
+
+ Stage 1: Pre-train                                                                              Stage 2: Mid-train                                                   Stage 3: Post-train
+ • 1V T2V / I2V                                                                                  • World control and Cam-pose injection                               • Consistency distillation
+   Broad data coverage; large salce pre-training                                                    Concatenate encoded controls and use Fused-PRoPE                    Student, frozen flow-matching teacher, EMA target
+
+ • Unified model architecture                                                                    • Scene context injection                                            • Streaming DMD
+   VTA + GLA; initial-frame and control interfaces                                                  Maintain geometric and visual consistency                           Optimize on the student’s own rollout distribution
+
+ • Physical evolution and vision understanding                                                   • Extend to multiple views                                           • Causal streaming rollout
+   Acquire physical causality and general understanding ability                                     Support 1-7V with the shared backbone                               Rolling history; current-chunk DMD objective
+
+
+                                       Generalization                                                                 Controllability + multi-view                                       Real-time + long-term stability
+
+                                                                                                           (b) Three-stage progressive training
+
+
+Figure 4 Architecture and training pipeline overview. The Causal World Model uses VTA and GLA to retain an
+efficient DiT backbone under multi-view settings. To handle diverse conditions, we adopt a unified condition injection
+design, enabling training across multiple tasks and datasets. During post-training, we introduce long-video rollout
+to improve long-horizon generation stability and Random Gradient Sampling to reduce memory usage. Overall, the
+model is trained in three stages to achieve efficient and controllable streaming generation.
+
+
+inheritance of the capabilities from base model. Compared with approaches such as ControlNet (Zhang et al.,
+2023) or Cross-Attention, this design is more lightweight and general, introduces no additional computational
+cost, and does not alter the architecture or weight parameters of the base model.
+   During pre-training, the vast majority of training samples do not have corresponding wi . For such samples,
+we apply zero padding to wi , thereby ensuring that the world control input is handled consistently across the
+pre-training, Mid-train, and Post-train stages. For the initial-frame image I0 , following Wan2.2, we replace
+the first frame of the noisy latent with I0 and set the corresponding timestamp to 0.
+
+View Temporal Attention. VTA is designed to address the computational overhead introduced by an
+increasing number of views. It reduces the growth of Attention computation while maintaining generation
+quality and cross-view consistency, thereby preserving inference efficiency. Specifically, our Causal World
+Model consists of L DiT Blocks, each of which contains a Cross-Attention module and a Self-Attention module.
+For a sample with N views and a temporal length of T , the original Self-Attention flattens the view,
+                                                                                                    temporal,
+and spatial dimensions into a single sequence, and thus has an attention complexity of O N 2 T 2 . To reduce
+the computational cost of multi-view modeling, VTA factorizes Self-Attention along the temporal and view
+dimensions and organizes the DiT Blocks into alternating odd and even layers. Odd-numbered layers perform
+only Temporal Attention, with N folded into the batch dimension. Even-numbered layers perform only View
+Attention, with T folded into the batch dimension. After alternately stacking L layers, the core complexity,
+ignoring the batch size and the spatial dimensions, becomes O (T N (N + T )), which maintains high inference
+efficiency in both single-view and multi-view settings.
+     Compared with other approaches, such as OmniDreams (Basant et al., 2026), our VTA does not introduce
+additional Attention modules and computes. During pre-training, to ensure consistency with subsequent
+multi-view training, the View Attention degenerates into intra-frame Self-Attention. Our experiments show
+that this design does not lead to a significant performance degradation. With this design, the model establishes
+a unified mechanism for multi-view correlation modeling, and our DiT Blocks require no modification when
+extending the model to multi-view tasks, enabling multi-view models to inherit the generalization capabilities
+learned during pre-training.
+
+
+                                                                                                                                     10
+Gated Linear Attention. VTA removes the quadratic dependence on the number of views, but Temporal
+Attention remains quadratic in the temporal length T . Let P = hw be the    tokens per view per frame. Each
+Temporal Attention layer attends over T P tokens, costing O N (T P )2 C , and its KV cache grows linearly
+with rollout length. By contrast, View Attention uses a sequence length N P that is independent of T and
+needs no cross-timestep cache. We therefore apply gated linear attention only to Temporal Attention.
+    We use the gated bidirectional linear attention from SANA-Video 2.0 (Chen et al., 2026a), which compresses
+the sequence into a fixed d × d state per head (d is the head dimension). Let qjr , knr be RoPE-rotated (Su
+et al., 2024) queries/keys and ϕ(·) = ReLU(·); each head computes
+                                                                      S qjr
+                                                                                           
+                               r ⊤
+                     X          
+                S=      vn βn kn ,        oj = Wo RMSNorm      P        ⊤
+                                                                                      ⊙ σ(gj ) ,           (2)
+                      n                                         n ϕ(kn ) ϕ(qj ) + ϵ
+
+where β gates writes to the state and g gates the output (Qiu et al., 2025). Because S is a permutation-invariant
+sum, the operator is bidirectional, matching our bidirectional pre-training. For causal training, we restrict the
+sum to the chunk prefix (bidirectional within a chunk, causal across chunks), reusing the same expression and
+parameters, so it transfers to autoregressive rollout without dropping weights. Both stages are warm-started
+from the pretrained base checkpoint; the added gate projections are zero-initialised with a positive bias so
+that β and g start near identity.
+    GLA reduces both compute and memory in the Temporal Attention branch. We do not linearize every
+Temporal Attention layer; instead, we keep periodic gated-softmax anchors (Chen et al., 2026a; Qwen Team,
+2025; Kimi Team, 2025). We use a 4:1 schedule, which matches the full-softmax baseline in our experiments
+while leaving fewer quadratic layers. With L blocks, anchors are placed at block 4n + 1 (see Fig. 4), so shallow,
+intermediate, and deep features each receive at least one full mixing pass. During streaming inference, each
+temporal GLA layer stores history in a length-independent state, reducing the per-layer temporal cache by
+over 97% relative to a softmax KV cache and making the per-step cost independent of generated length.
+
+3.3    Mid-train
+After pre-training, the Causal World Model already exhibits general generation capability, but it still needs to
+be further extended to support conditional generation across diverse physical AI applications. The mid-train
+stage has two concurrent goals: (i) enabling control conditions such as world control wi and camera view pose
+pi to reliably steer the generated state, and (ii) extending the model to generate multi-view state sequences.
+    For world control, we concatenate it into the latent-space channel reserved during pre-training. For camera
+view-pose control and multi-view extension, we achieve this by modifying the original 3D RoPE (Wan et al.,
+2025; Su et al., 2024) which also introduces no additional model parameters or computational overhead.
+Overall, the model architecture remains consistent with the pre-training stage, so that it can inherit the
+generalization ability and physical reasoning learned during pre-training.
+
+Multi-view RoPE. We extend the original 3D RoPE to support positional encoding in the multi-view
+setting. The original 3D RoPE partitions frequencies along the temporal, height, and width dimensions.
+For multi-view scenarios, we allocate non-overlapping coordinates to different views along the width axis.
+Concretely, for a sample with N views and temporal length T , we horizontally concatenate all views at the
+same time step, yielding x ∈ RT ×h×(N w)×d , where w is the per-view width. A token at local coordinate
+(i, u, v) in view n is assigned the absolute coordinate (i, h, nW + w).
+     All views share the same temporal and height origins, while the width origin is shifted by nw. In
+implementation, Temporal Attention first splits the concatenated sequence into N single-view sequences of
+shape T × h × w, and then applies the original 3D RoPE with the corresponding width offset. As a result,
+relative positions within each view are identical to the single-view case, while different views lie on distinct
+horizontal position bands.
+
+Fused PRoPE. Further, we condition our Causal World Model on camera view-pose with fused projective
+rotary positional embeddings (Fused-PRoPE), following SolarWM (Huang et al., 2026a) and MosaicMem (Yu
+et al., 2026). Each multi-view clip is converted into a geometric condition aligned with the latent video tokens.
+Per-frame, per-view poses are expressed relative to a shared origin, namely the first frame of a center camera
+together with its corresponding intrinsics. Within each DiT block, Multi-view RoPE represents temporal and
+intra-view spatial positions, and camera view-pose control pi determines the projective matrix.
+
+
+                                                       11
+                                                    Pi = Kf E,                                                  (3)
+where E denotes the relative extrinsics and focal-only intrinsics Kf .     We apply Pi⊤ to queries and Pi−1 to
+keys and values, run attention, and map the output back with Pi before the output projection. The same
+injection is used in both branches of view-temporal attention: even blocks attend over time within a camera,
+odd blocks attend across views at a fixed time. Camera motion is therefore introduced through the attention
+computation itself, rather than by appending an unrelated condition token or a separate camera branch.
+
+3.4    Post-train
+Although the model acquires controllable generation capabilities through pre-training and mid-training, it
+still cannot meet the requirements of real-time streaming inference. Moreover, during inference, the model
+suffers from exposure bias. We therefore further distill the model to improve both inference efficiency and
+long-term generation stability.
+
+Consistency Distillation. We first perform few-step distillation using a consistency-model objective (Song
+et al., 2023; Zhao et al., 2026). Specifically, we treat the autoregressive model trained in mid-training as
+the teacher. The student is initialized with the same weights and set to be trainable. During consistency
+distillation, given the state xti , where t is diffusion timestep, the teacher predicts the next state x̃t−δt
+                                                                                                         i    along
+the same probability-flow ODE (PF-ODE) trajectory. The student network Gθ also predicts from xti and is
+trained to match the prediction of the stop-gradient EMA target network Gθ− evaluated at x̃t−δt     i   :
+
+                                          L = E d Gθ (xti ), Gθ− (x̃t−δt
+                                                                         
+                                                                    i    ) ,                                     (4)
+
+where d(·, ·) denotes distance under a predefined norm and Gθ− is the EMA of Gθ with gradients detached.
+With this objective, we distill the multi-step teacher into a few-step student while retaining generation quality.
+
+Streaming DMD. After the above consistency distillation, our model still suffers from exposure bias
+during long-video inference. A common remedy is to apply DMD (Yin et al., 2024) with self-forcing-style
+training. However, standard self-forcing is only trained with a short horizon, so the model cannot fully capture
+long-range temporal dependencies, which still leads to suboptimal quality for long-video generation. Following
+LongLive (Yang et al., 2025b), we extend self-forcing (Huang et al., 2026b) to a streaming DMD training
+scheme, as illustrated in Fig. 4(a). Specifically, we train on long videos and split each sample into multiple
+segments, where each segment length matches the training length of the bidirectional teacher. During training,
+the student continuously rolls out the same sample across multiple consecutive steps; the rollout results are
+then fed to the teacher model and a fake model to compute the DMD loss.
+    Since a video may contain up to seven views, naively rolling out all segments and backpropagating the
+DMD loss can easily trigger GPU out-of-memory. To address this, we introduce a Random Gradient Sampling
+strategy. Each segment is composed of multiple chunks. Instead of recording gradients for every chunk as
+in prior implementations, we only keep gradients for the last chunk and randomly select a small number
+of earlier chunks to record gradients. In practice, this achieves training behavior comparable to full-chunk
+backpropagation while substantially reducing memory consumption.
+
+3.5    WorldRec 2.0
+To enhance consistency and stability in long-horizon causal inference, we introduce an explicit scene context
+grounded in real observations. Concretely, we propose WorldRec 2.0 to construct a persistent 3D scene
+state and use it as a geometry-aware prior for generation. Given multi-camera, multi-temporal observations,
+WorldRec 2.0 reconstructs a scene state composed of static and dynamic 3D Gaussians in a single forward
+pass, and renders it under a target camera and timestamp. The rendered prior is then fed into the generator
+through the world-control channels introduced in Sec. 3.3, serving as a stable 3D scene memory for causal
+generation. In this way, WorldRec 2.0 anchors geometry, appearance, and cross-view correspondence in
+observed regions, while the Causal World Model generates more realistic scenes and completes fine-grained
+appearance details as well as motion details beyond the observations.
+
+
+
+                                                        12
+                                                              Unprojection
+                                                                  and
+                                                             DeComposition
+                                                                                               Static Query      Dynamic Query
+        Image                   Depth                                          3D Query                  Scene Graph
+
+
+                     ...                                         V1 vs V2                                   ...
+                                                    Update 3D Query
+
+             Multi-View Features                                                                      Multi View Features
+
+                                                                 GS decoder
+             Projection                                                                                         L times
+
+
+
+                           Spatial-                                                                                 interactive
+                          Temporal                                                                                 Transformer
+                           Fusion                                                                                    attention
+
+                                         Updated                                           3D Query                                Updated
+  3D Query
+                                        3D Query                                                                                  3D Query
+
+   WorldRec V1                Isolated                                                       WorldRec V2              Interactive
+                                                                3D Gaussians
+
+Figure 5 WorldRec 2.0: point-aligned interaction and explicit 3D scene memory. Multi-camera and multi-temporal
+observations are aligned in 3D, exchanged through static-scene and dynamic-instance registers, decoded into static and
+dynamic Gaussians, and rendered under a target camera pose and time.
+
+
+From Point-Aligned Representation to Point-Aligned Interaction. WorldRec 1.0 (Zhou et al.,
+2026c) follows the point-aligned design of PointForward 1.0 (Chi et al., 2026). It lifts multi-view images with
+estimated depth into a shared 3D space, and aggregates observations from the same spatial location into a set
+of sparse 3D queries. Each query is initialized from its 3D position, color, image feature, and Plücker ray.
+Static queries stay in world coordinates. For each dynamic instance k, observed points are mapped into a
+canonical coordinate system using the instance pose Tk (τ ):
+
+                                           q = ϕinit (x, r, c, f ),        xcan = Tk (τ )−1 xw .                                         (5)
+
+This point-aligned representation helps reduce duplicate points and the ghosting artifacts introduced by
+frame-wise Gaussian prediction. However, fusion mainly happens within each query, and related queries lack
+an efficient communication path. In contrast, applying full global attention to tens of thousands of queries
+would be prohibitively expensive in both compute and memory.
+
+Scene-Structured Register Interaction. To enable efficient communication, WorldRec 2.0 adopts the
+register-based interaction design of PointForward 2.0 (Wang et al., 2026d). We introduce a small set of
+learnable registers as a shared communication bottleneck among point queries. Each interaction block consists
+of three stages—compress, communicate, and broadcast:
+
+                                        R̂ = A(R, Q),          R̃ = S(R̂),          Q̃ = A(Q, R̃),                                       (6)
+
+where A denotes query–register cross-attention and S denotes register self-attention. Static scene registers
+propagate background information across views and timestamps. Dynamic instance registers aggregate
+observations of the same object over time in its canonical space, while separating unrelated instances. On
+the query side, we additionally employ 4D RoPE built from the aligned 3D coordinates and the original
+timestamp, so that temporal provenance is preserved after spatial alignment. Overall, this scene-structured
+interaction supplies the Gaussian decoder with richer geometric and appearance context without resorting to
+point-level global attention.
+
+
+                                                                      13
+Table 2 Multi-stage training curriculum. In General Data, Full denotes the complete dataset, and HQ denotes the
+high-quality subset selected using the scoring scheme in Chapter 2. In Physical Causal Data, Pub. Media refers to
+counterfactual video data retrieved from public datasets and open-source materials (e.g., vehicle-collision clips).
+
+                                           General Data         Physical World Data        Physical Causal Data
+ Data & Stage         Res.       Views
+                                           Full         HQ      Driving    Robot      Engine     LVM     Pub. Media
+ Data samples          –            –      3.6M         0.5M        5.4M   3.6M         37K      29K          12K
+ Pre-train           480p          1V        ✓            ✓           ✓      ✓           ✓        ✓            ✓
+ Mid-train         480p,540p      1-7V       –            ✓           ✓      ✓           ✓        ✓            ✓
+ Post-train        480p,540p      1-7V       –            –           ✓      ✓           –        –            –
+
+
+Gaussian Scene Memory and Generative Interface. The updated queries are directly decoded into
+RGB Gaussians parameterized by position, color, scale, rotation, and opacity. Static Gaussians are represented
+in world coordinates. Dynamic Gaussians are predicted in canonical coordinates and then transformed back to
+world space using the instance pose at the target timestamp. We train the reconstruction with RGB, depth,
+and perceptual objectives.
+    Let Gs denote the static Gaussian set and Gdk denote the canonical Gaussian set of dynamic instance k.
+Given a target camera pose pi and the instance poses Tk (i), we render a geometry-aware prior as
+                                            K
+                                                            !
+                                            [
+                                                      k
+                              ri = R Gs ∪      Tk (i)Gd , pi ,     w̃i = [wi ; ri ],                        (7)
+                                                  k=1
+
+where R is a Gaussian rasterizer. The augmented world control w̃i is injected into the DiT via the VAE
+encoding and channel-concatenation mechanism in Sec. 3.3, without introducing a separate conditioning
+branch. In effect, WorldRec 2.0 writes observation-supported content into a persistent 3D scene memory,
+providing a stable geometric anchor across time and views during streaming rollout. We report detailed
+reconstruction results in Sec. 5.5.
+
+
+4     Training and Inference
+4.1    Multi Stage Training
+Our Causal world model training process is mainly divided into three stages. The training data and data
+mixture differ across stages, but we keep the model architecture consistent throughout, allowing the weights
+from the previous stage to be reused as the initialization for the next stage. The specific data usage is
+summarized in Tab. 2.
+
+Stage I: Pre-training. In Stage I, our model architecture is identical to that described in Sec. 3.2. Using
+this architecture, we train two models separately: a bidirectional model and an autoregressive model. Both
+models are trained with the flow-matching loss. Given a sample x1:T , we denote its corresponding clean latent
+as x0 and random noise as x1 ∼ N (0, I) (we omit subscripts for simplicity). We sample a timestep t ∈ [0, 1]
+from a logit-normal distribution and define the intermediate latent xt and its corresponding ground-truth
+velocity v t as
+                                  xt = (1 − t)x0 + tx1 ,     v t = x1 − x0 .                               (8)
+   We feed xt into the model to predict the velocity uθ (xt | w, p, I0 , c). and the loss is computed using MSE.
+For the bidirectional model, all chunks xti , i ∈ {1, . . . , T }, use the same timestep t, and full attention is applied
+between all chunks. For the unidirectional model, we use Diffusion Forcing for training and assign a different
+timestep ti to each chunk xtii . We apply a causal attention mask, so that xtii can attend only to the historical
+chunks x1:i−1 . During training, we use a learning rate of 1 × 10−4 and the AdamW optimizer with β1 = 0.9,
+β2 = 0.95, and a weight decay of 5 × 10−2 . To facilitate optimization, we first train the bidirectional model
+and use its learned parameters to initialize the Diffusion Forcing (Chen et al., 2024a) model. We group every
+two latent frames into one chunk (i.e., chunksize=2).
+
+
+                                                               14
+Stage II: Mid-train. In Stage II, our goal is to endow the model with controllability and the ability to
+generate multi-view states, while preserving its general generation capability. We therefore adopt a progressive,
+multi-step training curriculum. First, we mix single-view data with multi-view data and train with T2V
+and I2V tasks, where the single-view data comes from the high-quality subset of General Data and Physical
+World Data, and the multi-view data comes from driving Data and robot Data. Next, we introduce camera
+view-pose conditioning with a certain probability, resulting in a hybrid training objective over T2V, I2V, and
+CI2V. Finally, we incorporate world-control conditions and train with T2V, I2V, CI2V, WI2V, and WCI2V.
+We design this curriculum because CI2V is more challenging and has more data than WCI2V; introducing
+the harder task earlier helps the model learn complex conditional generation. In this stage, we initialize the
+bidirectional model and the autoregressive model separately from their Stage I counterparts.
+
+Stage III: Post-train. In Stage III, we optimize the model for downstream deployment by post-training
+on a small, carefully curated subset from the high-quality portions of driving Data and robot Data. We
+explicitly balance this subset to match the desired application-specific distribution and to ensure both high
+quality and diversity. This is crucial because CD and Streaming DMD are prone to mode collapse, which
+can lead to a substantial drop in sample diversity; by finely adjusting the training samples, we encourage
+the model to recover both diversity and fidelity. Concretely, we run post-training separately for different
+application scenarios. Before applying CD and Streaming DMD, we further fine-tune the bidirectional model
+and the autoregressive model on the corresponding scenario-specific high-quality subset, using a learning rate
+of 2 × 10−2 for roughly one epoch. We then perform CD and Streaming DMD to obtain scenario-specific
+weights (e.g., autonomous-driving 7V and embodied 3V). Meanwhile, we reduce the training objective to
+a fixed task (e.g., WCI2V) so that only a small number of optimization steps is needed to achieve strong
+downstream performance. During the Streaming DMD training stage, we roll out the student model for two
+steps and distill a model that performs two-step denoising with chunksize=2.
+
+4.2    Inference.
+In closed-loop evaluation and training, inference throughput and latency are critical. We speed up inference
+along three dimensions: world-control generation, VAE encoding/decoding, and DiT denoising. First, world-
+control signals must be rendered online based on the ego pose and dynamic scene changes. Following
+FlashDreams (FlashDreams Contributors, 2026; Basant et al., 2026), we use Ludus to accelerate rendering.
+Second, for VAE encoding and decoding, we combine torch.compile (Ansel et al., 2024) with CUDA
+Graphs (Guide, 2020) to reduce kernel-launch overhead and improve GPU utilization. Third, for DiT
+denoising, we allocate a fixed-size KV cache for the local-attention window. To keep training and inference
+consistent, we also use a fixed KV-cache size during post-training for self rollouts. This keeps the computation
+graph and tensor shapes constant at inference time, enabling CUDA-Graph acceleration for DiT. We further
+run inference in parallel on 8 GPUs. In the 7V setting, we shard the tokens of each view across 7 GPUs, while
+the remaining GPU handles VAE encoding for world control. The generated latents are then decoded on the
+same 7 GPUs. We implement context parallelism via ring attention (Liu et al., 2024).
+
+Table 3 Efficiency and quality of three DiT attention designs. FSA denotes native full softmax attention and flattens
+all the view tokens; VTA denotes view-temporal decoupled attention with softmax attention; and GLA uses the VTA
+with GLA in temporal attention branch. SA/layer reports the mean CUDA-event latency (per DiT forward pass) of a
+representative attention layer used by each design: full spatiotemporal softmax attention for FSA, temporal-branch
+softmax attention for VTA, and temporal-branch gated linear attention for GLA. DiT/chunk is the causal DiT latency
+per chunk generation. Parenthesized efficiency values are speedups relative to FSA; the parenthesized FID change
+compares GLA with VTA.
+
+               Attention      SA/layer (ms) ↓    DiT/chunk (s) ↓     Latent FPS ↑         FID ↓
+               FSA                 60.14              6.481              0.309               –
+               VTA             23.17 (2.60×)      2.299 (2.82×)     0.870 (+182%)         37.24
+               GLA(Ours)       8.412 (7.15×)      1.742 (3.72×)     1.148 (+272%)     38.08 (+2.3%)
+
+
+
+
+                                                         15
+5       Results
+5.1      Video Generation Evaluation
+Tab. 3 compares efficiency and generation quality across three attention designs. All models use three-stage
+training; we report final distilled two-step results. All measurements use the same 7V setting and 100 output
+latent frames on a single NVIDIA H20 GPU. VTA cuts attention-layer latency from 60.14 ms (FSA) to
+23.17 ms (2.60×), and GLA further cuts it to 8.412 ms (2.75× over VTA; 7.15× over FSA). End-to-end, causal
+DiT latency per 2-latent-frame chunk drops from 6.481 s (FSA) to 2.299 s (VTA) and 1.742 s (GLA), increasing
+throughput from 0.309 to 1.148 latent frames/s.
+    Unless otherwise specified, all subsequent experiments use the VTA and hybrid GLA as DiT backbone.
+Using this shared setting, we evaluate the model in the Mid-train stage from three complementary perspectives:
+general video generation, scene perception, and camera-pose control. General video generation assesses visual
+quality and temporal coherence on standard benchmarks, together with the ability to simulate long-tail
+scenarios and physically causal events across synchronized views. Scene perception examines whether the
+model captures scene geometry and preserves object-level information through depth prediction and referring
+video segmentation. Camera-pose control evaluates whether explicit geometric conditions can steer viewpoint
+changes while maintaining the consistency of the generated scene.
+
+Table 4 Quality evaluation on the Autonomous Vehicle subset of PAI-Bench-G. AV-Quality denotes the average score;
+SC, BC, MS, AQ, IQ, OC, IS, and IB denote Subject Consistency, Background Consistency, Motion Smoothness,
+Aesthetic Quality, Imaging Quality, Overall Consistency, Image-to-Video Subject Consistency, and Image-to-Video
+Background Consistency, respectively. Bold and underlined values denote the best and second-best results per column.
+
+ Model                                  AV-Quality ↑     SC ↑    BC ↑    MS ↑    AQ ↑    IQ ↑   OC ↑   IS ↑   IB ↑
+ Wan2.2-5B (Wan et al., 2025)               76.1         90.4    93.7    97.1    47.5    67.4   21.8   95.4   95.8
+ Wan2.1-14B (Wan et al., 2025)              77.2         91.7    94.3    98.4    48.1    68.8   21.7   97.0   97.3
+ Wan2.2-14B (Wan et al., 2025)              77.0         91.4    94.1    98.6    47.3    68.1   21.9   97.2   97.5
+ DreamXWorld (Team et al., 2026b)           76.1         91.9    93.7    97.3    47.5    64.4   21.7   95.7   96.7
+ HunyuanVideo1.5 (Wu et al., 2025a)         77.4         91.5    92.5    99.3    48.8    69.0   22.3   97.9   98.1
+ LingBotWorld (Team et al., 2026c)          77.3         91.2    94.4    98.8    48.3    69.1   21.8   97.3   97.8
+ Ours                                       78.0         96.2    96.5    99.5    46.6    64.5   22.2   99.0   99.2
+
+
+
+Table 5 Quality evaluation on the Robot subset of PAI-Bench-G using the same metrics as Tab. 4. Robot-Quality
+denotes the average score.
+
+ Model                                 Robot-Quality ↑    SC ↑    BC ↑   MS ↑    AQ ↑    IQ ↑   OC ↑   IS ↑   IB ↑
+ Wan2.2-5B (Wan et al., 2025)                74.3         89.0    91.0    98.0    46.1   67.8   19.2   90.3   92.8
+ Wan2.1-14B (Wan et al., 2025)               75.2         87.9    90.3    98.5    48.8   71.7   19.0   91.5   93.7
+ Wan2.2-14B (Wan et al., 2025)               75.4         89.4    90.6    98.4    48.1   70.6   19.4   92.3   94.3
+ DreamXWorld (Team et al., 2026b)            74.8         90.3    92.2    97.3    45.6   66.2   18.9   92.4   95.8
+ HunyuanVideo1.5 (Wu et al., 2025a)          76.9         89.0    90.6    99.2    51.0   70.1   19.6   97.9   97.8
+ LingBotWorld (Team et al., 2026c)           77.0         91.8    93.2    99.0    50.0   66.8   19.7   97.8   98.0
+ Ours                                        77.1         95.4    95.7    99.5    44.8   67.2   19.0   96.1   98.8
+
+
+
+5.1.1    General Video Generation
+We evaluate general video generation across complementary settings, covering standard benchmark scenarios
+as well as synchronized seven-view generation in long-tail and causally structured environments. Specifically,
+we report results on the Autonomous Vehicle and Robot subsets of PAI-Bench-G (Zhou et al., 2026a), and
+complement them with targeted seven-view experiments that probe coherent scene evolution and physical
+interaction under challenging driving conditions. PAI-Bench is a comprehensive Physical AI benchmark
+covering video generation, conditional video generation, and video understanding. Its generation track, PAI-
+Bench-G, provides a fine-grained evaluation of perceptual quality, temporal consistency, semantic alignment,
+
+
+                                                         16
+reference fidelity, and physical plausibility.
+    Our evaluation focuses on its Autonomous Vehicle and Robot subsets, which contain 118 and 174 videos,
+respectively. These two subsets cover driving-related and embodied-interaction scenarios that align with
+the primary application domains of our model. Tab. 4 and Tab. 5 report the corresponding results. Our
+model achieves the highest Quality Score in both domains across all evaluated models, with scores of 78.0 for
+autonomous driving and 77.1 for robotics. Compared with Wan2.2-5B, Ours improves Subject Consistency
+from 90.4 to 96.2 in autonomous driving and from 89.0 to 95.4 in robotics, while also achieving the best
+Background Consistency, Motion Smoothness, and Image-to-Video Background Consistency in both domains.
+These results indicate improved preservation of scene appearance, object identity, temporal continuity, and
+background structure. The synchronized seven-view experiments complement this benchmark by examining
+long-tail content, coherent physical interactions, and cross-view consistency in challenging driving scenarios.
+
+           Front Wide                Rear                 Front Tele        Front Wide                Rear                  Front Tele
+
+
+
+  0s
+
+
+
+
+  9s
+
+
+
+                        (a) Long-Tail Road Participants                                  (b) Long-Tail Weather Conditions
+
+
+
+Figure 6 Qualitative results for long-tail corner cases. For compact visualization, we show the Front Wide, Rear, and
+Front Tele views selected from the full seven-view output. Rows present representative frames from 0 to 9 seconds. Left:
+Long-Tail Road Participants, where a horse appears in an urban driving scene. Right: Long-Tail Weather Conditions,
+showing nighttime driving on a snow-covered road.
+
+    Beyond PAI-Bench-G, we examine synchronized seven-view generation in two complementary categories:
+long-tail corner cases that are underrepresented in naturally collected driving data, and physically causal
+events that require the generated dynamics to remain consistent with real-world physics and preserve coherent
+cause-and-effect relationships throughout scene evolution. The generated sequences must preserve a consistent
+scene state throughout the rollout, with objects and events remaining spatially compatible across views and
+evolving coherently over time. For compact visualization, Fig. 6 and Fig. 7 show the Front Wide, Rear, and
+Front Tele views selected from the full seven-view output. The rows present representative frames spanning a
+nine-second generation horizon. Fig. 6 presents two long-tail corner cases. In the Long-Tail Road Participants
+example, a horse gradually emerges in the driving scene during the rollout, transitioning from an initially
+absent object to a newly appearing road participant. The model incorporates this unexpected participant into
+the ongoing traffic scene while preserving the temporal stability of the surrounding vehicles, road structure, and
+background. The Long-Tail Weather Conditions example depicts nighttime driving on a snow-covered road,
+where the model maintains the altered road appearance, reduced surface contrast, snow-covered surroundings,
+and traffic dynamics throughout the sequence. Together, these examples show that the model can incorporate
+rare road participants and unusual weather conditions into a temporally coherent scene, while maintaining
+
+
+                                                                       17
+consistent visual and dynamic changes throughout the rollout.
+    Fig. 7 presents two physically causal events designed to examine whether the model can preserve real-world
+physical consistency and cause-and-effect relationships during scene evolution. In the Environmental Hazard
+Response example, rocks fall and roll down the adjacent mountain slope under gravity before entering the
+roadway, prompting the ego vehicle to perform an evasive maneuver. The generated sequence preserves the
+causal order from the initially unobstructed road, to rockfall, and finally to the vehicle’s response, while
+maintaining plausible spatial and temporal relationships among the slope, obstacles, and ego vehicle. In
+the Vehicle Collision Dynamics example, the ego vehicle gradually closes the distance to the vehicle ahead,
+and the rear-end collision occurs only after the two vehicles come into contact. The continuous reduction in
+inter-vehicle distance and the subsequent collision reflect a physically plausible interaction rather than an
+abrupt frame-level change. Across both examples, object motions and vehicle responses remain consistent
+with the preceding scene state, while the front-facing views capture the key event progression and the rear
+view confirms the coherence of the surrounding scene.
+
+           Front Wide                 Rear                  Front Tele        Front Wide                Rear                Front Tele
+
+
+
+  0s
+
+
+
+
+  9s
+
+
+
+                        (a) Environmental Hazard Response                                  (b) Vehicle Collision Dynamics
+
+
+
+Figure 7 Qualitative results for physically causal events. Three representative views are shown from the full seven-view
+output, with rows spanning 0 to 9 seconds. Left: Environmental Hazard Response, where rocks enter a mountain
+road and the ego vehicle performs an evasive maneuver. Right: Vehicle Collision Dynamics, where the ego vehicle
+progressively approaches and rear-ends the vehicle ahead.
+
+
+
+5.1.2   Scene Perception for Video Generation
+A capable world model should generate visually plausible RGB frames while also modeling scene geometry and
+preserving object-level information over time. We evaluate these capabilities through depth prediction and
+referring video segmentation. During perception-oriented pretraining, RGB videos, depth videos, and referring
+segmentation masks are represented as video targets and processed by the same latent video generator,
+without independent task-specific prediction heads. We assess depth prediction using absolute relative error
+(AbsRel), where lower is better, and threshold accuracy δ1 , where higher is better. Tab. 6 reports the
+results on two driving sequences and the reported dataset average. Our model achieves the strongest average
+performance among all evaluated methods, with an AbsRel of 0.058 and a δ1 accuracy of 96.3. Compared
+with VGGT-World (Sun et al., 2026b), the strongest competing method, our model reduces AbsRel from
+0.065 to 0.058, corresponding to a relative reduction of 10.8%, and improves δ1 from 94.0 to 96.3, an absolute
+
+
+                                                                         18
+gain of 2.3 percentage points. The advantage is consistent across both driving sequences, where our model
+obtains the lowest AbsRel and highest δ1 . It also outperforms the remaining baselines on the reported dataset
+average, reducing AbsRel by 29.3%, 39.6%, and 57.7% relative to DINO-Foresight (Karypidis et al., 2026),
+Aether (Zhu et al., 2025), and VGGT (Wang et al., 2025a), respectively. These results indicate that the
+shared video generator learns accurate and transferable geometric representations.
+    We also evaluate referring video segmentation to test whether the model preserves object-level information
+over time. The model achieves a RefSeg IoU of 0.6726 at reference time t. As the temporal offset increases, IoU
+remains above 0.55 through t + 10 (0.5934 at t + 5 and 0.5501 at t + 10). Although performance decreases at
+larger offsets, the model still obtains IoUs of 0.3104 at t+20 and 0.1705 at t+30, indicating that object identity,
+location, visibility, and boundaries remain partially recoverable over extended temporal distances. Together
+with the depth comparison, these results show that perception-oriented pretraining provides geometric and
+object-level temporal priors within the shared video generator. Fig. 8 further visualizes both perception tasks.
+The predicted depth maps preserve the scene layout and relative depth ordering across frames, while the
+referring segmentation masks stay aligned with the target object as the scene evolves.
+
+Table 6 Depth prediction comparison on two driving sequences and the reported dataset average. AbsRel is lower-is-
+better, while δ1 (%) is higher-is-better.
+
+                                           2011_09_26_drive_0002_sync   2011_10_03_drive_0047_sync   Reported Dataset Avg.
+ Method
+                                           AbsRel ↓        δ1 ↑         AbsRel ↓        δ1 ↑         AbsRel ↓      δ1 ↑
+ Cosmos-4B (Agarwal et al., 2025)           0.138          84.0          0.155          77.5          0.155       77.1
+ Cosmos-12B (Agarwal et al., 2025)          0.131          84.5          0.149          77.6          0.154       77.5
+ Copy Last (VGGT) (Wang et al., 2025a)      0.112          89.6          0.140          84.4          0.137       83.7
+ Aether (Zhu et al., 2025)                  0.074          94.2          0.113          87.4          0.096       87.9
+ DINO-Foresight (Karypidis et al., 2026)    0.063          96.5          0.076          90.9          0.082       91.6
+ VGGT-World (Sun et al., 2026b)             0.050          98.3          0.064          94.9          0.065       94.0
+ Ours                                       0.028          99.3          0.059          96.9          0.058       96.3
+
+
+
+
+Figure 8 Qualitative results for scene perception. Top: RGB frames and corresponding depth predictions. Bottom:
+RGB frames and referring segmentation masks for target objects. Columns show temporal progression of each sequence.
+
+
+
+5.1.3     Camera-Pose Control for Video Generation
+Camera-pose control evaluates whether explicit geometric conditions can steer the generated viewpoint while
+preserving scene structure. Our model uses Fused-PRoPE (Huang et al., 2026a) to inject camera intrinsics
+and extrinsics directly into temporal and cross-view attention, allowing the attention computation to account
+for camera motion and relative view geometry without introducing a separate camera branch. We adopt
+the camera controllability metric introduced by WorldScore (Duan et al., 2025) for evaluation. This metric
+
+
+                                                             19
+Table 7 Camera-pose-controlled video generation evaluated using the camera controllability metric introduced by
+WorldScore. WorldScore denotes the static-world subset of the WorldScore evaluation set, while Combined denotes the
+evaluation set formed by merging TartanAir and RealCam-Vid. Higher scores indicate more accurate adherence to the
+specified camera trajectories.
+
+                                                                Camera Controllability Score ↑
+                  Method
+                                                               WorldScore    Combined         Average
+                  CogVideoX-I2V (Yang et al., 2025c)             38.27         26.72            32.50
+                  Hunyuan 1.5 (Wu et al., 2025a)                 40.15         28.71            34.43
+                  LingBot World (Team et al., 2026c)             42.06         35.97            39.02
+                  FantasyWorld-1.0 (Dai et al., 2026)            81.45         44.28            62.87
+                  DreamXWorld (Team et al., 2026b)               81.23         43.01            62.12
+                  Ours                                           86.35         70.08            78.22
+
+
+compares the camera trajectory estimated from a generated video with the corresponding input trajectory
+by combining scale-invariant rotation and translation errors; the resulting error is normalized into a score
+for which a higher value indicates more accurate camera control. We compute this metric on two evaluation
+sets: the static-world subset of WorldScore and a combined set constructed from TartanAir (Wang et al.,
+2020) and RealCam-Vid (Zheng et al., 2025). The former measures camera controllability on the benchmark’s
+diverse static scenes, while the latter evaluates generalization to additional scenes and camera trajectories.
+    As reported in Tab. 7, our model achieves the best camera controllability score on both evaluation sets. It
+obtains 86.35 on the WorldScore (Duan et al., 2025) static-world subset, exceeding the strongest baseline,
+FantasyWorld-1.0 (Dai et al., 2026), by 4.90 points. On the combined TartanAir (Wang et al., 2020) and
+RealCam-Vid (Zheng et al., 2025) set, our model reaches 70.08 and outperforms FantasyWorld-1.0 (Dai
+et al., 2026) by 25.80 points. The consistent improvements across both evaluation sets demonstrate that
+Fused-PRoPE enables the model to follow specified camera trajectories across diverse scenes and motion
+patterns. Fig. 9 provides qualitative examples in both single-view and multi-view settings. In the single-view
+example, the generated frames follow the prescribed camera trajectory while maintaining a stable scene layout.
+In the multi-view example, the head, left, and right camera streams follow their respective trajectories and
+produce mutually consistent observations of the scene.
+
+
+
+
+                     (a) Single-View Camera Control                                (b) Multi-View Camera Control
+
+
+Figure 9 Qualitative results for camera-pose-controlled generation. (a) Single-view camera control, with the prescribed
+camera trajectory shown on the left and representative generated frames on the right. (b) Multi-view camera control
+for the head, left, and right cameras, showing their trajectories and the corresponding synchronized observations. The
+color progression indicates the temporal order from start to end.
+
+
+
+5.2    Closed-loop Simulation
+In this section, we assess our model which from the Post-train stage as a closed-loop simulator for autonomous
+driving from three aspects: (i) multi-view driving generation on nuScenes (Caesar et al., 2019) for benchmarking,
+(ii) multi-view embodied (Liu et al., 2026a) results to verify cross-view consistency and action-conditioned
+scene evolution, and (iii) system-level deployment of our model server to simulate long-horizon, controllable
+driving scenarios, where the generated observations are consumed by Xiaomi’s autonomous driving stack for
+closed-loop testing.
+
+
+                                                          20
+5.2.1   Multi-view Driving Results
+We first evaluate on the public nuScenes benchmark for a fair comparison with prior work. Following the
+standard split, we train on 750 scenes and evaluate on 150 scenes; each scene lasts roughly 20 seconds
+and contains six synchronized camera views. We report FID and FVD. As shown in Tab. 8, our model
+achieves competitive performance among short-video generation methods (e.g., Vista (Gao et al., 2024b),
+DriveDreamer (Wang et al., 2024a), and MagicDrive-V2 (Gao et al., 2024a)), while supporting generation
+at arbitrary length. Under the long-video setting, our method outperforms other autoregressive generators
+(e.g., Self-Forcing(++) (Huang et al., 2026b; Cui et al., 2026), LongLive (Yang et al., 2025b), and Causal-
+Forcing++ (Zhao et al., 2026)) with the best FVD and the second-best FID, indicating superior temporal
+quality in driving scenarios; our 6-view results are also competitive.
+
+         Front Left     Front Wide     Front Right     Rear Right       Rear          Rear Left      Front Tele
+
+
+
+  0s
+
+
+
+
+ 45s
+
+
+
+
+Figure 10 Qualitative results on internal driving data: 7-view long-video generation (45 s). Our model preserves
+fine-grained structures (e.g., lane markings and traffic signs) over long horizons.
+
+   We validate on internal driving data. To ensure that the videos remain consistent with the scene, we
+adopt the rendered reconstructions from Sec. 3.5 as scene priors for world control. Fig. 10 showcases 7-view
+long-horizon generation up to 45 seconds, and Fig. 11 demonstrates generation under diverse, novel trajectories.
+
+5.2.2   Multi-view Embodied Results
+We evaluate our method in embodied, multi-view settings on TriWorldBench (Liu et al., 2026a), an action-
+conditioned multi-view video generation benchmark. Given a robot action sequence, the first-frame observations
+from one head camera and two wrist cameras, and a task description, the benchmark requires generating a
+video sequence that is consistent with the executed actions. The evaluation set contains 500 episodes spanning
+50 manipulation tasks. Performance is measured by TWB-Score, which aggregates 19 sub-metrics over six
+aspects: tri-view consistency, task alignment, 3D coherence, motion quality, temporal consistency, and visual
+quality. We compare against methods with publicly available papers, and report their numbers from the
+official leaderboard snapshot dated Sep. 30, 2026.
+    As shown in Tab. 9, our approach achieves competitive overall performance without any additional tricks
+or test-time heuristics, and attains the best Trajectory Accuracy among all compared methods. Fig. 12
+visualizes representative results. In each row, the top shows the input world control signal, rendered by
+driving the robot’s URDF model with the action sequence. The bottom shows our generated outputs. The
+results indicate that our model faithfully follows the arm motions specified by the world control, while the
+
+
+                                                      21
+         Front Left    Front Wide   Front Right    Front Left     Front Wide      Front Right        Front Left    Front Wide   Front Right
+
+
+  0s
+
+
+
+
+ 10.3s
+
+
+
+
+Figure 11 Qualitative results on internal driving data: generation under novel trajectories. Our model remains robust
+under challenging, out-of-distribution trajectories.
+
+   Table 8 Video generation results under short-video and long-video settings. FID and FVD are lower-is-better.
+
+              Method                                               Views           Frames              FID ↓          FVD ↓
+               Short-video Generation
+              Vista (Gao et al., 2024b)                                 1               25              6.90          89.40
+              DriveDreamer (Wang et al., 2024a)                         6                8              14.90         340.80
+              MagicDrive-V2 (Gao et al., 2024a)                         6               16              20.91          94.84
+                                                                        1               21              12.09         135.13
+              Ours
+                                                                        6               21              19.62         171.73
+               Long-video generation
+              Self-Forcing (Huang et al., 2026b)                        1              211             41.53          161.00
+              Self-Forcing++ (Cui et al., 2026)                         1              211             28.84          147.57
+              LongLive (Yang et al., 2025b)                             1              211             29.05          161.41
+              Causal Forcing++ (Zhao et al., 2026)                      1              211             25.05          126.86
+                                                                        1              211             25.57          125.74
+              Ours
+                                                                        6              211             58.90          203.76
+
+
+camera-view pose control keeps the motion consistent across different cameras.
+
+Table 9 TriWorldBench results on TWB-Score and the metrics where our method ranks first or second among the
+compared methods. Bold and underlined scores denote first and second place. All metrics are higher-is-better.
+
+Method                                            TWB-          Traj.          Norm.         VQA           Flow        Bg.       Photo.
+                                                  Score         Acc.           PSNR          Cons.         Score      Cons.     Smooth.
+DreamDojo (Gao et al., 2026)                      51.72         16.61          59.78        47.82          6.52       89.29      15.86
+Fysiverse-Video (Wang et al., 2026b)              63.62         37.40          68.90        63.32         22.16       75.36      35.63
+WoVR_Plus (Jiang et al., 2026b)                   65.39         45.27          74.62        69.11         24.85       75.19      32.90
+BWM (Team et al., 2026a)                          65.54         41.97          73.43        65.94         20.48       70.29      33.95
+CausalWM (Xu et al., 2026e)                       66.04         42.98          72.41        70.03         22.99       75.53      30.27
+Ours                                              64.79         47.25          73.44        69.31         23.76       75.57      34.16
+
+
+
+
+                                                                 22
+        Left Wrist   Head    Right Wrist    Left Wrist   Head      Right Wrist    Left Wrist   Head      Right Wrist
+
+
+
+
+ t
+
+
+Figure 12 Qualitative visualization of world control (top) and our generated multi-view results (bottom). The world
+control is rendered from the robot URDF driven by the action sequence.
+
+
+5.2.3      Closed-loop Evaluation Results
+Using the post-trained model together with the deployment optimizations in Sec. 4.2, we build a closed-loop
+evaluation environment to benchmark six versions of our policy model. Taking hazardous lane change and late
+deceleration as examples, the relative ranking of these six models in our closed-loop evaluation matches the
+relative ranking observed in real-vehicle tests. Specifically, the Pearson correlation is r = −0.88 for hazardous
+lane change and r = −0.84 for late deceleration. These results suggest that the closed-loop evaluation
+environment built on our Causal World Model is highly reproducible and can be used for policy-model
+performance evaluation.
+
+5.3       Closed-loop Training
+In this section, we construct a simulator based on the causal reasoning world model and endow the end-to-end
+autonomous driving framework with causal reasoning-enabled planning capability through post-training of the
+end-to-end model. Subsequently, Sec. 5.3.1 elaborates the world model-based closed-loop training strategy
+and experimental setup, and Sec. 5.3.2 reports the corresponding closed-loop training test results.
+
+5.3.1      Closed-Loop Training Strategy and Setup
+At the core of this strategy lies a causal reasoning world model-based simulator, which conducts online
+post-training of the end-to-end model via closed-loop interaction. This equips the driving policy with
+causal planning capabilities and improves key performance metrics, including safety and driving efficiency.
+Specifically, we develop an online RL-enabled post-training scheme based on a state-of-the-art end-to-end
+driving policy (Kirby et al., 2026; Anonymous, 2026) to fine-tune its action generation network. Fig. 13 shows
+
+
+                                                         23
+the overall architecture of this closed-loop training strategy, which consists of three modules: the end-to-end
+driving model, the RL post-training module, and the causal world model simulator.
+
+
+                    E2E Backbone                               Action Expert
+                                                                                                               Casual World Model
+                                   Q    Trajectory
+                                         Decoder                        Actor                                    Scene context
+                                                                        Head
+                                                                  Actor
+                                                                        Critic
+                                       K,V                              Head         Actor/Critic    Rollout
+                                                K,V                                                              Casual DiT
+                                                                                        Loss         Buffer
+      Ego status                                  Shared FeatureNorm
+
+
+Figure 13 Architecture of the closed-loop training strategy based on the causal reasoning world model simulator. The
+strategy comprises three core components: an end-to-end driving model, a reinforcement learning (RL) post-training
+module, and a causal reasoning world model simulator. Solid lines denote data flow; dashed lines denote gradient
+propagation. The proposed strategy fine-tunes the action generation model via post-training.
+
+
+End-to-End Model and Post-Training Strategy. Based on a state-of-the-art end-to-end driving model, we
+redesign the action output by adding a policy head and a value head, making the driving policy compatible
+with reinforcement-learning post-training. The backbone acts as an observation encoder, mapping raw images,
+historical trajectories, and ego-state signals into a unified token sequence. The policy predicts trajectories
+and, through closed-loop interaction with the causal-reasoning world-model simulator, receives future state
+transitions and reward feedback. Finally, based on interaction data collected from rollouts, we update
+the policy network and value evaluation network corresponding to expert actions via the Proximal Policy
+Optimization (PPO) algorithm. The mathematical formulation of the post-training policy loss function is
+presented below.
+                          h                                                     2                 i
+             L(θ, ϕ) = E min ρt At , clip(ρt , 1 − ϵ, 1 + ϵ)At − c1 Vϕ (st ) − Rt + c2 H(πθ (·|st )) ,     (9)
+
+where L(θ, ϕ) denotes the composite objective function of the PPO algorithm combining the clipped policy
+surrogate objective, value-function regression loss, and entropy bonus; E[·] is the expectation taken over
+sampled environment trajectories; ρt = πθ (at |st )/πθold (at |st ) represents the probability ratio between the
+updated policy πθ and the old policy πθold ; At is the advantage function at time step t; clip(ρt , 1 − ϵ, 1 + ϵ) is
+the clipping operator restricting ρt within [1 − ϵ, 1 + ϵ]; ϵ is the clipping threshold hyperparameter to constrain
+the magnitude of each policy update; Vϕ (st ) is the state value predicted by the value network parameterized
+by ϕ; Rt denotes the target baseline value for state st ; c1 and c2 are weighting coefficients for the value loss
+and entropy bonus term, respectively; H(πθ (·|st )) is the entropy of stochastic policy distribution πa , which
+promotes exploration by discouraging over-deterministic policies; st refers to the environment state at time
+step t; and πθ (·|st ) is the stochastic policy network parameterized by θ.
+   The advantage function At involved in Eq. (9) is computed via generalized advantage estimation (GAE),
+which is built upon the exponentially weighted accumulation of temporal difference errors. Mathematically,
+the advantage function is formulated as:
+                                        −t−1
+                                       TX
+                             At =              (γλ)l δt+l ,      δt = rt + γVϕ (st+1 ) − Vϕ (st ),                            (10)
+                                         l=0
+
+where rt denotes the immediate reward received by the agent at time step t; γ ∈ [0, 1] is the discount factor
+that weights future rewards; Vϕ (st ) and Vϕ (st+1 ) are the predicted state values of states st and st+1 output
+by the value network parameterized by ϕ, respectively; λ ∈ [0, 1] serves as the GAE smoothing parameter
+that regulates the bias-variance trade-off of the advantage estimation; and T represents the total number of
+time steps in a single sampled trajectory.
+Simulator Based on the Causal Reasoning World Model. This closed-loop simulator receives future
+trajectory commands output from the end-to-end model, and estimates the vehicle’s future pose states via
+its integrated trajectory tracking module and dynamics model. The causal reasoning world model within
+
+
+                                                                  24
+Table 10 Test Results of Closed-Loop Training Strategy and End-to-End Baseline Methods. CR denotes collision rate,
+SCR denotes success rate, OR denotes off-road rate, TTC denotes minimum time-to-collision, EP denotes ego progress
+rate, and HDR denotes trajectory compliance region rate. The upward arrow ↑ indicates that higher values correspond
+to better performance, while the downward arrow ↓ indicates that lower values correspond to better performance.
+
+                                                                  Safety                           Efficiency and Others
+                 Method
+                                             CR (%) ↓ SCR (%) ↑ OR (%) ↓ TTC (s) ↑ EP (%)↑ HDR (%) ↑
+  DrivoR-E2E (Kirby et al., 2026)              1.4         80.3            0.0        0.504           81.0     99.96
+ ST-JEPA-E2E (Anonymous, 2026)                 1.2         95.2            0.0        0.614           84.7     99.93
+       E2E-WM-RL (Ours)                        0.4         96.3            0.0        0.740           84.5     99.99
+
+
+the simulator takes HD maps, ego vehicle pose, static and dynamic obstacle information, and initial frame
+data as inputs, generating scene frame information at subsequent timesteps and corresponding state reward
+signals. Furthermore, the simulator incorporates a Linear Quadratic Regulator (LQR) trajectory tracking
+controller and a linear two-degree-of-freedom (2-DOF) kinematic model, enabling the mapping from planned
+trajectories to the vehicle’s future poses. Furthermore, the simulator calculates the total reward rt of the
+current state using the ego-vehicle pose, lane markings, and both dynamic and static obstacles.
+       Scene Context       Generated Front           BEV             Scene Context      Generated Front        BEV
+
+
+
+0S
+0s
+
+
+
+
+5S
+5s
+
+
+                              JEPA-E2E                                                    E2E-WM-RL
+                       (a) ST-JEPA-E2E                                               (b) E2E-WM-RL
+
+Figure 14 Visualization Results of Testing Closed-Loop Training Strategy and End-to-End Policy for Unsignalized
+Intersection Scenarios. ST-JEPA-E2E is the state-of-the-art end-to-end baseline, and E2E-WM-RL is our RL-
+posttrained end-to-end policy. Subplots from left to right show the world-model scene control diagram, world-model
+generated scene with trajectory projections, and BEV visualization with trajectory projections.
+                                                                             P
+     The total reward is a weighted sum of individual reward terms rt = i ki ri where ki denotes the weight
+coefficient of each reward component, and ri represents individual reward terms, consisting of progress reward
+rp , drivable-area reward rd , Time to Collision (TTC) reward rtc , collision penalty rc , off-road penalty ro , and
+comfort reward ra . The progress reward rp characterizes the effective forward travel distance of the vehicle
+along the driving direction, formulated as rp = clip(∆p, −5, 5)/5, where ∆p is the effective forward distance
+projected from vehicle displacement onto the heading direction. The drivable-area reward rd is calculated
+from the fraction of the four corners of the ego bounding box that lie inside the drivable-area polygon. The
+off-road penalty ro is a binary indicator term, which takes the value of −1 when severe off-road driving is
+detected and 0 otherwise. The TTC reward is computedfrom the minimum time-to-collision tmin , and can be
+compactly written as rtc = − max 0, min 1, 3.0−t    1.5
+                                                       min
+                                                           . The collision penalty rc is also a binary indicator
+
+
+                                                           25
+term, assigned as −1 if geometric overlap between the ego vehicle and polygons of dynamic or static obstacles
+indicates a collision, and 0 otherwise. The comfort reward ra quantifies riding comfort penalties integrated
+from the violation degrees of vehicle speed, acceleration, yaw rate and jerk relative to predefined thresholds.
+
+5.3.2   Closed-Loop Training Experimental Results
+In this experiment, we adopt the causal inference world model to construct closed-loop simulation training
+scenarios using the training and validation scene data provided by NavSim, and build closed-loop simulation test
+scenarios based on the test-set scenes from NavSim. During the closed-loop testing phase, 1000 representative
+scenes are selected as evaluation cases. The results are shown in Tab. 10 and Fig. 14.
+
+        Scene Context       Generated Front    BEV              Scene Context     Generated Front       BEV
+
+
+
+0s
+0S
+
+
+
+
+5s
+5S
+
+
+                               JEPA-E2E                                            E2E-WM-RL
+                        (a) ST-JEPA-E2E                                         (b) E2E-WM-RL
+
+Figure 15 Visualization Results of Closed-Loop Training Strategy and End-to-End Policy for Parked Vehicle Occupation
+Scenarios. ST-JEPA-E2E is the state-of-the-art end-to-end baseline, and E2E-WM-RL is our RL-posttrained end-to-end
+policy. Subplots from left to right show the world-model scene control diagram, world-model generated scene with
+trajectory projections, and BEV visualization with trajectory projections.
+
+    The results of a multi-dimensional performance comparison between state-of-the-art end-to-end baselines
+and an end-to-end policy built on a causal-reasoning world model architecture with online reinforcement
+learning fine-tuning are summarized in Tab. 10. The evaluation metrics span two primary dimensions:
+driving safety and driving efficiency. The metrics adopted in this work include Collision Rate (CR), Scenario
+Completion Rate (SCR), Off-Road Probability (OR), TTC, Ego Progress (EP), and Host Driving Region
+Accuracy (HDR). Among them, CR, SCR, OR, and TTC characterize driving safety performance, while
+EP and HDR reflect driving efficiency and regulatory compliance, respectively. As shown in Tab. 10, the
+end-to-end policy E2E-WM-RL derived from closed-loop post-training delivers substantial improvements in
+collision rate, scenario completion rate, and TTC, effectively elevating the safety performance of the end-to-end
+framework. In addition, the proposed policy outperforms the baseline in driving region compliance, while
+retaining competitive performance on the driving efficiency metric EP. These results confirm that interactive
+closed-loop training enables end-to-end driving policies to achieve improved safety and regulatory compliance
+while preserving competitive driving efficiency.
+    A visual comparison of driving behaviors between two end-to-end driving strategies evaluated in a closed-
+loop simulation environment is presented in Fig. 14 and Fig. 15. The two strategies are the proposed
+strategy built on a causal inference world model architecture after online closed-loop fine-tuning, and the
+state-of-the-art end-to-end baseline algorithm. As depicted in Fig. 14, in the intersection merging scenario, the
+closed-loop-trained E2E-WM-RL strategy can proactively anticipate the motion dynamics of merging vehicles.
+
+
+                                                        26
+It completes speed adjustment of the ego vehicle 4 seconds before the merging vehicle enters the conflict
+zone, which effectively prevents collisions at the merging point. In contrast, the ST-JEPA-E2E end-to-end
+baseline strategy exhibits a pronounced delay in its deceleration response: it only initiates braking when
+the merging vehicle approaches the ego vehicle’s driving corridor, and ultimately collides with the merging
+vehicle during the merging process due to insufficient deceleration. As shown in Fig. 15, for the scenario
+where a temporarily stopped vehicle occupies the forward lane, the E2E-WM-RL strategy actively re-plans its
+driving trajectory to maneuver around the obstructing vehicle and smoothly traverses the section when a safe
+passing space is available in the left lane. By comparison, the ST-JEPA-E2E baseline strategy remains in a
+car-following waiting state and fails to execute active obstacle avoidance maneuvers, eventually resulting in
+a collision with a trailing vehicle from behind. Overall, the E2E-WM-RL strategy with online closed-loop
+training can proactively regulate vehicle speed in response to situational changes across driving scenarios,
+which fundamentally mitigates collision risks and improves driving safety. Meanwhile, it is equipped with
+dynamic trajectory planning capability, which enhances road throughput efficiency by bypassing lane-occupying
+obstacles ahead. In summary, the proposed strategy outperforms existing end-to-end baseline algorithms in
+terms of both driving safety and traffic efficiency.
+
+5.4     World Action Model Application
+
+
+
+
+Figure 16 World-Action Model. The causal world model encodes multi-frame observations into a spatiotemporal world
+latent. The Action Model then combines this latent with multi-camera history and ego status to produce action tokens.
+These tokens are decoded into candidate future trajectories, which are scored by the PDM heads.
+
+
+
+5.4.1   World Action Model for Driving
+Generation and reconstruction quality alone do not establish that a world model has learned scene information
+relevant to driving decisions. Closed-loop driving also requires the model to understand drivable regions,
+traffic-participant motion, ego status, collision risk, and the effect of ego actions on future states. We therefore
+connect spatiotemporal world latents from a causal world model to a World-Action Model (WAM) planner
+and evaluate the interface with on NAVSIM (Dauner et al., 2024) using the Predictive Driver Model Score
+(PDMS) and its component metrics.
+
+System structure. The system is organized as an upstream causal world model followed by an Action
+Model planner. The information flow is illustrated in Fig. 16 and the qualitative trajectory examples are shown
+in Fig. 17. The causal world model receives historical multi-frame observations and encodes a spatiotemporal
+world latent. It supports an RGB mode and a mode augmented with scene-understanding conditions such
+as depth and segmentation. This world latent is provided as conditioning information to the Action Model,
+which also receives multi-camera history from four directions, ego status, and scene conditions. The Action
+Model maintains action tokens and lets them interact with the world latent to produce updated action
+
+
+                                                         27
+Figure 17 Qualitative trajectory comparison for WAM planning. Candidate trajectories produced by the Action Model
+conditioned on the causal world model are visualized in the ego-centric scene, showing how the causal world model
+affects trajectory selection and driving behavior.
+
+
+representations. A Trajectory Decoder maps the resulting representations to a fixed number of candidate
+future trajectories, and a scoring module predicts safety, drivability, progress, and comfort terms before
+selecting the highest-scoring trajectory.
+    The causal world model input five historical frames from a forward-facing camera. Its backbone contains a
+spatiotemporal VAE and 33 intermediate DiT layers, which provide representations related to future states
+and action consequences. The Action Model uses four cameras with four historical frames per camera and a
+joint DINOv2 ViT-S/14 and VJEPA 2 visual backbone. Each view contains 16 learned scene tokens, and the
+action branch outputs 64 action tokens. The planning horizon is 4 s with a 0.5 s interval, giving eight time
+points per candidate trajectory.
+
+Planning validation. For the controlled comparison between Base and Base + causal world model, we
+keep the Action Model, Trajectory Decoder, training budget, data split, and post-processing fixed. Only
+the use of the world latent and the addition of scene-understanding capabilities are changed. Here, NC
+denotes no-at-fault collision avoidance, DAC denotes drivable-area compliance, TTC denotes time-to-collision,
+C denotes comfort, and EP denotes ego progress. PDMS is the aggregate Predictive Driver Model Score
+computed from these behavior terms. In Tab. 11, the comparison between Base and Base + causal world
+model highlights the contribution of the generative world representation. Adding the causal world-model
+branch increases DAC from 98.7 to 99.0, EP from 92.8 to 93.6, and PDMS from 94.9 to 95.3, while keeping
+NC and C unchanged. Although TTC changes slightly, the overall PDMS gain of 0.4 percentage points
+shows that the generated spatiotemporal representation provides useful information for planning. Among the
+methods listed with NAVSIM Trainval training data, Base + causal world model achieves the highest PDMS
+of 95.3, exceeding the next-best reported Trainval results of 94.8. This result establishes the best leaderboard
+performance in the Trainval comparison setting on NAVSIM v1.1 navtest.
+
+
+
+
+                                                       28
+Table 11 WAM planning results on NAVSIM v1.1 navtest. External values are source-reported; dashes indicate
+unreported or pending submetrics. All metrics are higher-is-better.
+
+ Method                                         Training data      NC ↑      DAC ↑        TTC ↑          C↑        EP ↑      PDMS ↑
+ Epona (Zhang et al., 2025)                     Trainval 103k       97.9           95.1        93.8      99.9      80.4            86.2
+ DriveLaW (Xia et al., 2025)                    Trainval 103k       99.0           97.1        96.7     100.0      81.3            89.1
+ DriveVLA-W0 (Li et al., 2026a)                 Trainval 103k       98.7           99.1        95.3      99.3      83.3            90.2
+ DriveFine (Dang et al., 2026)                  Trainval 103k       98.6           97.9        95.2      99.9      85.5            90.7
+ R2SE (Dang et al., 2026)                       Trainval 103k       99.0           97.9        96.4     100.0      86.8            91.6
+ iPad (Guo et al., 2026)                        Trainval 103k       98.6           98.3        94.9     100.0      88.0            91.7
+ SparseDriveV2 (Sun et al., 2026a)              Trainval 103k       98.5           98.4        95.0      99.9      88.6            92.0
+ Centaur (Sima et al., 2025)                    Trainval 103k       99.5           98.9        98.0     100.0      85.9            92.6
+ DriveSuprim (Yao et al., 2026)                 Trainval 103k       98.6           98.6        95.5     100.0      91.3            93.5
+ DA-WAM (Zhong et al., 2026)                    Trainval 103k       99.1           98.9        96.8      99.8      90.0            93.7
+ DrivoR (Kirby et al., 2026)                    Trainval 103k       99.0           98.9        96.7     100.0      90.0            93.7
+ Drive-JEPA (Wang et al., 2026c)                Trainval 103k          –              –           –         –         –            93.7
+ ChainFlow-VLA (Wang et al., 2026e)             Trainval 103k       99.2           99.0        97.2      99.9      91.9            94.8
+ FPD-Drive (Chen et al., 2026b)                 Trainval 103k          –              –           –         –         –            94.8
+ DriveZero (He et al., 2026)                    Trainval 103k       99.0           99.2        96.0     100.0      93.1            94.8
+ Base                                           Trainval 103k       99.1           98.7        97.0      99.9      92.8            94.9
+ Base + causal world model                      Trainval 103k       99.1           99.0        96.6      99.9      93.6            95.3
+
+
+                 Table 12 LIBERO Plus Benchmark results (% success rate). Avg: weighted average.
+
+ Method                               Embodied PT.   Layout     Camera     Robot    Language    Light    Background       Sensor   Avg
+ Fast-WAM (Yuan et al., 2026)             No          61.4       16.5      44.5       67.0       79.9       52.6          38.2     49.9
+ Fast-WAM-Joint (Yuan et al., 2026)       No          74.8       27.9      60.9       89.3       86.7       49.3          51.1     62.2
+ 4D-WAM (Yang et al., 2026a)              Yes         79.2       45.2      64.3       90.6       94.3       57.7          69.1     71.0
+ GAM                                      Yes         79.1       83.1      70.0       84.8       97.2       94.3          95.3     85.5
+ Ours                                     No          81.5       39.6      74.7       95.3       97.5       71.0          71.4     75.0
+
+
+5.4.2   World Action Model for Robot
+Concretely, we instantiate a World Action Model (WAM) for embodied control on top of our Causal World
+Model, following Fast-WAM (Yuan et al., 2026). We reuse the Causal World Model DiT as the video-branch
+backbone, and introduce an additional action-expert DiT that shares attention with the video DiT. During
+training, the video DiT takes the clean first-frame latents together with future noisy latents, while action
+tokens in the action DiT are restricted to attend only to the clean first-frame latents. At inference time, the
+video DiT performs a single forward pass conditioned on the clean first-frame latents. We initialize the video
+DiT with the bidirectional model weights after mid-training.
+    Tab. 12 presents our LIBERO Plus (Fei et al., 2025) benchmark results, where our method reaches a 75.0%
+average success rate. It surpasses Fast-WAM (Yuan et al., 2026) and Fast-WAM-Joint (Yuan et al., 2026), with
+the most prominent gains observed under layout, camera, and background distribution shifts. These results
+indicate that the representations learned by our Causal World Model during pre-training and mid-training
+transfer effectively to downstream WAM, providing strong spatial priors for embodied manipulation planning.
+
+5.5     WorldRec 2.0 Reconstruction Experiments
+5.5.1   Evaluation Setup
+This section evaluates the reconstruction method described in Sec. 3.5. The experiments measure novel-view
+appearance and geometry reconstruction and compare WorldRec 2.0 with representative state-of-the-art
+reconstruction methods under a common protocol. Results are reported on the in-distribution Waymo
+benchmark in Sec. 5.5.2 and under cross-dataset transfer in Sec. 5.5.2. We also report the results on the
+MiData in Sec. 5.5.3.
+
+
+                                                              29
+Figure 18 Qualitative results on Waymo and nuScenes. WorldRec 2.0 produces geometry-consistent RGB renderings
+from unseen camera views and improves the reconstruction of dynamic regions.
+
+
+    Experiments use Waymo Open Dataset (Xu et al., 2026b) for the main comparison and nuScenes (Caesar
+et al., 2019) and Argoverse 2 (Wilson et al., 2023) for cross-dataset evaluation. The model uses 20-frame
+clips from three frontal cameras, four context views, an ImageNet-pretrained EfficientNetV2-S encoder, and
+InfiniDepth input depth. We report PSNR, SSIM, and depth RMSE (D-RMSE), with higher PSNR/SSIM
+and lower D-RMSE indicating better reconstruction.
+
+
+
+
+                           Figure 19 Qualitative 7V reconstruction on the MiData.
+
+
+
+
+                                                     30
+                                  Figure 20 Qualitative novel view results on the MiData.
+
+
+Table 13 Novel-view reconstruction on Waymo. Dynamic metrics are evaluated inside dynamic-object regions; full
+metrics use the complete image.
+
+ Method                                Dyn. PSNR ↑   Dyn. SSIM ↑   Dyn. D-RMSE ↓   Full PSNR ↑   Full SSIM ↑   Full D-RMSE ↓
+ EmerNeRF (Yang et al., 2024a)               17.79         0.255           40.88         24.51         0.738           33.99
+ 3DGS (Kerbl et al., 2023)                   17.13         0.267           13.88         25.13         0.741           19.68
+ PVG (Chen et al., 2026c)                    15.51         0.128           15.91         22.38         0.661           13.01
+ DeformableGS (Yang et al., 2024b)           17.10         0.266           12.14         25.29         0.761           14.79
+ LGM (Tang et al., 2024)                     19.58         0.443            9.43         23.59         0.691            8.02
+ GS-LRM (Zhang et al., 2024)                 20.02         0.520            9.95         25.18         0.753            7.94
+ Depth Anything 3 (Lin et al., 2026)         15.96         0.429           12.20         23.27         0.686           11.66
+ AnySplat (Jiang et al., 2025)               15.99         0.418           10.45         23.32         0.687           10.31
+ STORM (Yang et al., 2025a)                  22.10         0.624            7.50         26.38         0.794            5.48
+ DGGT (Chen et al., 2025b)                   22.80         0.651            6.55         27.41         0.846            3.47
+ WorldRec 1.0                                25.01         0.768            6.07         28.48         0.861            3.35
+ WorldRec 2.0                                25.81         0.773            3.99         29.88         0.865            2.89
+
+
+
+
+5.5.2     Quantitative Reconstruction Results on open datasets
+Waymo novel-view reconstruction. WorldRec 2.0 achieves the strongest full-image and dynamic-region
+metrics under the common protocol in Tab. 13. Relative to WorldRec 1.0, full-image PSNR increases by
+1.40 dB and D-RMSE decreases from 3.35 to 2.89. Dynamic D-RMSE decreases from 6.07 to 3.99, a relative
+reduction of approximately 34.3%. The larger geometric improvement in dynamic regions supports the role of
+dynamic instance registers, canonical alignment, and intra-instance temporal interaction.
+
+Cross-Dataset Generalization In the zero-shot setting Tab. 14, WorldRec 2.0 improves over 1.0 by 1.83
+dB on nuScenes and 0.99 dB on Argoverse 2. After fine-tuning, the gains remain 1.72 dB and 0.97 dB. These
+results show that the method is not specific to Waymo: it maintains strong novel-view reconstruction accuracy
+under changes in camera layout and data distribution, demonstrating improved cross-dataset generalization.
+
+5.5.3     Qualitative Reconstruction Results on MiData
+To further assess reconstruction quality on in-house driving data, we visualize WorldRec 2.0 on the MiData
+dataset. MiData provides synchronized multi-camera observations from seven views. Fig. 19 shows the
+reconstructed seven-view scene, while Fig. 20 shows a novel-view reconstruction. These examples qualitatively
+
+
+
+                                                              31
+                                 Table 14 Cross-dataset novel-view reconstruction.
+
+                                                                   nuScenes            Argoverse 2
+              Setting        Method
+                                                              PSNR ↑     SSIM ↑      PSNR ↑    SSIM ↑
+              Zero-shot      STORM (Yang et al., 2025a)          17.77     0.669       20.83     0.542
+              Zero-shot      DGGT (Chen et al., 2025b)           25.31     0.794       25.02     0.801
+              Zero-shot      WorldRec 1.0                        26.54     0.821       25.50     0.810
+              Zero-shot      WorldRec 2.0                        28.37     0.829       26.49     0.824
+              Fine-tuning    STORM (Yang et al., 2025a)          24.54     0.784       24.97     0.791
+              Fine-tuning    DGGT (Chen et al., 2025b)           26.63     0.813       26.96     0.831
+              Fine-tuning    WorldRec 1.0                        27.50     0.826       27.66     0.851
+              Fine-tuning    WorldRec 2.0                        29.22     0.847       28.63     0.872
+
+
+demonstrate that the same explicit scene representation supports both multi-view reconstruction and rendering
+from a target view beyond public benchmarks.
+
+
+Contributors
+Data: Zhenxin Zhu · Zhijian Huang · Mingfei Tu · Yonggang Li · Yuru Wang · Jianhua Wu · JiaKui Hu ·
+Ruiqiang Zhang
+Generation Model: Zhenxin Zhu · Zhijian Huang · Yuru Wang · Jianhua Wu · Yonggang Li · Jiayi Guan ·
+JiaKui Hu · Tao Xu
+WorldRec Model: Cheng Chi · Xianqi Wang · Mingfei Tu · Yuechuan Pu · Hao Li · Qizeng Jia
+Video Generation Evaluation: Zhijian Huang · Jianhua Wu · Yuru Wang · Yonggang Li · Xuhan Sheng · Jian
+Mao · Ruiqiang Zhang · Yu Zhu
+Closed-loop Simulation: Zhenxin Zhu · Hao Li · Qizeng Jia · Yuechuan Pu · Tao Xu · Ruiling Yang · Zhijian
+Huang
+Closed-loop Training: Jiayi Guan · Cheng Chi · Zhenxin Zhu · Jian Mao
+World Action Model: Cheng Chi · Hongxiao Yu · Jiayi Guan · Zhenxin Zhu
+Project Advisor: Guang Chen · Hangjun Ye
+Project Lead: Bing Wang
+
+
+Acknowledgements
+We are deeply grateful to the Cosmos team (Agarwal et al., 2026) for their helpful advice in data processing
+and model deployment. We sincerely thank the following colleagues for their valuable contributions and
+support: Zehan Zhang · Shikun Huang · Lei Gong · Kaixin Xiong · Lei Zhang · Fangzhen Li · Jingyang Zhao ·
+Xi Zhou · Chitian Sun · Chenming Wu · Jiong Deng · Hongwei Xie · Ming Lu · Kun Ma.
+
+
+References
+Niket Agarwal, Arslan Ali, Maciej Bala, Yogesh Balaji, Erik Barker, Tiffany Cai, Prithvijit Chattopadhyay, Yongxin
+  Chen, Yin Cui, Yifan Ding, et al. Cosmos world foundation model platform for physical ai. arXiv preprint
+  arXiv:2501.03575, 2025.
+Niket Agarwal, Arslan Ali, Jon Allen, Martin Antolini, Adeline Aubame, Alisson Azzolini, Junjie Bai, Maciej Bala,
+  Yogesh Balaji, Josh Bapst, et al. Cosmos 3: Omnimodal world models for physical ai. arXiv preprint arXiv:2606.02800,
+  2026.
+
+
+
+
+                                                         32
+Anonymous. ST-JEPA: JEPA-enhanced temporal scene–trajectory representation learning for end-to-end autonomous
+  driving. In Submitted to The Fifteenth International Conference on Learning Representations, 2026. under review.
+Jason Ansel, Edward Yang, Horace He, Natalia Gimelshein, Animesh Jain, Michael Voznesensky, Bin Bao, Peter
+  Bell, David Berard, Evgeni Burovski, et al. Pytorch 2: Faster machine learning through dynamic python bytecode
+  transformation and graph compilation. In Proceedings of the 29th ACM international conference on architectural
+  support for programming languages and operating systems, volume 2, pages 929–947, 2024.
+Aarti Basant, Amlan Kar, Despoina Paschalidou, Fangyin Wei, Francesco Ferroni, Guillermo Garcia Cobo, Haithem
+  Turki, Huan Ling, Jaewoo Seo, James Lucas, et al. Nvidia omnidreams: Real-time generative world model for
+  closed-loop autonomous vehicle simulation. arXiv preprint arXiv:2606.03159, 2026.
+Hongzhe Bi, Hengkai Tan, Shenghao Xie, Zeyuan Wang, Shuhe Huang, Haitian Liu, Ruowen Zhao, Yao Feng, Chendong
+  Xiang, Yinze Rong, et al. Motus: A unified latent action world model. In Proceedings of the IEEE/CVF Conference
+  on Computer Vision and Pattern Recognition, pages 35101–35113, 2026.
+Blender Online Community. Blender: A 3D Modeling and Rendering Package. https://www.blender.org/, 2025.
+Qingwen Bu, Jisong Cai, Li Chen, Xiuqi Cui, Yan Ding, Siyuan Feng, Shenyuan Gao, Xindong He, Xuan Hu, Xu
+  Huang, et al. Agibot world colosseo: A large-scale manipulation platform for scalable and intelligent embodied
+  systems. arXiv preprint arXiv:2503.06669, 2025.
+Holger Caesar, Varun Bankiti, Alex H. Lang, Sourabh Vora, Venice Erin Liong, Qiang Xu, Anush Krishnan, Yuxin Pan,
+  Giancarlo Baldan, and Oscar Beijbom. nuscenes: A multimodal dataset for autonomous driving. 2020 IEEE/CVF
+ Conference on Computer Vision and Pattern Recognition (CVPR), pages 11618–11628, 2019.
+Holger Caesar, Juraj Kabzan, Kok Seang Tan, Whye Kit Fong, Eric Wolff, Alex Lang, Luke Fletcher, Oscar Beijbom,
+  and Sammy Omari. nuplan: A closed-loop ml-based planning benchmark for autonomous vehicles. arXiv preprint
+  arXiv:2106.11810, 2021.
+Boyuan Chen, Diego Martí Monsó, Yilun Du, Max Simchowitz, Russ Tedrake, and Vincent Sitzmann. Diffusion
+  forcing: Next-token prediction meets full-sequence diffusion. Advances in Neural Information Processing Systems,
+  37:24081–24125, 2024a.
+Junsong Chen, Jincheng Yu, Yitong Li, Shuchen Xue, Haozhe Liu, Jingyu Xin, Yuyang Zhao, Tian Ye, Zhangjie Wu,
+  Zian Wang, Daquan Zhou, Ping Luo, Song Han, and Enze Xie. SANA-Video 2.0: Hybrid linear attention with
+  attention residuals for efficient video generation. arXiv preprint arXiv:2607.21553, 2026a.
+Li-Heng Chen, Qifeng Chen, Chengwei Wu, Yingjie Zhang, Sheng Yang, Hongbo Fu, and Shaoqing Ren. Fpd-drive:
+   Future policy distillation for end-to-end autonomous driving. arXiv preprint arXiv:2610.13232, 2026b.
+Tsai-Shien Chen, Aliaksandr Siarohin, Willi Menapace, Ekaterina Deyneka, Hsiang-wei Chao, Byung Eun Jeon,
+  Yuwei Fang, Hsin-Ying Lee, Jian Ren, Ming-Hsuan Yang, et al. Panda-70m: Captioning 70m videos with multiple
+  cross-modality teachers. In 2024 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR),
+  pages 13320–13331. IEEE, 2024b.
+Tian-Xing Chen, Zan-Xin Chen, Bai-Jun Chen, Zijian Cai, Yi-Bin Liu, Qi-Wei Liang, Zi-Xuan Li, Xianlian Lin,
+  Yi-Heng Ge, Zhen-Yu Gu, Wei-Liang Deng, Yu-Bin Guo, Nian Tian, Xuanbing Xie, Qiang-Yu Chen, Kai-Lun Su,
+  Tian-Ling Xu, Guo-Dong Liu, Meng-Kang Hu, Huan-Ang Gao, Kai-Xuan Wang, Zhi-Xuan Liang, Yu-Sen Qin,
+  Xiao-Kang Yang, Ping Luo, and Yao Mu. Robotwin 2.0: A scalable data generator and benchmark with strong
+  domain randomization for robust bimanual robotic manipulation. ArXiv, abs/2506.18088, 2025a.
+Xiaoxue Chen, Ziyi Xiong, Yuantao Chen, Gen Li, Nan Wang, Hongcheng Luo, Long Chen, Haiyang Sun, Bing Wang,
+  Guang Chen, et al. DGGT: Feedforward 4d reconstruction of dynamic driving scenes using unposed images. arXiv
+  preprint arXiv:2512.03004, 2025b.
+Yurui Chen, Chun Gu, Junzhe Jiang, Xiatian Zhu, and Li Zhang. Periodic vibration gaussian: Dynamic urban scene
+  reconstruction and real-time rendering. International Journal of Computer Vision, 134(3):83, 2026c.
+Cheng Chi, Xianqi Wang, Hongcheng Luo, Mingfei Tu, Gangwei Xu, Zehan Zhang, Bing Wang, Guang Chen, Hangjun
+  Ye, Sida Peng, et al. Pointforward: Feedforward driving reconstruction through point-aligned representations. arXiv
+  preprint arXiv:2605.11594, 2026.
+OX-Embodiment Collaboration, Abby O’Neill, Abdul Rehman, Abhinav Gupta, Abhiram Maddukuri, Abhishek Gupta,
+ Abhishek Padalkar, Abraham Lee, Acorn Pooley, Agrim Gupta, et al. Open x-embodiment: Robotic learning
+ datasets and rt-x models. arXiv preprint arXiv:2310.08864, 1(2), 2023.
+
+
+
+                                                         33
+Jiaxing Cui, Jie Wu, Ming Li, Tao Yang, Xiaojie Li, Rui Wang, Andrew Bai, Yuanhao Ban, and Cho-Jui Hsieh.
+   Self-forcing++: Towards minute-scale high-quality video generation. In International Conference on Learning
+  Representations, pages 85802–85822, 2026.
+Yixiang Dai, Fan Jiang, Chiyu Wang, Mu Xu, and Yonggang Qi. Fantasyworld: Geometry-consistent world modeling
+  via unified video and 3d prediction. In International Conference on Learning Representations, pages 103603–103622,
+  2026.
+Chenxu Dang, Sining Ang, Yongkang Li, Haochen Tian, Jie Wang, Guang Li, Hangjun Ye, Jie Ma, Long Chen, and Yan
+  Wang. Drivefine: Refining-augmented masked diffusion vla for efficient and robust driving. In European Conference
+  on Computer Vision, pages 412–429. Springer, 2026.
+Daniel Dauner, Marcel Hallgarten, Tianyu Li, Xinshuo Weng, Zhiyu Huang, Zetong Yang, Hongyang Li, Igor
+  Gilitschenski, Boris Ivanovic, Marco Pavone, et al. Navsim: Data-driven non-reactive autonomous vehicle simulation
+  and benchmarking. Advances in Neural Information Processing Systems, 37:28706–28719, 2024.
+Alexey Dosovitskiy, German Ros, Felipe Codevilla, Antonio Lopez, and Vladlen Koltun. Carla: An open urban driving
+  simulator. In Conference on robot learning, pages 1–16. PMLR, 2017.
+Haoyi Duan, Hong-Xing Yu, Sirui Chen, Li Fei-Fei, and Jiajun Wu. Worldscore: A unified evaluation benchmark for
+  world generation. In Proceedings of the IEEE/CVF international conference on computer vision, pages 27713–27724,
+  2025.
+Epic Games. Unreal Engine 5. https://www.unrealengine.com/en-US/unreal-engine-5, 2022.
+Senyu Fei, Siyin Wang, Junhao Shi, Zihao Dai, Jikun Cai, Pengfang Qian, Li Ji, Xinzhe He, Shiduo Zhang, Zhaoye Fei,
+  et al. Libero-plus: In-depth robustness analysis of vision-language-action models. arXiv preprint arXiv:2510.13626,
+  2025.
+FlashDreams Contributors. Flashdreams: High-performance inference and serving for interactive autoregressive video
+  and world models. https://github.com/NVIDIA/flashdreams, 2026.
+Ruiyuan Gao, Kai Chen, Bo Xiao, Lanqing Hong, Zhenguo Li, and Qiang Xu. MagicDrive-V2: High-resolution long
+  video generation for autonomous driving with adaptive control. arXiv preprint arXiv:2411.13807, 2024a.
+Shenyuan Gao, Jiazhi Yang, Li Chen, Kashyap Chitta, Yihang Qiu, Andreas Geiger, Jun Zhang, and Hongyang Li.
+  Vista: A generalizable driving world model with high fidelity and versatile controllability. In Advances in Neural
+  Information Processing Systems (NeurIPS), 2024b.
+Shenyuan Gao, William Liang, Kaiyuan Zheng, Ayaan Malik, Seonghyeon Ye, Sihyun Yu, Wei-Cheng Tseng, Yuzhu
+  Dong, Kaichun Mo, Chen-Hsuan Lin, et al. Dreamdojo: A generalist robot world model from large-scale human
+  videos. arXiv preprint arXiv:2602.06949, 2026.
+Jiayi Guan, Tianle Zhang, Li Shen, Ruiqi Zhang, Ao Zhou, Lusong Li, Guai Chen, Mengjie Li, Alois Knoll, Xiaodong
+   He, et al. Cdcp: Conditional diffusion model with contextual prompts for multi-task offline safe reinforcement
+   learning. arXiv preprint arXiv:2607.03903, 2026.
+Design Guide. Cuda c++ programming guide. NVIDIA, July, pages 6–11, 2020.
+Ke Guo, Haochen Liu, Xiaojun Wu, Jia Pan, and Chen Lv. ipad: Iterative proposal-centric end-to-end autonomous
+  driving. IEEE Robotics and Automation Letters, 2026.
+Xiangyu Guo, Zhanqian Wu, Kaixin Xiong, Ziyang Xu, Lijun Zhou, Gangwei Xu, Shaoqing Xu, Haiyang Sun, Bing
+  Wang, Guang Chen, et al. Genesis: Multimodal driving scene generation with spatio-temporal and cross-modal
+  consistency. arXiv preprint arXiv:2506.07497, 2025.
+Chenlong He, Qi Zheng, Ruoxi Zhu, Xiaoyang Zeng, Yibo Fan, and Zhengzhong Tu. Cover: A comprehensive
+  video quality evaluator. In 2024 IEEE/CVF Conference on Computer Vision and Pattern Recognition Workshops
+ (CVPRW), pages 5799–5809. IEEE, 2024.
+Hao He, Chengcheng Hu, Zirun Su, Heng Zhang, Haisong Liu, Jinke Li, Haochen Tian, Zhenwei Shen, Hongyang Li,
+  Zhichao Li, et al. Drivezero: End-to-end driving beyond human demonstrations. arXiv preprint arXiv:2609.06055,
+  2026.
+Ryan Hoque, Peide Huang, David Yoon, Jian Zhang, et al. Egodex: Learning dexterous manipulation from large-scale
+  egocentric video. In International Conference on Learning Representations, pages 4218–4237, 2026.
+
+
+
+
+                                                         34
+JiaKui Hu, Tailai Chen, Yuqi Pan, Xuerui Qiu, Jialun Liu, Xiao Cao, Zhenxin Zhu, Guang Chen, Hangjun Ye,
+   Bing Wang, et al. Learning to retrieve: Internalizing memory retrieval for video world models. arXiv preprint
+  arXiv:2610.11444, 2026a.
+JiaKui Hu, Jialun Liu, Liying Yang, Xinliang Zhang, Kaiwen Li, Shuang Zeng, Yuanwei Li, Haibin Huang, Chi Zhang,
+   and Yanye Lu. Geometry-as-context: Modulating explicit 3d in scene-consistent video generation to geometry context.
+   In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 4258–4268, 2026b.
+JiaKui Hu, Shanshan Zhao, Qing-Guo Chen, Xuerui Qiu, Jialun Liu, Zhao Xu, Weihua Luo, Kaifu Zhang, and Yanye
+   Lu. Omni-view: Unlocking how generation facilitates understanding in unified 3d model based on multiview images.
+   In International Conference on Learning Representations, pages 133697–133724, 2026c.
+Junchao Huang, Guian Fang, Shengju Qian, Xianghao Kong, Zhuoran Zhao, Wei Huang, Yihua Du, Zixin Zhang,
+  Justin Cui, Yuchao Gu, et al. Solarwm: Open data and scalable training for long-horizon video world models. arXiv
+  preprint arXiv:2609.02886, 2026a.
+Xun Huang, Zhengqi Li, Guande He, Mingyuan Zhou, and Eli Shechtman. Self forcing: Bridging the train-test gap in
+  autoregressive video diffusion. Advances in Neural Information Processing Systems, 38:167283–167308, 2026b.
+Yishen Ji, Ziyue Zhu, Zhenxin Zhu, Kaixin Xiong, Ming Lu, Zhiqi Li, Lijun Zhou, Haiyang Sun, Bing Wang, and
+  Tong Lu. Cogen: 3d consistent video generation via adaptive conditioning for autonomous driving. arXiv preprint
+  arXiv:2503.22231, 2025.
+Xiaosong Jia, Zhenjie Yang, Qifeng Li, Zhiyuan Zhang, and Junchi Yan. Bench2drive: Towards multi-ability
+  benchmarking of closed-loop end-to-end autonomous driving. Advances in Neural Information Processing Systems,
+  37:819–844, 2024.
+Lihan Jiang, Yucheng Mao, Linning Xu, Tao Lu, Kerui Ren, Yichen Jin, Xudong Xu, Mulin Yu, Jiangmiao Pang,
+  Feng Zhao, et al. Anysplat: Feed-forward 3d gaussian splatting from unconstrained views. ACM Transactions on
+  Graphics (TOG), 44(6):1–16, 2025.
+Tao Jiang, Tianyuan Yuan, Yicheng Liu, Chenhao Lu, Jianning Cui, Xiao Liu, Shuiqi Cheng, Jiyang Gao, Huazhe Xu,
+  and Hang Zhao. Galaxy open-world dataset and g0 dual-system vla model. In 2026 IEEE International Conference
+  on Robotics and Automation (ICRA), pages 20749–20756. IEEE, 2026a.
+Zhennan Jiang, Shangqing Zhou, Yutong Jiang, Zefang Huang, Mingjie Wei, Yuhui Chen, Tianxing Zhou, Zhen Guo,
+  Hao Lin, Quanlu Zhang, et al. Wovr: World models as reliable simulators for post-training vla policies with rl.
+  arXiv preprint arXiv:2602.13977, 2026b.
+Bu Jin, Weize Li, Baihan Yang, Zhenxin Zhu, Junpeng Jiang, Huan-ang Gao, Haiyang Sun, Kun Zhan, Hengtong Hu,
+  Xueyang Zhang, et al. Posepilot: Steering camera pose for generative world models with self-supervised depth. In
+  2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), pages 8051–8058. IEEE, 2025.
+Efstathios Karypidis, Ioannis Kakogeorgiou, Spyridon Gidaris, and Nikos Komodakis. Dino-foresight: Looking into the
+  future with dino. Advances in Neural Information Processing Systems, 38:163779–163811, 2026.
+Bernhard Kerbl, Georgios Kopanas, Thomas Leimkühler, George Drettakis, et al. 3d gaussian splatting for real-time
+  radiance field rendering. ACM Trans. Graph., 42(4):139–1, 2023.
+Alexander Khazatsky, Karl Pertsch, Suraj Nair, Ashwin Balakrishna, Sudeep Dasari, Siddharth Karamcheti, Soroush
+  Nasiriany, Mohan Kumar Srirama, Lawrence Yunliang Chen, Kirsty Ellis, P Fagan, Joey Hejna, Masha Itkina,
+  Marion Lepert, Yecheng Jason Ma, Patrick Miller, Jimmy Wu, Suneel Belkhale, Shivin Dass, Huy Ha, Arhan
+  Jain, Abraham Lee, Youngwoon Lee, Marius Memmel, Sungjae Park, Ilija Radosavovic, Kaiyuan Wang, Albert
+  Zhan, Kevin Black, Cheng Chi, Kyle Beltran Hatch, Shan Lin, Jingpei Lu, Jean-Pierre Mercat, Abdul Rehman,
+  Pannag R. Sanketi, Archit Sharma, C. Blake Simpson, Quang Uyên Vǒng, Homer Rich Walke, Blake Wulfe, Ted
+  Xiao, Jonathan Heewon Yang, Arefeh Yavary, Tony Zhao, Christopher Agia, Rohan Baijal, Mateo Guaman Castro,
+  Daphne Chen, Qiuyu Chen, Trinity Chung, Jaimyn Drake, Ethan Paul Foster, Jensen Gao, David Antonio Herrera,
+  Minho Heo, Kyle Hsu, Jiaheng Hu, Muhammad Zubair Irshad, Donovon Jackson, Charlotte Le, Yunshuang Li, Kevin
+  Lin, Roy Lin, Ze-Han Ma, Abhiram Maddukuri, Suvir Mirchandani, Daniel Morton, Tony Nguyen, Abigail O’Neill,
+  Rosario Scalise, Derick Seale, Victor Son, Stephen Tian, Emi Tran, Andrew Wang, Yilin Elaine Wu, Annie Xie,
+  Jing-Yun Yang, Patrick Yin, Yunchu Zhang, Osbert Bastani, Glen Berseth, Jeannette Bohg, Ken Goldberg, Abhinav
+  Gupta, Abhishek Gupta, Dinesh Jayaraman, Joseph J. Lim, Jitendra Malik, Roberto Martín-Martín, Subramanian
+  Ramamoorthy, Dorsa Sadigh, Shuran Song, Jia-Jun Wu, Michael C. Yip, Yu-Ke Zhu, Thomas Kollar, Sergey Levine,
+  and Chelsea Finn. Droid: A large-scale in-the-wild robot manipulation dataset. ArXiv, abs/2403.12945, 2024.
+Kimi Team. Kimi Linear: An expressive, efficient attention architecture. arXiv preprint arXiv:2510.26692, 2025.
+
+
+                                                         35
+Ellington Kirby, Alexandre Boulch, Yihong Xu, Yuan Yin, Gilles Puy, Éloi Zablocki, Andrei Bursuc, Spyros Gidaris,
+  Renaud Marlet, Florent Bartoccioni, Anh-Quan Cao, Nermin Samet, Tuan-Hung VU, and Matthieu Cord. Driving
+  on registers. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR),
+  pages 32058–32069, 2026.
+Yingyan Li, Shuyao Shang, Weisong Liu, Bing Zhan, Haochen Wang, Yuqi Wang, Yuntao Chen, Xiaoman Wang,
+  Yasong An, Chufeng Tang, et al. Drivevla-w0: World models amplify data scaling law in autonomous driving. In
+  International Conference on Learning Representations, pages 7890–7911, 2026a.
+Zhi Li, Aaron Aaron, Ioannis Katsavounidis, Anush Moorthy, and Megha Manohara. Toward a practical perceptual
+  video quality metric. Netflix Technology Blog, 2016. Accessed: 2016-06-06.
+Zhen Li, Chuanhao Li, Xiaofeng Mao, Shaoheng Lin, Ming Li, Shitian Zhao, Zhaopan Xu, Xinyue Li, Yukang Feng,
+  Jianwen Sun, et al. Sekai: A video dataset towards world exploration. Advances in Neural Information Processing
+  Systems, 38, 2026b.
+Haotong Lin, Sili Chen, Jun Hao Liew, Donny Y. Chen, Zhenyu Li, Yang Zhao, Sida Peng, Hengkai Guo, Xiaowei
+  Zhou, Guang Shi, Jiashi Feng, and Bingyi Kang. Depth anything 3: Recovering the visual space from any views. In
+ The Fourteenth International Conference on Learning Representations, 2026.
+Hao Liu, Matei Zaharia, and Pieter Abbeel. Ringattention with blockwise transformers for near-infinite context. In
+  International Conference on Learning Representations, pages 3992–4008, 2024.
+Xuanyi Liu, Haofeng Wang, Ruiqi Li, Danni Yu, Rui Wan, Ruixu Zhang, Siyu Tao, Xue Yang, Shaofeng Zhang,
+  Zicheng Zhang, Jiaqi Zhang, and Siwei Ma. TriWorldBench: A benchmark evaluating triple-view embodied world
+  models. https://github.com/TriWorldBench/TriWorldBench, 2026a. GitHub repository.
+Xuanyi Liu, Haofeng Wang, Ruiqi Li, Danni Yu, Rui Wan, Ruixu Zhang, Siyu Tao, Xue Yang, Shaofeng Zhang,
+  Zicheng Zhang, et al. Triworldbench: A tri-view consistency perspective on embodied world models. arXiv preprint
+ arXiv:2609.26314, 2026b.
+Jinghui Lu, Jiayi Guan, Zhijian Huang, Jinlong Li, Guang Li, Lingdong Kong, Yingyan Li, Han Wang, Shaoqing Xu,
+  Yuechen Luo, et al. Xiaomi onevl: One-step latent reasoning and planning with vision-language explanation. arXiv
+   preprint arXiv:2604.18486, 2026.
+Yuechen Luo, He Chong, Fang Li, Shaoqing Xu, Hexin Zhang, Ruiqi Zhang, Ziying Song, Lei Yang, Zhi-Xin Yang,
+  and Fuxi Wen. Reflect-vla: Internalizing reflective guidance via dual-path on-policy self-distillation for autonomous
+  driving. arXiv preprint arXiv:2610.13453, 2026.
+William Peebles and Saining Xie. Scalable diffusion models with transformers. In International Conference on Computer
+ Vision (ICCV), 2023.
+Zihan Qiu et al. Gated attention for large language models: Non-linearity, sparsity, and attention-sink-free. In Advances
+  in Neural Information Processing Systems (NeurIPS), 2025. arXiv:2505.06708.
+Qwen Team. Qwen3-Next: Towards ultimate training & inference efficiency. Qwen Team blog, https://qwen.ai/
+ blog?id=qwen3-next, 2025.
+Qwen Team. Qwen3.8-Max: A new bar for coding and cowork, 2026.
+Xuanchi Ren, Yifan Lu, Tianshi Cao, Ruiyuan Gao, Shengyu Huang, Amirmojtaba Sabour, Tianchang Shen, Tobias
+  Pfaff, Jay Zhangjie Wu, Runjian Chen, Seung Wook Kim, Jun Gao, Laura Leal-Taixé, Mike Chen, Sanja Fidler, and
+  Huan Ling. Cosmos-drive-dreams: Scalable synthetic driving data generation with world foundation models, 2025.
+Lloyd Russell, Anthony Hu, Lorenzo Bertoni, George Fedoseev, Jamie Shotton, Elahe Arani, and Gianluca Corrado.
+  GAIA-2: A controllable multi-view generative world model for autonomous driving. arXiv preprint arXiv:2503.20523,
+  2025.
+Chonghao Sima, Kashyap Chitta, Zhiding Yu, Shiyi Lan, Ping Luo, Andreas Geiger, Hongyang Li, and Jose M Alvarez.
+  Centaur: Robust end-to-end autonomous driving with test-time training. arXiv preprint arXiv:2503.11650, 2025.
+Yang Song, Prafulla Dhariwal, Mark Chen, and Ilya Sutskever. Consistency models. arXiv preprint arXiv:2303.01469,
+  2023.
+Jianlin Su, Murtadha Ahmed, Yu Lu, Shengfeng Pan, Wen Bo, and Yunfeng Liu. RoFormer: Enhanced transformer
+  with rotary position embedding. Neurocomputing, 568:127063, 2024. arXiv:2104.09864.
+
+
+
+
+                                                           36
+Wenchao Sun, Xuewu Lin, Keyu Chen, Zixiang Pei, Xiang Li, Yining Shi, and Sifa Zheng. Sparsedrivev2: Scoring
+ is all you need for end-to-end autonomous driving. In European Conference on Computer Vision, pages 446–463.
+ Springer, 2026a.
+Xiangyu Sun, Shijie Wang, Fengyi Zhang, Lin Liu, Caiyan Jia, Ziying Song, Zi Huang, and Yadan Luo. Vggt-world:
+  Transforming vggt into an autoregressive geometry world model. In European Conference on Computer Vision,
+  pages 382–400. Springer, 2026b.
+Kaiyuan Tan, Yingying Shen, Mingfei Tu, Haohui Zhu, Bing Wang, Guang Chen, Hangjun Ye, and Haiyang Sun.
+  UFO: Unifying feed-forward and optimization-based methods for large driving scene modeling. arXiv preprint
+ arXiv:2602.20943, 2026.
+Jiaxiang Tang, Zhaoxi Chen, Xiaokang Chen, Tengfei Wang, Gang Zeng, and Ziwei Liu. Lgm: Large multi-view
+   gaussian model for high-resolution 3d content creation. In European Conference on Computer Vision, pages 1–18.
+   Springer, 2024.
+BWM Team et al. Bwm: A low-cost high-fidelity world simulator for robot learning. arXiv preprint arXiv:2607.29302,
+ 2026a.
+DreamX Team, Yancheng Bai, Rui Chen, Xiangxiang Chu, Rujing Dang, Hao Dou, Bingjie Gao, Qiwen Gu, Siyu Hong,
+  Jiachen Lei, et al. Dreamx-world 1.0: A general-purpose interactive world model. arXiv preprint arXiv:2606.16993,
+  2026b.
+Octo Model Team, Dibya Ghosh, Homer Walke, Karl Pertsch, Kevin Black, Oier Mees, Sudeep Dasari, Joey Hejna,
+  Tobias Kreiman, Charles Xu, et al. Octo: An open-source generalist robot policy. arXiv preprint arXiv:2405.12213,
+  2024.
+Robbyant Team, Zelin Gao, Qiuyu Wang, Yanhong Zeng, Jiapeng Zhu, Ka Leong Cheng, Yixuan Li, Hanlin Wang,
+  Yinghao Xu, Shuailei Ma, et al. Advancing open-source world models. arXiv preprint arXiv:2601.20540, 2026c.
+Yang Tian, Yuyin Yang, Yiman Xie, Zetao Cai, Xu Shi, Ning Gao, Hangxu Liu, Xuekun Jiang, Zherui Qiu, Feng Yuan,
+  et al. Interndata-a1: Pioneering high-fidelity synthetic data for pre-training generalist policy. In Proceedings of the
+  IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 976–985, 2026.
+Team Wan, Ang Wang, Baole Ai, Bin Wen, Chaojie Mao, Chen-Wei Xie, Di Chen, Feiwu Yu, Haiming Zhao, Jianxiao
+  Yang, et al. Wan: Open and advanced large-scale video generative models. arXiv preprint arXiv:2503.20314, 2025.
+Jianyuan Wang, Minghao Chen, Nikita Karaev, Andrea Vedaldi, Christian Rupprecht, and David Novotny. VGGT:
+  Visual geometry grounded transformer. arXiv preprint arXiv:2503.11651, 2025a.
+Jiahao Wang, Yufeng Yuan, Rujie Zheng, Youtian Lin, Jian Gao, Lin-Zhuo Chen, Yajie Bao, Chang Zeng, Yanxi
+   Zhou, Xiao-Xiao Long, et al. Spatialvid: A large-scale video dataset with spatial annotations. In Proceedings of the
+  IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 42592–42603, 2026a.
+Lintao Wang, Mingyang Sun, Yang Liu, Dingkang Yang, and Lihua Zhang. Fysiverse-3d-simready technical report:
+  Agentic physical simulation for pragmatic 3d world reconstruction. arXiv preprint arXiv:2609.31715, 2026b.
+Linhan Wang, Zichong Yang, Chen Bai, Guoxiang Zhang, Xiaotong Liu, Xiaoyin Zheng, Xiao-Xiao Long, Chang-Tien
+  Lu, and Cheng Lu. Drive-jepa: Video jepa meets multimodal trajectory distillation for end-to-end driving. arXiv
+  preprint arXiv:2601.22032, 2026c.
+Wenshan Wang, Delong Zhu, Xiangwei Wang, Yaoyu Hu, Yuheng Qiu, Chen Wang, Yafei Hu, Ashish Kapoor, and
+ Sebastian Scherer. Tartanair: A dataset to push the limits of visual slam. In 2020 IEEE/RSJ International
+ Conference on Intelligent Robots and Systems (IROS), pages 4909–4916. IEEE, 2020.
+Xiaofeng Wang, Zheng Zhu, Guan Huang, Xinze Chen, Jiagang Zhu, and Jiwen Lu. DriveDreamer: Towards
+  real-world-driven world models for autonomous driving. In European Conference on Computer Vision (ECCV),
+  2024a.
+Xianqi Wang, Cheng Chi, Yuechuan Pu, Hongcheng Luo, Junda Cheng, Guang Chen, Hangjun Ye, Bing Wang,
+  and Xin Yang. Pointforward v2: Point-aligned interaction for feedforward driving reconstruction. arXiv preprint
+  arXiv:2610.28120, 2026d.
+Xiyang Wang, Xinlin Wang, Tingguang Zhou, Gong Chen, Xingtai Gui, Zhi Xu, Xiaolei Wu, Feiyang Tan, Hangn-
+  ing Zhou, and Mu Yang. Chainflow-vla: Causal flow planning with vision-language models. arXiv preprint
+  arXiv:2605.23270, 2026e.
+
+
+
+
+                                                           37
+Yuqi Wang, Jiawei He, Lue Fan, Hongxin Li, Yuntao Chen, and Zhaoxiang Zhang. Driving into the future: Multiview
+  visual forecasting and planning with world model for autonomous driving. In Proceedings of the IEEE/CVF
+  Conference on Computer Vision and Pattern Recognition (CVPR), pages 14749–14759, 2024b.
+Yan Wang, Wenjie Luo, Junjie Bai, Yulong Cao, Tong Che, Ke Chen, Yuxiao Chen, Jenna Diamond, Yifan Ding,
+  Wenhao Ding, et al. Alpamayo-r1: Bridging reasoning and action prediction for generalizable autonomous driving in
+  the long tail. arXiv preprint arXiv:2511.00088, 2025b.
+Benjamin Wilson, William Qi, Tanmay Agarwal, John Lambert, Jagjeet Singh, Siddhesh Khandelwal, Bowen Pan,
+  Ratnesh Kumar, Andrew Hartnett, Jhony Kaesemodel Pontes, et al. Argoverse 2: Next generation datasets for
+  self-driving perception and forecasting. arXiv preprint arXiv:2301.00493, 2023.
+Bing Wu, Chang Zou, Changlin Li, Duojun Huang, Fang Yang, Hao Tan, Jack Peng, Jianbing Wu, Jiangfeng Xiong,
+  Jie Jiang, et al. Hunyuanvideo 1.5 technical report. arXiv preprint arXiv:2511.18870, 2025a.
+Haoning Wu, Erli Zhang, Liang Liao, Chaofeng Chen, Jingwen Hou, Annan Wang, Wenxiu Sun, Qiong Yan, and Weisi
+  Lin. Exploring video quality assessment on user generated contents from aesthetic and technical perspectives. In
+  2023 IEEE/CVF International Conference on Computer Vision (ICCV), pages 20087–20097. IEEE, 2023a.
+Kun Wu, Cheng-Kai Hou, Jiaming Liu, Zhengping Che, Xiao-Zhu Ju, Zhuqin Yang, Meng Li, Yi-Nuo Zhao, Zhiyuan
+ Xu, Guang Yang, Shichao Fan, Xin-Hua Wang, Fei Liao, Zhen Zhao, Guang-Yu Li, Zhao Jin, Lecheng Wang,
+  Ji-Lei Mao, Ning Liu, Peifeng Ren, Qiang Zhang, Yaoxu Lyu, Meng-Zhen Liu, Jingyang He, Yulin Luo, Zeyu Gao,
+  Chen-Xuan Li, Chen-Yang Gu, Yan-Kai Fu, Disheng Wu, Xing-Yu Wang, Si-Xiang Chen, Zhenyu Wang, Peng-Ju
+ An, Si-Yuan Qian, Shan-Shan Zhang, and Jianfeng Tang. Robomind: Benchmark on multi-embodiment intelligence
+  normative data for robot manipulation. ArXiv, abs/2412.13877, 2024.
+Philipp Wu, Alejandro Escontrela, Danijar Hafner, Pieter Abbeel, and Ken Goldberg. Daydreamer: World models for
+  physical robot learning. In Conference on robot learning, pages 2226–2240. PMLR, 2023b.
+Shi-Han Wu, Xue-Cheng Liu, Shao-Xuan Xie, Peng-Wei Wang, Xinghang Li, Bo-Wen Yang, Zhe Li, Kai Zhu, Hongyu
+  Wu, Yi-Heng Liu, Zhaoye Long, Yue Wang, Chong Liu, Dihan Wang, Ziqiang Ni, Xiang Yang, You Liu, Ruo-Xuan
+  Feng, Runtian Xu, Lei Zhang, Deng-Hang Huang, Cheng-Hao Jin, Anlan Yin, Xinlong Wang, Zhen-Zhu Sun, Jun-Kai
+  Zhao, Mengfei Du, Mingyu Cao, Xian-Sheng Chen, Hong-Yang Cheng, Xiao-Jie Zhang, Yan-Kai Fu, Ning Chen,
+  Cheng Chi, Si-Xiang Chen, Huaihai Lyu, Xiaoshuai Hao, Ye-Quan Wang, Bo-Nan Lei, Dong Liu, Xi Yang, Yan-Ce
+  Jiao, Tengfei Pan, Yun-Yun Zhang, Song Wang, Zi-Qian Zhang, Xu Liu, Ji Zhang, Cao-Wei Meng, Zhi-Zheng Zhang,
+  Ji-Yang Gao, Song Wang, Xiao-Kun Leng, Zhiqiang Xie, Zhen-Yu Zhou, Peng Huang, Wu Yang, Yan-Dong Guo,
+  Yi-Cheng Zhu, Su-Fen Zheng, Hao Cheng, Xin-Xin Ding, Yang Yue, Huan-Qian Wang, Chi Chen, Jin-Li Pang, Yuxi
+  Qian, Hao Geng, Lian-Li Gao, Hai-Yuan Li, Bin Fang, Gao Huang, Yaodong Yang, Hao Dong, He Wang, Hang
+  Zhao, Yadong Mu, Di Hu, Hao Zhao, Tiejun Huang, Shang-Hang Zhang, Yong-Wen Lin, Zhong-Yuan Wang, and
+  Guo-Cai Yao. Robocoin: An open-sourced bimanual robotic data collection for integrated manipulation. ArXiv,
+  abs/2511.17441, 2025b.
+Tong Wu, Shuai Yang, Ryan Po, Yinghao Xu, Ziwei Liu, Dahua Lin, and Gordon Wetzstein. Video world models with
+  long-term spatial memory. Advances in Neural Information Processing Systems, 38:49371–49393, 2026.
+Tianze Xia, Yongkang Li, Lijun Zhou, Jingfeng Yao, Kaixin Xiong, Haiyang Sun, Bing Wang, Kun Ma, Guang Chen,
+  Hangjun Ye, et al. Drivelaw: Unifying planning and video generation in a latent driving world. arXiv preprint
+  arXiv:2512.23421, 2025.
+Tianze Xia, Lijun Zhou, Kaixin Xiong, Jingfeng Yao, Yu Zhu, Zhenxin Zhu, Bing Wang, Guang Chen, Hangjun Ye,
+  Wenyu Liu, et al. Reworld: Learning better representations for world action models. arXiv preprint arXiv:2606.27504,
+  2026.
+Jiacong Xu, Hanwen Jiang, Zhixin Shu, Kalyan Sunkavalli, Vishal M Patel, and Yiqun Mei. Wonder: Video world
+   model done better. arXiv preprint arXiv:2607.26037, 2026a.
+Runsheng Xu, Hubert Lin, Wonseok Jeon, Hao Feng, Yuliang Zou, Liting Sun, John Gorman, Kate Tolstaya, Sarah
+  Tang, Brandyn White, et al. Wod-e2e: Waymo open dataset for end-to-end driving in challenging long-tail scenarios.
+  In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 3709–3718, 2026b.
+Shaoqing Xu, Fang Li, Yuechen Luo, Qimao Chen, Yifan Yang, Zhixiang Duan, Long Chen, and Zhi-xin Yang.
+  World-in-loop: Online correction via event-triggered world models for robust vla policies. In European Conference
+  on Computer Vision, pages 664–681. Springer, 2026c.
+
+
+
+
+                                                         38
+Tao Xu, Runhao Zhang, Zhijian Huang, Jiayi Guan, Jiaxin Wang, Yifan Ding, Yong-Lu Li, Long Chen, Guang Chen,
+  and Jinghui Lu. Univiewvla: A unified multiview vision-language-action model with world modeling. arXiv preprint
+  arXiv:2606.21501, 2026d.
+Ziming Xu, Shuang Liang, Ruobing Han, Ziqiao Xi, Mingxing Rao, Kun Zhou, Zijun Zhang, Yuchen Yan, Yufan
+  Wei, Junbo Huang, et al. Causalwm: Causal chain-of-thought reasoning for embodied world model. arXiv preprint
+  arXiv:2609.23184, 2026e.
+Jiawei Yang, Boris Ivanovic, Or Litany, Xinshuo Weng, Seung Wook Kim, Boyi Li, Tong Che, Danfei Xu, Sanja
+   Fidler, Marco Pavone, et al. Emernerf: Emergent spatial-temporal scene decomposition via self-supervision. In
+  International Conference on Learning Representations, pages 16739–16766, 2024a.
+Jiawei Yang, Jiahui Huang, Yuxiao Chen, Yan Wang, Boyi Li, Yurong You, Apoorva Sharma, Maximilian Igl, Peter
+   Karkus, Danfei Xu, et al. STORM: Spatio-temporal reconstruction model for large-scale outdoor scenes. arXiv
+   preprint arXiv:2501.00602, 2025a.
+Lishan Yang, Wenxuan Song, Xi Wang, Pingyue Sheng, Zheng Fang, Ziyang Zhou, Junjie He, Haodong Yan, Jiayi
+  Chen, Nan Sun, et al. 4d-wam: Infusing spatiotemporal awareness into world action models through trajectory
+  fields. arXiv preprint arXiv:2608.08023, 2026a.
+Shuai Yang, Wei Huang, Ruihang Chu, Yicheng Xiao, Yuyang Zhao, Xianbang Wang, Muyang Li, Enze Xie, Yingcong
+  Chen, Yao Lu, et al. Longlive: Real-time interactive long video generation. arXiv preprint arXiv:2509.22622, 2025b.
+Yuxue Yang, Lue Fan, Ziqi Shi, Junran Peng, Feng Wang, and Zhaoxiang Zhang. Neoverse: Enhancing 4d world model
+  with in-the-wild monocular videos. arXiv preprint arXiv:2601.00393, 2026b.
+Ziyi Yang, Xinyu Gao, Wen Zhou, Shaohui Jiao, Yuqing Zhang, and Xiaogang Jin. Deformable 3d gaussians for
+  high-fidelity monocular dynamic scene reconstruction. In 2024 IEEE/CVF Conference on Computer Vision and
+  Pattern Recognition (CVPR), pages 20331–20341. IEEE, 2024b.
+Zhuoyi Yang, Jiayan Teng, Wendi Zheng, Ming Ding, Shiyu Huang, Jiazheng Xu, Yuanming Yang, Wenyi Hong,
+  Xiaohan Zhang, Guanyu Feng, et al. Cogvideox: Text-to-video diffusion models with an expert transformer. In
+  International Conference on Learning Representations, pages 83048–83077, 2025c.
+Wenhao Yao, Zhenxin Li, Shiyi Lan, Zi Wang, Xinglong Sun, Jose M Alvarez, and Zuxuan Wu. Drivesuprim: Towards
+ precise trajectory selection for end-to-end planning. In Proceedings of the AAAI Conference on Artificial Intelligence,
+ pages 11910–11918, 2026.
+Seonghyeon Ye, Yunhao Ge, Kaiyuan Zheng, Shenyuan Gao, Sihyun Yu, George Kurian, Suneel Indupuru, You Liang
+  Tan, Chuning Zhu, Jiannan Xiang, et al. World action models are zero-shot policies. arXiv preprint arXiv:2602.15922,
+  2026.
+Tianwei Yin, Michaël Gharbi, Richard Zhang, Eli Shechtman, Fredo Durand, William T Freeman, and Taesung Park.
+  One-step diffusion with distribution matching distillation. In 2024 IEEE/CVF Conference on Computer Vision and
+  Pattern Recognition (CVPR), pages 6613–6623. IEEE, 2024.
+Wei Yu, Runjia Qian, Yumeng Li, Liquan Wang, Songheng Yin, Dennis Anthony, Yang Ye, Yidi Li, Weiwei Wan,
+ Animesh Garg, et al. Mosaicmem: Hybrid spatial memory for controllable video world models. arXiv preprint
+ arXiv:2603.17117, 2026.
+Tianyuan Yuan, Zibin Dong, Yicheng Liu, and Hang Zhao. Fast-wam: Do world action models need test-time future
+  imagination? arXiv preprint arXiv:2603.16666, 2026.
+Kai Zeng, Zhanqian Wu, Kaixin Xiong, Xiaobao Wei, Xiangyu Guo, Zhenxin Zhu, Kalok Ho, Lijun Zhou, Bohan Zeng,
+  Ming Lu, et al. Rethinking driving world model as synthetic data generator for perception tasks. arXiv preprint
+ arXiv:2510.19195, 2025.
+Conglang Zhang, Yifan Zhan, Qingjie Wang, Zhanpeng Ouyang, Yu Li, Zihao Yang, Xiaoyang Guo, Weiqiang Ren,
+  Qian Zhang, Zhen Dong, et al. Horizondrive: Self-corrective autoregressive world model for long-horizon driving
+  simulation. arXiv preprint arXiv:2605.11596, 2026.
+Kai Zhang, Sai Bi, Hao Tan, Yuanbo Xiangli, Nanxuan Zhao, Kalyan Sunkavalli, and Zexiang Xu. Gs-lrm: Large
+  reconstruction model for 3d gaussian splatting. In European Conference on Computer Vision, pages 1–19. Springer,
+  2024.
+
+
+
+
+                                                          39
+Kaiwen Zhang, Zhenyu Tang, Xiaotao Hu, Xingang Pan, Xiaoyang Guo, Yuan Liu, Jingwei Huang, Li Yuan, Qian
+  Zhang, Xiao-Xiao Long, Xun Cao, and Wei Yin. Epona: Autoregressive diffusion world model for autonomous
+  driving, 2025.
+Lvmin Zhang, Anyi Rao, and Maneesh Agrawala. Adding conditional control to text-to-image diffusion models. In
+  2023 IEEE/CVF International Conference on Computer Vision (ICCV), pages 3813–3824. IEEE, 2023.
+Min Zhao, Hongzhou Zhu, Kaiwen Zheng, Zihan Zhou, Bokai Yan, Xinyuan Li, Xiao Yang, Chongxuan Li, and Jun Zhu.
+  Causal forcing++: Scalable few-step autoregressive diffusion distillation for real-time interactive video generation.
+ arXiv preprint arXiv:2605.15141, 2026.
+Chaoda Zheng, Sean Li, Jinhao Deng, Zhennan Wang, Shijia Chen, Liqiang Xiao, Ziheng Chi, Hongbin Lin, Kangjie
+  Chen, Boyang Wang, et al. X-world: Controllable ego-centric multi-camera world models for scalable end-to-end
+  driving. arXiv preprint arXiv:2603.19979, 2026.
+Guangcong Zheng, Teng Li, Xianpan Zhou, and Xi Li. Realcam-vid: High-resolution video dataset with dynamic
+ scenes and metric-scale camera movements. arXiv preprint arXiv:2504.08212, 2025.
+Ruiguo Zhong, Benshan Ma, Xiaolong Chen, Lang Zhang, Mingyue Feng, Yaonong Wang, Pei Liu, and Jun Ma.
+  Da-wam: Decision-aligned future latents for driving world models. arXiv preprint arXiv:2608.19085, 2026.
+Fengzhe Zhou, Jiannan Huang, Jialuo Li, Deva Ramanan, and Humphrey Shi. Pai-bench: A comprehensive benchmark
+  for physical ai. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages
+  21522–21536, 2026a.
+Jiawei Zhou, Zhenxin Zhu, Lingyi Du, Linye Lyu, Lijun Zhou, Zhanqian Wu, Hongcheng Luo, Zhuotao Tian, Bing
+  Wang, Guang Chen, et al. Toward physically consistent driving video world models under challenging trajectories.
+  arXiv preprint arXiv:2603.24506, 2026b.
+Lijun Zhou, Hongcheng Luo, Zhenxin Zhu, Cheng Chi, Mingfei Tu, Kaixin Xiong, Lei Gong, Zhanqian Wu, Zehan
+   Zhang, Fangzhen Li, et al. Xiaomi auto world model: A joint world model integrating reconstruction and generation
+   for autonomous driving. arXiv preprint arXiv:2605.18137, 2026c.
+Haoyi Zhu, Yifan Wang, Jianjun Zhou, Wenzheng Chang, Yang Zhou, Zizun Li, Junyi Chen, Chunhua Shen, Jiangmiao
+  Pang, and Tong He. Aether: Geometric-aware unified world modeling. In 2025 IEEE/CVF International Conference
+  on Computer Vision (ICCV), pages 8535–8546. IEEE, 2025.
+Haoyi Zhu, Haozhe Liu, Yuyang Zhao, Tian Ye, Junsong Chen, Jincheng Yu, Tong He, Song Han, and Enze Xie. Sana-
+  wm: Efficient minute-scale world modeling with hybrid linear diffusion transformer. arXiv preprint arXiv:2605.15178,
+  2026a.
+Ziyue Zhu, Zhanqian Wu, Zhenxin Zhu, Lijun Zhou, Haiyang Sun, Bing Wang, Kun Ma, Guang Chen, Hangjun Ye, Jin
+  Xie, et al. Worldsplat: Gaussian-centric feed-forward 4d scene generation for autonomous driving. In International
+  Conference on Learning Representations, pages 68258–68277, 2026b.
+
+
+
+
+                                                          40
+

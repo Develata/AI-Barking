@@ -1,0 +1,415 @@
+robbyant/LingBot-Navi · Datasets at Hugging Face
+
+ Hugging Face [/] 
+ Search models, datasets, users... Ctrl K
+
+ Models [/models]
+
+ Datasets [/datasets]
+
+ Spaces [/spaces]
+
+ Buckets [/storage]
+
+ Docs [/docs]
+
+ Enterprise [/enterprise]
+
+Pricing [/pricing]
+
+ More 
+
+Website
+
+ Tasks [/tasks] 
+
+ HuggingChat [/chat] 
+
+ Collections [/collections] 
+
+ Languages [/languages] 
+
+ Organizations [/organizations] 
+
+Community
+
+ Blog [/blog] 
+
+ Posts [/posts] 
+
+ Daily Papers [/papers] 
+
+ Hardware [/hardware] 
+
+ Learn [/learn] 
+
+ Discord [/join/discord] 
+
+ Forum [https://discuss.huggingface.co/] 
+
+ GitHub [https://github.com/huggingface] 
+
+Solutions
+
+ Team & Enterprise [/enterprise] 
+
+ Hugging Face PRO [/pro] 
+
+ Enterprise Support [/support] 
+
+ Inference Providers [/inference/models] 
+
+ Inference Endpoints [/inference-endpoints] 
+
+ Storage Buckets [/storage] 
+
+Log In [/login]
+
+Sign Up [/join]
+
+ Datasets: [/datasets] 
+
+ [/robbyant] 
+ robbyant [/robbyant] 
+/
+
+LingBot-Navi [/datasets/robbyant/LingBot-Navi] 
+
+ Like 37
+
+Follow
+ Robbyant 623
+
+License: 
+
+ cc-by-nc-sa-4.0 
+
+ Dataset card [/datasets/robbyant/LingBot-Navi] Files Files and versions 
+ xet
+ [/datasets/robbyant/LingBot-Navi/tree/main] Community [/datasets/robbyant/LingBot-Navi/discussions]
+
+ You need to agree to share your Hugging Face information to access this dataset
+
+This repository is publicly accessible, but you have to accept the conditions to access its files and content.
+
+Log in [/login?next=/datasets/robbyant/LingBot-Navi] or Sign Up [/join?next=/datasets/robbyant/LingBot-Navi] to review the conditions and access this dataset content.
+
+Overview [#overview] 
+
+Data collection and reconstruction [#data-collection-and-reconstruction] 
+
+Directory structure [#directory-structure] 
+
+Repository root [#repository-root] 
+
+Per-scene directory [#per-scene-directory] 
+
+Test archive [#test-archive] 
+
+Using the dataset [#using-the-dataset] 
+
+Data formats [#data-formats] 
+
+Rendering 3D Gaussian models [#rendering-3d-gaussian-models] 
+
+Evaluation data [#evaluation-data] 
+
+Tasks and annotations [#tasks-and-annotations] 
+
+Example targets [#example-targets] 
+
+License [#license] 
+
+Citation [#citation] 
+
+LingBot-Navi
+
+This dataset accompanies the LingBot-Navi navigation project [https://github.com/Robbyant/lingbot-navi], which provides the code and usage examples.
+
+Overview [#overview] · Directory structure [#directory-structure] · Using the dataset [#using-the-dataset] · Evaluation data [#evaluation-data] · License and citation [#license]
+
+ [#overview]
+
+ Overview
+
+LingBot-Navi contains 511 real-world 3D scenes. The training split has 475 scenes and the test split has 36. Together they cover seven types of venues and 103,522.67 m² of traversable area. Each scene includes a 3D Gaussian Splatting (3DGS) model for rendering color views, a triangle mesh for rendering depth, and a 2D navigation grid that marks traversable space.
+
+ [https://huggingface.co/datasets/robbyant/LingBot-Navi-Test/resolve/4fe806a936efbdedfd636a4bf0de615f0f713f63/assets/scene-examples.png]
+
+ [https://huggingface.co/datasets/robbyant/LingBot-Navi-Test/resolve/4fe806a936efbdedfd636a4bf0de615f0f713f63/assets/scene-statistics.png]
+
+Venue types (left). Commercial venues (142 scenes) and institutional venues (129 scenes) together account for 53% of the dataset.
+
+Traversable area (right). The mean is 202.59 m² per scene, the median is 167.02 m², and the largest scene has 1,242.99 m² of traversable space.
+
+ [#data-collection-and-reconstruction]
+
+ Data collection and reconstruction
+
+ [https://huggingface.co/datasets/robbyant/LingBot-Navi-Test/resolve/4fe806a936efbdedfd636a4bf0de615f0f713f63/assets/3dgs-dataflow-visual-lidar-joint-ba.svg]
+
+A handheld rig captures LiDAR scans, inertial measurements and high-resolution panoramic images for batch processing in the cloud. SLAM and joint visual–LiDAR bundle adjustment estimate globally consistent poses and geometry. A model masks moving content in the input images. LiDAR and visual observation rays provide the surface mesh and 2D occupancy grid. Geometry-guided training then produces the 3DGS model.
+
+ [#directory-structure]
+
+ Directory structure
+
+ [#repository-root]
+
+ Repository root
+
+Training scenes are distributed across 13 archives. A separate test archive contains the evaluation scenes and tasks. All resources for a given scene are in one archive, so each archive can be downloaded and extracted independently.
+
+File
+Contents
+
+lingbot-navi-3dgs-test.tar.zst
+36 evaluation scenes, tasks, object models, target annotations and a manifest.
+
+lingbot-navi-3dgs-train-01.tar.zst through lingbot-navi-3dgs-train-13.tar.zst
+475 training scenes, with 36–38 scenes per archive.
+
+checksums.sha256
+Filenames and SHA-256 checksums for all 14 archives.
+
+ [#per-scene-directory]
+
+ Per-scene directory
+
+Both splits store scenes under scenes/<scene_id>/. The scene manifest records resource paths. Scene models are under background/ and the navigation grid is under navigation/.
+
+scenes/
+└── <scene_id>/
+ ├── scene.json
+ ├── background/
+ │ ├── splat.ply # 3D Gaussian model
+ │ └── mesh.ply # Scene surface mesh
+ └── navigation/
+ ├── occupancy.json # Bounds, resolution and state encoding
+ └── occupancy.npz # Navigation grid array
+
+ [#test-archive]
+
+ Test archive
+
+After extracting lingbot-navi-3dgs-test.tar.zst, consult the root manifest.json for relative paths, sizes and SHA-256 checksums. Static tasks are grouped by scene. Dynamic tasks are grouped by scene and task chain.
+
+<extracted-test-root>/
+├── manifest.json
+├── scenes/<scene_id>/ # 3DGS, mesh and navigation grid
+├── tasks/
+│ ├── static/<scene_id>.json # Static tasks for one scene
+│ └── placements/
+│ ├── index.json # Dynamic task-chain index
+│ └── <scene_id>/<episode_id>/
+│ ├── tasks.json # Instructions, goal order and state changes
+│ ├── scene_before.json # Initial object placements
+│ └── scene_after.json # Updated object placements
+├── objects/
+│ ├── objects.json # Registry, normalization and credits
+│ └── models/<asset_uid>.glb # Object model used for placement
+├── static_annotations/
+│ ├── atlas.json
+│ └── <scene_id>/<target_id>/
+│ ├── region.json
+│ └── visibility.npz
+└── dynamic_annotations/
+ ├── atlas.json
+ └── <scene_id>/<source_episode_id>/<before-or-after>/<pair_id>/
+ ├── region.json # Region metadata for this state
+ └── visibility.npz # Visibility grid for this state
+
+The state directory shown as <before-or-after> is named before or after.
+
+ [#using-the-dataset]
+
+ Using the dataset
+
+ [#data-formats]
+
+ Data formats
+
+The training archives contain scene models and navigation grids. The test archive uses the same scene format and adds navigation tasks, object models and target visibility annotations.
+
+ [#scene-files-in-both-splits]
+
+ Scene files in both splits
+
+Read scenes/<scene_id>/scene.json and resolve its resource paths from the extracted archive root, the directory containing scenes/. For example, assets.splat already contains scenes/<scene_id>/background/splat.ply. If package_root is a Python Path pointing to the extraction root, use package_root / scene["assets"]["splat"].
+
+For readability, the following table gives paths relative to the scene directory, omitting scenes/<scene_id>/.
+
+Use
+File
+Contents
+
+Render color views
+background/splat.ply
+3D Gaussian model of scene appearance
+
+Render depth
+background/mesh.ply
+Triangle mesh of the scene surface
+
+Locate grid cells
+navigation/occupancy.json
+Grid bounds, row and column layout, and resolution
+
+Check traversability
+navigation/occupancy.npz
+In the state array, 1 indicates traversable space and 0 covers obstacles and unknown space.
+
+ [#evaluation-files-in-the-test-archive]
+
+ Evaluation files in the test archive
+
+You can download the test archive from LingBot-Navi-Test [https://huggingface.co/datasets/robbyant/LingBot-Navi-Test] without requesting access. The paths below are relative to the extracted archive root. Its manifest.json lists the evaluation files and their checksums.
+
+ [#static-tasks]
+
+ Static tasks
+
+Read the goal order and instructions. Open tasks/static/<scene_id>.json and read episodes[].goals.
+
+Locate the target’s visible region. Find static_annotations/<scene_id>/<target_id>/ using the scene and target IDs. Align the local visibility mask in visibility.npz to the scene grid using the row and column offsets in region.json.
+
+ [#dynamic-tasks]
+
+ Dynamic tasks
+
+Select a task chain. Look up its directory in tasks/placements/index.json, then read the instructions and state-change events (scene_events) in tasks.json.
+
+Load placements and models. In the task directory, scene_before.json and scene_after.json record the two placements. Look up each object by asset_uid in objects/objects.json and load objects/models/<asset_uid>.glb.
+
+Match annotations across states. Use task_chains in dynamic_annotations/atlas.json to find the annotation directory for each state. Match the two annotations by pair_id. Each contains region.json and visibility.npz.
+
+ [#task-poses-in-both-task-types]
+
+ Task poses in both task types
+
+Coordinates. Task poses use the Habitat world coordinate system, with Y up and lengths in meters.
+
+Rotation. Quaternion components are ordered [x, y, z, w].
+
+Alignment. When overlaying scene geometry and task poses, use coordinates.source_to_habitat from scene.json to transform the geometry into Habitat coordinates.
+
+ [#rendering-3d-gaussian-models]
+
+ Rendering 3D Gaussian models
+
+ [#rendering-example]
+
+ Rendering example
+
+Extract the archive containing the scene and locate scenes/<scene_id>/background/splat.ply.
+
+To render an RGB image from a specified camera pose, follow the 3DGS rendering example in LingBot-Navi [https://github.com/Robbyant/lingbot-navi#3dgs-rendering-example].
+
+ [#notes-for-other-renderers]
+
+ Notes for other renderers
+
+Gaussian sorting. During rasterization, sort by distance from each Gaussian center to the camera center (radial sorting). This reproduces the alpha-blending order used in training. The default in gsplat is camera-space Z sorting.
+
+Visibility outside the field of view. Some camera models produce invalid projection Jacobians outside their field of view. Gaussian tails can then project into the image and create haze. Mask regions outside the camera model’s valid range before computing the Jacobian.
+
+Edges of pinhole images. At large angles to the optical axis, the projection Jacobian changes rapidly across a Gaussian. Approximating the whole Gaussian with the Jacobian at its center can produce an excessively large footprint near the image edge. Constrain these footprints in the renderer. Implementations such as SuperSplat and three.js discard Gaussians with unusually large projections, which can partly mitigate the issue.
+
+ [#evaluation-data]
+
+ Evaluation data
+
+ [#tasks-and-annotations]
+
+ Tasks and annotations
+
+Metric
+Static
+Dynamic
+Total
+
+Task sequences
+360
+150
+510
+
+Instructions
+1,497
+1,105
+2,602
+
+A static sequence is one episode, and a dynamic sequence is one task chain. Each request counts as one instruction. All 2,602 instructions are available in English, and 2,596 are also available in Chinese.
+
+Static targets. The annotations cover 385 targets within the scenes.
+
+Dynamic placements. The tasks use 45 object models. Each of the 193 placement pairs has a before-state and an after-state annotation, for 386 annotations in total.
+
+Dynamic task chains. There are 75 single-object chains and 75 two-object chains. Of the 1,105 dynamic instructions, 225 ask for a target previously requested in the same chain.
+
+ [#example-targets]
+
+ Example targets
+
+Static targets · Blue arcade machine, fire extinguisher and hotel vases.
+
+Dynamic targets · Shopping mall bench and digital piano. Each pair shows the initial placement on the left and the updated placement on the right.
+
+ [#license]
+
+ License
+
+The dataset repository is licensed under CC BY-NC-SA 4.0.
+
+The 45 third-party object models in the test archive retain their respective licenses. The GLB files are in objects/models/. Use the asset_uid in each filename to look up the creator, source link and license in objects/objects.json.
+
+CC BY 4.0 · 44 models
+
+objects/models/
+├── 0318ad51a7294885b452ff4f408353ba.glb # Globe · Chris Torres
+├── 1198ef61edb04eaeadc0ed22541f0796.glb # Table lamp · RedHorn
+├── 90151fb0fb294e56b45e52b001a884db.glb # Wooden chess set · cmzw
+├── 6470ac1ca16f4769b65055a461bfe57a.glb # Suitcase · MMKH
+└── … # 40 additional CC BY 4.0 models
+
+CC0 1.0 · 1 model
+
+objects/models/
+└── 0c3fcd7771574e63aa252d02712e80d6.glb # Cup-shaped vase · The Smithsonian Institution
+
+ [#citation]
+
+ Citation
+
+@misc{lingbot_navi_dataset,
+ title = {{LingBot-Navi}},
+ howpublished = {Hugging Face dataset repository},
+ url = {https://huggingface.co/datasets/robbyant/LingBot-Navi}
+}
+
+ Copy to bucket 
+
+ More actions 
+
+Downloads last month
+
+292
+
+Total file size:
+
+2.77 TB
+
+ Collection including robbyant/LingBot-Navi
+
+LingBot-Navi
+
+ Collection
+
+ 3 items • Updated 2 days ago • 4
+ [/collections/robbyant/lingbot-navi]
+
+ System theme 
+
+Company
+ TOS [/terms-of-service] Privacy [/privacy] About [/huggingface] Careers [https://apply.workable.com/huggingface/] [/] 
+Website
+ Models [/models] Datasets [/datasets] Spaces [/spaces] Pricing [/pricing] Docs [/docs]
